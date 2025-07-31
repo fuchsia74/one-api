@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/logger"
 )
 
@@ -42,7 +44,7 @@ func DebugChannelModelConfigs(channelId int) error {
 					logger.Logger.Info(fmt.Sprintf("  %s: max_tokens=%d", modelName, config.MaxTokens))
 				}
 			} else {
-				logger.Logger.Error(fmt.Sprintf("ModelConfigs parsing failed: %s", err.Error()))
+				logger.Logger.Error("ModelConfigs parsing failed", zap.Error(err))
 			}
 		}
 	} else {
@@ -59,7 +61,7 @@ func DebugChannelModelConfigs(channelId int) error {
 				logger.Logger.Info(fmt.Sprintf("  %s: %.6f", modelName, ratio))
 			}
 		} else {
-			logger.Logger.Error(fmt.Sprintf("ModelRatio parsing failed: %s", err.Error()))
+			logger.Logger.Error("ModelRatio parsing failed", zap.Error(err))
 		}
 	} else {
 		logger.Logger.Info("ModelRatio: empty or null")
@@ -75,7 +77,7 @@ func DebugChannelModelConfigs(channelId int) error {
 				logger.Logger.Info(fmt.Sprintf("  %s: %.2f", modelName, ratio))
 			}
 		} else {
-			logger.Logger.Error(fmt.Sprintf("CompletionRatio parsing failed: %s", err.Error()))
+			logger.Logger.Error("CompletionRatio parsing failed", zap.Error(err))
 		}
 	} else {
 		logger.Logger.Info("CompletionRatio: empty or null")
@@ -99,7 +101,7 @@ func DebugAllChannelModelConfigs() error {
 		var fullChannel Channel
 		err := DB.Where("id = ?", channel.Id).First(&fullChannel).Error
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to load channel %d: %s", channel.Id, err.Error()))
+			logger.Logger.Error("Failed to load channel", zap.Int("channel_id", channel.Id), zap.Error(err))
 			continue
 		}
 
@@ -187,7 +189,7 @@ func FixChannelModelConfigs(channelId int) error {
 		"completion_ratio": channel.CompletionRatio,
 	}).Error
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to save fixed data: %s", err.Error()))
+		logger.Logger.Error("Failed to save fixed data", zap.Error(err))
 		return err
 	}
 	logger.Logger.Info("Fixed data saved to database")
@@ -231,7 +233,7 @@ func CleanAllMixedModelData() error {
 					logger.Logger.Info(fmt.Sprintf("Cleaning mixed data for channel %d", channel.Id))
 					err := FixChannelModelConfigs(channel.Id)
 					if err != nil {
-						logger.Logger.Error(fmt.Sprintf("Failed to clean channel %d: %s", channel.Id, err.Error()))
+						logger.Logger.Error("Failed to clean channel", zap.Int("channel_id", channel.Id), zap.Error(err))
 					} else {
 						cleanedCount++
 					}
@@ -361,14 +363,14 @@ func ValidateAllChannelModelConfigs() error {
 			// Validate unified format
 			var configs map[string]ModelConfigLocal
 			if err := json.Unmarshal([]byte(*channel.ModelConfigs), &configs); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Channel %d: Invalid ModelConfigs JSON: %s", channel.Id, err.Error()))
+				logger.Logger.Error("Channel: Invalid ModelConfigs JSON", zap.Int("channel_id", channel.Id), zap.Error(err))
 				issueCount++
 				continue
 			}
 
 			// Validate each model config
 			if err := channel.validateModelPriceConfigs(configs); err != nil {
-				logger.Logger.Error(fmt.Sprintf("Channel %d: Invalid ModelConfigs data: %s", channel.Id, err.Error()))
+				logger.Logger.Error("Channel: Invalid ModelConfigs data", zap.Int("channel_id", channel.Id), zap.Error(err))
 				issueCount++
 				continue
 			}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
@@ -55,7 +56,7 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info(err.Error())
+		logger.Logger.Info("Unable to connect to Lark server", zap.Error(err))
 		return nil, errors.New("Unable to connect to Lark server, please try again later!")
 	}
 	defer res.Body.Close()
@@ -71,7 +72,7 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", oAuthResponse.AccessToken))
 	res2, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info(err.Error())
+		logger.Logger.Info("Unable to connect to Lark server for user info", zap.Error(err))
 		return nil, errors.New("Unable to connect to Lark server, please try again later!")
 	}
 	var larkUser LarkUser

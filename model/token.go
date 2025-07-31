@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"gorm.io/gorm"
 
 	"github.com/songquanpeng/one-api/common"
@@ -40,7 +41,7 @@ func clearTokenCache(key string) {
 	if common.RedisEnabled {
 		err := common.RedisDel(fmt.Sprintf("token:%s", key))
 		if err != nil {
-			logger.Logger.Error("failed to clear token cache: " + err.Error())
+			logger.Logger.Error("failed to clear token cache", zap.String("key", key), zap.Error(err))
 		}
 	}
 }
@@ -74,7 +75,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 	}
 	token, err = CacheGetTokenByKey(key)
 	if err != nil {
-		logger.Logger.Error("CacheGetTokenByKey failed: " + err.Error())
+		logger.Logger.Error("CacheGetTokenByKey failed", zap.String("key", key), zap.Error(err))
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.Wrap(err, "token not found")
 		}
@@ -94,7 +95,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			token.Status = TokenStatusExpired
 			err := token.SelectUpdate()
 			if err != nil {
-				logger.Logger.Error("failed to update token status" + err.Error())
+				logger.Logger.Error("failed to update token status", zap.Int("token_id", token.Id), zap.Error(err))
 			}
 		} else {
 			// If Redis is enabled, the cache will be updated by the next fetch
@@ -112,7 +113,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			token.Status = TokenStatusExhausted
 			err := token.SelectUpdate()
 			if err != nil {
-				logger.Logger.Error("failed to update token status" + err.Error())
+				logger.Logger.Error("failed to update token status", zap.Int("token_id", token.Id), zap.Error(err))
 			}
 		} else {
 			// If Redis IS enabled, and token is exhausted, we should clear it.
@@ -234,7 +235,7 @@ func increaseTokenQuota(id int, quota int64) (err error) {
 		if fetchErr == nil && token != nil {
 			clearTokenCache(token.Key)
 		} else if fetchErr != nil {
-			logger.Logger.Error(fmt.Sprintf("failed to fetch token %d for cache clearing after quota increase: %s", id, fetchErr.Error()))
+			logger.Logger.Error("failed to fetch token for cache clearing after quota increase", zap.Int("token_id", id), zap.Error(fetchErr))
 		}
 	}
 	return err
@@ -265,7 +266,7 @@ func decreaseTokenQuota(id int, quota int64) (err error) {
 		if fetchErr == nil && token != nil {
 			clearTokenCache(token.Key)
 		} else if fetchErr != nil {
-			logger.Logger.Error(fmt.Sprintf("failed to fetch token %d for cache clearing after quota decrease: %s", id, fetchErr.Error()))
+			logger.Logger.Error("failed to fetch token for cache clearing after quota decrease", zap.Int("token_id", id), zap.Error(fetchErr))
 		}
 	}
 	return err
@@ -295,7 +296,7 @@ func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 		go func() {
 			email, err := GetUserEmail(token.UserId)
 			if err != nil {
-				logger.Logger.Error("failed to fetch user email: " + err.Error())
+				logger.Logger.Error("failed to fetch user email", zap.Int("user_id", token.UserId), zap.Error(err))
 			}
 			prompt := "Quota Reminder"
 			var contentText string
@@ -321,7 +322,7 @@ func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 				)
 				err = message.SendEmail(prompt, email, content)
 				if err != nil {
-					logger.Logger.Error("failed to send email: " + err.Error())
+					logger.Logger.Error("failed to send email", zap.String("email", email), zap.Error(err))
 				}
 			}
 		}()

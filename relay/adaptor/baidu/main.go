@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
@@ -158,7 +159,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var baiduResponse ChatStreamResponse
 		err := json.Unmarshal([]byte(data), &baiduResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 		if baiduResponse.Usage.TotalTokens != 0 {
@@ -169,12 +170,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		response := streamResponseBaidu2OpenAI(&baiduResponse)
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error(err.Error())
+			logger.Logger.Error("error rendering stream response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		logger.Logger.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)

@@ -544,7 +544,7 @@ func (channel *Channel) UpdateResponseTime(responseTime int64) {
 		ResponseTime: int(responseTime),
 	}).Error
 	if err != nil {
-		logger.Logger.Error("failed to update response time: " + err.Error())
+		logger.Logger.Error("failed to update response time", zap.Error(err))
 	}
 }
 
@@ -554,7 +554,7 @@ func (channel *Channel) UpdateBalance(balance float64) {
 		Balance:            balance,
 	}).Error
 	if err != nil {
-		logger.Logger.Error("failed to update balance: " + err.Error())
+		logger.Logger.Error("failed to update balance", zap.Error(err))
 	}
 }
 
@@ -652,11 +652,11 @@ func (channel *Channel) SetCompletionRatio(completionRatio map[string]float64) e
 func UpdateChannelStatusById(id int, status int) {
 	err := UpdateAbilityStatus(id, status == ChannelStatusEnabled)
 	if err != nil {
-		logger.Logger.Error("failed to update ability status: " + err.Error())
+		logger.Logger.Error("failed to update ability status", zap.Error(err))
 	}
 	err = DB.Model(&Channel{}).Where("id = ?", id).Update("status", status).Error
 	if err != nil {
-		logger.Logger.Error("failed to update channel status: " + err.Error())
+		logger.Logger.Error("failed to update channel status", zap.Error(err))
 	}
 	if err == nil {
 		InitChannelCache()
@@ -1099,8 +1099,10 @@ func MigrateAllChannelModelConfigs() error {
 		if channel.ModelConfigs != nil && *channel.ModelConfigs != "" && *channel.ModelConfigs != "{}" {
 			err := channel.MigrateModelConfigsToModelPrice()
 			if err != nil {
+				logger.Logger.Error("Failed to migrate ModelConfigs for channel",
+					zap.Int("channel_id", channel.Id),
+					zap.Error(err))
 				errorMsg := fmt.Sprintf("Failed to migrate ModelConfigs for channel %d: %s", channel.Id, err.Error())
-				logger.Logger.Error(errorMsg)
 				migrationErrors = append(migrationErrors, errorMsg)
 				errorCount++
 				continue
@@ -1112,8 +1114,10 @@ func MigrateAllChannelModelConfigs() error {
 		// Second, migrate historical ModelRatio/CompletionRatio data to ModelConfigs
 		err := channel.MigrateHistoricalPricingToModelConfigs()
 		if err != nil {
+			logger.Logger.Error("Failed to migrate historical pricing for channel",
+				zap.Int("channel_id", channel.Id),
+				zap.Error(err))
 			errorMsg := fmt.Sprintf("Failed to migrate historical pricing for channel %d: %s", channel.Id, err.Error())
-			logger.Logger.Error(errorMsg)
 			migrationErrors = append(migrationErrors, errorMsg)
 			errorCount++
 			continue
@@ -1132,8 +1136,10 @@ func MigrateAllChannelModelConfigs() error {
 			// Validate the final result before saving
 			finalConfigs := channel.GetModelPriceConfigs()
 			if err := channel.validateModelPriceConfigs(finalConfigs); err != nil {
+				logger.Logger.Error("Migration validation failed for channel",
+					zap.Int("channel_id", channel.Id),
+					zap.Error(err))
 				errorMsg := fmt.Sprintf("Migration validation failed for channel %d: %s", channel.Id, err.Error())
-				logger.Logger.Error(errorMsg)
 				migrationErrors = append(migrationErrors, errorMsg)
 				errorCount++
 				// Restore original data
@@ -1147,8 +1153,10 @@ func MigrateAllChannelModelConfigs() error {
 
 			err = tx.Model(channel).Update("model_configs", channel.ModelConfigs).Error
 			if err != nil {
+				logger.Logger.Error("Failed to save migrated ModelConfigs for channel",
+					zap.Int("channel_id", channel.Id),
+					zap.Error(err))
 				errorMsg := fmt.Sprintf("Failed to save migrated ModelConfigs for channel %d: %s", channel.Id, err.Error())
-				logger.Logger.Error(errorMsg)
 				migrationErrors = append(migrationErrors, errorMsg)
 				errorCount++
 				continue

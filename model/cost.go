@@ -1,11 +1,11 @@
 package model
 
 import (
-	"fmt"
 	"math/rand"
 	"sync"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -71,6 +71,6 @@ func removeOldRequestCost() {
 		Where("created_time < ?", helper.GetTimestamp()-3600*24*7).
 		Delete(&UserRequestCost{}).Error
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("failed to remove old request cost: %s", err.Error()))
+		logger.Logger.Error("failed to remove old request cost", zap.Error(err))
 	}
 }

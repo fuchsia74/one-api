@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
@@ -133,7 +134,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var ollamaResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &ollamaResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 
@@ -146,12 +147,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		response := streamResponseOllama2OpenAI(&ollamaResponse)
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error(err.Error())
+			logger.Logger.Error("error rendering response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		logger.Logger.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)

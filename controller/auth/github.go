@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
@@ -51,7 +52,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info(err.Error())
+		logger.Logger.Info("Unable to connect to GitHub server", zap.Error(err))
 		return nil, errors.New("Unable to connect to GitHub server, please try again later!")
 	}
 	defer res.Body.Close()
@@ -67,7 +68,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", oAuthResponse.AccessToken))
 	res2, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info(err.Error())
+		logger.Logger.Info("Unable to connect to GitHub server for user info", zap.Error(err))
 		return nil, errors.New("Unable to connect to GitHub server, please try again later!")
 	}
 	defer res2.Body.Close()

@@ -87,7 +87,7 @@ func Relay(c *gin.Context) {
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
 	if err := shouldRetry(c, bizErr.StatusCode); err != nil {
-		logger.Logger.Error(fmt.Sprintf("relay error happen, won't retry since of %v", err.Error()))
+		logger.Logger.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
 		retryTimes = 0
 	}
 

@@ -72,7 +72,7 @@ func main() {
 	// Initialize Redis
 	err = common.InitRedisClient()
 	if err != nil {
-		logger.Logger.Fatal("failed to initialize Redis: " + err.Error())
+		logger.Logger.Fatal("failed to initialize Redis", zap.Error(err))
 	}
 
 	// Initialize options
@@ -94,7 +94,7 @@ func main() {
 	if os.Getenv("CHANNEL_TEST_FREQUENCY") != "" {
 		frequency, err := strconv.Atoi(os.Getenv("CHANNEL_TEST_FREQUENCY"))
 		if err != nil {
-			logger.Logger.Fatal("failed to parse CHANNEL_TEST_FREQUENCY: " + err.Error())
+			logger.Logger.Fatal("failed to parse CHANNEL_TEST_FREQUENCY", zap.Error(err))
 		}
 		go controller.AutomaticallyTestChannels(frequency)
 	}
@@ -111,13 +111,13 @@ func main() {
 	if config.EnablePrometheusMetrics {
 		startTime := time.Unix(common.StartTime, 0)
 		if err := monitor.InitPrometheusMonitoring(common.Version, startTime.Format(time.RFC3339), runtime.Version(), startTime); err != nil {
-			logger.Logger.Fatal("failed to initialize Prometheus monitoring: " + err.Error())
+			logger.Logger.Fatal("failed to initialize Prometheus monitoring", zap.Error(err))
 		}
 		logger.Logger.Info("Prometheus monitoring initialized")
 
 		// Initialize database monitoring
 		if err := model.InitPrometheusDBMonitoring(); err != nil {
-			logger.Logger.Fatal("failed to initialize database monitoring: " + err.Error())
+			logger.Logger.Fatal("failed to initialize database monitoring", zap.Error(err))
 		}
 
 		// Initialize Redis monitoring if enabled
@@ -201,6 +201,6 @@ func main() {
 	logger.Logger.Info(fmt.Sprintf("server started on http://localhost:%s", port))
 	err = server.Run(":" + port)
 	if err != nil {
-		logger.Logger.Fatal("failed to start HTTP server: " + err.Error())
+		logger.Logger.Fatal("failed to start HTTP server", zap.Error(err))
 	}
 }

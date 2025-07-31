@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -221,7 +222,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 	rawResponse := w.Body.String()
 	_, responseMessage, err = parseTestResponse(rawResponse)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("failed to parse error: %s, \nresponse: %s", err.Error(), rawResponse))
+		logger.Logger.Error("failed to parse error", zap.Error(err), zap.String("response", rawResponse))
 		return "", err, nil
 	}
 	result := w.Result()
@@ -335,7 +336,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 		if notify {
 			err := message.Notify(message.ByAll, "Channel test completed", "", "Channel test completed, if you have not received the disable notification, it means that all channels are normal")
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("failed to send notify: %s", err.Error()))
+				logger.Logger.Error("failed to send notify", zap.Error(err))
 			}
 		}
 	}()

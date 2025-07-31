@@ -3,6 +3,8 @@ package monitor
 import (
 	"fmt"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
@@ -13,7 +15,7 @@ func notifyRootUser(subject string, content string) {
 	if config.MessagePusherAddress != "" {
 		err := message.SendMessage(subject, content, content)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("failed to send message: %s", err.Error()))
+			logger.Logger.Error("failed to send message", zap.Error(err))
 		} else {
 			return
 		}
@@ -23,7 +25,7 @@ func notifyRootUser(subject string, content string) {
 	}
 	err := message.SendEmail(subject, config.RootUserEmail, content)
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("failed to send email: %s", err.Error()))
+		logger.Logger.Error("failed to send email", zap.String("email", config.RootUserEmail), zap.Error(err))
 	}
 }
 

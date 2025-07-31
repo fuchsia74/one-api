@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common/random"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
@@ -52,7 +53,7 @@ func RenderPrompt(messages []relaymodel.Message) string {
 	var buf bytes.Buffer
 	err := promptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
 	if err != nil {
-		logger.Logger.Error("error rendering prompt messages: " + err.Error())
+		logger.Logger.Error("error rendering prompt messages", zap.Error(err))
 	}
 	return buf.String()
 }
@@ -184,7 +185,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			var llamaResp StreamResponse
 			err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(&llamaResp)
 			if err != nil {
-				logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+				logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
 				return false
 			}
 
@@ -201,7 +202,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			response.Created = createdTime
 			jsonStr, err := json.Marshal(response)
 			if err != nil {
-				logger.Logger.Error("error marshalling stream response: " + err.Error())
+				logger.Logger.Error("error marshalling stream response", zap.Error(err))
 				return true
 			}
 			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})

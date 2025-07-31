@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/render"
 
@@ -57,7 +59,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		var response openai.ChatCompletionsStreamResponse
 		err := json.Unmarshal([]byte(data), &response)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 		for _, v := range response.Choices {
@@ -68,12 +70,12 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		response.Model = modelName
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error(err.Error())
+			logger.Logger.Error("error rendering stream response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		logger.Logger.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)

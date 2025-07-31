@@ -6,8 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/songquanpeng/one-api/common/config"
 	"github.com/Laisky/zap"
+
+	"github.com/songquanpeng/one-api/common/config"
 )
 
 func TestSetupEnhancedLogger(t *testing.T) {

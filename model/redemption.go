@@ -83,7 +83,7 @@ func Redeem(ctx context.Context, key string, userId int) (quota int64, err error
 		return err
 	})
 	if err != nil {
-		return 0, errors.New("Redeem failed, " + err.Error())
+		return 0, errors.Wrap(err, "Redeem failed")
 	}
 	RecordLog(ctx, userId, LogTypeTopup, fmt.Sprintf("Recharged %s using redemption code", common.LogQuota(redemption.Quota)))
 	return redemption.Quota, nil

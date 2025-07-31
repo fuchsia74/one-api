@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/logger"
 )
 
@@ -17,7 +19,7 @@ var GroupRatio = map[string]float64{
 func GroupRatio2JSONString() string {
 	jsonBytes, err := json.Marshal(GroupRatio)
 	if err != nil {
-		logger.Logger.Error("error marshalling model ratio: " + err.Error())
+		logger.Logger.Error("error marshalling model ratio", zap.Error(err))
 	}
 	return string(jsonBytes)
 }

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/driver/sqlite"
@@ -117,7 +118,7 @@ func InitDB() {
 	var err error
 	DB, err = chooseDB("SQL_DSN")
 	if err != nil {
-		logger.Logger.Fatal("failed to initialize database: " + err.Error())
+		logger.Logger.Fatal("failed to initialize database", zap.Error(err))
 		return
 	}
 
@@ -138,20 +139,20 @@ func InitDB() {
 
 	logger.Logger.Info("database migration started")
 	if err = migrateDB(); err != nil {
-		logger.Logger.Fatal("failed to migrate database: " + err.Error())
+		logger.Logger.Fatal("failed to migrate database", zap.Error(err))
 		return
 	}
 	logger.Logger.Info("database migrated")
 
 	// Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
 	if err = MigrateChannelFieldsToText(); err != nil {
-		logger.Logger.Error("failed to migrate channel field types: " + err.Error())
+		logger.Logger.Error("failed to migrate channel field types", zap.Error(err))
 		// Don't fail startup for this migration, just log the error
 	}
 
 	// Migrate existing ModelConfigs data from old format to new format
 	if err = MigrateAllChannelModelConfigs(); err != nil {
-		logger.Logger.Error("failed to migrate channel ModelConfigs: " + err.Error())
+		logger.Logger.Error("failed to migrate channel ModelConfigs", zap.Error(err))
 		// Don't fail startup for this migration, just log the error
 	}
 }
@@ -195,7 +196,7 @@ func InitLogDB() {
 	var err error
 	LOG_DB, err = chooseDB("LOG_SQL_DSN")
 	if err != nil {
-		logger.Logger.Fatal("failed to initialize secondary database: " + err.Error())
+		logger.Logger.Fatal("failed to initialize secondary database", zap.Error(err))
 		return
 	}
 
@@ -208,7 +209,7 @@ func InitLogDB() {
 	logger.Logger.Info("secondary database migration started")
 	err = migrateLOGDB()
 	if err != nil {
-		logger.Logger.Fatal("failed to migrate secondary database: " + err.Error())
+		logger.Logger.Fatal("failed to migrate secondary database", zap.Error(err))
 		return
 	}
 	logger.Logger.Info("secondary database migrated")
@@ -225,7 +226,7 @@ func migrateLOGDB() error {
 func setDBConns(db *gorm.DB) *sql.DB {
 	sqlDB, err := db.DB()
 	if err != nil {
-		logger.Logger.Fatal("failed to connect database: " + err.Error())
+		logger.Logger.Fatal("failed to connect database", zap.Error(err))
 		return nil
 	}
 
