@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"encoding/base64"
 	"fmt"
@@ -38,15 +39,18 @@ import (
 var buildFS embed.FS
 
 func main() {
+	ctx := context.Background()
+
 	common.Init()
 	logger.SetupLogger()
+
+	// Setup enhanced logger with alertPusher integration
+	logger.SetupEnhancedLogger(ctx)
+
 	logger.Logger.Info(fmt.Sprintf("One API %s started", common.Version))
 
 	if os.Getenv("GIN_MODE") != gin.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
-	}
-	if config.DebugEnabled {
-		logger.Logger.Info("running in debug mode")
 	}
 
 	// Initialize SQL Database
@@ -132,9 +136,6 @@ func main() {
 	if err := i18n.Init(); err != nil {
 		logger.Logger.Fatal("failed to initialize i18n", zap.Error(err))
 	}
-
-	// Ensure logger is initialized
-	logger.SetupLogger()
 
 	logLevel := glog.LevelInfo
 	if config.DebugEnabled {

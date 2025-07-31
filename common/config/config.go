@@ -192,6 +192,11 @@ var GeminiVersion = env.String("GEMINI_VERSION", "v1")
 
 var OnlyOneLogFile = env.Bool("ONLY_ONE_LOG_FILE", false)
 
+// Alert pusher configuration for logging system
+var LogPushAPI = env.String("LOG_PUSH_API", "")
+var LogPushType = env.String("LOG_PUSH_TYPE", "")
+var LogPushToken = env.String("LOG_PUSH_TOKEN", "")
+
 var RelayProxy = env.String("RELAY_PROXY", "")
 var UserContentRequestProxy = env.String("USER_CONTENT_REQUEST_PROXY", "")
 var UserContentRequestTimeout = env.Int("USER_CONTENT_REQUEST_TIMEOUT", 30)
