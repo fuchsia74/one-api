@@ -62,7 +62,25 @@ func getPromptTokens(ctx context.Context, textRequest *relaymodel.GeneralOpenAIR
 		return openai.CountTokenInput(textRequest.Prompt, textRequest.Model)
 	case relaymode.Moderations:
 		return openai.CountTokenInput(textRequest.Input, textRequest.Model)
+	case relaymode.Embeddings:
+		// Use ParseInput to properly handle both string and array inputs
+		inputs := textRequest.ParseInput()
+		totalTokens := 0
+		for _, input := range inputs {
+			totalTokens += openai.CountTokenText(input, textRequest.Model)
+		}
+		return totalTokens
+	case relaymode.Rerank:
+		return openai.CountTokenInput(textRequest.Input, textRequest.Model)
+	case relaymode.Edits:
+		return openai.CountTokenInput(textRequest.Instruction, textRequest.Model)
+	default:
+		// Log error for unhandled relay modes that should have billing
+		logger.Logger.Error("getPromptTokens: unhandled relay mode without billing logic",
+			zap.Int("relayMode", relayMode),
+			zap.String("model", textRequest.Model))
 	}
+
 	return 0
 }
 

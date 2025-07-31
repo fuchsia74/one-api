@@ -3,42 +3,39 @@ package relaymode
 import "strings"
 
 func GetByPath(path string) int {
-	relayMode := Unknown
-	if strings.HasPrefix(path, "/v1/oneapi/proxy") {
-		relayMode = Proxy
-	} else if strings.HasPrefix(path, "/v1/responses") {
-		relayMode = ResponseAPI
-	} else if strings.HasPrefix(path, "/v1/messages") {
-		relayMode = ClaudeMessages
-	} else if strings.HasPrefix(path, "/v1/chat/completions") {
-		relayMode = ChatCompletions
-	} else if strings.HasPrefix(path, "/v1/completions") {
-		relayMode = Completions
-	} else if strings.HasPrefix(path, "/v1/embeddings") {
-		relayMode = Embeddings
-	} else if strings.HasPrefix(path, "/v1/rerank") {
-		relayMode = Rerank
-	} else if strings.HasSuffix(path, "/rerank") {
-		relayMode = Rerank
-	} else if strings.HasSuffix(path, "/rerankers") {
-		relayMode = Rerank
-	} else if strings.HasSuffix(path, "embeddings") {
-		relayMode = Embeddings
-	} else if strings.HasPrefix(path, "/v1/moderations") {
-		relayMode = Moderations
-	} else if strings.HasPrefix(path, "/v1/images/generations") {
-		relayMode = ImagesGenerations
-	} else if strings.HasPrefix(path, "/v1/edits") {
-		relayMode = Edits
-	} else if strings.HasPrefix(path, "/v1/audio/speech") {
-		relayMode = AudioSpeech
-	} else if strings.HasPrefix(path, "/v1/audio/transcriptions") {
-		relayMode = AudioTranscription
-	} else if strings.HasPrefix(path, "/v1/audio/translations") {
-		relayMode = AudioTranslation
-	} else if strings.HasPrefix(path, "/v1/images/edits") {
-		relayMode = ImagesEdits
+	switch {
+	case strings.HasPrefix(path, "/v1/oneapi/proxy"):
+		return Proxy
+	case strings.HasPrefix(path, "/v1/responses"):
+		return ResponseAPI
+	case strings.HasPrefix(path, "/v1/messages"):
+		return ClaudeMessages
+	case strings.HasPrefix(path, "/v1/chat/completions"):
+		return ChatCompletions
+	case strings.HasPrefix(path, "/v1/completions"):
+		return Completions
+	case strings.HasPrefix(path, "/v1/embeddings"),
+		strings.HasSuffix(path, "embeddings"):
+		return Embeddings
+	case strings.HasPrefix(path, "/v1/rerank"),
+		strings.HasSuffix(path, "/rerank"),
+		strings.HasSuffix(path, "/rerankers"):
+		return Rerank
+	case strings.HasPrefix(path, "/v1/moderations"):
+		return Moderations
+	case strings.HasPrefix(path, "/v1/images/generations"):
+		return ImagesGenerations
+	case strings.HasPrefix(path, "/v1/edits"):
+		return Edits
+	case strings.HasPrefix(path, "/v1/audio/speech"):
+		return AudioSpeech
+	case strings.HasPrefix(path, "/v1/audio/transcriptions"):
+		return AudioTranscription
+	case strings.HasPrefix(path, "/v1/audio/translations"):
+		return AudioTranslation
+	case strings.HasPrefix(path, "/v1/images/edits"):
+		return ImagesEdits
+	default:
+		return Unknown
 	}
-
-	return relayMode
 }
