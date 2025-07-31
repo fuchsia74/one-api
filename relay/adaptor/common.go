@@ -8,10 +8,12 @@ import (
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	gutils "github.com/Laisky/go-utils/v5"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/meta"
 )
 
@@ -52,8 +54,25 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	if err != nil {
 		return nil, errors.Wrap(err, "setup request header failed")
 	}
+
+	// Log upstream request for billing tracking
+	logger.Logger.Info("sending request to upstream channel",
+		zap.String("url", fullRequestURL),
+		zap.Int("channelId", meta.ChannelId),
+		zap.Int("userId", meta.UserId),
+		zap.String("model", meta.ActualModelName),
+		zap.String("channelName", a.GetChannelName()))
+
 	resp, err := DoRequest(c, req)
 	if err != nil {
+		// Log failed upstream request as ERROR for billing tracking
+		logger.Logger.Error("upstream request failed - potential unbilled request",
+			zap.Error(err),
+			zap.String("url", fullRequestURL),
+			zap.Int("channelId", meta.ChannelId),
+			zap.Int("userId", meta.UserId),
+			zap.String("model", meta.ActualModelName),
+			zap.String("channelName", a.GetChannelName()))
 		return nil, errors.Wrap(err, "do request failed")
 	}
 	return resp, nil

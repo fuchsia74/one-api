@@ -674,7 +674,11 @@ func UpdateChannelUsedQuota(id int, quota int64) {
 func updateChannelUsedQuota(id int, quota int64) {
 	err := DB.Model(&Channel{}).Where("id = ?", id).Update("used_quota", gorm.Expr("used_quota + ?", quota)).Error
 	if err != nil {
-		logger.Logger.Error("failed to update channel used quota", zap.Error(err))
+		logger.Logger.Error("failed to update channel used quota - channel statistics may be inaccurate",
+			zap.Error(err),
+			zap.Int("channelId", id),
+			zap.Int64("quota", quota),
+			zap.String("note", "billing completed successfully but channel usage statistics update failed"))
 	}
 }
 

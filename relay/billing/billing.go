@@ -19,7 +19,11 @@ func ReturnPreConsumedQuota(ctx context.Context, preConsumedQuota int64, tokenId
 			// return pre-consumed quota
 			err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
 			if err != nil {
-				logger.Logger.Error("error return pre-consumed quota", zap.Error(err))
+				logger.Logger.Warn("failed to return pre-consumed quota - cleanup operation failed",
+					zap.Error(err),
+					zap.Int("tokenId", tokenId),
+					zap.Int64("preConsumedQuota", preConsumedQuota),
+					zap.String("note", "main billing already completed successfully"))
 			}
 		}(ctx)
 	}
@@ -54,11 +58,24 @@ func PostConsumeQuota(ctx context.Context, tokenId int, quotaDelta int64, totalQ
 	// quotaDelta is remaining quota to be consumed
 	err := model.PostConsumeTokenQuota(tokenId, quotaDelta)
 	if err != nil {
-		logger.Logger.Error("error consuming token remain quota: " + err.Error())
+		logger.Logger.Error("CRITICAL: upstream request was sent but billing failed - unbilled request detected",
+			zap.Error(err),
+			zap.Int("tokenId", tokenId),
+			zap.Int("userId", userId),
+			zap.Int("channelId", channelId),
+			zap.String("model", modelName),
+			zap.Int64("quotaDelta", quotaDelta),
+			zap.Int64("totalQuota", totalQuota))
 	}
 	err = model.CacheUpdateUserQuota(ctx, userId)
 	if err != nil {
-		logger.Logger.Error("error update user quota cache: " + err.Error())
+		logger.Logger.Warn("user quota cache update failed - billing completed successfully",
+			zap.Error(err),
+			zap.Int("userId", userId),
+			zap.Int("channelId", channelId),
+			zap.String("model", modelName),
+			zap.Int64("totalQuota", totalQuota),
+			zap.String("note", "database billing succeeded, cache will be refreshed on next request"))
 	}
 	// totalQuota is total quota consumed
 	// Always log the request for tracking purposes, regardless of quota amount
@@ -132,13 +149,26 @@ func PostConsumeQuotaDetailed(ctx context.Context, tokenId int, quotaDelta int64
 	// quotaDelta is remaining quota to be consumed
 	err := model.PostConsumeTokenQuota(tokenId, quotaDelta)
 	if err != nil {
-		logger.Logger.Error("error consuming token remain quota: " + err.Error())
+		logger.Logger.Error("CRITICAL: upstream request was sent but billing failed - unbilled request detected",
+			zap.Error(err),
+			zap.Int("tokenId", tokenId),
+			zap.Int("userId", userId),
+			zap.Int("channelId", channelId),
+			zap.String("model", modelName),
+			zap.Int64("quotaDelta", quotaDelta),
+			zap.Int64("totalQuota", totalQuota))
 		metrics.GlobalRecorder.RecordBillingError("database_error", "post_consume_token_quota", userId, channelId, modelName)
 		billingSuccess = false
 	}
 	err = model.CacheUpdateUserQuota(ctx, userId)
 	if err != nil {
-		logger.Logger.Error("error update user quota cache: " + err.Error())
+		logger.Logger.Warn("user quota cache update failed - billing completed successfully",
+			zap.Error(err),
+			zap.Int("userId", userId),
+			zap.Int("channelId", channelId),
+			zap.String("model", modelName),
+			zap.Int64("totalQuota", totalQuota),
+			zap.String("note", "database billing succeeded, cache will be refreshed on next request"))
 		metrics.GlobalRecorder.RecordBillingError("cache_error", "update_user_quota_cache", userId, channelId, modelName)
 		billingSuccess = false
 	}

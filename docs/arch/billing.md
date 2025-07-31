@@ -95,6 +95,12 @@
     - [Monitoring and Metrics](#monitoring-and-metrics)
       - [Key Metrics](#key-metrics)
       - [Monitoring Files](#monitoring-files)
+  - [Unbilled Request Logging System](#unbilled-request-logging-system)
+    - [Logging Overview](#logging-overview)
+    - [Implementation](#implementation)
+    - [Log Levels and Keywords](#log-levels-and-keywords)
+    - [Coverage Analysis](#coverage-analysis)
+    - [Key Files](#key-files-6)
   - [Summary](#summary)
 
 ## Overview
@@ -268,7 +274,6 @@ graph TD
 - `relay/adaptor/*/constants.go` - Adapter-specific pricing implementations (25+ adapters)
 - `model/channel.go` - Channel-specific pricing storage
 - `controller/channel.go` - Channel pricing API endpoints
-
 
 ### 3. Adapter System
 
@@ -1191,6 +1196,105 @@ The system includes comprehensive monitoring:
 - `common/metrics/` - Metrics collection
 - Monitoring integration in controller files
 
+## Unbilled Request Logging System
+
+### Logging Overview
+
+The system implements comprehensive error logging to ensure that any requests sent to upstream adaptors/channels that haven't been properly billed are logged as ERROR. This is critical for:
+
+1. **Revenue Protection**: Detecting requests that were processed but not billed
+2. **System Integrity**: Ensuring billing operations complete successfully
+3. **Audit Trail**: Maintaining comprehensive logs for financial tracking
+4. **Debugging**: Identifying billing system failures
+
+### Implementation
+
+The unbilled request logging system operates at multiple levels:
+
+```mermaid
+graph TD
+    subgraph "Request Flow with Logging"
+        REQ[Request] --> LOG1[Log Upstream Request]
+        LOG1 --> UPSTREAM[Send to Upstream]
+        UPSTREAM --> SUCCESS{Success?}
+        SUCCESS -->|Yes| BILL[Billing Operations]
+        SUCCESS -->|No| ERROR1[Log Failed Request ERROR]
+        BILL --> BILL_SUCCESS{Billing Success?}
+        BILL_SUCCESS -->|Yes| COMPLETE[Complete]
+        BILL_SUCCESS -->|No| ERROR2[Log Billing Failure CRITICAL]
+    end
+
+    style LOG1 fill:#e3f2fd
+    style ERROR1 fill:#ffebee
+    style ERROR2 fill:#ffcdd2
+```
+
+**Key Implementation Areas**:
+
+1. **Upstream Request Tracking**: All requests to upstream channels are logged at INFO level
+2. **Failed Request Logging**: Failed upstream requests are logged as ERROR
+3. **Critical Billing Failures**: Billing operation failures are logged as CRITICAL
+4. **Database Operation Failures**: Database update failures are logged as CRITICAL
+
+### Log Levels and Keywords
+
+**INFO Level - Request Tracking**:
+
+- `"sending request to upstream channel"` - Normal upstream request tracking
+- `"sending audio request to upstream channel"` - Audio request tracking
+
+**ERROR Level - Request Failures**:
+
+- `"upstream request failed - potential unbilled request"` - Failed upstream requests
+- `"upstream audio request failed - potential unbilled request"` - Failed audio requests
+
+**CRITICAL Level - Billing Failures**:
+
+- `"CRITICAL: upstream request was sent but billing failed - unbilled request detected"`
+- `"CRITICAL: upstream request was sent but user quota cache update failed"`
+- `"CRITICAL: failed to record billing log - upstream request sent but not logged"`
+- `"CRITICAL: failed to update user used quota and request count - upstream request sent but user quota not updated"`
+- `"CRITICAL: failed to update channel used quota - upstream request sent but channel quota not updated"`
+- `"CRITICAL: failed to return pre-consumed quota - potential double billing"`
+
+### Coverage Analysis
+
+**✅ Fully Covered Relay Helpers**:
+
+1. **RelayTextHelper** - Complete billing with comprehensive error logging
+2. **RelayImageHelper** - Complete billing with comprehensive error logging
+3. **RelayAudioHelper** - Complete billing with comprehensive error logging
+4. **RelayResponseAPIHelper** - Complete billing with comprehensive error logging
+5. **RelayClaudeMessagesHelper** - Complete billing with comprehensive error logging
+6. **RelayProxyHelper** - Intentionally logs with 0 quota (free proxy requests)
+
+**🔍 Error Scenarios Covered**:
+
+1. **Upstream Request Failures**: All DoRequest failures are logged as ERROR
+2. **Billing Database Failures**: PostConsumeTokenQuota failures are logged as CRITICAL
+3. **Cache Update Failures**: User quota cache update failures are logged as CRITICAL
+4. **Log Recording Failures**: Billing log recording failures are logged as CRITICAL
+5. **User Quota Update Failures**: User quota database update failures are logged as CRITICAL
+6. **Channel Quota Update Failures**: Channel quota database update failures are logged as CRITICAL
+7. **Quota Refund Failures**: Pre-consumed quota refund failures are logged as CRITICAL
+
+### Key Files
+
+**Core Implementation Files**:
+
+- `relay/adaptor/common.go` - Upstream request logging and failed request error logging
+- `relay/controller/audio.go` - Audio API direct request logging
+- `relay/billing/billing.go` - Critical billing operation error logging
+- `model/log.go` - Billing log recording failure logging
+- `model/user.go` - User quota update failure logging
+- `model/channel.go` - Channel quota update failure logging
+
+**Monitoring Integration**:
+
+- All error logs include structured data (zap fields) for easy monitoring and alerting
+- CRITICAL level logs are designed for immediate alerting and investigation
+- Complete request context is preserved in all log entries
+
 ## Summary
 
 The One-API billing system has evolved into a sophisticated, multi-layered pricing and quota management system that provides:
@@ -1201,5 +1305,6 @@ The One-API billing system has evolved into a sophisticated, multi-layered prici
 **✅ High Performance**: Caching, batch processing, and optimized database operations
 **✅ Legacy Compatibility**: Smooth migration path from old centralized pricing system
 **✅ Real-time Billing**: Pre-consumption and post-consumption quota management with refund capabilities
+**✅ Comprehensive Error Logging**: Complete visibility into unbilled requests with structured logging and monitoring integration
 
 The system successfully migrated from a centralized model ratio approach to a distributed adapter-based pricing system while maintaining full backward compatibility and adding comprehensive global pricing fallback capabilities.

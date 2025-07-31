@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"gorm.io/gorm"
 
 	"github.com/songquanpeng/one-api/common"
@@ -433,7 +434,12 @@ func updateUserUsedQuotaAndRequestCount(id int, quota int64, count int) {
 		},
 	).Error
 	if err != nil {
-		logger.Logger.Error("failed to update user used quota and request count: " + err.Error())
+		logger.Logger.Error("failed to update user used quota and request count - statistics may be inaccurate",
+			zap.Error(err),
+			zap.Int("userId", id),
+			zap.Int64("quota", quota),
+			zap.Int("count", count),
+			zap.String("note", "billing completed successfully but usage statistics update failed"))
 	}
 }
 

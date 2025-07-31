@@ -70,7 +70,19 @@ func recordLogHelper(ctx context.Context, log *Log) {
 	log.RequestId = requestId
 	err := LOG_DB.Create(log).Error
 	if err != nil {
-		logger.Logger.Error("failed to record log", zap.Error(err))
+		// For billing logs (consume type), this is critical as it means we sent upstream request but failed to log it
+		if log.Type == LogTypeConsume {
+			logger.Logger.Error("failed to record billing log - audit trail incomplete",
+				zap.Error(err),
+				zap.Int("userId", log.UserId),
+				zap.Int("channelId", log.ChannelId),
+				zap.String("model", log.ModelName),
+				zap.Int("quota", log.Quota),
+				zap.String("requestId", log.RequestId),
+				zap.String("note", "billing completed successfully but log recording failed"))
+		} else {
+			logger.Logger.Error("failed to record log", zap.Error(err))
+		}
 		return
 	}
 	logger.Logger.Info("record log",
