@@ -70,16 +70,26 @@ oneapi:
   environment:
     # (optional) SESSION_SECRET set a fixed session secret so that user sessions won't be invalidated after server restart
     SESSION_SECRET: xxxxxxx
-    # (optional) DEBUG enable debug mode
-    DEBUG: "true"
-    # (optional) DEBUG_SQL display SQL logs
-    DEBUG_SQL: "true"
     # (optional) If you access one-api using a non-HTTPS address, you need to set DISABLE_COOKIE_SECURE to true
     DISABLE_COOKIE_SECURE: "true"
+
+    # (optional) DEBUG enable debug mode
+    DEBUG: "true"
+
+    # (optional) DEBUG_SQL display SQL logs
+    DEBUG_SQL: "true"
+    # (optional) REDIS_CONN_STRING set REDIS cache connection
+    REDIS_CONN_STRING: redis://100.122.41.16:6379/1
+    # (optional) SQL_DSN set SQL database connection,
+    # default is sqlite3, support mysql, postgresql, sqlite3
+    SQL_DSN: "postgres://laisky:xxxxxxx@1.2.3.4/oneapi"
+
     # (optional) ENFORCE_INCLUDE_USAGE require upstream API responses to include usage field
     ENFORCE_INCLUDE_USAGE: "true"
+
     # (optional) MAX_ITEMS_PER_PAGE maximum items per page, default is 10
     MAX_ITEMS_PER_PAGE: 10
+
     # (optional) GLOBAL_API_RATE_LIMIT maximum API requests per IP within three minutes, default is 1000
     GLOBAL_API_RATE_LIMIT: 1000
     # (optional) GLOBAL_WEB_RATE_LIMIT maximum web page requests per IP within three minutes, default is 1000
@@ -88,16 +98,25 @@ oneapi:
     GLOBAL_RELAY_RATE_LIMIT: 1000
     # (optional) Whether to ratelimit for channel, 0 is unlimited, 1 is to enable the ratelimit
     GLOBAL_CHANNEL_RATE_LIMIT: 1
-    # (optional) REDIS_CONN_STRING set REDIS cache connection
-    REDIS_CONN_STRING: redis://100.122.41.16:6379/1
+
     # (optional) FRONTEND_BASE_URL redirect page requests to specified address, server-side setting only
     FRONTEND_BASE_URL: https://oneapi.laisky.com
+
     # (optional) OPENROUTER_PROVIDER_SORT set sorting method for OpenRouter Providers, default is throughput
     OPENROUTER_PROVIDER_SORT: throughput
+
     # (optional) CHANNEL_SUSPEND_SECONDS_FOR_429 set the duration for channel suspension when receiving 429 error, default is 60 seconds
     CHANNEL_SUSPEND_SECONDS_FOR_429: 60
+
     # (optional) DEFAULT_MAX_TOKEN set the default maximum number of tokens for requests, default is 2048
     DEFAULT_MAX_TOKEN: 2048
+
+    # (optional) LOG_PUSH_API set the API address for pushing error logs to telegram.
+    # More information about log push can be found at: https://github.com/Laisky/laisky-blog-graphql/tree/master/internal/web/telegram
+    LOG_PUSH_API: "https://gq.laisky.com/query/"
+    LOG_PUSH_TYPE: "oneapi"
+    LOG_PUSH_TOKEN: "xxxxxxx"
+
   volumes:
     - /var/lib/oneapi:/data
   ports:
