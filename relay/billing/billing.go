@@ -201,7 +201,11 @@ func PostConsumeQuotaDetailed(ctx context.Context, tokenId int, quotaDelta int64
 		model.UpdateChannelUsedQuota(channelId, totalQuota)
 	}
 	if totalQuota <= 0 {
-		logger.Logger.Error(fmt.Sprintf("totalQuota consumed is %d, something is wrong", totalQuota))
+		logger.Logger.Error("invalid totalQuota consumed - something is wrong",
+			zap.Int64("total_quota", totalQuota),
+			zap.Int("user_id", userId),
+			zap.Int("channel_id", channelId),
+			zap.String("model_name", modelName))
 		metrics.GlobalRecorder.RecordBillingError("calculation_error", "post_consume_detailed", userId, channelId, modelName)
 		billingSuccess = false
 	}

@@ -579,7 +579,7 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		// Let ErrorWrapper handle the logging to avoid duplicate logging
 		return ErrorWrapper(err, "read_stream_failed", http.StatusInternalServerError), responseText, usage
 	}
 
@@ -747,7 +747,7 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		// Let ErrorWrapper handle the logging to avoid duplicate logging
 		return ErrorWrapper(err, "read_stream_failed", http.StatusInternalServerError), responseText, usage
 	}
 

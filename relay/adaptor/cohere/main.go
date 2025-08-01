@@ -184,6 +184,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 	err := resp.Body.Close()
 	if err != nil {
+		// Let ErrorWrapper handle the logging to avoid duplicate logging
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 

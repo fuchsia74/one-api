@@ -10,12 +10,10 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
-	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/controller"
 	"github.com/songquanpeng/one-api/model"
 )
@@ -56,8 +54,8 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info("Unable to connect to Lark server", zap.Error(err))
-		return nil, errors.New("Unable to connect to Lark server, please try again later!")
+		// Return error without logging - let the caller decide whether to log
+		return nil, errors.Wrapf(err, "unable to connect to Lark server")
 	}
 	defer res.Body.Close()
 	var oAuthResponse LarkOAuthResponse
@@ -72,8 +70,8 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", oAuthResponse.AccessToken))
 	res2, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info("Unable to connect to Lark server for user info", zap.Error(err))
-		return nil, errors.New("Unable to connect to Lark server, please try again later!")
+		// Return error without logging - let the caller decide whether to log
+		return nil, errors.Wrapf(err, "unable to connect to Lark server for user info")
 	}
 	var larkUser LarkUser
 	err = json.NewDecoder(res2.Body).Decode(&larkUser)

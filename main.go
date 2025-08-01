@@ -47,7 +47,7 @@ func main() {
 	// Setup enhanced logger with alertPusher integration
 	logger.SetupEnhancedLogger(ctx)
 
-	logger.Logger.Info(fmt.Sprintf("One API %s started", common.Version))
+	logger.Logger.Info("One API started", zap.String("version", common.Version))
 
 	if os.Getenv("GIN_MODE") != gin.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
@@ -198,7 +198,7 @@ func main() {
 	if port == "" {
 		port = strconv.Itoa(*common.Port)
 	}
-	logger.Logger.Info(fmt.Sprintf("server started on http://localhost:%s", port))
+	logger.Logger.Info("server started", zap.String("address", "http://localhost:"+port))
 	err = server.Run(":" + port)
 	if err != nil {
 		logger.Logger.Fatal("failed to start HTTP server", zap.Error(err))

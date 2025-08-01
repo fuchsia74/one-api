@@ -38,8 +38,8 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 	}
 
 	if aliTaskResponse.Message != "" {
-		logger.Logger.Error("aliAsyncTask err: " + string(responseBody))
-		return openai.ErrorWrapper(errors.New(aliTaskResponse.Message), "ali_async_task_failed", http.StatusInternalServerError), nil
+		// Let ErrorWrapper handle the logging to avoid duplicate logging
+		return openai.ErrorWrapper(errors.Errorf("ali async task failed: %s", aliTaskResponse.Message), "ali_async_task_failed", http.StatusInternalServerError), nil
 	}
 
 	aliResponse, _, err := asyncTaskWait(aliTaskResponse.Output.TaskId, apiKey)

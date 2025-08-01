@@ -35,7 +35,6 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// get & validate Response API request
 	responseAPIRequest, err := getAndValidateResponseAPIRequest(c)
 	if err != nil {
-		logger.Logger.Error("getAndValidateResponseAPIRequest failed", zap.Error(err))
 		return openai.ErrorWrapper(err, "invalid_response_api_request", http.StatusBadRequest)
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
@@ -87,7 +86,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// do request
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
-		logger.Logger.Error("DoRequest failed", zap.Error(err))
+		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 
@@ -100,7 +99,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
 	if respErr != nil {
-		logger.Logger.Error("DoResponse failed", zap.Any("error", *respErr))
+		// DoResponse already logs errors internally, so we don't need to log it here
 		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
 		return respErr
 	}

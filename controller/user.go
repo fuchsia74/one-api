@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	gcrypto "github.com/Laisky/go-utils/v5/crypto"
 	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
@@ -15,6 +16,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/i18n"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
@@ -139,11 +141,7 @@ func SetupLogin(user *model.User, c *gin.Context) {
 	session.Set("status", user.Status)
 	err := session.Save()
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Unable to save login session information: %+v", err))
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Unable to save login session information, please try again",
-			"success": false,
-		})
+		helper.RespondError(c, errors.Wrap(err, "unable to save login session information"))
 		return
 	}
 

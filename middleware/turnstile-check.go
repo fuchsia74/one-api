@@ -5,12 +5,11 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/Laisky/zap"
+	"github.com/Laisky/errors/v2"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 )
 
 type turnstileCheckResponse struct {
@@ -41,41 +40,24 @@ func TurnstileCheck() gin.HandlerFunc {
 				"remoteip": {c.ClientIP()},
 			})
 			if err != nil {
-				logger.Logger.Error("turnstile check request failed", zap.Error(err))
-				c.JSON(http.StatusOK, gin.H{
-					"success": false,
-					"message": err.Error(),
-				})
-				c.Abort()
+				AbortWithError(c, http.StatusOK, errors.Wrap(err, "turnstile check request failed"))
 				return
 			}
 			defer rawRes.Body.Close()
 			var res turnstileCheckResponse
 			err = json.NewDecoder(rawRes.Body).Decode(&res)
 			if err != nil {
-				logger.Logger.Error("turnstile response decode failed", zap.Error(err))
-				c.JSON(http.StatusOK, gin.H{
-					"success": false,
-					"message": err.Error(),
-				})
-				c.Abort()
+				AbortWithError(c, http.StatusOK, errors.Wrap(err, "turnstile response decode failed"))
 				return
 			}
 			if !res.Success {
-				c.JSON(http.StatusOK, gin.H{
-					"success": false,
-					"message": "Turnstile verification failed, please refresh and try again!",
-				})
-				c.Abort()
+				AbortWithError(c, http.StatusOK, errors.New("turnstile verification failed"))
 				return
 			}
 			session.Set("turnstile", true)
 			err = session.Save()
 			if err != nil {
-				c.JSON(http.StatusOK, gin.H{
-					"message": "Unable to save turnsite session information, please try again",
-					"success": false,
-				})
+				AbortWithError(c, http.StatusOK, errors.Wrap(err, "unable to save turnstile session information"))
 				return
 			}
 		}

@@ -41,7 +41,7 @@ func clearTokenCache(key string) {
 	if common.RedisEnabled {
 		err := common.RedisDel(fmt.Sprintf("token:%s", key))
 		if err != nil {
-			logger.Logger.Error("failed to clear token cache", zap.String("key", key), zap.Error(err))
+			logger.Logger.Warn("failed to clear token cache, continuing", zap.String("key", key), zap.Error(err))
 		}
 	}
 }
@@ -75,20 +75,22 @@ func ValidateUserToken(key string) (token *Token, err error) {
 	}
 	token, err = CacheGetTokenByKey(key)
 	if err != nil {
-		logger.Logger.Error("CacheGetTokenByKey failed", zap.String("key", key), zap.Error(err))
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.Wrap(err, "token not found")
+			return nil, errors.Wrapf(err, "token not found for key: %s", key)
 		}
 
-		return nil, errors.Wrap(err, "failed to get token by key")
+		return nil, errors.Wrapf(err, "failed to get token by key: %s", key)
 	}
-	if token.Status == TokenStatusExhausted {
-		return nil, fmt.Errorf("API Key %s (#%d) quota has been exhausted", token.Name, token.Id)
-	} else if token.Status == TokenStatusExpired {
-		return nil, errors.New("The token has expired")
+
+	switch token.Status {
+	case TokenStatusExhausted:
+		return nil, errors.Errorf("API Key %s (#%d) quota has been exhausted", token.Name, token.Id)
+	case TokenStatusExpired:
+		return nil, errors.Errorf("token %s (#%d) has expired", token.Name, token.Id)
 	}
+
 	if token.Status != TokenStatusEnabled {
-		return nil, errors.New("The token status is not available")
+		return nil, errors.Errorf("token %s (#%d) status is not available (status: %d)", token.Name, token.Id, token.Status)
 	}
 	if token.ExpiredTime != -1 && token.ExpiredTime < helper.GetTimestamp() {
 		if !common.RedisEnabled {
@@ -105,7 +107,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			// So, if Redis IS enabled, and token is expired, we should clear it.
 			clearTokenCache(token.Key)
 		}
-		return nil, errors.New("The token has expired")
+		return nil, errors.Errorf("token %s (#%d) has expired at timestamp %d", token.Name, token.Id, token.ExpiredTime)
 	}
 	if !token.UnlimitedQuota && token.RemainQuota <= 0 {
 		if !common.RedisEnabled {
@@ -119,29 +121,34 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			// If Redis IS enabled, and token is exhausted, we should clear it.
 			clearTokenCache(token.Key)
 		}
-		return nil, errors.New("The token quota has been used up")
+		return nil, errors.Errorf("token %s (#%d) quota has been used up (remaining: %d)", token.Name, token.Id, token.RemainQuota)
 	}
+
 	return token, nil
 }
 
 func GetTokenByIds(id int, userId int) (*Token, error) {
 	if id == 0 || userId == 0 {
-		return nil, errors.New("id or userId is empty!")
+		return nil, errors.Errorf("invalid parameters: id=%d, userId=%d", id, userId)
 	}
 	token := Token{Id: id, UserId: userId}
-	var err error = nil
-	err = DB.First(&token, "id = ? and user_id = ?", id, userId).Error
-	return &token, err
+	err := DB.First(&token, "id = ? and user_id = ?", id, userId).Error
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get token by id=%d and userId=%d", id, userId)
+	}
+	return &token, nil
 }
 
 func GetTokenById(id int) (*Token, error) {
 	if id == 0 {
-		return nil, errors.New("id is empty!")
+		return nil, errors.Errorf("invalid token id: %d", id)
 	}
 	token := Token{Id: id}
-	var err error = nil
-	err = DB.First(&token, "id = ?", id).Error
-	return &token, err
+	err := DB.First(&token, "id = ?", id).Error
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get token by id=%d", id)
+	}
+	return &token, nil
 }
 
 func (t *Token) Insert() error {
@@ -194,21 +201,25 @@ func (t *Token) GetModels() string {
 func DeleteTokenById(id int, userId int) (err error) {
 	// Why we need userId here? In case user want to delete other's token.
 	if id == 0 || userId == 0 {
-		return errors.New("id or userId is empty!")
+		return errors.Errorf("invalid parameters: id=%d, userId=%d", id, userId)
 	}
 	token := Token{Id: id, UserId: userId}
 	err = DB.Where(token).First(&token).Error
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to find token for deletion: id=%d, userId=%d", id, userId)
 	}
 	// The key is now populated in token object
 	// token.Delete() will handle clearing the cache
-	return token.Delete()
+	err = token.Delete()
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete token: id=%d, userId=%d", id, userId)
+	}
+	return nil
 }
 
 func IncreaseTokenQuota(id int, quota int64) (err error) {
 	if quota < 0 {
-		return errors.New("quota cannot be negative!")
+		return errors.Errorf("quota cannot be negative: %d", quota)
 	}
 	if config.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeTokenQuota, id, quota)
@@ -243,7 +254,7 @@ func increaseTokenQuota(id int, quota int64) (err error) {
 
 func DecreaseTokenQuota(id int, quota int64) (err error) {
 	if quota < 0 {
-		return errors.New("quota cannot be negative!")
+		return errors.Errorf("quota cannot be negative: %d", quota)
 	}
 	if config.BatchUpdateEnabled {
 		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
@@ -274,21 +285,21 @@ func decreaseTokenQuota(id int, quota int64) (err error) {
 
 func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 	if quota < 0 {
-		return errors.New("quota cannot be negative!")
+		return errors.Errorf("quota cannot be negative: %d", quota)
 	}
 	token, err := GetTokenById(tokenId)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get token for pre-consume: tokenId=%d", tokenId)
 	}
 	if !token.UnlimitedQuota && token.RemainQuota < quota {
-		return errors.New("Insufficient token quota")
+		return errors.Errorf("insufficient token quota: required=%d, available=%d, tokenId=%d", quota, token.RemainQuota, tokenId)
 	}
 	userQuota, err := GetUserQuota(token.UserId)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to get user quota for pre-consume: userId=%d, tokenId=%d", token.UserId, tokenId)
 	}
 	if userQuota < quota {
-		return errors.New("Insufficient user quota")
+		return errors.Errorf("insufficient user quota: required=%d, available=%d, userId=%d, tokenId=%d", quota, userQuota, token.UserId, tokenId)
 	}
 	quotaTooLow := userQuota >= config.QuotaRemindThreshold && userQuota-quota < config.QuotaRemindThreshold
 	noMoreQuota := userQuota-quota <= 0

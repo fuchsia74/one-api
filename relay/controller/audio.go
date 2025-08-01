@@ -229,15 +229,8 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
-		// Log failed upstream request as ERROR for billing tracking
-		logger.Logger.Error("upstream audio request failed - potential unbilled request",
-			zap.Error(err),
-			zap.String("url", fullRequestURL),
-			zap.Int("channelId", channelId),
-			zap.Int("userId", userId),
-			zap.String("model", audioModel),
-			zap.Int("relayMode", relayMode))
-		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
+		// Let ErrorWrapper handle the logging to avoid duplicate logging
+		return openai.ErrorWrapper(errors.Wrapf(err, "upstream audio request failed for channel %d", channelId), "do_request_failed", http.StatusInternalServerError)
 	}
 
 	err = req.Body.Close()

@@ -191,7 +191,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	meta := metalib.GetByContext(c)
 	imageRequest, err := getImageRequest(c, meta.Mode)
 	if err != nil {
-		logger.Logger.Error("getImageRequest failed", zap.Error(err))
+		// Let ErrorWrapper handle the logging to avoid duplicate logging
 		return openai.ErrorWrapper(err, "invalid_image_request", http.StatusBadRequest)
 	}
 
@@ -305,7 +305,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// do request
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
-		logger.Logger.Error("DoRequest failed", zap.Error(err))
+		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 
@@ -359,7 +359,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
 	if respErr != nil {
-		logger.Logger.Error("respErr is not nil", zap.Any("error", respErr))
+		// Return error without logging - respErr is already an ErrorWithStatusCode that will be handled by the caller
 		return respErr
 	}
 

@@ -301,7 +301,13 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 }
 
 func processChannelRelayError(ctx context.Context, userId int, channelId int, channelName string, group string, originalModel string, err model.ErrorWithStatusCode) {
-	logger.Logger.Error(fmt.Sprintf("relay error (channel id %d, name %s, user_id %d, group: %s, model: %s): %s", channelId, channelName, userId, group, originalModel, err.Message))
+	logger.Logger.Error("relay error",
+		zap.Int("channel_id", channelId),
+		zap.String("channel_name", channelName),
+		zap.Int("user_id", userId),
+		zap.String("group", group),
+		zap.String("model", originalModel),
+		zap.String("error_message", err.Message))
 
 	// Handle 400 errors differently - they are client request issues, not channel problems
 	if err.StatusCode == http.StatusBadRequest {

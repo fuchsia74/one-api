@@ -65,15 +65,9 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 
 	resp, err := DoRequest(c, req)
 	if err != nil {
-		// Log failed upstream request as ERROR for billing tracking
-		logger.Logger.Error("upstream request failed - potential unbilled request",
-			zap.Error(err),
-			zap.String("url", fullRequestURL),
-			zap.Int("channelId", meta.ChannelId),
-			zap.Int("userId", meta.UserId),
-			zap.String("model", meta.ActualModelName),
-			zap.String("channelName", a.GetChannelName()))
-		return nil, errors.Wrap(err, "do request failed")
+		// Return error without logging - let the calling ErrorWrapper function handle logging
+		// This prevents duplicate logging when ErrorWrapper also logs the error
+		return nil, errors.Wrapf(err, "upstream request failed for channel %s (id: %d)", a.GetChannelName(), meta.ChannelId)
 	}
 	return resp, nil
 }

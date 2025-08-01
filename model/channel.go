@@ -98,25 +98,27 @@ func SearchChannels(keyword string) (channels []*Channel, err error) {
 
 func GetChannelById(id int, selectAll bool) (*Channel, error) {
 	channel := Channel{Id: id}
-	var err error = nil
+	var err error
 	if selectAll {
 		err = DB.First(&channel, "id = ?", id).Error
 	} else {
 		err = DB.Omit("key").First(&channel, "id = ?", id).Error
 	}
-	return &channel, err
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get channel by id=%d, selectAll=%t", id, selectAll)
+	}
+	return &channel, nil
 }
 
 func BatchInsertChannels(channels []Channel) error {
-	var err error
-	err = DB.Create(&channels).Error
+	err := DB.Create(&channels).Error
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to batch insert %d channels", len(channels))
 	}
-	for _, channel_ := range channels {
+	for i, channel_ := range channels {
 		err = channel_.AddAbilities()
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to add abilities for channel %d (index %d) during batch insert", channel_.Id, i)
 		}
 	}
 	InitChannelCache()
@@ -512,30 +514,30 @@ func ValidateInferenceProfileArnMapJSON(jsonStr string) error {
 }
 
 func (channel *Channel) Insert() error {
-	var err error
-	err = DB.Create(channel).Error
+	err := DB.Create(channel).Error
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to insert channel: name=%s, type=%d", channel.Name, channel.Type)
 	}
 	err = channel.AddAbilities()
-	if err == nil {
-		InitChannelCache()
+	if err != nil {
+		return errors.Wrapf(err, "failed to add abilities for channel: id=%d, name=%s", channel.Id, channel.Name)
 	}
-	return err
+	InitChannelCache()
+	return nil
 }
 
 func (channel *Channel) Update() error {
-	var err error
-	err = DB.Model(channel).Updates(channel).Error
+	err := DB.Model(channel).Updates(channel).Error
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to update channel: id=%d, name=%s", channel.Id, channel.Name)
 	}
 	DB.Model(channel).First(channel, "id = ?", channel.Id)
 	err = channel.UpdateAbilities()
-	if err == nil {
-		InitChannelCache()
+	if err != nil {
+		return errors.Wrapf(err, "failed to update abilities for channel: id=%d, name=%s", channel.Id, channel.Name)
 	}
-	return err
+	InitChannelCache()
+	return nil
 }
 
 func (channel *Channel) UpdateResponseTime(responseTime int64) {

@@ -259,16 +259,21 @@ func monitorDBConnections(sqlDB *sql.DB) {
 
 		// Log warning if connection pool is under stress
 		if stats.InUse > int(float64(stats.MaxOpenConnections)*0.8) {
-			logger.Logger.Error(fmt.Sprintf("HIGH DB CONNECTION USAGE: InUse=%d/%d (%.1f%%), Idle=%d, WaitCount=%d, WaitDuration=%v",
-				stats.InUse, stats.MaxOpenConnections,
-				float64(stats.InUse)/float64(stats.MaxOpenConnections)*100,
-				stats.Idle, stats.WaitCount, stats.WaitDuration))
+			usagePercent := float64(stats.InUse) / float64(stats.MaxOpenConnections) * 100
+			logger.Logger.Error("HIGH DB CONNECTION USAGE",
+				zap.Int("in_use", stats.InUse),
+				zap.Int("max_open", stats.MaxOpenConnections),
+				zap.Float64("usage_percent", usagePercent),
+				zap.Int("idle", stats.Idle),
+				zap.Int64("wait_count", stats.WaitCount),
+				zap.Duration("wait_duration", stats.WaitDuration))
 		}
 
 		// Log critical error if we're hitting connection limits
 		if stats.WaitCount > 0 && stats.WaitDuration > time.Second {
-			logger.Logger.Error(fmt.Sprintf("CRITICAL DB CONNECTION BOTTLENECK: WaitCount=%d, WaitDuration=%v - Consider increasing SQL_MAX_OPEN_CONNS",
-				stats.WaitCount, stats.WaitDuration))
+			logger.Logger.Error("CRITICAL DB CONNECTION BOTTLENECK - Consider increasing SQL_MAX_OPEN_CONNS",
+				zap.Int64("wait_count", stats.WaitCount),
+				zap.Duration("wait_duration", stats.WaitDuration))
 		}
 	}
 }

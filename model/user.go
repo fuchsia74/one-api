@@ -124,7 +124,7 @@ func (user *User) Insert(ctx context.Context, inviterId int) error {
 	if user.Password != "" {
 		user.Password, err = common.Password2Hash(user.Password)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to hash password for user: username=%s", user.Username)
 		}
 	}
 	user.Quota = config.QuotaForNewUser
@@ -132,7 +132,7 @@ func (user *User) Insert(ctx context.Context, inviterId int) error {
 	user.AffCode = random.GetRandomString(4)
 	result := DB.Create(user)
 	if result.Error != nil {
-		return result.Error
+		return errors.Wrapf(result.Error, "failed to create user: username=%s, inviterId=%d", user.Username, inviterId)
 	}
 	if config.QuotaForNewUser > 0 {
 		RecordLog(ctx, user.Id, LogTypeSystem, fmt.Sprintf("New user registration gift %s", common.LogQuota(config.QuotaForNewUser)))
@@ -171,7 +171,7 @@ func (user *User) Update(updatePassword bool) error {
 	if updatePassword {
 		user.Password, err = common.Password2Hash(user.Password)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to hash password for user update: id=%d, username=%s", user.Id, user.Username)
 		}
 	}
 	if user.Status == UserStatusDisabled {
@@ -180,7 +180,10 @@ func (user *User) Update(updatePassword bool) error {
 		blacklist.UnbanUser(user.Id)
 	}
 	err = DB.Model(user).Updates(user).Error
-	return err
+	if err != nil {
+		return errors.Wrapf(err, "failed to update user: id=%d, username=%s", user.Id, user.Username)
+	}
+	return nil
 }
 
 // ClearTotpSecret clears the TOTP secret for the user
@@ -216,7 +219,7 @@ func (user *User) ValidateAndFill() (err error) {
 		// consider this case: a malicious user set his username as other's email
 		err := DB.Where("email = ?", user.Username).First(user).Error
 		if err != nil {
-			return errors.New("Username or password is wrong, or user has been banned")
+			return errors.Errorf("username or password is wrong, or user has been banned: username=%s", user.Username)
 		}
 	}
 	okay := common.ValidatePasswordAndHash(password, user.Password)

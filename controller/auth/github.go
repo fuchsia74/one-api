@@ -9,12 +9,10 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
-	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/controller"
 	"github.com/songquanpeng/one-api/model"
@@ -52,8 +50,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info("Unable to connect to GitHub server", zap.Error(err))
-		return nil, errors.New("Unable to connect to GitHub server, please try again later!")
+		return nil, errors.Wrap(err, "unable to connect to GitHub server")
 	}
 	defer res.Body.Close()
 	var oAuthResponse GitHubOAuthResponse
@@ -68,8 +65,7 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", oAuthResponse.AccessToken))
 	res2, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info("Unable to connect to GitHub server for user info", zap.Error(err))
-		return nil, errors.New("Unable to connect to GitHub server, please try again later!")
+		return nil, errors.Wrap(err, "unable to connect to GitHub server for user info")
 	}
 	defer res2.Body.Close()
 	var githubUser GitHubUser

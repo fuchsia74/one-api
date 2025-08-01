@@ -50,7 +50,7 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 		}
 		err = common.RedisSet(fmt.Sprintf("token:%s", key), string(jsonBytes), time.Duration(TokenCacheSeconds)*time.Second)
 		if err != nil {
-			logger.Logger.Error("Redis set token error: " + err.Error())
+			logger.Logger.Warn("Redis set token failed, continuing without cache", zap.String("key", key), zap.Error(err))
 		}
 		return &token, nil
 	}
@@ -71,7 +71,7 @@ func CacheGetUserGroup(id int) (group string, err error) {
 		}
 		err = common.RedisSet(fmt.Sprintf("user_group:%d", id), group, time.Duration(UserId2GroupCacheSeconds)*time.Second)
 		if err != nil {
-			logger.Logger.Error("Redis set user group error: " + err.Error())
+			logger.Logger.Warn("Redis set user group failed, continuing without cache", zap.Int("user_id", id), zap.Error(err))
 		}
 	}
 	return group, err
@@ -84,7 +84,7 @@ func fetchAndUpdateUserQuota(ctx context.Context, id int) (quota int64, err erro
 	}
 	err = common.RedisSet(fmt.Sprintf("user_quota:%d", id), fmt.Sprintf("%d", quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
 	if err != nil {
-		logger.Logger.Error("Redis set user quota error", zap.Error(err))
+		logger.Logger.Warn("Redis set user quota failed, continuing without cache", zap.Int("user_id", id), zap.Error(err))
 	}
 	return
 }
@@ -147,7 +147,7 @@ func CacheIsUserEnabled(userId int) (bool, error) {
 	}
 	err = common.RedisSet(fmt.Sprintf("user_enabled:%d", userId), enabled, time.Duration(UserId2StatusCacheSeconds)*time.Second)
 	if err != nil {
-		logger.Logger.Error("Redis set user enabled error: " + err.Error())
+		logger.Logger.Warn("Redis set user enabled failed, continuing without cache", zap.Int("user_id", userId), zap.Error(err))
 	}
 	return userEnabled, err
 }
@@ -169,7 +169,7 @@ func CacheGetGroupModels(ctx context.Context, group string) (models []string, er
 	}
 	err = common.RedisSet(fmt.Sprintf("group_models:%s", group), strings.Join(models, ","), time.Duration(GroupModelsCacheSeconds)*time.Second)
 	if err != nil {
-		logger.Logger.Error("Redis set group models error: " + err.Error())
+		logger.Logger.Warn("Redis set group models failed, continuing without cache", zap.String("group", group), zap.Error(err))
 	}
 	return models, nil
 }
@@ -181,10 +181,10 @@ func CacheGetGroupModelsV2(ctx context.Context, group string) (models []EnabledA
 	}
 	modelsStr, err := common.RedisGet(fmt.Sprintf("group_models_v2:%s", group))
 	if err != nil {
-		logger.Logger.Warn(fmt.Sprintf("Redis get group models error: %+v", err))
+		logger.Logger.Debug("Redis cache miss for group models, falling back to database", zap.String("group", group), zap.Error(err))
 	} else {
 		if err = json.Unmarshal([]byte(modelsStr), &models); err != nil {
-			logger.Logger.Warn(fmt.Sprintf("Redis get group models error: %+v", err))
+			logger.Logger.Warn("Redis cached group models data corrupted, falling back to database", zap.String("group", group), zap.Error(err))
 		} else {
 			return models, nil
 		}
@@ -197,14 +197,14 @@ func CacheGetGroupModelsV2(ctx context.Context, group string) (models []EnabledA
 
 	cachePayload, err := json.Marshal(models)
 	if err != nil {
-		logger.Logger.Error("Redis set group models error: " + err.Error())
+		logger.Logger.Warn("failed to marshal group models for cache, continuing without cache", zap.String("group", group), zap.Error(err))
 		return models, nil
 	}
 
-	err = common.RedisSet(fmt.Sprintf("group_models:%s", group), string(cachePayload),
+	err = common.RedisSet(fmt.Sprintf("group_models_v2:%s", group), string(cachePayload),
 		time.Duration(GroupModelsCacheSeconds)*time.Second)
 	if err != nil {
-		logger.Logger.Error("Redis set group models error: " + err.Error())
+		logger.Logger.Warn("Redis set group models failed, continuing without cache", zap.String("group", group), zap.Error(err))
 	}
 
 	return models, nil

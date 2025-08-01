@@ -41,7 +41,6 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// get & validate Claude Messages API request
 	claudeRequest, err := getAndValidateClaudeMessagesRequest(c)
 	if err != nil {
-		logger.Logger.Error("getAndValidateClaudeMessagesRequest failed", zap.Error(err))
 		return openai.ErrorWrapper(err, "invalid_claude_messages_request", http.StatusBadRequest)
 	}
 	meta.IsStream = claudeRequest.Stream != nil && *claudeRequest.Stream
@@ -101,7 +100,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// do request
 	resp, err := adaptorInstance.DoRequest(c, meta, requestBody)
 	if err != nil {
-		logger.Logger.Error("DoRequest failed", zap.Error(err))
+		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 

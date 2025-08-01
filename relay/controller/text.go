@@ -40,7 +40,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// get & validate textRequest
 	textRequest, err := getAndValidateTextRequest(c, meta.Mode)
 	if err != nil {
-		logger.Logger.Error("getAndValidateTextRequest failed", zap.Error(err))
+		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "invalid_text_request", http.StatusBadRequest)
 	}
 	meta.IsStream = textRequest.Stream
@@ -102,7 +102,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// do request
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
-		logger.Logger.Error("DoRequest failed", zap.Error(err))
+		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 	if isErrorHappened(meta, resp) {
@@ -113,7 +113,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
 	if respErr != nil {
-		logger.Logger.Error("respErr is not nil", zap.Any("error", respErr))
+		// DoResponse already logs errors internally, so we don't need to log it here
 		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
 		return respErr
 	}

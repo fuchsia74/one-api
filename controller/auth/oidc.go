@@ -10,12 +10,10 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
-	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/controller"
 	"github.com/songquanpeng/one-api/model"
 )
@@ -59,8 +57,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	}
 	res, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info("Unable to connect to the OIDC server", zap.Error(err))
-		return nil, errors.New("Unable to connect to the OIDC server, please try again later!")
+		return nil, errors.Wrap(err, "unable to connect to the OIDC server")
 	}
 	defer res.Body.Close()
 	var oidcResponse OidcResponse
@@ -75,8 +72,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	req.Header.Set("Authorization", "Bearer "+oidcResponse.AccessToken)
 	res2, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Info("Unable to connect to the OIDC server for user info", zap.Error(err))
-		return nil, errors.New("Unable to connect to the OIDC server, please try again later!")
+		return nil, errors.Wrap(err, "unable to connect to the OIDC server for user info")
 	}
 	var oidcUser OidcUser
 	err = json.NewDecoder(res2.Body).Decode(&oidcUser)

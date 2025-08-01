@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/logger"
@@ -18,10 +19,11 @@ func DebugChannelModelConfigs(channelId int) error {
 		return fmt.Errorf("failed to find channel %d: %w", channelId, err)
 	}
 
-	logger.Logger.Info(fmt.Sprintf("=== DEBUG CHANNEL %d ===", channelId))
-	logger.Logger.Info(fmt.Sprintf("Name: %s", channel.Name))
-	logger.Logger.Info(fmt.Sprintf("Type: %d", channel.Type))
-	logger.Logger.Info(fmt.Sprintf("Status: %d", channel.Status))
+	logger.Logger.Info("=== DEBUG CHANNEL ===",
+		zap.Int("channel_id", channelId),
+		zap.String("name", channel.Name),
+		zap.Int("type", channel.Type),
+		zap.Int("status", channel.Status))
 
 	// Check ModelConfigs
 	if channel.ModelConfigs != nil && *channel.ModelConfigs != "" && *channel.ModelConfigs != "{}" {
@@ -189,8 +191,7 @@ func FixChannelModelConfigs(channelId int) error {
 		"completion_ratio": channel.CompletionRatio,
 	}).Error
 	if err != nil {
-		logger.Logger.Error("Failed to save fixed data", zap.Error(err))
-		return err
+		return errors.Wrapf(err, "failed to save fixed data for channel %d", channelId)
 	}
 	logger.Logger.Info("Fixed data saved to database")
 
