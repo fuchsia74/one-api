@@ -12,22 +12,19 @@ import (
 	"github.com/songquanpeng/one-api/common/helper"
 )
 
-func abortWithMessage(c *gin.Context, statusCode int, message string) {
-	logger := gmw.GetLogger(c)
-	logger.Error("server abort with message", zap.String("message", message))
-	c.JSON(statusCode, gin.H{
-		"error": gin.H{
-			"message": helper.MessageWithRequestId(message, c.GetString(helper.RequestIdKey)),
-			"type":    "one_api_error",
-		},
-	})
-	c.Abort()
-}
-
 // AbortWithError aborts the request with an error message
 func AbortWithError(c *gin.Context, statusCode int, err error) {
 	logger := gmw.GetLogger(c)
-	logger.Error("server abort", zap.Error(err))
+	if ignoreServerError(err) {
+		logger.Warn("server abort",
+			zap.Int("status_code", statusCode),
+			zap.Error(err))
+	} else {
+		logger.Error("server abort",
+			zap.Int("status_code", statusCode),
+			zap.Error(err))
+	}
+
 	c.JSON(statusCode, gin.H{
 		"error": gin.H{
 			"message": helper.MessageWithRequestId(err.Error(), c.GetString(helper.RequestIdKey)),
@@ -35,6 +32,15 @@ func AbortWithError(c *gin.Context, statusCode int, err error) {
 		},
 	})
 	c.Abort()
+}
+
+func ignoreServerError(err error) bool {
+	switch {
+	case strings.Contains(err.Error(), "token not found for key:"):
+		return true
+	default:
+		return false
+	}
 }
 
 func getRequestModel(c *gin.Context) (string, error) {
