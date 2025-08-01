@@ -26,8 +26,13 @@ import { useTranslation } from 'react-i18next';
 import { ITEMS_PER_PAGE } from '../constants';
 import { renderColorLabel, renderQuota } from '../helpers/render';
 import { Link } from 'react-router-dom';
+import './LogsTable.mobile.css';
 
 function renderTimestamp(timestamp, request_id) {
+  const fullTimestamp = timestamp2string(timestamp);
+  // Extract MM-DD HH:MM:SS from YYYY-MM-DD HH:MM:SS
+  const compactTimestamp = fullTimestamp.slice(5); // Remove YYYY- part
+
   return (
     <code
       onClick={async () => {
@@ -38,8 +43,9 @@ function renderTimestamp(timestamp, request_id) {
         }
       }}
       style={{ cursor: 'pointer' }}
+      title={fullTimestamp} // Show full timestamp on hover
     >
-      {timestamp2string(timestamp)}
+      {compactTimestamp}
     </code>
   );
 }
@@ -345,9 +351,144 @@ const LogsTable = () => {
     }
   };
 
+  // Simple mobile detection
+  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth <= 768;
+      setIsMobile(mobile);
+
+      // Fix body padding and container margins for mobile
+      if (mobile) {
+        document.body.style.paddingTop = '0px';
+        document.body.style.paddingLeft = '0px';
+        document.body.style.paddingRight = '0px';
+        document.body.style.marginTop = '0px';
+
+        // Also fix main content container
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+          mainContent.style.padding = '0px';
+          mainContent.style.margin = '0px';
+          mainContent.style.marginTop = '0px';
+          mainContent.style.paddingTop = '0px';
+        }
+
+        // Fix root container
+        const root = document.getElementById('root');
+        if (root) {
+          root.style.padding = '0px';
+          root.style.margin = '0px';
+          root.style.marginTop = '0px';
+          root.style.paddingTop = '0px';
+        }
+
+        // Fix any semantic-ui containers
+        const containers = document.querySelectorAll('.ui.container, .ui.segment, .pusher');
+        containers.forEach(container => {
+          container.style.padding = '0px';
+          container.style.margin = '0px';
+          container.style.marginTop = '0px';
+          container.style.paddingTop = '0px';
+        });
+      } else {
+        document.body.style.paddingTop = '55px';
+        document.body.style.paddingLeft = '';
+        document.body.style.paddingRight = '';
+        document.body.style.marginTop = '';
+
+        // Restore desktop styles
+        const mainContent = document.querySelector('.main-content');
+        if (mainContent) {
+          mainContent.style.padding = '4px';
+          mainContent.style.margin = '';
+        }
+      }
+    };
+
+    // Set initial state
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Simple mobile card component
+  const renderMobileCard = (log) => {
+    return (
+      <div key={log.id} style={{
+        backgroundColor: '#ffffff',
+        borderRadius: '0px',     // Remove rounded corners
+        margin: '2px 0px',       // Minimal margins, no side margins
+        padding: '12px 8px',     // Reduce side padding
+        boxShadow: 'none',       // Remove shadow completely
+        border: 'none',          // Ensure no borders
+        borderTop: 'none',       // Explicitly remove top border
+        borderBottom: '1px solid #f0f0f0',  // Very light separator only
+        borderLeft: 'none',      // Explicitly remove left border
+        borderRight: 'none'      // Explicitly remove right border
+      }}>
+        <div style={{ marginBottom: '8px' }}>
+          <strong>时间:</strong> {renderTimestamp(log.created_at, log.request_id)}
+        </div>
+        {isAdminUser && log.channel && (
+          <div style={{ marginBottom: '8px' }}>
+            <strong>渠道:</strong> <Label basic as={Link} to={`/channel/edit/${log.channel}`}>{log.channel}</Label>
+          </div>
+        )}
+        <div style={{ marginBottom: '8px' }}>
+          <strong>类型:</strong> {renderType(log.type)}
+        </div>
+        <div style={{ marginBottom: '8px' }}>
+          <strong>模型:</strong> {log.model_name ? renderColorLabel(log.model_name) : ''}
+        </div>
+        {showUserTokenQuota() && (
+          <>
+            {isAdminUser && log.username && (
+              <div style={{ marginBottom: '8px' }}>
+                <strong>用户:</strong> <Label basic as={Link} to={`/user/edit/${log.user_id}`}>{log.username}</Label>
+              </div>
+            )}
+            {log.token_name && (
+              <div style={{ marginBottom: '8px' }}>
+                <strong>令牌:</strong> {renderColorLabel(log.token_name)}
+              </div>
+            )}
+            <div style={{ marginBottom: '8px' }}>
+              <strong>提示:</strong> {log.prompt_tokens || ''}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>完成:</strong> {log.completion_tokens || ''}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>配额:</strong> {log.quota ? renderQuota(log.quota, t, 6) : 'free'}
+            </div>
+            <div style={{ marginBottom: '8px' }}>
+              <strong>延迟:</strong> {renderLatency(log.elapsed_time)}
+            </div>
+          </>
+        )}
+        <div style={{ wordWrap: 'break-word', overflowWrap: 'break-word' }}>
+          <strong>详情:</strong> {renderDetail(log)}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <>
-      <Header as='h3'>
+      <Header as='h3' style={isMobile ? {
+        position: 'static',  // Remove sticky positioning to eliminate overlay
+        margin: '0px',
+        padding: '8px 8px',  // Minimal padding
+        border: 'none',
+        boxShadow: 'none',   // Remove shadow
+        fontSize: '16px',
+        fontWeight: 600,
+        lineHeight: 1.2,
+        backgroundColor: 'transparent'  // Transparent background
+      } : {}}>
         {t('log.usage_details')}（{t('log.total_quota')}：
         {showStat && (
           <>
@@ -481,7 +622,32 @@ const LogsTable = () => {
           onChange={(_, { value }) => setSearchKeyword(value)}
         />
       </Form>
-      <Table basic={'very'} compact size='small'>
+      {isMobile ? (
+        // Mobile card layout - full width, no top margin
+        <div style={{
+          padding: 0,
+          margin: 0,
+          marginTop: 0,
+          paddingTop: 0,
+          backgroundColor: '#f8f9fa',
+          width: '100%',
+          boxSizing: 'border-box',
+          position: 'relative',
+          top: 0
+        }}>
+          {logs
+            .slice(
+              (activePage - 1) * ITEMS_PER_PAGE,
+              activePage * ITEMS_PER_PAGE
+            )
+            .map((log) => {
+              if (log.deleted) return null;
+              return renderMobileCard(log);
+            })}
+        </div>
+      ) : (
+        // Desktop table layout
+        <Table basic={'very'} compact size='small'>
         <Table.Header>
           <Table.Row>
             <Table.HeaderCell
@@ -600,11 +766,11 @@ const LogsTable = () => {
               if (log.deleted) return <></>;
               return (
                 <Table.Row key={log.id}>
-                  <Table.Cell>
+                  <Table.Cell data-label={t('log.table.time')}>
                     {renderTimestamp(log.created_at, log.request_id)}
                   </Table.Cell>
                   {isAdminUser && (
-                    <Table.Cell>
+                    <Table.Cell data-label={t('log.table.channel')}>
                       {log.channel ? (
                         <Label
                           basic
@@ -618,14 +784,14 @@ const LogsTable = () => {
                       )}
                     </Table.Cell>
                   )}
-                  <Table.Cell>{renderType(log.type)}</Table.Cell>
-                  <Table.Cell>
+                  <Table.Cell data-label={t('log.table.type')}>{renderType(log.type)}</Table.Cell>
+                  <Table.Cell data-label={t('log.table.model')}>
                     {log.model_name ? renderColorLabel(log.model_name) : ''}
                   </Table.Cell>
                   {showUserTokenQuota() && (
                     <>
                       {isAdminUser && (
-                        <Table.Cell>
+                        <Table.Cell data-label={t('log.table.username')}>
                           {log.username ? (
                             <Label
                               basic
@@ -639,26 +805,26 @@ const LogsTable = () => {
                           )}
                         </Table.Cell>
                       )}
-                      <Table.Cell>
+                      <Table.Cell data-label={t('log.table.token_name')}>
                         {log.token_name ? renderColorLabel(log.token_name) : ''}
                       </Table.Cell>
 
-                      <Table.Cell>
+                      <Table.Cell data-label={t('log.table.prompt_tokens')}>
                         {log.prompt_tokens ? log.prompt_tokens : ''}
                       </Table.Cell>
-                      <Table.Cell>
+                      <Table.Cell data-label={t('log.table.completion_tokens')}>
                         {log.completion_tokens ? log.completion_tokens : ''}
                       </Table.Cell>
-                      <Table.Cell>
+                      <Table.Cell data-label={t('log.table.quota')}>
                         {log.quota ? renderQuota(log.quota, t, 6) : 'free'}
                       </Table.Cell>
-                      <Table.Cell>
+                      <Table.Cell data-label={t('log.table.latency')}>
                         {renderLatency(log.elapsed_time)}
                       </Table.Cell>
                     </>
                   )}
 
-                  <Table.Cell>{renderDetail(log)}</Table.Cell>
+                  <Table.Cell data-label={t('log.table.detail')}>{renderDetail(log)}</Table.Cell>
                 </Table.Row>
               );
             })}
@@ -695,6 +861,7 @@ const LogsTable = () => {
           </Table.Row>
         </Table.Footer>
       </Table>
+      )}
     </>
   );
 };

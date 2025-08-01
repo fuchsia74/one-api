@@ -26,39 +26,43 @@ function renderType(type) {
 }
 
 export default function LogTableRow({ item, userIsAdmin }) {
+  const fullTimestamp = timestamp2string(item.created_at);
+  // Extract MM-DD HH:MM:SS from YYYY-MM-DD HH:MM:SS for compact display
+  const compactTimestamp = fullTimestamp.slice(5); // Remove YYYY- part
+
   return (
     <>
       <TableRow tabIndex={item.id}>
-        <TableCell>{timestamp2string(item.created_at)}</TableCell>
+        <TableCell data-label="时间" title={fullTimestamp}>{compactTimestamp}</TableCell>
 
-        {userIsAdmin && <TableCell>{item.channel || ''}</TableCell>}
+        {userIsAdmin && <TableCell data-label="渠道">{item.channel || ''}</TableCell>}
         {userIsAdmin && (
-          <TableCell>
+          <TableCell data-label="用户">
             <Label color="default" variant="outlined">
               {item.username}
             </Label>
           </TableCell>
         )}
-        <TableCell>
+        <TableCell data-label="令牌">
           {item.token_name && (
             <Label color="default" variant="soft">
               {item.token_name}
             </Label>
           )}
         </TableCell>
-        <TableCell>{renderType(item.type)}</TableCell>
-        <TableCell>
+        <TableCell data-label="类型">{renderType(item.type)}</TableCell>
+        <TableCell data-label="模型">
           {item.model_name && (
             <Label color="primary" variant="outlined">
               {item.model_name}
             </Label>
           )}
         </TableCell>
-        <TableCell>{item.prompt_tokens || ''}</TableCell>
-        <TableCell>{item.completion_tokens || ''}</TableCell>
-        <TableCell>{item.quota ? renderQuota(item.quota, 6) : ''}</TableCell>
-        <TableCell>{item.elapsed_time ? `${item.elapsed_time} ms` : ''}</TableCell>
-        <TableCell>{item.content}</TableCell>
+        <TableCell data-label="提示">{item.prompt_tokens || ''}</TableCell>
+        <TableCell data-label="完成">{item.completion_tokens || ''}</TableCell>
+        <TableCell data-label="配额">{item.quota ? renderQuota(item.quota, 6) : ''}</TableCell>
+        <TableCell data-label="用时">{item.elapsed_time ? `${item.elapsed_time} ms` : ''}</TableCell>
+        <TableCell data-label="详情">{item.content}</TableCell>
       </TableRow>
     </>
   );

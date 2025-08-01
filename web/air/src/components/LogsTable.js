@@ -6,14 +6,11 @@ import { IconRefresh } from '@douyinfe/semi-icons';
 import { ITEMS_PER_PAGE } from '../constants';
 import { renderNumber, renderQuota, stringToColor } from '../helpers/render';
 import Paragraph from '@douyinfe/semi-ui/lib/es/typography/paragraph';
+import './LogsTable.mobile.css';
 
 const { Header } = Layout;
 
-function renderTimestamp(timestamp) {
-  return (<>
-    {timestamp2string(timestamp)}
-  </>);
-}
+
 
 const MODE_OPTIONS = [{ key: 'all', text: '全部用户', value: 'all' }, { key: 'self', text: '当前用户', value: 'self' }];
 
@@ -297,7 +294,14 @@ const LogsTable = () => {
 
   const setLogsFormat = (logs) => {
     for (let i = 0; i < logs.length; i++) {
-      logs[i].timestamp2string = timestamp2string(logs[i].created_at);
+      const fullTimestamp = timestamp2string(logs[i].created_at);
+      // Extract MM-DD HH:MM:SS from YYYY-MM-DD HH:MM:SS for compact display
+      const compactTimestamp = fullTimestamp.slice(5); // Remove YYYY- part
+      logs[i].timestamp2string = (
+        <span title={fullTimestamp}>
+          {compactTimestamp}
+        </span>
+      );
       logs[i].key = '' + logs[i].id;
     }
     // data.key = '' + data.id
@@ -432,8 +436,8 @@ const LogsTable = () => {
   };
 
   return (<>
-    <Layout>
-      <Header>
+    <Layout className="logs-layout">
+      <Header className="logs-header">
         <Spin spinning={loadingStat}>
           <h3>使用明细（总消耗额度：
             <span onClick={handleEyeClick} style={{
@@ -455,7 +459,7 @@ const LogsTable = () => {
           </h3>
         </Spin>
       </Header>
-      <Form layout="horizontal" style={{ marginTop: 10 }}>
+      <Form layout="horizontal" className="logs-form" style={{ marginTop: 10 }}>
         <>
           <Form.Input field="token_name" label="令牌名称" style={{ width: 176 }} value={token_name}
             placeholder={'可选值'} name="token_name"
@@ -507,7 +511,7 @@ const LogsTable = () => {
           </Form.Section>
         </>
       </Form>
-      <Table style={{ marginTop: 5 }} columns={columns} dataSource={pageData} pagination={{
+      <Table className="logs-table" style={{ marginTop: 5 }} columns={columns} dataSource={pageData} pagination={{
         currentPage: activePage,
         pageSize: pageSize,
         total: logCount,
@@ -518,7 +522,7 @@ const LogsTable = () => {
         },
         onPageChange: handlePageChange
       }} />
-      <Select defaultValue="0" style={{ width: 120 }} onChange={(value) => {
+      <Select className="logs-select" defaultValue="0" style={{ width: 120 }} onChange={(value) => {
         setLogType(parseInt(value));
         refresh(parseInt(value)).then();
       }}>

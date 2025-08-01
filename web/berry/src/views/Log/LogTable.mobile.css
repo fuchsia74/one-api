@@ -1,0 +1,388 @@
+/* ==============================|| MODERN MOBILE LOGS TABLE - BERRY TEMPLATE ||============================== */
+
+/* Mobile-first responsive design for LogsTable component (Material-UI) */
+@media screen and (max-width: 768px) {
+
+  /* ==============================|| CRITICAL LAYOUT RESET ||============================== */
+
+  /* Override global body padding that causes top margin issue */
+  body {
+    padding-top: 0 !important;
+  }
+
+  /* Container and layout fixes */
+  .MuiContainer-root {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  .MuiCard-root {
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* ==============================|| HEADER FIXES ||============================== */
+
+  /* Header styling */
+  .MuiTypography-h3 {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    line-height: 1.3 !important;
+    padding: 12px 16px !important;
+    position: sticky !important;
+    top: 0 !important;
+    background-color: #ffffff !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    z-index: 1000 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  /* ==============================|| FORM OPTIMIZATION ||============================== */
+
+  /* Toolbar styling */
+  .MuiToolbar-root {
+    padding: 16px !important;
+    margin: 0 !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    background-color: #f8f9fa !important;
+  }
+
+  .MuiStack-root {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+  }
+
+  .MuiStack-root:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .MuiTextField-root,
+  .MuiFormControl-root,
+  .MuiButton-root {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+    min-height: 44px !important; /* Touch-friendly size */
+  }
+
+  .MuiTextField-root:last-child,
+  .MuiFormControl-root:last-child,
+  .MuiButton-root:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  .MuiTextField-root .MuiInputBase-root {
+    font-size: 16px !important; /* Prevent zoom on iOS */
+    border-radius: 8px !important;
+  }
+
+  /* ==============================|| TABLE CARD LAYOUT ||============================== */
+
+  /* Table container */
+  .MuiTableContainer-root {
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Table mobile card layout */
+  .MuiTable-root {
+    border: none !important;
+  }
+
+  .MuiTableHead-root {
+    display: none !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root {
+    display: block !important;
+    border: none !important;
+    border-radius: 12px !important;
+    margin: 16px !important;
+    padding: 16px !important;
+    background-color: #ffffff !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root {
+    display: flex !important;
+    align-items: flex-start !important;
+    border: none !important;
+    padding: 8px 0 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.5 !important;
+    min-height: auto !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:before {
+    content: attr(data-label) !important;
+    font-weight: 600 !important;
+    color: #6c757d !important;
+    font-size: 14px !important;
+    min-width: 80px !important;
+    margin-right: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root > * {
+    flex: 1 !important;
+    margin: 0 !important;
+  }
+
+  /* Add data labels for mobile */
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(1):before {
+    content: '时间: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(2):before {
+    content: '渠道: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(3):before {
+    content: '用户: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(4):before {
+    content: '令牌: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(5):before {
+    content: '类型: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(6):before {
+    content: '模型: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(7):before {
+    content: '提示: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(8):before {
+    content: '完成: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(9):before {
+    content: '配额: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(10):before {
+    content: '用时: ' !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:nth-child(11):before {
+    content: '详情: ' !important;
+  }
+
+  /* ==============================|| COMPLETE BORDER REMOVAL ||============================== */
+
+  /* Remove all table borders */
+  .MuiTable-root,
+  .MuiTableContainer-root,
+  .MuiTableHead-root,
+  .MuiTableBody-root,
+  .MuiTableRow-root,
+  .MuiTableCell-root {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-collapse: separate !important;
+  }
+
+  /* ==============================|| PAGINATION ||============================== */
+
+  /* Pagination mobile styling */
+  .MuiTablePagination-root {
+    padding: 16px !important;
+    border: none !important;
+    background-color: #ffffff !important;
+  }
+
+  .MuiTablePagination-toolbar {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  .MuiTablePagination-selectLabel,
+  .MuiTablePagination-displayedRows {
+    margin: 4px 0 !important;
+    font-size: 14px !important;
+  }
+
+  .MuiTablePagination-actions {
+    margin-left: 0 !important;
+  }
+
+  .MuiTablePagination-actions .MuiIconButton-root {
+    min-width: 44px !important;
+    height: 44px !important;
+    border-radius: 8px !important;
+    border: 1px solid #dee2e6 !important;
+    margin: 0 4px !important;
+  }
+
+  /* ==============================|| COMPONENT STYLING ||============================== */
+
+  /* Chips and labels styling */
+  .MuiChip-root {
+    margin: 2px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+  }
+
+  /* Button styling */
+  .MuiButton-root {
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    padding: 12px 20px !important;
+    margin: 8px 0 !important;
+    min-height: 44px !important;
+    transition: all 0.2s ease !important;
+  }
+
+  /* Alert styling */
+  .MuiAlert-root {
+    margin: 16px !important;
+    font-size: 14px !important;
+    border-radius: 8px !important;
+  }
+
+  /* Linear progress */
+  .MuiLinearProgress-root {
+    margin: 0 !important;
+  }
+
+  /* Perfect scrollbar */
+  .scrollbar-container {
+    overflow: visible !important;
+  }
+
+  /* Stack spacing */
+  .MuiStack-root > * {
+    margin-bottom: 8px !important;
+  }
+
+  .MuiStack-root > *:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  /* Box styling */
+  .MuiBox-root {
+    padding: 8px !important;
+  }
+}
+
+  /* Remove all borders completely */
+  .MuiTable-root,
+  .MuiTableContainer-root,
+  .MuiTableHead-root,
+  .MuiTableBody-root,
+  .MuiTableRow-root,
+  .MuiTableCell-root {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Pagination mobile styling */
+  .MuiTablePagination-root {
+    padding: 8px 16px !important;
+    border: none !important;
+  }
+
+  .MuiTablePagination-toolbar {
+    flex-direction: column !important;
+    align-items: center !important;
+  }
+
+  .MuiTablePagination-selectLabel,
+  .MuiTablePagination-displayedRows {
+    margin: 4px 0px !important;
+    font-size: 12px !important;
+  }
+
+  /* Chips and labels styling */
+  .MuiChip-root {
+    margin: 2px !important;
+    font-size: 12px !important;
+    height: 24px !important;
+  }
+
+  /* Button styling */
+  .MuiButton-root {
+    margin: 2px !important;
+    font-size: 12px !important;
+    padding: 6px 12px !important;
+  }
+
+  /* Alert styling */
+  .MuiAlert-root {
+    margin: 8px 16px !important;
+    font-size: 12px !important;
+  }
+
+  /* Ensure proper spacing and no overlap */
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root > * {
+    margin: 2px 0px !important;
+    display: inline-block !important;
+    vertical-align: top !important;
+  }
+
+  /* Linear progress */
+  .MuiLinearProgress-root {
+    margin: 8px 0px !important;
+  }
+
+  /* Perfect scrollbar */
+  .scrollbar-container {
+    overflow: visible !important;
+  }
+
+  /* Stack spacing */
+  .MuiStack-root > * {
+    margin-bottom: 8px !important;
+  }
+
+  /* Box styling */
+  .MuiBox-root {
+    padding: 8px !important;
+  }
+
+  /* Remove any remaining borders */
+  * {
+    border: none !important;
+  }
+
+  /* Restore necessary borders for visual structure */
+  .MuiChip-root,
+  .MuiButton-root,
+  .MuiTextField-root .MuiOutlinedInput-root,
+  .MuiFormControl-root .MuiOutlinedInput-root {
+    border: 1px solid #ddd !important;
+  }
+
+  .MuiTableBody-root .MuiTableRow-root {
+    border: 1px solid #e6e6e6 !important;
+  }
+}

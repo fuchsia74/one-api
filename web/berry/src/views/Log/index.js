@@ -18,6 +18,7 @@ import TableToolBar from './component/TableToolBar';
 import { API } from 'utils/api';
 import { isAdmin } from 'utils/common';
 import { ITEMS_PER_PAGE } from 'constants';
+import './LogTable.mobile.css';
 
 export default function Log() {
   let now = new Date();

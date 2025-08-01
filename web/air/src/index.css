@@ -1,13 +1,14 @@
 body {
     margin: 0;
-    padding-top: 55px;
+    padding-top: 60px;
+    /* Increased from 55px to account for header height */
     overflow-y: scroll;
     font-family: Lato, 'Helvetica Neue', Arial, Helvetica, "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     scrollbar-width: none;
     color: var(--semi-color-text-0) !important;
-    background-color: var( --semi-color-bg-0) !important;
+    background-color: var(--semi-color-bg-0) !important;
     height: 100%;
 }
 
@@ -15,34 +16,276 @@ body {
     height: 100%;
 }
 
-@media only screen and (max-width: 767px) {
-    .semi-table-tbody, .semi-table-row, .semi-table-row-cell {
-        display: block!important;
-        width: auto!important;
-        padding: 2px!important;
+/* ==============================|| AIR TEMPLATE MOBILE-FIRST RESPONSIVE DESIGN ||============================== */
+
+/* Base mobile styles (0-768px) */
+@media only screen and (max-width: 768px) {
+
+    /* Ensure proper body spacing for mobile */
+    body {
+        padding-top: 60px !important;
+        /* Maintain header space */
     }
-    .semi-table-row-cell {
-        border-bottom: 0!important;
+
+    /* Layout containers - minimal padding */
+    .semi-layout-content {
+        padding: 4px !important;
+        /* Minimal padding */
+        margin: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        box-shadow: none !important;
     }
-    .semi-table-tbody>.semi-table-row {
-        border-bottom: 1px solid rgba(0,0,0,.1);
+
+    /* Remove borders from cards but keep minimal spacing */
+    .semi-card,
+    .semi-card-body {
+        border: none !important;
+        border-radius: 4px !important;
+        box-shadow: none !important;
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        background: var(--semi-color-bg-0) !important;
     }
+
+    /* Table responsive design - convert to mobile card layout */
+    .semi-table {
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        background: var(--semi-color-bg-0) !important;
+    }
+
+    .semi-table-thead {
+        display: none !important;
+        /* Hide table headers on mobile */
+    }
+
+    .semi-table-tbody .semi-table-row {
+        display: block !important;
+        border: none !important;
+        border-radius: 0 !important;
+        margin-bottom: 8px !important;
+        padding: 12px !important;
+        background: var(--semi-color-bg-0) !important;
+        box-shadow: none !important;
+        width: auto !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell {
+        display: block !important;
+        border: none !important;
+        padding: 4px 0 !important;
+        text-align: left !important;
+        position: relative !important;
+        padding-left: 40% !important;
+        width: auto !important;
+        border-bottom: none !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:before {
+        position: absolute !important;
+        left: 0 !important;
+        width: 35% !important;
+        font-weight: 600 !important;
+        color: var(--semi-color-text-1) !important;
+        font-size: 0.9em !important;
+    }
+
+    /* Add labels for each column using nth-child selectors */
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(1):before {
+        content: "时间" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(2):before {
+        content: "渠道" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(3):before {
+        content: "用户" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(4):before {
+        content: "令牌" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(5):before {
+        content: "类型" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(6):before {
+        content: "模型" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(7):before {
+        content: "提示" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(8):before {
+        content: "补全" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(9):before {
+        content: "花费" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(10):before {
+        content: "Latency" !important;
+    }
+
+    .semi-table-tbody .semi-table-row .semi-table-row-cell:nth-child(11):before {
+        content: "详情" !important;
+    }
+
+    /* Space component - responsive flex layout */
     .semi-space {
-        /*display: block!important;*/
         display: flex;
         flex-direction: row;
         flex-wrap: wrap;
         row-gap: 3px;
         column-gap: 10px;
     }
+
+    /* Main content area - minimal padding */
+    .main-content {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+
+    /* Dashboard container - minimal padding */
+    .dashboard-container {
+        padding: 8px !important;
+        margin: 0 !important;
+    }
+
+    /* Form styling - remove borders and compact */
+    .semi-form {
+        padding: 4px !important;
+        /* Minimal padding */
+        border: none !important;
+        box-shadow: none !important;
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+    }
+
+    .semi-form .semi-form-field {
+        margin-bottom: 8px !important;
+        /* Reduced margin */
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+
+    .semi-input-wrapper,
+    .semi-select-wrapper,
+    .semi-textarea-wrapper {
+        border-radius: 4px !important;
+    }
+
+    /* Button groups - stack vertically */
+    .semi-button-group {
+        flex-direction: column !important;
+    }
+
+    .semi-button-group .semi-button {
+        margin: 2px 0 !important;
+        width: 100% !important;
+    }
+
+    /* Navigation - full width */
+    .semi-navigation {
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Hide elements that take too much space on mobile */
+    .hide-on-mobile {
+        display: none !important;
+    }
+
+    /* Modal adjustments */
+    .semi-modal {
+        margin: 8px !important;
+        width: calc(100% - 16px) !important;
+    }
+
+    /* Page header adjustments */
+    .semi-page-header {
+        padding: 8px !important;
+        border: none !important;
+    }
 }
 
-.semi-table-tbody > .semi-table-row > .semi-table-row-cell {
+/* ==============================|| TABLET RESPONSIVE DESIGN ||============================== */
+
+/* Tablet styles (769px - 1366px) */
+@media only screen and (min-width: 769px) and (max-width: 1366px) {
+    .semi-layout-content {
+        padding: 0 16px !important;
+    }
+
+    /* Reduce card margins and borders for tablets */
+    .semi-card {
+        border-radius: 4px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    /* Table adjustments for tablets */
+    .semi-table {
+        border-radius: 4px !important;
+    }
+
+    .semi-table-tbody>.semi-table-row>.semi-table-row-cell {
+        padding: 12px 8px !important;
+    }
+
+    /* Content area adjustments */
+    .main-content {
+        padding: 12px !important;
+    }
+
+    .dashboard-container {
+        padding: 16px !important;
+    }
+
+    /* Form adjustments */
+    .semi-form {
+        padding: 16px !important;
+    }
+}
+
+/* ==============================|| DESKTOP RESPONSIVE DESIGN ||============================== */
+
+/* Desktop styles (1367px+) */
+@media only screen and (min-width: 1367px) {
+
+    /* Restore full styling for desktop */
+    .semi-card {
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .semi-table {
+        border-radius: 8px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .main-content {
+        padding: 16px !important;
+    }
+
+    .dashboard-container {
+        padding: 20px 24px 40px !important;
+    }
+}
+
+.semi-table-tbody>.semi-table-row>.semi-table-row-cell {
     padding: 16px 14px;
 }
 
 .channel-table {
-    .semi-table-tbody > .semi-table-row > .semi-table-row-cell {
+    .semi-table-tbody>.semi-table-row>.semi-table-row-cell {
         padding: 16px 8px;
     }
 }
@@ -112,7 +355,8 @@ body {
 
 /* 自定义滚动条样式 */
 body::-webkit-scrollbar {
-    width: 0;  /* 隐藏滚动条的宽度 */
+    width: 0;
+    /* 隐藏滚动条的宽度 */
 }
 
 /* Dark mode enhancements for Semi-UI components */

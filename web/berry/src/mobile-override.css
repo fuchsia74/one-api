@@ -1,0 +1,353 @@
+/* ==============================|| MOBILE OVERRIDE FRAMEWORK - BERRY TEMPLATE ||============================== */
+/* MAXIMUM SPECIFICITY CSS TO OVERRIDE ALL EXISTING STYLES */
+/* This file uses the highest possible CSS specificity to ensure mobile styles are applied */
+
+@media screen and (max-width: 768px) {
+
+  /* ==============================|| CRITICAL LAYOUT RESET ||============================== */
+
+  /* Maintain proper body spacing for mobile */
+  html body,
+  body {
+    padding-top: 60px !important;
+    /* Keep header space */
+    margin-top: 0 !important;
+  }
+
+  /* Override root container */
+  html #root,
+  #root {
+    min-height: calc(100vh - 60px) !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  /* Override main content container */
+  html body .main-content,
+  body .main-content,
+  .main-content {
+    padding: 4px !important;
+    /* Minimal padding */
+    margin: 0 !important;
+    min-height: calc(100vh - 60px) !important;
+  }
+
+  /* Override Material-UI containers */
+  html body .MuiContainer-root,
+  body .MuiContainer-root,
+  .MuiContainer-root {
+    padding: 0 !important;
+    /* Remove all padding */
+    margin: 0 !important;
+    max-width: 100% !important;
+  }
+
+  html body .MuiCard-root,
+  body .MuiCard-root,
+  .MuiCard-root {
+    margin: 2px 0 !important;
+    /* Minimal vertical margin only */
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 4px !important;
+  }
+
+  /* ==============================|| NAVIGATION MENU FIXES ||============================== */
+
+  /* Fix navigation menu positioning only - NOT content headers */
+  html body .MuiAppBar-root,
+  body .MuiAppBar-root,
+  .MuiAppBar-root {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  /* Ensure content headers are NOT sticky */
+  html body .MuiTypography-h3,
+  body .MuiTypography-h3,
+  .MuiTypography-h3 {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+  }
+
+  /* ==============================|| FORM OPTIMIZATION ||============================== */
+
+  /* Toolbar styling - MAXIMUM SPECIFICITY */
+  html body .MuiToolbar-root,
+  body .MuiToolbar-root,
+  .MuiToolbar-root {
+    padding: 16px !important;
+    margin: 0 !important;
+    flex-direction: column !important;
+    align-items: stretch !important;
+    background-color: #f8f9fa !important;
+  }
+
+  html body .MuiStack-root,
+  body .MuiStack-root,
+  .MuiStack-root {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+  }
+
+  html body .MuiStack-root:last-child,
+  body .MuiStack-root:last-child,
+  .MuiStack-root:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  html body .MuiTextField-root,
+  html body .MuiFormControl-root,
+  html body .MuiButton-root,
+  body .MuiTextField-root,
+  body .MuiFormControl-root,
+  body .MuiButton-root,
+  .MuiTextField-root,
+  .MuiFormControl-root,
+  .MuiButton-root {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+    min-height: 44px !important;
+  }
+
+  html body .MuiTextField-root:last-child,
+  html body .MuiFormControl-root:last-child,
+  html body .MuiButton-root:last-child,
+  body .MuiTextField-root:last-child,
+  body .MuiFormControl-root:last-child,
+  body .MuiButton-root:last-child,
+  .MuiTextField-root:last-child,
+  .MuiFormControl-root:last-child,
+  .MuiButton-root:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  html body .MuiTextField-root .MuiInputBase-root,
+  body .MuiTextField-root .MuiInputBase-root,
+  .MuiTextField-root .MuiInputBase-root {
+    font-size: 16px !important;
+    border-radius: 8px !important;
+  }
+
+  /* ==============================|| TABLE COMPLETE OVERRIDE ||============================== */
+
+  /* Table container - MAXIMUM SPECIFICITY */
+  html body .MuiTableContainer-root,
+  body .MuiTableContainer-root,
+  .MuiTableContainer-root {
+    margin: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Table mobile card layout */
+  html body .MuiTable-root,
+  body .MuiTable-root,
+  .MuiTable-root {
+    border: none !important;
+  }
+
+  html body .MuiTableHead-root,
+  body .MuiTableHead-root,
+  .MuiTableHead-root {
+    display: none !important;
+  }
+
+  html body .MuiTableBody-root .MuiTableRow-root,
+  body .MuiTableBody-root .MuiTableRow-root,
+  .MuiTableBody-root .MuiTableRow-root {
+    display: block !important;
+    border: none !important;
+    /* Remove all borders */
+    border-radius: 4px !important;
+    margin: 2px 0 !important;
+    /* Minimal vertical margin only */
+    padding: 8px !important;
+    /* Reduced padding */
+    background-color: var(--mui-palette-background-paper) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    width: 100% !important;
+    /* Full width */
+  }
+
+  html body .MuiTableBody-root .MuiTableRow-root:hover,
+  body .MuiTableBody-root .MuiTableRow-root:hover,
+  .MuiTableBody-root .MuiTableRow-root:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  html body .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root,
+  body .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root,
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root {
+    display: flex !important;
+    align-items: flex-start !important;
+    border: none !important;
+    padding: 8px 0 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.5 !important;
+    min-height: auto !important;
+  }
+
+  html body .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:before,
+  body .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:before,
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root:before {
+    content: attr(data-label) !important;
+    font-weight: 600 !important;
+    color: #6c757d !important;
+    font-size: 14px !important;
+    min-width: 80px !important;
+    margin-right: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  html body .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root>*,
+  body .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root>*,
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root>* {
+    flex: 1 !important;
+    margin: 0 !important;
+  }
+
+  /* ==============================|| COMPLETE BORDER REMOVAL ||============================== */
+
+  /* Remove ALL borders with maximum specificity */
+  html body .MuiTable-root,
+  html body .MuiTable-root *,
+  html body .MuiTableContainer-root,
+  html body .MuiTableContainer-root *,
+  html body .MuiTableHead-root,
+  html body .MuiTableHead-root *,
+  html body .MuiTableBody-root,
+  html body .MuiTableBody-root *,
+  html body .MuiTableRow-root,
+  html body .MuiTableRow-root *,
+  html body .MuiTableCell-root,
+  html body .MuiTableCell-root *,
+  body .MuiTable-root,
+  body .MuiTable-root *,
+  body .MuiTableContainer-root,
+  body .MuiTableContainer-root *,
+  body .MuiTableHead-root,
+  body .MuiTableHead-root *,
+  body .MuiTableBody-root,
+  body .MuiTableBody-root *,
+  body .MuiTableRow-root,
+  body .MuiTableRow-root *,
+  body .MuiTableCell-root,
+  body .MuiTableCell-root *,
+  .MuiTable-root,
+  .MuiTable-root *,
+  .MuiTableContainer-root,
+  .MuiTableContainer-root *,
+  .MuiTableHead-root,
+  .MuiTableHead-root *,
+  .MuiTableBody-root,
+  .MuiTableBody-root *,
+  .MuiTableRow-root,
+  .MuiTableRow-root *,
+  .MuiTableCell-root,
+  .MuiTableCell-root * {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-collapse: separate !important;
+  }
+
+  /* ==============================|| PAGINATION ||============================== */
+
+  /* Pagination mobile styling */
+  html body .MuiTablePagination-root,
+  body .MuiTablePagination-root,
+  .MuiTablePagination-root {
+    padding: 16px !important;
+    border: none !important;
+    background-color: #ffffff !important;
+  }
+
+  html body .MuiTablePagination-toolbar,
+  body .MuiTablePagination-toolbar,
+  .MuiTablePagination-toolbar {
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 8px !important;
+  }
+
+  html body .MuiTablePagination-selectLabel,
+  html body .MuiTablePagination-displayedRows,
+  body .MuiTablePagination-selectLabel,
+  body .MuiTablePagination-displayedRows,
+  .MuiTablePagination-selectLabel,
+  .MuiTablePagination-displayedRows {
+    margin: 4px 0 !important;
+    font-size: 14px !important;
+  }
+
+  html body .MuiTablePagination-actions,
+  body .MuiTablePagination-actions,
+  .MuiTablePagination-actions {
+    margin-left: 0 !important;
+  }
+
+  html body .MuiTablePagination-actions .MuiIconButton-root,
+  body .MuiTablePagination-actions .MuiIconButton-root,
+  .MuiTablePagination-actions .MuiIconButton-root {
+    min-width: 44px !important;
+    height: 44px !important;
+    border-radius: 8px !important;
+    border: 1px solid #dee2e6 !important;
+    margin: 0 4px !important;
+  }
+
+  /* ==============================|| COMPONENT STYLING ||============================== */
+
+  /* Chips and labels styling */
+  html body .MuiChip-root,
+  body .MuiChip-root,
+  .MuiChip-root {
+    margin: 2px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    height: 28px !important;
+    border-radius: 6px !important;
+  }
+
+  /* Button styling */
+  html body .MuiButton-root,
+  body .MuiButton-root,
+  .MuiButton-root {
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    padding: 12px 20px !important;
+    margin: 8px 0 !important;
+    min-height: 44px !important;
+    transition: all 0.2s ease !important;
+  }
+
+  /* Alert styling */
+  html body .MuiAlert-root,
+  body .MuiAlert-root,
+  .MuiAlert-root {
+    margin: 16px !important;
+    font-size: 14px !important;
+    border-radius: 8px !important;
+  }
+}

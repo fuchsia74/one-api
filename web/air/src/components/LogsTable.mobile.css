@@ -1,0 +1,374 @@
+/* ==============================|| MODERN MOBILE LOGS TABLE - AIR TEMPLATE ||============================== */
+
+/* Mobile-first responsive design for LogsTable component (Semi-UI) */
+@media screen and (max-width: 768px) {
+
+  /* ==============================|| CRITICAL LAYOUT RESET ||============================== */
+
+  /* Override global body padding that causes top margin issue */
+  body {
+    padding-top: 0 !important;
+  }
+
+  /* Reset layout containers */
+  .logs-layout {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* ==============================|| HEADER FIXES ||============================== */
+
+  /* Fix header positioning and overlay issues */
+  .logs-header {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 1000 !important;
+    background-color: #ffffff !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+    margin: 0 !important;
+    padding: 12px 16px !important;
+    border: none !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  }
+
+  .logs-header h3 {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    line-height: 1.3 !important;
+    color: #212529 !important;
+  }
+
+  /* ==============================|| FORM OPTIMIZATION ||============================== */
+
+  /* Modern form styling */
+  .logs-form {
+    padding: 16px !important;
+    margin: 0 !important;
+    background-color: #f8f9fa !important;
+  }
+
+  .logs-form .semi-form-field {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+  }
+
+  .logs-form .semi-form-field:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  /* Full-width form controls */
+  .logs-form .semi-input,
+  .logs-form .semi-datepicker,
+  .logs-form .semi-select,
+  .logs-form .semi-autocomplete,
+  .logs-form .semi-button {
+    width: 100% !important;
+    min-height: 44px !important;
+    /* Touch-friendly size */
+  }
+
+  .logs-form .semi-input-wrapper {
+    width: 100% !important;
+  }
+
+  .logs-form .semi-input {
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    /* Prevent zoom on iOS */
+    border-radius: 8px !important;
+    border: 1px solid #ced4da !important;
+    background-color: #ffffff !important;
+  }
+
+  /* ==============================|| TABLE CARD LAYOUT ||============================== */
+
+  /* Hide traditional table structure */
+  .logs-table {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .logs-table .semi-table {
+    border: none !important;
+  }
+
+  .logs-table .semi-table-thead {
+    display: none !important;
+  }
+
+  /* Card-based row layout */
+  .logs-table .semi-table-tbody .semi-table-row {
+    display: block !important;
+    background-color: #ffffff !important;
+    border: none !important;
+    border-radius: 12px !important;
+    margin: 16px !important;
+    padding: 16px !important;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row:hover {
+    transform: translateY(-2px) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12) !important;
+  }
+
+  /* Cell styling with labels */
+  .logs-table .semi-table-tbody .semi-table-row-cell {
+    display: flex !important;
+    align-items: flex-start !important;
+    padding: 8px 0 !important;
+    border: none !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.5 !important;
+    min-height: auto !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:before {
+    content: attr(data-label) !important;
+    font-weight: 600 !important;
+    color: #6c757d !important;
+    font-size: 14px !important;
+    min-width: 80px !important;
+    margin-right: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell>* {
+    flex: 1 !important;
+    margin: 0 !important;
+  }
+
+  /* Add data labels for mobile */
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(1):before {
+    content: '时间: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(2):before {
+    content: '渠道: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(3):before {
+    content: '用户: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(4):before {
+    content: '令牌: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(5):before {
+    content: '类型: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(6):before {
+    content: '模型: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(7):before {
+    content: '提示: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(8):before {
+    content: '完成: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(9):before {
+    content: '配额: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(10):before {
+    content: '详情: ' !important;
+  }
+
+  /* ==============================|| COMPLETE BORDER REMOVAL ||============================== */
+
+  /* Remove all table borders */
+  .logs-table,
+  .logs-table .semi-table,
+  .logs-table .semi-table-thead,
+  .logs-table .semi-table-tbody,
+  .logs-table .semi-table-row,
+  .logs-table .semi-table-row-cell,
+  .logs-table .semi-table-row-head {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-collapse: separate !important;
+  }
+
+  /* ==============================|| PAGINATION ||============================== */
+
+  /* Modern pagination */
+  .logs-table .semi-page {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    margin: 16px 0 !important;
+    padding: 0 16px !important;
+  }
+
+  .logs-table .semi-page .semi-page-item {
+    min-width: 44px !important;
+    height: 44px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    border: 1px solid #dee2e6 !important;
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .logs-table .semi-page .semi-page-item:hover,
+  .logs-table .semi-page .semi-page-item.semi-page-item-active {
+    background-color: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+  }
+
+  /* ==============================|| COMPONENT STYLING ||============================== */
+
+  /* Modern tags */
+  .logs-table .semi-tag {
+    border-radius: 6px !important;
+    font-size: 12px !important;
+    font-weight: 500 !important;
+    padding: 4px 8px !important;
+    margin: 2px !important;
+    border: 1px solid transparent !important;
+  }
+
+  /* Modern buttons */
+  .logs-table .semi-button {
+    border-radius: 8px !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    padding: 12px 20px !important;
+    margin: 8px 0 !important;
+    min-height: 44px !important;
+    border: 1px solid #dee2e6 !important;
+    transition: all 0.2s ease !important;
+  }
+
+  .logs-table .semi-button-primary {
+    background-color: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+  }
+
+  /* Modern select dropdown */
+  .logs-select {
+    border-radius: 8px !important;
+    border: 1px solid #ced4da !important;
+    background-color: #ffffff !important;
+    min-height: 44px !important;
+    margin: 8px 0 !important;
+    width: 100% !important;
+  }
+
+  .logs-select .semi-select-selection {
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    border: none !important;
+    background: transparent !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(11):before {
+    content: '流式: ' !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:nth-child(12):before {
+    content: '用时: ' !important;
+  }
+
+  /* Select dropdown */
+  .logs-select {
+    width: 100% !important;
+    margin: 8px 16px !important;
+  }
+
+  /* Pagination mobile styling */
+  .logs-table .semi-table-pagination {
+    padding: 8px 16px !important;
+  }
+
+  .logs-table .semi-table-pagination .semi-page {
+    margin: 0px 2px !important;
+  }
+
+  /* Tags and content styling */
+  .logs-table .semi-tag {
+    margin: 2px !important;
+    font-size: 12px !important;
+    padding: 2px 6px !important;
+  }
+
+  /* Avatar styling */
+  .logs-table .semi-avatar {
+    width: 24px !important;
+    height: 24px !important;
+    font-size: 12px !important;
+  }
+
+  /* Remove borders completely */
+  .logs-table .semi-table-tbody .semi-table-row,
+  .logs-table .semi-table-tbody .semi-table-row-cell,
+  .logs-table .semi-table-thead .semi-table-row,
+  .logs-table .semi-table-thead .semi-table-row-head,
+  .logs-table .semi-table,
+  .logs-table .semi-table-wrapper,
+  .logs-table .semi-table-container {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-collapse: collapse !important;
+  }
+
+  /* Remove all possible border variations */
+  .logs-table * {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Override any Semi-UI table borders */
+  .logs-table .semi-table-tbody .semi-table-row:not(:last-child) {
+    border-bottom: none !important;
+  }
+
+  .logs-table .semi-table-tbody .semi-table-row-cell:not(:last-child) {
+    border-right: none !important;
+  }
+
+  /* Ensure proper spacing and no overlap */
+  .logs-table .semi-table-tbody .semi-table-row-cell>* {
+    margin: 2px 0px !important;
+    display: inline-block !important;
+    vertical-align: top !important;
+  }
+
+  /* Fix text wrapping and prevent overlap */
+  .logs-table .semi-table-tbody .semi-table-row-cell {
+    white-space: normal !important;
+    line-height: 1.4 !important;
+    min-height: 20px !important;
+  }
+}

@@ -1,55 +1,56 @@
 /* CSS Variables for Theme Support */
 :root {
-  /* Light theme colors */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --bg-tertiary: #e9ecef;
-  --text-primary: #212529;
-  --text-secondary: #6c757d;
-  --text-muted: #adb5bd;
-  --border-color: #dee2e6;
-  --shadow-color: rgba(0, 0, 0, 0.1);
-  --menu-bg: #ffffff;
-  --menu-hover: #f8f9fa;
-  --menu-active: #e9ecef;
-  --card-bg: #ffffff;
-  --input-bg: #ffffff;
-  --input-border: #ced4da;
-  --button-primary: #007bff;
-  --button-secondary: #6c757d;
-  --success-color: #28a745;
-  --warning-color: #ffc107;
-  --error-color: #dc3545;
-  --info-color: #17a2b8;
+    /* Light theme colors */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8f9fa;
+    --bg-tertiary: #e9ecef;
+    --text-primary: #212529;
+    --text-secondary: #6c757d;
+    --text-muted: #adb5bd;
+    --border-color: #dee2e6;
+    --shadow-color: rgba(0, 0, 0, 0.1);
+    --menu-bg: #ffffff;
+    --menu-hover: #f8f9fa;
+    --menu-active: #e9ecef;
+    --card-bg: #ffffff;
+    --input-bg: #ffffff;
+    --input-border: #ced4da;
+    --button-primary: #007bff;
+    --button-secondary: #6c757d;
+    --success-color: #28a745;
+    --warning-color: #ffc107;
+    --error-color: #dc3545;
+    --info-color: #17a2b8;
 }
 
 [data-theme="dark"] {
-  /* Dark theme colors - More refined palette */
-  --bg-primary: #1e1e1e;
-  --bg-secondary: #2a2a2a;
-  --bg-tertiary: #363636;
-  --text-primary: #e4e4e4;
-  --text-secondary: #b8b8b8;
-  --text-muted: #888888;
-  --border-color: #3a3a3a;
-  --shadow-color: rgba(0, 0, 0, 0.4);
-  --menu-bg: #2a2a2a;
-  --menu-hover: #363636;
-  --menu-active: #404040;
-  --card-bg: #2a2a2a;
-  --input-bg: #363636;
-  --input-border: #4a4a4a;
-  --button-primary: #4a9eff;
-  --button-secondary: #5a5a5a;
-  --success-color: #4caf50;
-  --warning-color: #ff9800;
-  --error-color: #f44336;
-  --info-color: #2196f3;
+    /* Dark theme colors - More refined palette */
+    --bg-primary: #1e1e1e;
+    --bg-secondary: #2a2a2a;
+    --bg-tertiary: #363636;
+    --text-primary: #e4e4e4;
+    --text-secondary: #b8b8b8;
+    --text-muted: #888888;
+    --border-color: #3a3a3a;
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --menu-bg: #2a2a2a;
+    --menu-hover: #363636;
+    --menu-active: #404040;
+    --card-bg: #2a2a2a;
+    --input-bg: #363636;
+    --input-border: #4a4a4a;
+    --button-primary: #4a9eff;
+    --button-secondary: #5a5a5a;
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --error-color: #f44336;
+    --info-color: #2196f3;
 }
 
 body {
     margin: 0;
-    padding-top: 55px;
+    padding-top: 60px;
+    /* Increased from 55px to account for header height */
     overflow-y: scroll;
     font-family: Lato, 'Helvetica Neue', Arial, Helvetica, "Microsoft YaHei", sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -66,7 +67,8 @@ html {
 }
 
 #root {
-    min-height: calc(100vh - 55px);
+    min-height: calc(100vh - 60px);
+    /* Updated to match body padding-top */
     display: flex;
     flex-direction: column;
     background-color: var(--bg-primary);
@@ -81,10 +83,12 @@ code {
 }
 
 .main-content {
-    padding: 4px;
+    padding: 8px;
+    /* Increased from 4px for better spacing */
     background-color: var(--bg-primary);
     flex: 1;
-    min-height: calc(100vh - 55px - 60px); /* Account for header and footer */
+    min-height: calc(100vh - 60px - 60px);
+    /* Updated header height */
 }
 
 /* Footer positioning */
@@ -102,7 +106,8 @@ code {
 /* Dashboard and settings container */
 .dashboard-container {
     background-color: var(--bg-primary) !important;
-    min-height: calc(100vh - 55px - 60px);
+    min-height: calc(100vh - 60px - 60px);
+    /* Updated header height */
     padding: 1rem;
 }
 
@@ -155,11 +160,11 @@ code {
     background-color: transparent !important;
 }
 
-[data-theme="dark"] .ui.grid > .row {
+[data-theme="dark"] .ui.grid>.row {
     background-color: transparent !important;
 }
 
-[data-theme="dark"] .ui.grid > .column {
+[data-theme="dark"] .ui.grid>.column {
     background-color: transparent !important;
 }
 
@@ -169,14 +174,14 @@ code {
 }
 
 [data-theme="dark"] .ui.card,
-[data-theme="dark"] .ui.cards > .card {
+[data-theme="dark"] .ui.cards>.card {
     background-color: var(--card-bg) !important;
     border: 1px solid var(--border-color) !important;
     color: var(--text-primary) !important;
 }
 
-[data-theme="dark"] .ui.card > .content,
-[data-theme="dark"] .ui.cards > .card > .content {
+[data-theme="dark"] .ui.card>.content,
+[data-theme="dark"] .ui.cards>.card>.content {
     background-color: var(--card-bg) !important;
     color: var(--text-primary) !important;
     border-color: var(--border-color) !important;
@@ -543,7 +548,7 @@ code {
     background-color: var(--menu-hover) !important;
 }
 
-[data-theme="dark"] .ui.form .field > label {
+[data-theme="dark"] .ui.form .field>label {
     color: var(--text-primary) !important;
 }
 
@@ -551,8 +556,8 @@ code {
     color: var(--text-primary) !important;
 }
 
-[data-theme="dark"] .ui.checkbox input:checked ~ .box:before,
-[data-theme="dark"] .ui.checkbox input:checked ~ label:before {
+[data-theme="dark"] .ui.checkbox input:checked~.box:before,
+[data-theme="dark"] .ui.checkbox input:checked~label:before {
     background-color: var(--button-primary) !important;
     border-color: var(--button-primary) !important;
 }
@@ -631,12 +636,12 @@ code {
 }
 
 /* Generic white backgrounds that might appear */
-[data-theme="dark"] .ui.form .field > .ui.input,
-[data-theme="dark"] .ui.form .field > .ui.dropdown {
+[data-theme="dark"] .ui.form .field>.ui.input,
+[data-theme="dark"] .ui.form .field>.ui.dropdown {
     background-color: var(--input-bg) !important;
 }
 
-[data-theme="dark"] .ui.form .field > .ui.input input {
+[data-theme="dark"] .ui.form .field>.ui.input input {
     background-color: var(--input-bg) !important;
     color: var(--text-primary) !important;
 }
@@ -721,11 +726,11 @@ code {
 }
 
 /* Content areas and panels */
-[data-theme="dark"] .ui.grid > .column {
+[data-theme="dark"] .ui.grid>.column {
     background-color: transparent !important;
 }
 
-[data-theme="dark"] .ui.container > .ui.grid {
+[data-theme="dark"] .ui.container>.ui.grid {
     background-color: transparent !important;
 }
 
@@ -932,11 +937,11 @@ code {
 }
 
 /* Ensure theme dropdown trigger is properly styled */
-[data-theme="dark"] .ui.dropdown > .dropdown.icon {
+[data-theme="dark"] .ui.dropdown>.dropdown.icon {
     color: var(--text-secondary) !important;
 }
 
-[data-theme="dark"] .ui.dropdown > .text {
+[data-theme="dark"] .ui.dropdown>.text {
     color: var(--text-secondary) !important;
 }
 
@@ -1031,7 +1036,7 @@ code {
     }
 
     /* Ensure icons are properly centered in icon-only mode */
-    .ui.menu .item > .icon:only-child {
+    .ui.menu .item>.icon:only-child {
         margin: 0 !important;
     }
 
@@ -1066,7 +1071,7 @@ code {
 }
 
 /* Ensure navigation buttons stay left-aligned */
-.ui.menu .ui.container > .item:not(.right) {
+.ui.menu .ui.container>.item:not(.right) {
     margin-right: 0 !important;
 }
 
@@ -1077,84 +1082,317 @@ code {
     }
 }
 
+/* ==============================|| MOBILE-FIRST RESPONSIVE DESIGN ||============================== */
+
+/* Base mobile styles (0-768px) */
 @media screen and (max-width: 768px) {
-  .ui.container {
-    width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    padding: 0 10px !important;
-  }
 
-  .ui.card,
-  .ui.cards,
-  .ui.segment {
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
+    /* Ensure proper body spacing for mobile */
+    body {
+        padding-top: 60px !important;
+        /* Maintain header space */
+    }
 
-  .ui.table {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
+    /* Ensure navigation menu is properly positioned */
+    .ui.menu {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        right: 0 !important;
+        z-index: 1000 !important;
+        height: 60px !important;
+    }
+
+    /* Reset containers for mobile - NO padding */
+    .ui.container {
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        /* Remove all padding */
+        max-width: none !important;
+    }
+
+    /* Main content with minimal padding */
+    .main-content {
+        padding: 4px !important;
+        /* Minimal padding */
+    }
+
+    /* Dashboard container with minimal padding */
+    .dashboard-container {
+        padding: 4px !important;
+        /* Minimal padding */
+    }
+
+    /* Card styling - minimal margins, no borders */
+    .ui.card,
+    .ui.cards>.card {
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        border: none !important;
+        /* Remove borders */
+        border-radius: 4px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    }
+
+    /* Segment styling - minimal margins, no borders */
+    .ui.segment {
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        border: none !important;
+        /* Remove borders */
+        border-radius: 4px !important;
+        box-shadow: none !important;
+    }
+
+    /* Table styling - no borders */
+    .ui.table {
+        border: none !important;
+        /* Remove borders */
+        border-radius: 4px !important;
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        box-shadow: none !important;
+    }
+
+    /* Remove all horizontal margins and padding from common elements */
+    .ui.segment,
+    .ui.card,
+    .ui.form,
+    .ui.table,
+    .ui.container {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Form styling - remove all borders */
+    .ui.form {
+        margin: 0 !important;
+        border: none !important;
+    }
+
+    .ui.form .ui.segment {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 4px !important;
+        /* Reduced padding */
+        margin: 0 !important;
+        background: var(--bg-primary) !important;
+    }
+
+    /* Ensure form fields take full width with minimal padding */
+    .ui.form .field,
+    .ui.form .fields {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
+    }
+
+    .ui.form .field {
+        margin-bottom: 0.75rem !important;
+    }
+
+    /* Table responsive design - convert to mobile layout */
+    .ui.table {
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        background: var(--bg-primary) !important;
+    }
+
+    .ui.table thead {
+        display: none !important;
+        /* Hide table headers on mobile */
+    }
+
+    .ui.table tbody tr {
+        display: block !important;
+        border: none !important;
+        border-radius: 0 !important;
+        margin-bottom: 8px !important;
+        padding: 12px !important;
+        background: var(--bg-primary) !important;
+        box-shadow: none !important;
+    }
+
+    .ui.table tbody tr td {
+        display: block !important;
+        border: none !important;
+        padding: 4px 0 !important;
+        text-align: left !important;
+        position: relative !important;
+        padding-left: 40% !important;
+    }
+
+    .ui.table tbody tr td:before {
+        content: attr(data-label) !important;
+        position: absolute !important;
+        left: 0 !important;
+        width: 35% !important;
+        font-weight: bold !important;
+        color: var(--text-secondary) !important;
+        font-size: 0.9em !important;
+    }
+
+    /* Button groups - stack vertically */
+    .ui.buttons {
+        flex-direction: column !important;
+    }
+
+    .ui.buttons .button {
+        margin: 2px 0 !important;
+        width: 100% !important;
+    }
+
+    /* Menu - full width */
+    .ui.menu {
+        border: none !important;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .ui.menu .ui.container {
+        padding: 0 8px !important;
+    }
+
+    /* Hide elements that take too much space on mobile */
+    .hide-on-mobile {
+        display: none !important;
+    }
+
+    /* Compact statistics */
+    .ui.statistic {
+        margin: 0.5em 0 !important;
+    }
+
+    .ui.statistic>.value {
+        font-size: 1.5rem !important;
+    }
+
+    /* Modal adjustments */
+    .ui.modal {
+        margin: 8px !important;
+        width: calc(100% - 16px) !important;
+    }
 }
 
-/* 小屏笔记本 (13-14寸) */
+/* ==============================|| TABLET RESPONSIVE DESIGN ||============================== */
+
+/* Tablet styles (769px - 1366px) */
 @media screen and (min-width: 769px) and (max-width: 1366px) {
-  .ui.container {
-    width: auto !important;
-    max-width: 100% !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding: 0 24px !important;
-  }
+    .ui.container {
+        width: auto !important;
+        max-width: 100% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding: 0 16px !important;
+    }
 
-  /* 调整表格显示 */
-  .ui.table {
-    font-size: 0.9em;
-  }
+    /* Reduce card margins and borders for tablets */
+    .ui.card,
+    .ui.cards>.card {
+        border-radius: 4px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
 
-  /* 调整卡片布局 */
-  .ui.cards {
-    margin-left: -0.5em !important;
-    margin-right: -0.5em !important;
-  }
+    /* Table adjustments for tablets */
+    .ui.table {
+        font-size: 0.9em;
+        border-radius: 4px !important;
+    }
 
-  .ui.cards > .card {
-    margin: 0.5em !important;
-    width: calc(50% - 1em) !important;
-  }
+    .ui.table th,
+    .ui.table td {
+        padding: 8px 6px !important;
+    }
+
+    /* Card layout optimization */
+    .ui.cards {
+        margin-left: -0.5em !important;
+        margin-right: -0.5em !important;
+    }
+
+    .ui.cards>.card {
+        margin: 0.5em !important;
+        width: calc(50% - 1em) !important;
+    }
+
+    /* Content area adjustments */
+    .main-content {
+        padding: 12px !important;
+    }
+
+    .dashboard-container {
+        padding: 1rem !important;
+        max-width: none !important;
+    }
+
+    /* Form adjustments */
+    .ui.form .ui.segment {
+        padding: 16px !important;
+    }
+
+    /* Menu adjustments */
+    .ui.menu .ui.container {
+        padding: 0 16px !important;
+    }
 }
 
-/* 大屏幕 */
+/* ==============================|| DESKTOP RESPONSIVE DESIGN ||============================== */
+
+/* Desktop styles (1367px+) */
 @media screen and (min-width: 1367px) {
-  .ui.container {
-    width: 1200px !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    padding: 0 !important;
-  }
+    .ui.container {
+        width: 1200px !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+        padding: 0 !important;
+    }
+
+    /* Restore full styling for desktop */
+    .ui.card,
+    .ui.cards>.card {
+        border-radius: 8px !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .ui.table {
+        border-radius: 8px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    }
+
+    .main-content {
+        padding: 16px !important;
+    }
+
+    .dashboard-container {
+        padding: 20px 24px 40px !important;
+        max-width: 1600px !important;
+    }
 }
 
 /* 优化 Dashboard 网格布局 */
 @media screen and (max-width: 1366px) {
-  .charts-grid {
-    margin: 0 -0.5em !important;
-  }
+    .charts-grid {
+        margin: 0 -0.5em !important;
+    }
 
-  .charts-grid .column {
-    padding: 0.5em !important;
-  }
+    .charts-grid .column {
+        padding: 0.5em !important;
+    }
 
-  .chart-card {
-    margin: 0 !important;
-  }
+    .chart-card {
+        margin: 0 !important;
+    }
 
-  /* 调整字体大小 */
-  .ui.header {
-    font-size: 1.1em !important;
-  }
+    /* 调整字体大小 */
+    .ui.header {
+        font-size: 1.1em !important;
+    }
 
-  .stat-value {
-    font-size: 0.9em !important;
-  }
+    .stat-value {
+        font-size: 0.9em !important;
+    }
 }

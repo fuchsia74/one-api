@@ -55,10 +55,21 @@ export default function componentStyleOverrides(theme) {
       },
       styleOverrides: {
         root: {
-          backgroundImage: 'none'
+          backgroundImage: 'none',
+          // Responsive styles for narrow screens
+          '@media (max-width: 768px)': {
+            borderLeft: 'none',
+            borderRight: 'none',
+            borderRadius: '0',
+            boxShadow: 'none',
+            margin: '0'
+          }
         },
         rounded: {
-          borderRadius: `${theme?.customization?.borderRadius}px`
+          borderRadius: `${theme?.customization?.borderRadius}px`,
+          '@media (max-width: 768px)': {
+            borderRadius: '0'
+          }
         }
       }
     },
@@ -76,14 +87,124 @@ export default function componentStyleOverrides(theme) {
     MuiCardContent: {
       styleOverrides: {
         root: {
-          padding: '24px'
+          padding: '24px',
+          // Responsive padding for narrow screens
+          '@media (max-width: 768px)': {
+            padding: '12px',
+            borderLeft: 'none',
+            borderRight: 'none',
+            borderRadius: '0'
+          }
         }
       }
     },
     MuiCardActions: {
       styleOverrides: {
         root: {
-          padding: '24px'
+          padding: '24px',
+          // Responsive padding for narrow screens
+          '@media (max-width: 768px)': {
+            padding: '4px' /* Minimal padding */
+          }
+        }
+      }
+    },
+    MuiContainer: {
+      styleOverrides: {
+        root: {
+          // Responsive container styles for narrow screens
+          '@media (max-width: 768px)': {
+            paddingLeft: '0', /* Remove all padding */
+            paddingRight: '0', /* Remove all padding */
+            margin: '0'
+          },
+          '@media (min-width: 769px) and (max-width: 1366px)': {
+            paddingLeft: '16px',
+            paddingRight: '16px'
+          }
+        }
+      }
+    },
+    MuiTableContainer: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 768px)': {
+            border: 'none',
+            borderRadius: '0',
+            boxShadow: 'none',
+            margin: '0'
+          }
+        }
+      }
+    },
+    MuiTable: {
+      styleOverrides: {
+        root: {
+          '@media (max-width: 768px)': {
+            borderLeft: 'none',
+            borderRight: 'none',
+            boxShadow: 'none',
+            '& .MuiTableHead-root': {
+              display: 'none'
+            },
+            '& .MuiTableBody-root .MuiTableRow-root': {
+              display: 'block',
+              border: 'none',
+              borderRadius: '0',
+              marginBottom: '8px',
+              padding: '12px',
+              backgroundColor: 'transparent'
+            },
+            '& .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root': {
+              display: 'block',
+              border: 'none',
+              padding: '4px 0',
+              textAlign: 'left',
+              position: 'relative',
+              paddingLeft: '40%',
+              '&:before': {
+                position: 'absolute',
+                left: '0',
+                width: '35%',
+                fontWeight: 'bold',
+                color: theme.colors?.grey700 || '#666',
+                fontSize: '0.9em'
+              },
+              '&:nth-of-type(1):before': {
+                content: '"时间"'
+              },
+              '&:nth-of-type(2):before': {
+                content: '"渠道"'
+              },
+              '&:nth-of-type(3):before': {
+                content: '"类型"'
+              },
+              '&:nth-of-type(4):before': {
+                content: '"模型"'
+              },
+              '&:nth-of-type(5):before': {
+                content: '"用户"'
+              },
+              '&:nth-of-type(6):before': {
+                content: '"令牌"'
+              },
+              '&:nth-of-type(7):before': {
+                content: '"提示"'
+              },
+              '&:nth-of-type(8):before': {
+                content: '"补全"'
+              },
+              '&:nth-of-type(9):before': {
+                content: '"花费"'
+              },
+              '&:nth-of-type(10):before': {
+                content: '"延迟"'
+              },
+              '&:nth-of-type(11):before': {
+                content: '"详情"'
+              }
+            }
+          }
         }
       }
     },

@@ -1,0 +1,326 @@
+/* ==============================|| MOBILE OVERRIDE FRAMEWORK - AIR TEMPLATE ||============================== */
+/* MAXIMUM SPECIFICITY CSS TO OVERRIDE ALL EXISTING STYLES */
+/* This file uses the highest possible CSS specificity to ensure mobile styles are applied */
+
+@media screen and (max-width: 768px) {
+
+  /* ==============================|| CRITICAL LAYOUT RESET ||============================== */
+
+  /* Maintain proper body spacing for mobile */
+  html body,
+  body {
+    padding-top: 60px !important;
+    /* Keep header space */
+    margin-top: 0 !important;
+  }
+
+  /* Override root container */
+  html #root,
+  #root {
+    min-height: calc(100vh - 60px) !important;
+    padding-top: 0 !important;
+    margin-top: 0 !important;
+  }
+
+  /* Override main content container */
+  html body .main-content,
+  body .main-content,
+  .main-content {
+    padding: 4px !important;
+    /* Minimal padding */
+    margin: 0 !important;
+    min-height: calc(100vh - 60px) !important;
+  }
+
+  /* Override Semi-UI layout */
+  html body .semi-layout,
+  body .semi-layout,
+  .semi-layout,
+  html body .logs-layout,
+  body .logs-layout,
+  .logs-layout {
+    margin: 0 !important;
+    padding: 0 !important;
+    /* Remove all padding */
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* ==============================|| NAVIGATION MENU FIXES ||============================== */
+
+  /* Fix navigation menu positioning only - NOT content headers */
+  html body .semi-navigation,
+  body .semi-navigation,
+  .semi-navigation {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    z-index: 1000 !important;
+    margin: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  /* Ensure content headers are NOT sticky */
+  html body .semi-layout-header,
+  body .semi-layout-header,
+  .semi-layout-header,
+  html body .logs-header,
+  body .logs-header,
+  .logs-header {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    box-shadow: none !important;
+    z-index: auto !important;
+  }
+
+  html body .semi-layout-header h3,
+  body .semi-layout-header h3,
+  .semi-layout-header h3,
+  html body .logs-header h3,
+  body .logs-header h3,
+  .logs-header h3 {
+    font-size: 18px !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    line-height: 1.3 !important;
+    color: #212529 !important;
+  }
+
+  /* ==============================|| FORM OPTIMIZATION ||============================== */
+
+  /* Form container */
+  html body .semi-form,
+  body .semi-form,
+  .semi-form,
+  html body .logs-form,
+  body .logs-form,
+  .logs-form {
+    padding: 8px !important;
+    /* Reduced padding */
+    margin: 4px 0 !important;
+    /* Minimal margin */
+    background-color: var(--semi-color-bg-0) !important;
+    border: none !important;
+    /* Remove borders */
+  }
+
+  /* Form fields */
+  html body .semi-form-field,
+  body .semi-form-field,
+  .semi-form-field {
+    width: 100% !important;
+    margin-bottom: 16px !important;
+  }
+
+  /* Form inputs and controls */
+  html body .semi-input,
+  html body .semi-datepicker,
+  html body .semi-select,
+  html body .semi-autocomplete,
+  html body .semi-button,
+  body .semi-input,
+  body .semi-datepicker,
+  body .semi-select,
+  body .semi-autocomplete,
+  body .semi-button,
+  .semi-input,
+  .semi-datepicker,
+  .semi-select,
+  .semi-autocomplete,
+  .semi-button,
+  html body .logs-select,
+  body .logs-select,
+  .logs-select {
+    width: 100% !important;
+    min-height: 44px !important;
+  }
+
+  html body .semi-input-wrapper,
+  body .semi-input-wrapper,
+  .semi-input-wrapper {
+    width: 100% !important;
+  }
+
+  html body .semi-input,
+  body .semi-input,
+  .semi-input {
+    padding: 12px 16px !important;
+    font-size: 16px !important;
+    border-radius: 8px !important;
+    border: 1px solid #ced4da !important;
+    background-color: #ffffff !important;
+  }
+
+  /* ==============================|| TABLE COMPLETE OVERRIDE ||============================== */
+
+  /* Hide table headers - MAXIMUM SPECIFICITY */
+  html body .semi-table-thead,
+  body .semi-table-thead,
+  .semi-table-thead {
+    display: none !important;
+  }
+
+  /* Table container reset */
+  html body .semi-table,
+  body .semi-table,
+  .semi-table,
+  html body .logs-table,
+  body .logs-table,
+  .logs-table {
+    border: none !important;
+    box-shadow: none !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  /* Card-based row layout - MAXIMUM SPECIFICITY */
+  html body .semi-table-tbody .semi-table-row,
+  body .semi-table-tbody .semi-table-row,
+  .semi-table-tbody .semi-table-row {
+    display: block !important;
+    background-color: var(--semi-color-bg-1) !important;
+    border: none !important;
+    /* Remove all borders */
+    border-radius: 4px !important;
+    margin: 2px 0 !important;
+    /* Minimal vertical margin only */
+    padding: 8px !important;
+    /* Reduced padding */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+    width: 100% !important;
+    /* Full width */
+  }
+
+  html body .semi-table-tbody .semi-table-row:hover,
+  body .semi-table-tbody .semi-table-row:hover,
+  .semi-table-tbody .semi-table-row:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  }
+
+  /* Cell styling - MAXIMUM SPECIFICITY */
+  html body .semi-table-tbody .semi-table-row-cell,
+  body .semi-table-tbody .semi-table-row-cell,
+  .semi-table-tbody .semi-table-row-cell {
+    display: flex !important;
+    align-items: flex-start !important;
+    padding: 8px 0 !important;
+    border: none !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    line-height: 1.5 !important;
+    min-height: auto !important;
+  }
+
+  /* Data labels using CSS content */
+  html body .semi-table-tbody .semi-table-row-cell:before,
+  body .semi-table-tbody .semi-table-row-cell:before,
+  .semi-table-tbody .semi-table-row-cell:before {
+    font-weight: 600 !important;
+    color: #6c757d !important;
+    font-size: 14px !important;
+    min-width: 80px !important;
+    margin-right: 12px !important;
+    flex-shrink: 0 !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell>*,
+  body .semi-table-tbody .semi-table-row-cell>*,
+  .semi-table-tbody .semi-table-row-cell>* {
+    flex: 1 !important;
+    margin: 0 !important;
+  }
+
+  /* Add data labels for mobile */
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(1):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(1):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(1):before {
+    content: '时间: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(2):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(2):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(2):before {
+    content: '渠道: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(3):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(3):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(3):before {
+    content: '用户: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(4):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(4):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(4):before {
+    content: '令牌: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(5):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(5):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(5):before {
+    content: '类型: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(6):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(6):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(6):before {
+    content: '模型: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(7):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(7):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(7):before {
+    content: '提示: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(8):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(8):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(8):before {
+    content: '完成: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(9):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(9):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(9):before {
+    content: '配额: ' !important;
+  }
+
+  html body .semi-table-tbody .semi-table-row-cell:nth-child(10):before,
+  body .semi-table-tbody .semi-table-row-cell:nth-child(10):before,
+  .semi-table-tbody .semi-table-row-cell:nth-child(10):before {
+    content: '详情: ' !important;
+  }
+
+  /* ==============================|| COMPLETE BORDER REMOVAL ||============================== */
+
+  /* Remove ALL borders with maximum specificity */
+  html body .semi-table,
+  html body .semi-table *,
+  body .semi-table,
+  body .semi-table *,
+  .semi-table,
+  .semi-table *,
+  html body .logs-table,
+  html body .logs-table *,
+  body .logs-table,
+  body .logs-table *,
+  .logs-table,
+  .logs-table * {
+    border: none !important;
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+    border-collapse: separate !important;
+  }
+}
