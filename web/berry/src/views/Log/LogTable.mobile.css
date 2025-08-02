@@ -67,7 +67,8 @@
   .MuiButton-root {
     width: 100% !important;
     margin-bottom: 16px !important;
-    min-height: 44px !important; /* Touch-friendly size */
+    min-height: 44px !important;
+    /* Touch-friendly size */
   }
 
   .MuiTextField-root:last-child,
@@ -77,7 +78,8 @@
   }
 
   .MuiTextField-root .MuiInputBase-root {
-    font-size: 16px !important; /* Prevent zoom on iOS */
+    font-size: 16px !important;
+    /* Prevent zoom on iOS */
     border-radius: 8px !important;
   }
 
@@ -137,7 +139,7 @@
     flex-shrink: 0 !important;
   }
 
-  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root > * {
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root>* {
     flex: 1 !important;
     margin: 0 !important;
   }
@@ -277,11 +279,11 @@
   }
 
   /* Stack spacing */
-  .MuiStack-root > * {
+  .MuiStack-root>* {
     margin-bottom: 8px !important;
   }
 
-  .MuiStack-root > *:last-child {
+  .MuiStack-root>*:last-child {
     margin-bottom: 0 !important;
   }
 
@@ -289,7 +291,6 @@
   .MuiBox-root {
     padding: 8px !important;
   }
-}
 
   /* Remove all borders completely */
   .MuiTable-root,
@@ -343,7 +344,7 @@
   }
 
   /* Ensure proper spacing and no overlap */
-  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root > * {
+  .MuiTableBody-root .MuiTableRow-root .MuiTableCell-root>* {
     margin: 2px 0px !important;
     display: inline-block !important;
     vertical-align: top !important;
@@ -360,7 +361,7 @@
   }
 
   /* Stack spacing */
-  .MuiStack-root > * {
+  .MuiStack-root>* {
     margin-bottom: 8px !important;
   }
 
