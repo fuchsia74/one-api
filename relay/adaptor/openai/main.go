@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
@@ -81,7 +82,9 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 			// Parse the JSON response
 			err := json.Unmarshal([]byte(data[dataPrefixLength:]), &streamResponse)
 			if err != nil {
-				logger.Logger.Error(fmt.Sprintf("unmarshalling stream data %q got %+v", data, err))
+				logger.Logger.Error("unmarshalling stream data",
+					zap.String("data", data),
+					zap.Error(err))
 				render.StringData(c, data) // Pass raw data to client if parsing fails
 				continue
 			}

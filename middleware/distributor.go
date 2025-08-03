@@ -7,6 +7,7 @@ import (
 
 	"github.com/Laisky/errors/v2"
 	gutils "github.com/Laisky/go-utils/v5"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -51,7 +52,7 @@ func Distribute() func(c *gin.Context) {
 				if err != nil {
 					message := fmt.Sprintf("No available channels for Model %s under Group %s", requestModel, userGroup)
 					if channel != nil {
-						logger.Logger.Error(fmt.Sprintf("Channel does not exist: %d", channel.Id))
+						logger.Logger.Error("Channel does not exist", zap.Int("channel_id", channel.Id))
 						message = "Database consistency has been broken, please contact the administrator"
 					}
 					AbortWithError(c, http.StatusServiceUnavailable, errors.New(message))

@@ -123,12 +123,12 @@ func (m *Migrator) connectDatabases() error {
 func (m *Migrator) closeDatabases() {
 	if m.sourceConn != nil {
 		if err := m.sourceConn.Close(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to close source database: %v", err))
+			logger.Logger.Error("Failed to close source database", zap.Error(err))
 		}
 	}
 	if m.targetConn != nil {
 		if err := m.targetConn.Close(); err != nil {
-			logger.Logger.Error(fmt.Sprintf("Failed to close target database: %v", err))
+			logger.Logger.Error("Failed to close target database", zap.Error(err))
 		}
 	}
 }

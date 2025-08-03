@@ -60,7 +60,9 @@ func (m *Migrator) migrateData(ctx context.Context, stats *MigrationStats) error
 
 		if err := m.migrateTable(ctx, tableInfo, stats); err != nil {
 			stats.Errors = append(stats.Errors, fmt.Errorf("failed to migrate table %s: %w", tableInfo.Name, err))
-			logger.Logger.Error(fmt.Sprintf("Failed to migrate table %s: %v", tableInfo.Name, err))
+			logger.Logger.Error("Failed to migrate table",
+				zap.String("table", tableInfo.Name),
+				zap.Error(err))
 			continue
 		}
 
@@ -172,7 +174,9 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 		defer collectorWg.Done()
 		for result := range results {
 			if result.Error != nil {
-				logger.Logger.Error(fmt.Sprintf("Batch job %d failed: %v", result.JobID, result.Error))
+				logger.Logger.Error("Batch job failed",
+					zap.Int("job_id", result.JobID),
+					zap.Error(result.Error))
 				continue
 			}
 
@@ -425,7 +429,7 @@ func (m *Migrator) validateResults(stats *MigrationStats) error {
 	if len(validationErrors) > 0 {
 		logger.Logger.Error("Migration validation failed:")
 		for _, err := range validationErrors {
-			logger.Logger.Error(fmt.Sprintf("  - %v", err))
+			logger.Logger.Error("Migration validation error", zap.Error(err))
 		}
 		return fmt.Errorf("migration validation failed with %d errors", len(validationErrors))
 	}

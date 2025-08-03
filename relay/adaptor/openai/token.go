@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/pkoukk/tiktoken-go"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -64,7 +65,9 @@ func getTokenEncoder(model string) *tiktoken.Tiktoken {
 	if ok {
 		tokenEncoder, err := tiktoken.EncodingForModel(model)
 		if err != nil {
-			logger.Logger.Error(fmt.Sprintf("failed to get token encoder for model %s: %s, using encoder for gpt-3.5-turbo", model, err.Error()))
+			logger.Logger.Error("failed to get token encoder for model, using encoder for gpt-3.5-turbo",
+				zap.String("model", model),
+				zap.Error(err))
 			tokenEncoder = defaultTokenEncoder
 		}
 		tokenEncoderMap[model] = tokenEncoder

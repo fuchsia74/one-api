@@ -621,7 +621,7 @@ func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse)
 		"message_stop",
 		"content_block_stop":
 	default:
-		logger.Logger.Error(fmt.Sprintf("unknown stream response type %q", claudeResponse.Type))
+		logger.Logger.Error("unknown stream response type", zap.String("type", claudeResponse.Type))
 	}
 
 	// Cache signature if present (for thinking blocks)

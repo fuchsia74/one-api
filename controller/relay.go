@@ -280,7 +280,7 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 
 	err := dbmodel.DB.Where(groupCol+" = ? AND model = ? AND channel_id IN (?)", group, model, channelIds).Find(&abilities).Error
 	if err != nil {
-		logger.Logger.Error(fmt.Sprintf("Failed to check suspension status: %v", err))
+		logger.Logger.Error("Failed to check suspension status", zap.Error(err))
 		return
 	}
 
@@ -325,7 +325,11 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 		if suspendErr := dbmodel.SuspendAbility(ctx,
 			group, originalModel, channelId,
 			config.ChannelSuspendSecondsFor429); suspendErr != nil {
-			logger.Logger.Error(fmt.Sprintf("failed to suspend ability for channel %d, model %s, group %s: %v", channelId, originalModel, group, errors.Wrap(suspendErr, "suspend ability failed")))
+			logger.Logger.Error("failed to suspend ability for channel",
+				zap.Int("channel_id", channelId),
+				zap.String("model", originalModel),
+				zap.String("group", group),
+				zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
 		}
 	}
 

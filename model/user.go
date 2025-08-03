@@ -161,7 +161,9 @@ func (user *User) Insert(ctx context.Context, inviterId int) error {
 	result.Error = cleanToken.Insert()
 	if result.Error != nil {
 		// do not block
-		logger.Logger.Error(fmt.Sprintf("create default token for user %d failed: %s", user.Id, result.Error.Error()))
+		logger.Logger.Error("create default token for user failed",
+			zap.Int("user_id", user.Id),
+			zap.Error(result.Error))
 	}
 	return nil
 }

@@ -39,15 +39,15 @@ func PostConsumeQuota(ctx context.Context, tokenId int, quotaDelta int64, totalQ
 		return
 	}
 	if tokenId <= 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuota: invalid tokenId %d", tokenId))
+		logger.Logger.Error("PostConsumeQuota: invalid tokenId", zap.Int("token_id", tokenId))
 		return
 	}
 	if userId <= 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuota: invalid userId %d", userId))
+		logger.Logger.Error("PostConsumeQuota: invalid userId", zap.Int("user_id", userId))
 		return
 	}
 	if channelId <= 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuota: invalid channelId %d", channelId))
+		logger.Logger.Error("PostConsumeQuota: invalid channelId", zap.Int("channel_id", channelId))
 		return
 	}
 	if modelName == "" {
@@ -97,7 +97,7 @@ func PostConsumeQuota(ctx context.Context, tokenId int, quotaDelta int64, totalQ
 		model.UpdateChannelUsedQuota(channelId, totalQuota)
 	}
 	if totalQuota <= 0 {
-		logger.Logger.Error(fmt.Sprintf("totalQuota consumed is %d, something is wrong", totalQuota))
+		logger.Logger.Error("totalQuota consumed is invalid", zap.Int64("total_quota", totalQuota))
 	}
 }
 
@@ -121,22 +121,24 @@ func PostConsumeQuotaDetailed(ctx context.Context, tokenId int, quotaDelta int64
 		return
 	}
 	if tokenId <= 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuotaDetailed: invalid tokenId %d", tokenId))
+		logger.Logger.Error("PostConsumeQuotaDetailed: invalid tokenId", zap.Int("token_id", tokenId))
 		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed", userId, channelId, modelName)
 		return
 	}
 	if userId <= 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuotaDetailed: invalid userId %d", userId))
+		logger.Logger.Error("PostConsumeQuotaDetailed: invalid userId", zap.Int("user_id", userId))
 		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed", userId, channelId, modelName)
 		return
 	}
 	if channelId <= 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuotaDetailed: invalid channelId %d", channelId))
+		logger.Logger.Error("PostConsumeQuotaDetailed: invalid channelId", zap.Int("channel_id", channelId))
 		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed", userId, channelId, modelName)
 		return
 	}
 	if promptTokens < 0 || completionTokens < 0 {
-		logger.Logger.Error(fmt.Sprintf("PostConsumeQuotaDetailed: negative token counts - prompt: %d, completion: %d", promptTokens, completionTokens))
+		logger.Logger.Error("PostConsumeQuotaDetailed: negative token counts",
+			zap.Int("prompt_tokens", promptTokens),
+			zap.Int("completion_tokens", completionTokens))
 		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed", userId, channelId, modelName)
 		return
 	}
