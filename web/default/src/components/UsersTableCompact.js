@@ -10,68 +10,85 @@ import {
 import { Link } from 'react-router-dom';
 import {
   API,
-  copy,
   showError,
   showSuccess,
-  showWarning,
-  timestamp2string,
   renderQuota,
 } from '../helpers';
 
 import { ITEMS_PER_PAGE } from '../constants';
+import { cleanDisplay } from './shared/tableUtils';
 import FixedPagination from './FixedPagination';
 
-function renderTimestamp(timestamp) {
-  return <>{timestamp2string(timestamp)}</>;
-}
-
-function renderStatus(status, t) {
-  switch (status) {
+function renderUserRole(role, t) {
+  switch (role) {
     case 1:
       return (
-        <Label basic color='green'>
-          {t('redemption.status.unused')}
+        <Label basic color='blue'>
+          {t('role_types.normal')}
         </Label>
       );
-    case 2:
+    case 10:
       return (
-        <Label basic color='red'>
-          {t('redemption.status.disabled')}
+        <Label basic color='yellow'>
+          {t('role_types.admin')}
         </Label>
       );
-    case 3:
+    case 100:
       return (
-        <Label basic color='grey'>
-          {t('redemption.status.used')}
+        <Label basic color='orange'>
+          {t('role_types.super_admin')}
         </Label>
       );
     default:
       return (
-        <Label basic color='black'>
-          {t('redemption.status.unknown')}
+        <Label basic color='red'>
+          {t('role_types.unknown')}
         </Label>
       );
   }
 }
 
-const RedemptionsTable = () => {
+function renderUserStatus(status, t) {
+  switch (status) {
+    case 1:
+      return (
+        <Label basic color='green'>
+          {t('status.enabled')}
+        </Label>
+      );
+    case 2:
+      return (
+        <Label basic color='red'>
+          {t('status.disabled')}
+        </Label>
+      );
+    default:
+      return (
+        <Label basic color='black'>
+          {t('status.unknown')}
+        </Label>
+      );
+  }
+}
+
+const UsersTableCompact = () => {
   const { t } = useTranslation();
-  const [redemptions, setRedemptions] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
 
-  const loadRedemptions = async (startIdx) => {
-    const res = await API.get(`/api/redemption/?p=${startIdx}`);
+  const loadUsers = async (startIdx) => {
+    const res = await API.get(`/api/user/?p=${startIdx}`);
     const { success, message, data } = res.data;
     if (success) {
       if (startIdx === 0) {
-        setRedemptions(data);
+        setUsers(data);
       } else {
-        let newRedemptions = redemptions;
-        newRedemptions.push(...data);
-        setRedemptions(newRedemptions);
+        let newUsers = users;
+        newUsers.push(...data);
+        setUsers(newUsers);
       }
     } else {
       showError(message);
@@ -81,71 +98,71 @@ const RedemptionsTable = () => {
 
   const onPaginationChange = (e, { activePage }) => {
     (async () => {
-      if (activePage === Math.ceil(redemptions.length / ITEMS_PER_PAGE) + 1) {
+      if (activePage === Math.ceil(users.length / ITEMS_PER_PAGE) + 1) {
         // In this case we have to load more data and then append them.
-        await loadRedemptions(activePage - 1);
+        await loadUsers(activePage - 1);
       }
       setActivePage(activePage);
     })();
   };
 
   useEffect(() => {
-    loadRedemptions(0)
+    loadUsers(0)
       .then()
       .catch((reason) => {
         showError(reason);
       });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const manageRedemption = async (id, action, idx) => {
+  const manageUser = async (id, action, idx) => {
     let data = { id };
     let res;
     switch (action) {
       case 'delete':
-        res = await API.delete(`/api/redemption/${id}`);
+        res = await API.delete(`/api/user/${id}`);
         break;
       case 'enable':
         data.status = 1;
-        res = await API.put('/api/redemption/?status_only=true', data);
+        res = await API.put('/api/user/?status_only=true', data);
         break;
       case 'disable':
         data.status = 2;
-        res = await API.put('/api/redemption/?status_only=true', data);
+        res = await API.put('/api/user/?status_only=true', data);
         break;
       default:
         return;
     }
     const { success, message } = res.data;
     if (success) {
-      showSuccess(t('token.messages.operation_success'));
-      let redemption = res.data.data;
-      let newRedemptions = [...redemptions];
+      showSuccess(t('user.messages.operation_success'));
+      let user = res.data.data;
+      let newUsers = [...users];
       let realIdx = (activePage - 1) * ITEMS_PER_PAGE + idx;
       if (action === 'delete') {
-        newRedemptions[realIdx].deleted = true;
+        newUsers[realIdx].deleted = true;
       } else {
-        newRedemptions[realIdx].status = redemption.status;
+        newUsers[realIdx].status = user.status;
       }
-      setRedemptions(newRedemptions);
+      setUsers(newUsers);
     } else {
       showError(message);
     }
   };
 
-  const searchRedemptions = async () => {
+  const searchUsers = async () => {
     if (searchKeyword === '') {
-      // if keyword is blank, load files instead.
-      await loadRedemptions(0);
+      // if keyword is blank, load users instead.
+      await loadUsers(0);
       setActivePage(1);
       return;
     }
     setSearching(true);
     const res = await API.get(
-      `/api/redemption/search?keyword=${searchKeyword}`
+      `/api/user/search?keyword=${searchKeyword}`
     );
     const { success, message, data } = res.data;
     if (success) {
-      setRedemptions(data);
+      setUsers(data);
       setActivePage(1);
     } else {
       showError(message);
@@ -157,11 +174,11 @@ const RedemptionsTable = () => {
     setSearchKeyword(value.trim());
   };
 
-  const sortRedemption = (key) => {
-    if (redemptions.length === 0) return;
+  const sortUser = (key) => {
+    if (users.length === 0) return;
     setLoading(true);
-    let sortedRedemptions = [...redemptions];
-    sortedRedemptions.sort((a, b) => {
+    let sortedUsers = [...users];
+    sortedUsers.sort((a, b) => {
       if (!isNaN(a[key])) {
         // If the value is numeric, subtract to sort
         return a[key] - b[key];
@@ -170,27 +187,27 @@ const RedemptionsTable = () => {
         return ('' + a[key]).localeCompare(b[key]);
       }
     });
-    if (sortedRedemptions[0].id === redemptions[0].id) {
-      sortedRedemptions.reverse();
+    if (sortedUsers[0].id === users[0].id) {
+      sortedUsers.reverse();
     }
-    setRedemptions(sortedRedemptions);
+    setUsers(sortedUsers);
     setLoading(false);
   };
 
   const refresh = async () => {
     setLoading(true);
-    await loadRedemptions(0);
+    await loadUsers(0);
     setActivePage(1);
   };
 
   return (
     <>
-      <Form onSubmit={searchRedemptions}>
+      <Form onSubmit={searchUsers}>
         <Form.Input
           icon='search'
           fluid
           iconPosition='left'
-          placeholder={t('redemption.search')}
+          placeholder={t('user.search_placeholder')}
           value={searchKeyword}
           loading={searching}
           onChange={handleKeywordChange}
@@ -203,99 +220,110 @@ const RedemptionsTable = () => {
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
-                sortRedemption('id');
+                sortUser('id');
               }}
             >
-              {t('redemption.table.id')}
+              ID
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
-                sortRedemption('name');
+                sortUser('username');
               }}
             >
-              {t('redemption.table.name')}
+              Username
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
-                sortRedemption('status');
+                sortUser('role');
               }}
             >
-              {t('redemption.table.status')}
+              Role
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
-                sortRedemption('quota');
+                sortUser('status');
               }}
             >
-              {t('redemption.table.quota')}
+              Status
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
-                sortRedemption('created_time');
+                sortUser('quota');
               }}
             >
-              {t('redemption.table.created_time')}
+              Quota
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
-                sortRedemption('redeemed_time');
+                sortUser('group');
               }}
             >
-              {t('redemption.table.redeemed_time')}
+              Group
             </Table.HeaderCell>
-            <Table.HeaderCell>{t('redemption.table.actions')}</Table.HeaderCell>
+            <Table.HeaderCell>Actions</Table.HeaderCell>
           </Table.Row>
         </Table.Header>
 
         <Table.Body>
-          {redemptions
+          {users
             .slice(
               (activePage - 1) * ITEMS_PER_PAGE,
               activePage * ITEMS_PER_PAGE
             )
-            .map((redemption, idx) => {
-              if (redemption.deleted) return <></>;
+            .map((user, idx) => {
+              if (user.deleted) return <></>;
               return (
-                <Table.Row key={redemption.id}>
-                  <Table.Cell>{redemption.id}</Table.Cell>
+                <Table.Row key={user.id}>
+                  <Table.Cell>{user.id}</Table.Cell>
                   <Table.Cell>
-                    {redemption.name ? redemption.name : t('redemption.table.no_name')}
+                    {cleanDisplay(user.username)}
                   </Table.Cell>
-                  <Table.Cell>{renderStatus(redemption.status, t)}</Table.Cell>
-                  <Table.Cell>{renderQuota(redemption.quota, t)}</Table.Cell>
+                  <Table.Cell>{renderUserRole(user.role, t)}</Table.Cell>
+                  <Table.Cell>{renderUserStatus(user.status, t)}</Table.Cell>
                   <Table.Cell>
-                    {renderTimestamp(redemption.created_time)}
+                    {user.quota === -1 ? (
+                      <Label basic color="green">
+                        {t('unlimited')}
+                      </Label>
+                    ) : (
+                      renderQuota(user.quota, t)
+                    )}
                   </Table.Cell>
                   <Table.Cell>
-                    {redemption.redeemed_time
-                      ? renderTimestamp(redemption.redeemed_time)
-                      : t('redemption.table.not_redeemed')}{' '}
+                    {cleanDisplay(user.group, 'default')}
                   </Table.Cell>
                   <Table.Cell>
                     <div>
                       <Button
                         size={'tiny'}
-                        positive
-                        onClick={async () => {
-                          if (await copy(redemption.key)) {
-                            showSuccess(t('token.messages.copy_success'));
-                          } else {
-                            showWarning(t('token.messages.copy_failed'));
-                            setSearchKeyword(redemption.key);
-                          }
+                        onClick={() => {
+                          manageUser(
+                            user.id,
+                            user.status === 1 ? 'disable' : 'enable',
+                            idx
+                          );
                         }}
                       >
-                        {t('redemption.buttons.copy')}
+                        {user.status === 1
+                          ? t('disable')
+                          : t('enable')}
+                      </Button>
+                      <Button
+                        size={'tiny'}
+                        as={Link}
+                        to={'/user/edit/' + user.id}
+                      >
+                        {t('edit')}
                       </Button>
                       <Popup
                         trigger={
                           <Button size='tiny' negative>
-                            {t('redemption.buttons.delete')}
+                            {t('delete')}
                           </Button>
                         }
                         on='click'
@@ -305,34 +333,12 @@ const RedemptionsTable = () => {
                         <Button
                           negative
                           onClick={() => {
-                            manageRedemption(redemption.id, 'delete', idx);
+                            manageUser(user.id, 'delete', idx);
                           }}
                         >
-                          {t('redemption.buttons.confirm_delete')}
+                          {t('confirm_delete')}
                         </Button>
                       </Popup>
-                      <Button
-                        size={'tiny'}
-                        disabled={redemption.status === 3} // used
-                        onClick={() => {
-                          manageRedemption(
-                            redemption.id,
-                            redemption.status === 1 ? 'disable' : 'enable',
-                            idx
-                          );
-                        }}
-                      >
-                        {redemption.status === 1
-                          ? t('redemption.buttons.disable')
-                          : t('redemption.buttons.enable')}
-                      </Button>
-                      <Button
-                        size={'tiny'}
-                        as={Link}
-                        to={'/redemption/edit/' + redemption.id}
-                      >
-                        {t('redemption.buttons.edit')}
-                      </Button>
                     </div>
                   </Table.Cell>
                 </Table.Row>
@@ -346,13 +352,13 @@ const RedemptionsTable = () => {
               <Button
                 size='small'
                 as={Link}
-                to='/redemption/add'
+                to='/user/add'
                 loading={loading}
               >
-                {t('redemption.buttons.add')}
+                {t('add')}
               </Button>
               <Button size='small' onClick={refresh} loading={loading}>
-                {t('redemption.buttons.refresh')}
+                {t('refresh')}
               </Button>
             </Table.HeaderCell>
           </Table.Row>
@@ -360,8 +366,8 @@ const RedemptionsTable = () => {
       </Table>
       {(() => {
         // Calculate total pages based on loaded data, but always allow +1 for potential more data
-        const currentPages = Math.ceil(redemptions.length / ITEMS_PER_PAGE);
-        const totalPages = Math.max(currentPages, activePage + (redemptions.length % ITEMS_PER_PAGE === 0 ? 1 : 0));
+        const currentPages = Math.ceil(users.length / ITEMS_PER_PAGE);
+        const totalPages = Math.max(currentPages, activePage + (users.length % ITEMS_PER_PAGE === 0 ? 1 : 0));
 
         return (
           <FixedPagination
@@ -377,4 +383,4 @@ const RedemptionsTable = () => {
   );
 };
 
-export default RedemptionsTable;
+export default UsersTableCompact;

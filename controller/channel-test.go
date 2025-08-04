@@ -158,7 +158,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 	// Capture usage information for accurate test logging
 	var actualUsage *relaymodel.Usage
 	defer func() {
-		logContent := fmt.Sprintf("渠道 %s 测试成功，响应：%s", channel.Name, responseMessage)
+		logContent := fmt.Sprintf("test channel %s succeed，response: %s", channel.Name, responseMessage)
 		if err != nil || openaiErr != nil {
 			errorMessage := ""
 			if err != nil {
@@ -166,7 +166,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 			} else {
 				errorMessage = openaiErr.Message
 			}
-			logContent = fmt.Sprintf("渠道 %s 测试失败，错误：%s", channel.Name, errorMessage)
+			logContent = fmt.Sprintf("test channel %s failed, error: %s", channel.Name, errorMessage)
 		}
 
 		// Create test log with actual usage information if available

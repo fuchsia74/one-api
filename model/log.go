@@ -28,6 +28,7 @@ type Log struct {
 	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0;index"` // Added index for sorting
 	ChannelId         int    `json:"channel" gorm:"index"`
 	RequestId         string `json:"request_id" gorm:"default:''"`
+	UpdatedAt         int64  `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 	ElapsedTime       int64  `json:"elapsed_time" gorm:"default:0;index"` // Added index for sorting (unit is ms)
 	IsStream          bool   `json:"is_stream" gorm:"default:false"`
 	SystemPromptReset bool   `json:"system_prompt_reset" gorm:"default:false"`
@@ -172,6 +173,36 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		err = tx.Order(orderClause).Limit(num).Offset(startIdx).Find(&logs).Error
 	}
 	return logs, err
+}
+
+func GetAllLogsCount(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int) (count int64, err error) {
+	var tx *gorm.DB
+	if logType == LogTypeUnknown {
+		tx = LOG_DB
+	} else {
+		tx = LOG_DB.Where("type = ?", logType)
+	}
+	if modelName != "" {
+		tx = tx.Where("model_name = ?", modelName)
+	}
+	if username != "" {
+		tx = tx.Where("username = ?", username)
+	}
+	if tokenName != "" {
+		tx = tx.Where("token_name = ?", tokenName)
+	}
+	if startTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", endTimestamp)
+	}
+	if channel != 0 {
+		tx = tx.Where("channel_id = ?", channel)
+	}
+
+	err = tx.Model(&Log{}).Count(&count).Error
+	return count, err
 }
 
 func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string, startIdx int, num int, sortBy string, sortOrder string) (logs []*Log, err error) {

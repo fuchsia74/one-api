@@ -11,8 +11,10 @@ import (
 )
 
 type Option struct {
-	Key   string `json:"key" gorm:"primaryKey"`
-	Value string `json:"value"`
+	Key       string `json:"key" gorm:"primaryKey"`
+	Value     string `json:"value"`
+	CreatedAt int64  `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt int64  `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 }
 
 func AllOption() ([]*Option, error) {

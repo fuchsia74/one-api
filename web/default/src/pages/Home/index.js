@@ -15,33 +15,46 @@ const Home = () => {
   const [userState] = useContext(UserContext);
 
   const displayNotice = async () => {
-    const res = await API.get('/api/notice');
-    const { success, message, data } = res.data;
-    if (success) {
-      let oldNotice = localStorage.getItem('notice');
-      if (data !== oldNotice && data !== '') {
-        const htmlNotice = marked(data);
-        showNotice(htmlNotice, true);
-        localStorage.setItem('notice', data);
+    try {
+      const res = await API.get('/api/notice');
+      if (res && res.data) {
+        const { success, message, data } = res.data;
+        if (success) {
+          let oldNotice = localStorage.getItem('notice');
+          if (data !== oldNotice && data !== '') {
+            const htmlNotice = marked(data);
+            showNotice(htmlNotice, true);
+            localStorage.setItem('notice', data);
+          }
+        } else {
+          showError(message);
+        }
       }
-    } else {
-      showError(message);
+    } catch (error) {
+      console.error('Error fetching notices:', error);
     }
   };
 
   const displayHomePageContent = async () => {
     setHomePageContent(localStorage.getItem('home_page_content') || '');
-    const res = await API.get('/api/home_page_content');
-    const { success, message, data } = res.data;
-    if (success) {
-      let content = data;
-      if (!data.startsWith('https://')) {
-        content = marked.parse(data);
+    try {
+      const res = await API.get('/api/home_page_content');
+      if (res && res.data) {
+        const { success, message, data } = res.data;
+        if (success) {
+          let content = data;
+          if (!data.startsWith('https://')) {
+            content = marked.parse(data);
+          }
+          setHomePageContent(content);
+          localStorage.setItem('home_page_content', content);
+        } else {
+          showError(message);
+          setHomePageContent(t('home.loading_failed'));
+        }
       }
-      setHomePageContent(content);
-      localStorage.setItem('home_page_content', content);
-    } else {
-      showError(message);
+    } catch (error) {
+      console.error('Error fetching home page content:', error);
       setHomePageContent(t('home.loading_failed'));
     }
     setHomePageContentLoaded(true);

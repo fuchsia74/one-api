@@ -22,6 +22,8 @@ type Ability struct {
 	Enabled      bool       `json:"enabled"`
 	Priority     *int64     `json:"priority" gorm:"bigint;default:0;index"`
 	SuspendUntil *time.Time `json:"suspend_until,omitempty" gorm:"index"`
+	CreatedAt    int64      `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt    int64      `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 }
 
 func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority bool) (*Channel, error) {

@@ -283,14 +283,17 @@ const Header = () => {
       return (
         <Dropdown
           item
-          text={t('header.more')}
-          icon="ellipsis horizontal"
+          trigger={
+            <Icon
+              name="ellipsis horizontal"
+              style={{
+                margin: 0,
+                fontSize: '18px',
+                color: 'var(--text-secondary)',
+              }}
+            />
+          }
           className="header-more-dropdown"
-          style={{
-            fontSize: '15px',
-            fontWeight: '400',
-            color: 'var(--text-secondary)',
-          }}
         >
           <Dropdown.Menu>
             {secondaryItems.map((button) => (

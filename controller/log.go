@@ -54,10 +54,22 @@ func GetAllLogs(c *gin.Context) {
 		})
 		return
 	}
+
+	// Get total count for pagination
+	totalCount, err := model.GetAllLogsCount(logType, startTimestamp, endTimestamp, modelName, username, tokenName, channel)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    logs,
+		"total":   totalCount,
 	})
 	return
 }

@@ -8,6 +8,8 @@ import Footer from './components/Footer';
 import 'semantic-ui-css/semantic.min.css';
 import './index.css';
 import './mobile-override.css';
+import './global-table-fixes.css';
+import './compact-table-styles.css';
 import { UserProvider } from './context/User';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';

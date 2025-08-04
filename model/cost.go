@@ -18,6 +18,8 @@ type UserRequestCost struct {
 	RequestID   string  `json:"request_id"`
 	Quota       int64   `json:"quota"`
 	CostUSD     float64 `json:"cost_usd" gorm:"-"`
+	CreatedAt   int64   `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt   int64   `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 }
 
 // NewUserRequestCost create a new UserRequestCost

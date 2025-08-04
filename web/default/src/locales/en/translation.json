@@ -71,8 +71,14 @@
       "priority_tip": "Channel selection priority, higher is preferred",
       "select_test_model": "Please select test model",
       "click_to_update": "Click to update",
-      "balance_not_supported": "-"
+      "balance_not_supported": "Not Supported",
+      "balance_unknown": "Balance Unknown"
     },
+    "test": "Test",
+    "disable": "Disable",
+    "enable": "Enable",
+    "pricing": "Pricing",
+    "update_balance": "Update Balance",
     "buttons": {
       "test": "Test",
       "delete": "Delete",
@@ -214,6 +220,10 @@
       "status_depleted": "Depleted",
       "status_unknown": "Unknown Status"
     },
+    "copy": "Copy",
+    "disable": "Disable",
+    "enable": "Enable",
+    "delete_confirm": "Confirm delete this token?",
     "buttons": {
       "copy": "Copy",
       "chat": "Chat",
@@ -281,7 +291,13 @@
       "display": "Equivalent: ${{amount}}",
       "display_short": "${{amount}}",
       "unit": "$"
-    }
+    },
+    "edit": "Edit",
+    "delete": "Delete",
+    "enable": "Enable",
+    "disable": "Disable",
+    "test": "Test",
+    "unknown": "Unknown"
   },
   "redemption": {
     "title": "Redemption Management",
@@ -346,7 +362,8 @@
       "usage": "Usage",
       "admin": "Admin",
       "system": "System",
-      "test": "Test"
+      "test": "Test",
+      "unknown": "Unknown Type"
     },
     "table": {
       "time": "Time",
@@ -367,7 +384,10 @@
       "completion_tokens": "Completion Tokens",
       "quota": "Quota",
       "latency": "Latency",
-      "detail": "Detail"
+      "detail": "Detail",
+      "unknown_user": "Unknown User",
+      "no_details": "No Details",
+      "token": "Token"
     },
     "buttons": {
       "query": "Action",
@@ -433,6 +453,14 @@
         "banned": "Banned",
         "unknown": "Unknown Status"
       },
+      "status": {
+        "active": "Active",
+        "banned": "Banned",
+        "pending": "Pending",
+        "unknown": "Unknown Status",
+        "enabled": "Enabled",
+        "disabled": "Disabled"
+      },
       "sort": {
         "default": "Default Order",
         "by_quota": "Sort by Remaining Quota",
@@ -441,6 +469,11 @@
       },
       "sort_by": "Sort By"
     },
+    "top_up": "Top Up",
+    "ban": "Ban",
+    "unban": "Unban",
+    "disable_confirm": "Confirm disable this user?",
+    "enable_confirm": "Confirm enable this user?",
     "buttons": {
       "add": "Add New User",
       "delete": "Delete",
@@ -449,7 +482,8 @@
       "disable": "Disable",
       "edit": "Edit",
       "promote": "Promote",
-      "demote": "Demote"
+      "demote": "Demote",
+      "confirm_delete": "Confirm Delete"
     }
   },
   "dashboard": {

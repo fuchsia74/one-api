@@ -271,10 +271,21 @@ func GetAllUsers(c *gin.Context) {
 		return
 	}
 
+	// Get total count for pagination
+	totalCount, err := model.GetUserCount()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    users,
+		"total":   totalCount,
 	})
 }
 

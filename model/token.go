@@ -33,6 +33,8 @@ type Token struct {
 	RemainQuota    int64   `json:"remain_quota" gorm:"bigint;default:0"`
 	UnlimitedQuota bool    `json:"unlimited_quota" gorm:"default:false"`
 	UsedQuota      int64   `json:"used_quota" gorm:"bigint;default:0"` // used quota
+	CreatedAt      int64   `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt      int64   `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 	Models         *string `json:"models" gorm:"type:text"`            // allowed models
 	Subnet         *string `json:"subnet" gorm:"default:''"`           // allowed subnet
 }
@@ -62,6 +64,11 @@ func GetAllUserTokens(userId int, startIdx int, num int, order string) ([]*Token
 
 	err = query.Limit(num).Offset(startIdx).Find(&tokens).Error
 	return tokens, err
+}
+
+func GetUserTokenCount(userId int) (count int64, err error) {
+	err = DB.Model(&Token{}).Where("user_id = ?", userId).Count(&count).Error
+	return count, err
 }
 
 func SearchUserTokens(userId int, keyword string) (tokens []*Token, err error) {

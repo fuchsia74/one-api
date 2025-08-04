@@ -136,7 +136,18 @@ export function removeTrailingSlash(url) {
 }
 
 export function timestamp2string(timestamp) {
+  // Handle invalid timestamps
+  if (!timestamp || timestamp <= 0 || isNaN(timestamp)) {
+    return 'N/A';
+  }
+
   let date = new Date(timestamp * 1000);
+
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    return 'Invalid Date';
+  }
+
   let year = date.getFullYear().toString();
   let month = (date.getMonth() + 1).toString();
   let day = date.getDate().toString();

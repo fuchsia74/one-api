@@ -99,7 +99,7 @@ export function renderQuota(quota, t, precision = 2) {
     localStorage.getItem('quota_per_unit') || '500000'
   );
 
-  if (displayInCurrency) {
+  if (displayInCurrency && t) {
     const amount = (quota / quotaPerUnit).toFixed(precision);
     return t('common.quota.display_short', { amount });
   }

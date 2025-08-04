@@ -3,22 +3,35 @@ applyTo: "**/*"
 ---
 
 
-# Project Memory & Handover Instructions
 
-## Critical Project Principles & Recent Developments (2025-07)
+## Pricing & Billing Architecture (2025-07)
 
-- **Pricing Unit Standardization:** All model pricing, quota, and billing calculations are standardized to "per 1M tokens" (1 million tokens). This must be reflected in all code, documentation, and UI. Never use "per 1K tokens" or other units.
-- **Centralized Model Pricing:** All adapters must use the shared `ModelRatios` constant from their respective `constants.go` or subadaptor. Local pricing maps are deprecated. Model lists are always derived from the keys of these shared maps.
-- **Unified Fallback Logic:** For unknown models, all adapters use a unified fallback (e.g., `5 * ratio.MilliTokensUsd`). If a model is missing from the shared map, it will use this fallback. VertexAI pricing is aggregated from all subadapters (Claude, Imagen, Gemini, Veo); omissions propagate.
-- **Four-Layer Pricing System:** Pricing resolution order is: channel override → adapter default → global fallback → final default. All adapters must follow this logic.
-- **Billing Timeout:** Billing operations (quota deduction, cost recording) use a configurable timeout (`BILLING_TIMEOUT`, default 900s/15min). This prevents stuck billing and allows for future dead-letter/retry handling. See `relay/controller/text.go` and similar controllers for the goroutine pattern.
-- **Database Pool Tuning & Monitoring:** Default DB pool sizes are increased (see `model/main.go`) to handle billing load. A background goroutine logs pool health and bottlenecks. Operators must ensure DB capacity matches these settings.
-- **Error Handling:** Always use `github.com/Laisky/errors/v2` for error wrapping. Never return bare errors. Handle errors as close to the source as possible.
-- **Testing:** All bug fixes and features must be covered by unit tests. No temporary scripts. Update tests for new issues/features.
-- **Time Handling:** Always use UTC for server, DB, and API time.
-- **Golang ORM:** Use `gorm.io/gorm` for writes; prefer SQL for reads to minimize DB load. Never use `gorm.io/gorm/clause` or `Preload`.
+- **Pricing Unit Standardization:** All model pricing, quota, and billing calculations are now standardized to use "per 1M tokens" (1 million tokens) instead of "per 1K tokens". This is reflected in all code, comments, and documentation. Double-check all user-facing messages and documentation for consistency.
+- **Centralized Model Pricing:** Each channel/adaptor now imports and uses a shared `ModelRatios` constant from its respective `constants.go` or subadaptor. Local, hardcoded pricing maps have been removed to avoid duplication and drift.
+- **Model List Generation:** Supported model lists are always derived from the keys of the shared pricing maps, ensuring pricing and support are always in sync.
+- **Default/Fallback Pricing:** All adaptors use a unified fallback (e.g., `5 * ratio.MilliTokensUsd`) for unknown models. If a model is missing from the shared map, it will use this fallback.
+- **VertexAI Aggregation:** VertexAI pricing is now aggregated from all subadaptors (Claude, Imagen, Gemini, Veo) and includes VertexAI-specific models. Any omission in a subadaptor will propagate to VertexAI.
+
+## General Project Practices
+
+- **Error Handling:** Always use `github.com/Laisky/errors/v2` for error wrapping; never return bare errors.
 - **Context Keys:** All context keys must be pre-defined in `common/ctxkey/key.go`.
 - **Package Management:** Use package managers (npm, pip, etc.), never edit package files by hand.
+- **Testing:** All bug fixes/features must be covered by unit tests. No temporary scripts. Unit tests must be updated to cover new issues and features.
+- **Time Handling:** Always use UTC for server, DB, and API time.
+- **Golang ORM:** Use `gorm.io/gorm` for writes; prefer SQL for reads to minimize DB load.
+
+## Handover Guidance
+
+- **Claude Messages API:** Fully production-ready, with universal conversion and billing parity. See `docs/arch/api_billing.md` and `docs/arch/api_convert.md` for details.
+- **Billing Architecture:** Four-layer pricing (channel overrides > adapter defaults > global > fallback).
+- **Adaptor Pattern:** All new API formats should follow the Claude Messages pattern: interface method + universal conversion + context marking.
+
+---
+**Recent Developments (2025-07):**
+
+- Major refactor to unify and clarify model pricing logic, reduce duplication, and standardize on "per 1M tokens" as the pricing unit. All adaptors now use shared pricing maps and fallback logic. This change is critical for maintainability and billing accuracy.
+- When handing over, ensure the new assistant is aware of the pricing unit change, the centralized pricing logic, and the importance of keeping documentation and UI in sync with backend logic.
 
 ## Claude Messages API: Universal Conversion
 

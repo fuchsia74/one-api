@@ -562,18 +562,19 @@ code {
     border-color: var(--button-primary) !important;
 }
 
-[data-theme="dark"] .ui.pagination .item {
+/* Legacy dark theme pagination rules - less specific to avoid conflicts */
+[data-theme="dark"] .ui.pagination .item:not(.pagination-container .item) {
     background-color: var(--bg-secondary) !important;
     color: var(--text-primary) !important;
     border: 1px solid var(--border-color) !important;
 }
 
-[data-theme="dark"] .ui.pagination .active.item {
+[data-theme="dark"] .ui.pagination .active.item:not(.pagination-container .item) {
     background-color: var(--button-primary) !important;
     color: white !important;
 }
 
-[data-theme="dark"] .ui.pagination .item:hover {
+[data-theme="dark"] .ui.pagination .item:hover:not(.pagination-container .item) {
     background-color: var(--menu-hover) !important;
 }
 
@@ -1021,11 +1022,508 @@ code {
 /* Progressive header disclosure styles */
 .header-more-dropdown .dropdown.menu {
     min-width: 180px !important;
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 4px 12px var(--shadow-color) !important;
 }
 
 .header-more-dropdown .dropdown.item {
     padding: 8px 16px !important;
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    transition: all 0.2s ease !important;
 }
+
+.header-more-dropdown .dropdown.item:hover {
+    background-color: var(--menu-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+.header-more-dropdown .dropdown.item:last-child {
+    border-bottom: none !important;
+}
+
+/* Dark theme support for header more dropdown */
+[data-theme="dark"] .header-more-dropdown .dropdown.menu {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .header-more-dropdown .dropdown.item {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .header-more-dropdown .dropdown.item:hover {
+    background-color: var(--menu-hover) !important;
+    color: var(--text-primary) !important;
+}
+
+/* ==============================|| LOG LABELS DARK MODE FIX ||============================== */
+
+/* Fix bright colored labels in logs for better dark mode readability */
+[data-theme="dark"] .ui.label {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Specific color adjustments for log type labels in dark mode */
+[data-theme="dark"] .ui.label.green {
+    background-color: rgba(33, 186, 69, 0.2) !important;
+    color: #4ade80 !important;
+    border: 1px solid rgba(33, 186, 69, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.olive {
+    background-color: rgba(181, 204, 24, 0.2) !important;
+    color: #a3e635 !important;
+    border: 1px solid rgba(181, 204, 24, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.orange {
+    background-color: rgba(242, 113, 28, 0.2) !important;
+    color: #fb923c !important;
+    border: 1px solid rgba(242, 113, 28, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.purple {
+    background-color: rgba(163, 73, 164, 0.2) !important;
+    color: #c084fc !important;
+    border: 1px solid rgba(163, 73, 164, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.violet {
+    background-color: rgba(139, 69, 195, 0.2) !important;
+    color: #a855f7 !important;
+    border: 1px solid rgba(139, 69, 195, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.pink {
+    background-color: rgba(224, 102, 102, 0.2) !important;
+    color: #f472b6 !important;
+    border: 1px solid rgba(224, 102, 102, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.red {
+    background-color: rgba(219, 40, 40, 0.2) !important;
+    color: #ef4444 !important;
+    border: 1px solid rgba(219, 40, 40, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.label.black {
+    background-color: rgba(128, 128, 128, 0.2) !important;
+    color: #9ca3af !important;
+    border: 1px solid rgba(128, 128, 128, 0.3) !important;
+}
+
+/* Ensure basic labels also follow dark theme */
+[data-theme="dark"] .ui.basic.label {
+    background-color: rgba(255, 255, 255, 0.05) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.green {
+    color: #4ade80 !important;
+    border: 1px solid rgba(33, 186, 69, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.olive {
+    color: #a3e635 !important;
+    border: 1px solid rgba(181, 204, 24, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.orange {
+    color: #fb923c !important;
+    border: 1px solid rgba(242, 113, 28, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.purple {
+    color: #c084fc !important;
+    border: 1px solid rgba(163, 73, 164, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.violet {
+    color: #a855f7 !important;
+    border: 1px solid rgba(139, 69, 195, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.pink {
+    color: #f472b6 !important;
+    border: 1px solid rgba(224, 102, 102, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.red {
+    color: #ef4444 !important;
+    border: 1px solid rgba(219, 40, 40, 0.4) !important;
+}
+
+[data-theme="dark"] .ui.basic.label.black {
+    color: #9ca3af !important;
+    border: 1px solid rgba(128, 128, 128, 0.4) !important;
+}
+
+/* ==============================|| LOG PAGE BACKGROUND FIX ||============================== */
+
+/* Fix bright white background in log content area for dark mode */
+[data-theme="dark"] .ui.card {
+    background-color: var(--card-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3) !important;
+}
+
+[data-theme="dark"] .ui.card>.content {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ui.card>.content>.header {
+    color: var(--text-primary) !important;
+}
+
+/* Fix table background in dark mode */
+[data-theme="dark"] .ui.table {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ui.table thead th {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ui.table tbody tr {
+    background-color: var(--card-bg) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ui.table tbody tr:hover {
+    background-color: var(--menu-hover) !important;
+}
+
+[data-theme="dark"] .ui.table tbody td {
+    border-top: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+/* Fix form backgrounds in dark mode */
+[data-theme="dark"] .ui.form {
+    background-color: var(--card-bg) !important;
+}
+
+[data-theme="dark"] .ui.form .field>label {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .ui.form input:not([type]),
+[data-theme="dark"] .ui.form input[type="text"],
+[data-theme="dark"] .ui.form input[type="email"],
+[data-theme="dark"] .ui.form input[type="search"],
+[data-theme="dark"] .ui.form input[type="password"] {
+    background-color: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ui.form .ui.dropdown {
+    background-color: var(--input-bg) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-color) !important;
+}
+
+[data-theme="dark"] .ui.form .ui.dropdown>.text {
+    color: var(--text-primary) !important;
+}
+
+/* ==============================|| MOBILE LOG CARDS STYLING ||============================== */
+
+/* Mobile log card container */
+.mobile-log-container {
+    padding: 0 !important;
+    margin: 0 !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    background-color: var(--bg-primary) !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    top: 0 !important;
+}
+
+/* Individual mobile log card */
+.mobile-log-card {
+    background-color: var(--card-bg) !important;
+    border-radius: 0px !important;
+    margin: 2px 0px !important;
+    padding: 12px 8px !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-top: none !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    border-left: none !important;
+    border-right: none !important;
+    color: var(--text-primary) !important;
+}
+
+/* Mobile log card field */
+.mobile-log-field {
+    margin-bottom: 8px !important;
+    color: var(--text-primary) !important;
+}
+
+.mobile-log-field strong {
+    color: var(--text-primary) !important;
+}
+
+/* Mobile log card detail field with word wrapping */
+.mobile-log-detail {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    color: var(--text-primary) !important;
+}
+
+/* Mobile log header styling */
+.mobile-log-header {
+    position: static !important;
+    margin: 0px !important;
+    padding: 8px 8px !important;
+    border: none !important;
+    box-shadow: none !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    line-height: 1.2 !important;
+    background-color: transparent !important;
+    color: var(--text-primary) !important;
+}
+
+/* Mobile log refresh button */
+.mobile-log-refresh-btn {
+    margin-left: 8px !important;
+    padding: 4px !important;
+    min-height: 20px !important;
+    min-width: 20px !important;
+    font-size: 10px !important;
+}
+
+/* Mobile log clickable span */
+.mobile-log-clickable {
+    cursor: pointer !important;
+    color: var(--text-secondary) !important;
+}
+
+/* Dark theme support for mobile log cards */
+[data-theme="dark"] .mobile-log-container {
+    background-color: var(--bg-primary) !important;
+}
+
+[data-theme="dark"] .mobile-log-card {
+    background-color: var(--card-bg) !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .mobile-log-field {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .mobile-log-field strong {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .mobile-log-detail {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .mobile-log-header {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .mobile-log-clickable {
+    color: var(--text-secondary) !important;
+}
+
+/* ==============================|| UTILITY CLASSES ||============================== */
+
+/* Clickable cursor */
+.cursor-pointer {
+    cursor: pointer !important;
+}
+
+/* Loading cursor */
+.cursor-wait {
+    cursor: wait !important;
+}
+
+/* Reduced opacity for loading states */
+.opacity-60 {
+    opacity: 0.6 !important;
+}
+
+/* Margin right 8px */
+.margin-right-8 {
+    margin-right: 8px !important;
+}
+
+/* User dropdown styling */
+.user-dropdown-content {
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.user-dropdown-name {
+    font-weight: bold !important;
+    color: var(--text-primary) !important;
+}
+
+.user-dropdown-details {
+    font-size: 0.9em !important;
+    color: var(--text-secondary) !important;
+}
+
+/* Dark theme support for user dropdown */
+[data-theme="dark"] .user-dropdown-name {
+    color: var(--text-primary) !important;
+}
+
+[data-theme="dark"] .user-dropdown-details {
+    color: var(--text-secondary) !important;
+}
+
+/* ==============================|| PAGINATION STYLES ||============================== */
+
+/* Legacy pagination container - exclude our new FixedPagination component */
+div.pagination-container:not(.fixed-pagination-container) {
+    position: fixed !important;
+    bottom: 20px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 1000 !important;
+    background-color: var(--card-bg, #ffffff) !important;
+    border-radius: 8px !important;
+    padding: 12px 16px !important;
+    box-shadow: 0 4px 20px var(--shadow-color, rgba(0, 0, 0, 0.15)) !important;
+    border: 1px solid var(--border-color, #e0e0e0) !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+}
+
+/* Legacy pagination styling - exclude our new component */
+div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu {
+    margin: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    display: flex !important;
+}
+
+div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .item {
+    background-color: var(--bg-secondary, #ffffff) !important;
+    color: var(--text-primary, #333333) !important;
+    border: 1px solid var(--border-color, #e0e0e0) !important;
+    margin: 0 2px !important;
+    border-radius: 6px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    transition: all 0.2s ease !important;
+    font-size: 14px !important;
+    font-weight: 500 !important;
+    text-decoration: none !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+}
+
+div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .item:hover {
+    background-color: var(--button-primary, #007bff) !important;
+    color: white !important;
+    border-color: var(--button-primary, #007bff) !important;
+    transform: translateY(-1px) !important;
+}
+
+div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .item.active {
+    background-color: var(--button-primary, #007bff) !important;
+    color: white !important;
+    border-color: var(--button-primary, #007bff) !important;
+    font-weight: 600 !important;
+}
+
+/* Dark theme support for legacy pagination - exclude our new component */
+[data-theme="dark"] div.pagination-container:not(.fixed-pagination-container) {
+    background-color: rgba(42, 42, 42, 0.95) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .item {
+    background-color: var(--bg-secondary) !important;
+    color: var(--text-primary) !important;
+    border-color: var(--border-color) !important;
+}
+
+[data-theme="dark"] div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .item:hover,
+[data-theme="dark"] div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .item.active {
+    background-color: var(--button-primary) !important;
+    color: white !important;
+    border-color: var(--button-primary) !important;
+}
+
+/* ==============================|| TABLE STYLES ||============================== */
+
+/* Sortable header cells */
+.sortable-header {
+    cursor: pointer !important;
+}
+
+.sortable-header:hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+/* Balance cell with clickable styling */
+.clickable-cell {
+    cursor: pointer !important;
+}
+
+.clickable-cell:hover {
+    background-color: var(--bg-secondary) !important;
+}
+
+/* Priority input styling */
+.priority-input input {
+    max-width: 60px !important;
+}
+
+/* Action buttons container */
+.table-actions {
+    display: flex !important;
+    align-items: center !important;
+    flex-wrap: wrap !important;
+    gap: 2px !important;
+    row-gap: 6px !important;
+}
+
+/* Dropdown Margin */
+.dropdown-margin-left {
+    margin-left: 10px !important;
+}
+
+/* Remove table footer pagination (since we use fixed pagination) */
+.ui.table tfoot .ui.pagination {
+    display: none !important;
+}
+
+/* Ensure tables have bottom padding for fixed pagination */
+.ui.table {
+    margin-bottom: 100px !important;
+}
+
+
 
 /* Icon-only header buttons on medium screens */
 @media screen and (min-width: 768px) and (max-width: 1399px) {
@@ -1101,6 +1599,158 @@ code {
         right: 0 !important;
         z-index: 1000 !important;
         height: 60px !important;
+    }
+
+    /* Mobile sidebar menu styling - Fix overlapping text issue and gaps */
+    .ui.segment {
+        background-color: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        box-shadow: 0 2px 8px var(--shadow-color) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    .ui.menu.secondary.vertical {
+        background-color: var(--card-bg) !important;
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    .ui.menu.secondary.vertical .item {
+        background-color: var(--card-bg) !important;
+        color: var(--text-primary) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        padding: 12px 16px !important;
+        margin: 0 !important;
+        transition: all 0.2s ease !important;
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+    }
+
+    .ui.menu.secondary.vertical .item:hover {
+        background-color: var(--menu-hover) !important;
+        color: var(--text-primary) !important;
+    }
+
+    .ui.menu.secondary.vertical .item:last-child {
+        border-bottom: none !important;
+    }
+
+    /* Fix dropdown items within mobile sidebar to remove gaps */
+    .ui.menu.secondary.vertical .item .ui.dropdown {
+        background-color: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        margin: 0 !important;
+        border-radius: 4px !important;
+    }
+
+    .ui.menu.secondary.vertical .item .ui.dropdown .menu {
+        background-color: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        box-shadow: 0 4px 12px var(--shadow-color) !important;
+        margin: 0 !important;
+        border-radius: 4px !important;
+    }
+
+    .ui.menu.secondary.vertical .item .ui.dropdown .menu .item {
+        background-color: var(--card-bg) !important;
+        color: var(--text-primary) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        padding: 8px 12px !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    .ui.menu.secondary.vertical .item .ui.dropdown .menu .item:hover {
+        background-color: var(--menu-hover) !important;
+    }
+
+    /* Ensure buttons in mobile sidebar have proper styling */
+    .ui.menu.secondary.vertical .item .ui.button {
+        background-color: transparent !important;
+        color: var(--text-primary) !important;
+        border: none !important;
+        padding: 8px 12px !important;
+        font-size: 14px !important;
+    }
+
+    .ui.menu.secondary.vertical .item .ui.button:hover {
+        background-color: var(--menu-hover) !important;
+        color: var(--text-primary) !important;
+    }
+
+    /* Dark theme mobile sidebar styling - ensure no gaps */
+    [data-theme="dark"] .ui.segment {
+        background-color: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-primary) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical {
+        background-color: var(--card-bg) !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border-radius: 0 !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item {
+        background-color: var(--card-bg) !important;
+        color: var(--text-primary) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+        margin: 0 !important;
+        border-radius: 0 !important;
+        border-left: none !important;
+        border-right: none !important;
+        border-top: none !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item:hover {
+        background-color: var(--menu-hover) !important;
+        color: var(--text-primary) !important;
+    }
+
+    /* Dark theme dropdown styling in mobile sidebar */
+    [data-theme="dark"] .ui.menu.secondary.vertical .item .ui.dropdown {
+        background-color: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item .ui.dropdown .menu {
+        background-color: var(--card-bg) !important;
+        border: 1px solid var(--border-color) !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item .ui.dropdown .menu .item {
+        background-color: var(--card-bg) !important;
+        color: var(--text-primary) !important;
+        border-bottom: 1px solid var(--border-color) !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item .ui.dropdown .menu .item:hover {
+        background-color: var(--menu-hover) !important;
+        color: var(--text-primary) !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item .ui.button {
+        background-color: transparent !important;
+        color: var(--text-primary) !important;
+        border: none !important;
+    }
+
+    [data-theme="dark"] .ui.menu.secondary.vertical .item .ui.button:hover {
+        background-color: var(--menu-hover) !important;
+        color: var(--text-primary) !important;
     }
 
     /* Reset containers for mobile - NO padding */
@@ -1208,6 +1858,11 @@ code {
         /* Hide table headers on mobile */
     }
 
+    .ui.table tfoot {
+        display: table-footer-group !important;
+        /* Ensure footer stays at bottom on mobile */
+    }
+
     .ui.table tbody tr {
         display: block !important;
         border: none !important;
@@ -1275,6 +1930,35 @@ code {
     .ui.modal {
         margin: 8px !important;
         width: calc(100% - 16px) !important;
+    }
+}
+
+/* ==============================|| DESKTOP TABLE FIX ||============================== */
+
+/* Ensure table structure is correct on desktop */
+@media screen and (min-width: 769px) {
+    .ui.table {
+        display: table !important;
+    }
+
+    .ui.table thead {
+        display: table-header-group !important;
+    }
+
+    .ui.table tbody {
+        display: table-row-group !important;
+    }
+
+    .ui.table tfoot {
+        display: table-footer-group !important;
+    }
+
+    .ui.table tbody tr {
+        display: table-row !important;
+    }
+
+    .ui.table tbody tr td {
+        display: table-cell !important;
     }
 }
 

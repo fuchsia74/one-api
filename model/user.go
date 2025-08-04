@@ -53,6 +53,8 @@ type User struct {
 	Group            string `json:"group" gorm:"type:varchar(32);default:'default'"`
 	AffCode          string `json:"aff_code" gorm:"type:varchar(32);column:aff_code;uniqueIndex"`
 	InviterId        int    `json:"inviter_id" gorm:"type:int;column:inviter_id;index"`
+	CreatedAt        int64  `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt        int64  `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 }
 
 func GetMaxUserId() int {
@@ -77,6 +79,11 @@ func GetAllUsers(startIdx int, num int, order string) (users []*User, err error)
 
 	err = query.Find(&users).Error
 	return users, err
+}
+
+func GetUserCount() (count int64, err error) {
+	err = DB.Model(&User{}).Where("status != ?", UserStatusDeleted).Count(&count).Error
+	return count, err
 }
 
 func SearchUsers(keyword string) (users []*User, err error) {

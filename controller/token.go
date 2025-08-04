@@ -51,10 +51,19 @@ func GetAllTokens(c *gin.Context) {
 		helper.RespondError(c, err)
 		return
 	}
+
+	// Get total count for pagination
+	totalCount, err := model.GetUserTokenCount(userId)
+	if err != nil {
+		helper.RespondError(c, err)
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    tokens,
+		"total":   totalCount,
 	})
 	return
 }

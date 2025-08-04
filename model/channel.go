@@ -48,6 +48,8 @@ type Channel struct {
 	// DEPRECATED: Use ModelConfigs instead. These fields are kept for backward compatibility and migration.
 	ModelRatio      *string `json:"model_ratio" gorm:"type:text"`      // DEPRECATED: JSON string of model pricing ratios
 	CompletionRatio *string `json:"completion_ratio" gorm:"type:text"` // DEPRECATED: JSON string of completion pricing ratios
+	CreatedAt       int64   `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt       int64   `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 	// AWS-specific configuration
 	InferenceProfileArnMap *string `json:"inference_profile_arn_map" gorm:"type:text"` // JSON string mapping model names to AWS Bedrock Inference Profile ARNs
 }
@@ -89,6 +91,11 @@ func GetAllChannels(startIdx int, num int, scope string) ([]*Channel, error) {
 		err = DB.Order("id desc").Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
 	}
 	return channels, err
+}
+
+func GetChannelCount() (count int64, err error) {
+	err = DB.Model(&Channel{}).Count(&count).Error
+	return count, err
 }
 
 func SearchChannels(keyword string) (channels []*Channel, err error) {

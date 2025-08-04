@@ -27,6 +27,8 @@ type Redemption struct {
 	CreatedTime  int64  `json:"created_time" gorm:"bigint"`
 	RedeemedTime int64  `json:"redeemed_time" gorm:"bigint"`
 	Count        int    `json:"count" gorm:"-:all"` // only for api request
+	CreatedAt    int64  `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
+	UpdatedAt    int64  `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 }
 
 func GetAllRedemptions(startIdx int, num int) ([]*Redemption, error) {
@@ -34,6 +36,11 @@ func GetAllRedemptions(startIdx int, num int) ([]*Redemption, error) {
 	var err error
 	err = DB.Order("id desc").Limit(num).Offset(startIdx).Find(&redemptions).Error
 	return redemptions, err
+}
+
+func GetRedemptionCount() (count int64, err error) {
+	err = DB.Model(&Redemption{}).Count(&count).Error
+	return count, err
 }
 
 func SearchRedemptions(keyword string) (redemptions []*Redemption, err error) {
