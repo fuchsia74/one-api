@@ -4,6 +4,7 @@ import {
   Button,
   Form,
   Label,
+  Pagination,
   Popup,
   Table,
 } from 'semantic-ui-react';
@@ -17,32 +18,31 @@ import {
 
 import { ITEMS_PER_PAGE } from '../constants';
 import { cleanDisplay } from './shared/tableUtils';
-import FixedPagination from './FixedPagination';
 
 function renderUserRole(role, t) {
   switch (role) {
     case 1:
       return (
         <Label basic color='blue'>
-          {t('role_types.normal')}
+          Normal
         </Label>
       );
     case 10:
       return (
         <Label basic color='yellow'>
-          {t('role_types.admin')}
+          Admin
         </Label>
       );
     case 100:
       return (
         <Label basic color='orange'>
-          {t('role_types.super_admin')}
+          Super Admin
         </Label>
       );
     default:
       return (
         <Label basic color='red'>
-          {t('role_types.unknown')}
+          Unknown
         </Label>
       );
   }
@@ -53,19 +53,19 @@ function renderUserStatus(status, t) {
     case 1:
       return (
         <Label basic color='green'>
-          {t('status.enabled')}
+          Enabled
         </Label>
       );
     case 2:
       return (
         <Label basic color='red'>
-          {t('status.disabled')}
+          Disabled
         </Label>
       );
     default:
       return (
         <Label basic color='black'>
-          {t('status.unknown')}
+          Unknown
         </Label>
       );
   }
@@ -76,20 +76,17 @@ const UsersTableCompact = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
 
-  const loadUsers = async (startIdx) => {
-    const res = await API.get(`/api/user/?p=${startIdx}`);
-    const { success, message, data } = res.data;
+  const loadUsers = async (page = 0) => {
+    setLoading(true);
+    const res = await API.get(`/api/user/?p=${page}`);
+    const { success, message, data, total } = res.data;
     if (success) {
-      if (startIdx === 0) {
-        setUsers(data);
-      } else {
-        let newUsers = users;
-        newUsers.push(...data);
-        setUsers(newUsers);
-      }
+      setUsers(data);
+      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } else {
       showError(message);
     }
@@ -97,13 +94,8 @@ const UsersTableCompact = () => {
   };
 
   const onPaginationChange = (e, { activePage }) => {
-    (async () => {
-      if (activePage === Math.ceil(users.length / ITEMS_PER_PAGE) + 1) {
-        // In this case we have to load more data and then append them.
-        await loadUsers(activePage - 1);
-      }
-      setActivePage(activePage);
-    })();
+    setActivePage(activePage);
+    loadUsers(activePage - 1);
   };
 
   useEffect(() => {
@@ -134,14 +126,13 @@ const UsersTableCompact = () => {
     }
     const { success, message } = res.data;
     if (success) {
-      showSuccess(t('user.messages.operation_success'));
+      showSuccess('Operation successful');
       let user = res.data.data;
       let newUsers = [...users];
-      let realIdx = (activePage - 1) * ITEMS_PER_PAGE + idx;
       if (action === 'delete') {
-        newUsers[realIdx].deleted = true;
+        newUsers[idx].deleted = true;
       } else {
-        newUsers[realIdx].status = user.status;
+        newUsers[idx].status = user.status;
       }
       setUsers(newUsers);
     } else {
@@ -207,7 +198,7 @@ const UsersTableCompact = () => {
           icon='search'
           fluid
           iconPosition='left'
-          placeholder={t('user.search_placeholder')}
+          placeholder='Search by username...'
           value={searchKeyword}
           loading={searching}
           onChange={handleKeywordChange}
@@ -360,25 +351,18 @@ const UsersTableCompact = () => {
               <Button size='small' onClick={refresh} loading={loading}>
                 {t('refresh')}
               </Button>
+              <Pagination
+                floated='right'
+                activePage={activePage}
+                onPageChange={onPaginationChange}
+                size='small'
+                siblingRange={1}
+                totalPages={totalPages}
+              />
             </Table.HeaderCell>
           </Table.Row>
         </Table.Footer>
       </Table>
-      {(() => {
-        // Calculate total pages based on loaded data, but always allow +1 for potential more data
-        const currentPages = Math.ceil(users.length / ITEMS_PER_PAGE);
-        const totalPages = Math.max(currentPages, activePage + (users.length % ITEMS_PER_PAGE === 0 ? 1 : 0));
-
-        return (
-          <FixedPagination
-            activePage={activePage}
-            onPageChange={(e, data) => {
-              onPaginationChange(e, data);
-            }}
-            totalPages={totalPages}
-          />
-        );
-      })()}
     </>
   );
 };

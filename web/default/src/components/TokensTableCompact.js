@@ -4,6 +4,7 @@ import {
   Button,
   Form,
   Label,
+  Pagination,
   Popup,
   Table,
 } from 'semantic-ui-react';
@@ -20,7 +21,6 @@ import {
 
 import { ITEMS_PER_PAGE } from '../constants';
 import { cleanDisplay } from './shared/tableUtils';
-import FixedPagination from './FixedPagination';
 
 function renderTimestamp(timestamp) {
   return <>{timestamp2string(timestamp)}</>;
@@ -66,20 +66,19 @@ const TokensTableCompact = () => {
   const [tokens, setTokens] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
 
-  const loadTokens = async (startIdx) => {
-    const res = await API.get(`/api/token/?p=${startIdx}`);
-    const { success, message, data } = res.data;
+  const loadTokens = async (page = 0) => {
+    setLoading(true);
+    const res = await API.get(`/api/token/?p=${page}`);
+    const { success, message, data, total } = res.data;
     if (success) {
-      if (startIdx === 0) {
-        setTokens(data);
-      } else {
-        let newTokens = tokens;
-        newTokens.push(...data);
-        setTokens(newTokens);
-      }
+      setTokens(data);
+      const calculatedTotalPages = Math.ceil(total / ITEMS_PER_PAGE);
+      console.log('DEBUG: total =', total, 'ITEMS_PER_PAGE =', ITEMS_PER_PAGE, 'calculatedTotalPages =', calculatedTotalPages);
+      setTotalPages(calculatedTotalPages);
     } else {
       showError(message);
     }
@@ -87,13 +86,8 @@ const TokensTableCompact = () => {
   };
 
   const onPaginationChange = (e, { activePage }) => {
-    (async () => {
-      if (activePage === Math.ceil(tokens.length / ITEMS_PER_PAGE) + 1) {
-        // In this case we have to load more data and then append them.
-        await loadTokens(activePage - 1);
-      }
-      setActivePage(activePage);
-    })();
+    setActivePage(activePage);
+    loadTokens(activePage - 1);
   };
 
   useEffect(() => {
@@ -368,21 +362,53 @@ const TokensTableCompact = () => {
           </Table.Row>
         </Table.Footer>
       </Table>
-      {(() => {
-        // Calculate total pages based on loaded data, but always allow +1 for potential more data
-        const currentPages = Math.ceil(tokens.length / ITEMS_PER_PAGE);
-        const totalPages = Math.max(currentPages, activePage + (tokens.length % ITEMS_PER_PAGE === 0 ? 1 : 0));
 
-        return (
-          <FixedPagination
+      {/* DEBUG SECTION OUTSIDE TABLE */}
+      <div style={{
+        position: 'fixed',
+        top: '10px',
+        right: '10px',
+        backgroundColor: 'yellow',
+        border: '3px solid red',
+        padding: '20px',
+        zIndex: 9999
+      }}>
+        <div>🔥 DEBUG: totalPages = {totalPages} | activePage = {activePage}</div>
+
+        {/* Simple manual pagination for testing */}
+        <div style={{ marginTop: '10px', border: '2px solid green', padding: '10px' }}>
+          <div>Manual Pagination:</div>
+          {Array.from({ length: Math.max(totalPages, 2) }, (_, i) => i + 1).map(pageNum => (
+            <button
+              key={pageNum}
+              onClick={() => onPaginationChange(null, { activePage: pageNum })}
+              style={{
+                margin: '0 5px',
+                padding: '8px 12px',
+                backgroundColor: pageNum === activePage ? '#007bff' : '#f8f9fa',
+                color: pageNum === activePage ? 'white' : '#333',
+                border: '2px solid #333',
+                cursor: 'pointer',
+                fontSize: '14px'
+              }}
+            >
+              Page {pageNum}
+            </button>
+          ))}
+        </div>
+
+        {/* Original Semantic UI Pagination */}
+        <div style={{ marginTop: '10px', border: '2px solid blue', padding: '10px' }}>
+          <div>Semantic UI Pagination:</div>
+          <Pagination
             activePage={activePage}
-            onPageChange={(e, data) => {
-              onPaginationChange(e, data);
-            }}
-            totalPages={totalPages}
+            onPageChange={onPaginationChange}
+            size='small'
+            siblingRange={1}
+            totalPages={Math.max(totalPages, 2)}
           />
-        );
-      })()}
+        </div>
+      </div>
     </>
   );
 };

@@ -4,6 +4,7 @@ import {
   Button,
   Form,
   Label,
+  Pagination,
   Popup,
   Table,
   Icon,
@@ -18,7 +19,6 @@ import {
 import { CHANNEL_OPTIONS } from '../constants';
 import { renderGroup, renderNumber } from '../helpers/render';
 import { cleanDisplay } from './shared/tableUtils';
-import FixedPagination from './FixedPagination';
 
 import { ITEMS_PER_PAGE } from '../constants';
 
@@ -146,21 +146,18 @@ const ChannelsTableCompact = () => {
   const [channels, setChannels] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
 
-  const loadChannels = async (startIdx) => {
-    const res = await API.get(`/api/channel/?p=${startIdx}`);
-    const { success, message, data } = res.data;
+  const loadChannels = async (page = 0) => {
+    setLoading(true);
+    const res = await API.get(`/api/channel/?p=${page}`);
+    const { success, message, data, total } = res.data;
     if (success) {
       const processedChannels = (data || []).map(processChannelData);
-      if (startIdx === 0) {
-        setChannels(processedChannels);
-      } else {
-        let newChannels = channels;
-        newChannels.push(...processedChannels);
-        setChannels(newChannels);
-      }
+      setChannels(processedChannels);
+      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } else {
       showError(message);
     }
@@ -189,13 +186,8 @@ const ChannelsTableCompact = () => {
   };
 
   const onPaginationChange = (e, { activePage }) => {
-    (async () => {
-      if (activePage === Math.ceil(channels.length / ITEMS_PER_PAGE) + 1) {
-        // In this case we have to load more data and then append them.
-        await loadChannels(activePage - 1);
-      }
-      setActivePage(activePage);
-    })();
+    setActivePage(activePage);
+    loadChannels(activePage - 1);
   };
 
   useEffect(() => {
@@ -225,8 +217,7 @@ const ChannelsTableCompact = () => {
           showSuccess(`Test successful!${time ? ` Response time: ${time}ms` : ''}`);
           // Update the channel's response time
           let newChannels = [...channels];
-          let realIdx = (activePage - 1) * ITEMS_PER_PAGE + idx;
-          newChannels[realIdx].response_time = time;
+          newChannels[idx].response_time = time;
           setChannels(newChannels);
         } else {
           showError(testMessage);
@@ -239,13 +230,12 @@ const ChannelsTableCompact = () => {
     if (success) {
       showSuccess('Operation successful');
       let newChannels = [...channels];
-      let realIdx = (activePage - 1) * ITEMS_PER_PAGE + idx;
       if (action === 'delete') {
-        newChannels[realIdx].deleted = true;
+        newChannels[idx].deleted = true;
       } else if (action === 'enable') {
-        newChannels[realIdx].status = 1;
+        newChannels[idx].status = 1;
       } else if (action === 'disable') {
-        newChannels[realIdx].status = 2;
+        newChannels[idx].status = 2;
       }
       setChannels(newChannels);
     } else {
@@ -269,6 +259,7 @@ const ChannelsTableCompact = () => {
       const processedChannels = (data || []).map(processChannelData);
       setChannels(processedChannels);
       setActivePage(1);
+      setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
     } else {
       showError(message);
     }
@@ -471,30 +462,23 @@ const ChannelsTableCompact = () => {
                 to='/channel/add'
                 loading={loading}
               >
-                {t('channel.add')}
+                Add
               </Button>
               <Button size='small' onClick={refresh} loading={loading}>
-                {t('channel.buttons.refresh')}
+                Refresh
               </Button>
+              <Pagination
+                floated='right'
+                activePage={activePage}
+                onPageChange={onPaginationChange}
+                size='small'
+                siblingRange={1}
+                totalPages={totalPages}
+              />
             </Table.HeaderCell>
           </Table.Row>
         </Table.Footer>
       </Table>
-      {(() => {
-        // Calculate total pages based on loaded data, but always allow +1 for potential more data
-        const currentPages = Math.ceil(channels.length / ITEMS_PER_PAGE);
-        const totalPages = Math.max(currentPages, activePage + (channels.length % ITEMS_PER_PAGE === 0 ? 1 : 0));
-
-        return (
-          <FixedPagination
-            activePage={activePage}
-            onPageChange={(e, data) => {
-              onPaginationChange(e, data);
-            }}
-            totalPages={totalPages}
-          />
-        );
-      })()}
     </>
   );
 };

@@ -4,6 +4,7 @@ import {
   Button,
   Form,
   Label,
+  Pagination,
   Popup,
   Table,
 } from 'semantic-ui-react';
@@ -19,7 +20,6 @@ import {
 } from '../helpers';
 
 import { ITEMS_PER_PAGE } from '../constants';
-import FixedPagination from './FixedPagination';
 
 function renderTimestamp(timestamp) {
   return <>{timestamp2string(timestamp)}</>;
@@ -59,20 +59,17 @@ const RedemptionsTable = () => {
   const [redemptions, setRedemptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activePage, setActivePage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
 
-  const loadRedemptions = async (startIdx) => {
-    const res = await API.get(`/api/redemption/?p=${startIdx}`);
-    const { success, message, data } = res.data;
+  const loadRedemptions = async (page = 0) => {
+    setLoading(true);
+    const res = await API.get(`/api/redemption/?p=${page}`);
+    const { success, message, data, total } = res.data;
     if (success) {
-      if (startIdx === 0) {
-        setRedemptions(data);
-      } else {
-        let newRedemptions = redemptions;
-        newRedemptions.push(...data);
-        setRedemptions(newRedemptions);
-      }
+      setRedemptions(data);
+      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } else {
       showError(message);
     }
@@ -80,13 +77,8 @@ const RedemptionsTable = () => {
   };
 
   const onPaginationChange = (e, { activePage }) => {
-    (async () => {
-      if (activePage === Math.ceil(redemptions.length / ITEMS_PER_PAGE) + 1) {
-        // In this case we have to load more data and then append them.
-        await loadRedemptions(activePage - 1);
-      }
-      setActivePage(activePage);
-    })();
+    setActivePage(activePage);
+    loadRedemptions(activePage - 1);
   };
 
   useEffect(() => {
@@ -354,25 +346,18 @@ const RedemptionsTable = () => {
               <Button size='small' onClick={refresh} loading={loading}>
                 {t('redemption.buttons.refresh')}
               </Button>
+              <Pagination
+                floated='right'
+                activePage={activePage}
+                onPageChange={onPaginationChange}
+                size='small'
+                siblingRange={1}
+                totalPages={totalPages}
+              />
             </Table.HeaderCell>
           </Table.Row>
         </Table.Footer>
       </Table>
-      {(() => {
-        // Calculate total pages based on loaded data, but always allow +1 for potential more data
-        const currentPages = Math.ceil(redemptions.length / ITEMS_PER_PAGE);
-        const totalPages = Math.max(currentPages, activePage + (redemptions.length % ITEMS_PER_PAGE === 0 ? 1 : 0));
-
-        return (
-          <FixedPagination
-            activePage={activePage}
-            onPageChange={(e, data) => {
-              onPaginationChange(e, data);
-            }}
-            totalPages={totalPages}
-          />
-        );
-      })()}
     </>
   );
 };

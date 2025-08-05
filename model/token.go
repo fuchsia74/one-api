@@ -35,8 +35,8 @@ type Token struct {
 	UsedQuota      int64   `json:"used_quota" gorm:"bigint;default:0"` // used quota
 	CreatedAt      int64   `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
 	UpdatedAt      int64   `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
-	Models         *string `json:"models" gorm:"type:text"`            // allowed models
-	Subnet         *string `json:"subnet" gorm:"default:''"`           // allowed subnet
+	Models         *string `json:"models" gorm:"type:text"`  // allowed models
+	Subnet         *string `json:"subnet" gorm:"default:''"` // allowed subnet
 }
 
 func clearTokenCache(key string) {
