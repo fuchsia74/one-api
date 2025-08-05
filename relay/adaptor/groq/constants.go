@@ -39,6 +39,8 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"llama-3.3-70b-specdec":                         {Ratio: 0.59 * ratio.MilliTokensUsd, CompletionRatio: 0.99 / 0.59},
 	"meta-llama/llama-4-maverick-17b-128e-instruct": {Ratio: 0.2 * ratio.MilliTokensUsd, CompletionRatio: 3},
 	"meta-llama/llama-4-scout-17b-16e-instruct":     {Ratio: 0.11 * ratio.MilliTokensUsd, CompletionRatio: 0.34 / 0.11},
+	"openai/gpt-oss-120b":                           {Ratio: 0.15 * ratio.MilliTokensUsd, CompletionRatio: 0.75 / 0.15},
+	"openai/gpt-oss-20b":                            {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 0.5 / 0.1},
 }
 
 // ModelList derived from ModelRatios for backward compatibility
