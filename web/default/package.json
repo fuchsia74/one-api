@@ -16,7 +16,7 @@
     "react-dropzone": "^14.3.8",
     "react-i18next": "^15.4.1",
     "react-router-dom": "^7.3.0",
-    "react-scripts": "5.0.1",
+    "react-scripts": "5.0.0",
     "react-toastify": "^11.0.5",
     "react-turnstile": "^1.1.4",
     "recharts": "^2.15.1",
@@ -27,8 +27,10 @@
   "scripts": {
     "start": "FAST_REFRESH=true react-scripts start",
     "dev": "FAST_REFRESH=true GENERATE_SOURCEMAP=true react-scripts start",
+    "dev:backend": "FAST_REFRESH=true GENERATE_SOURCEMAP=true REACT_APP_VERSION=$(cat ../../VERSION) react-scripts start",
     "build": "react-scripts build && rm -rf ../build/default && mv -f build ../build/default",
     "build:dev": "GENERATE_SOURCEMAP=true react-scripts build && rm -rf ../build/default && mv -f build ../build/default",
+    "build:prod": "DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ../../VERSION) react-scripts build && rm -rf ../build/default && mv -f build ../build/default",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -51,10 +53,14 @@
     ]
   },
   "devDependencies": {
+    "http-proxy-middleware": "^3.0.5",
     "prettier": "^3.5.3"
   },
   "prettier": {
     "singleQuote": true,
     "jsxSingleQuote": true
+  },
+  "resolutions": {
+    "webpack-dev-server": "^4.15.1"
   }
 }

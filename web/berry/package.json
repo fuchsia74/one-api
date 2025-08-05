@@ -1,7 +1,7 @@
 {
   "name": "one_api_web",
   "version": "1.0.0",
-  "proxy": "http://127.0.0.1:3000",
+  "proxy": "http://100.113.170.10:3000",
   "private": true,
   "homepage": "",
   "dependencies": {
@@ -41,8 +41,12 @@
     "yup": "^0.32.11"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "FAST_REFRESH=true react-scripts start",
+    "dev": "FAST_REFRESH=true GENERATE_SOURCEMAP=true react-scripts start",
+    "dev:backend": "FAST_REFRESH=true GENERATE_SOURCEMAP=true REACT_APP_VERSION=$(cat ../../VERSION) PORT=3003 react-scripts start",
     "build": "react-scripts build && rm -rf ../build/berry && mv -f build ../build/berry",
+    "build:dev": "GENERATE_SOURCEMAP=true react-scripts build && rm -rf ../build/berry && mv -f build ../build/berry",
+    "build:prod": "DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ../../VERSION) react-scripts build && rm -rf ../build/berry && mv -f build ../build/berry",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

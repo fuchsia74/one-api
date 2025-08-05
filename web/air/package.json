@@ -27,8 +27,12 @@
     "usehooks-ts": "^2.9.1"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "FAST_REFRESH=true react-scripts start",
+    "dev": "FAST_REFRESH=true GENERATE_SOURCEMAP=true react-scripts start",
+    "dev:backend": "FAST_REFRESH=true GENERATE_SOURCEMAP=true REACT_APP_VERSION=$(cat ../../VERSION) PORT=3002 react-scripts start",
     "build": "react-scripts build && mv -f build ../build/air",
+    "build:dev": "GENERATE_SOURCEMAP=true react-scripts build && rm -rf ../build/air && mv -f build ../build/air",
+    "build:prod": "DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ../../VERSION) react-scripts build && rm -rf ../build/air && mv -f build ../build/air",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -58,5 +62,5 @@
     "singleQuote": true,
     "jsxSingleQuote": true
   },
-  "proxy": "http://localhost:3000"
+  "proxy": "http://100.113.170.10:3000"
 }

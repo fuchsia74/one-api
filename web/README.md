@@ -1,9 +1,68 @@
-# One API 的前端界面
+# One API 的前端界面 / Frontend Templates
 
 > 每个文件夹代表一个主题，欢迎提交你的主题
+> Each folder represents a theme/template, and we welcome your theme submissions
 
 > [!WARNING]
 > 不是每一个主题都及时同步了所有功能，由于精力有限，优先更新默认主题，其他主题欢迎 & 期待 PR
+> Not every theme is synchronized with all features in a timely manner. Due to limited resources, the default theme is updated first. PRs for other themes are welcomed & expected.
+
+## 开发指南 / Development Guide
+
+### 可用模板 / Available Templates
+
+| 模板 / Template | UI框架 / Framework | 端口 / Port | 目录 / Directory |
+|----------------|-------------------|------------|------------------|
+| **Default** | Semantic UI React | 3001 | `./default/` |
+| **Air** | Semi UI | 3002 | `./air/` |
+| **Berry** | Material UI | 3003 | `./berry/` |
+
+### 快速开发启动 / Quick Development Start
+
+#### 1. 启动Go后端 / Start Go Backend (Required)
+
+```bash
+# 从项目根目录 / From project root
+go run main.go
+```
+
+#### 2. 选择模板并启动开发 / Choose Template and Start Development
+
+```bash
+# 从项目根目录 / From project root
+./dev.sh default dev    # Default template on port 3001
+./dev.sh air dev        # Air template on port 3002
+./dev.sh berry dev      # Berry template on port 3003
+
+# 或使用make / Or use make:
+make dev-default        # Default template
+make dev-air           # Air template
+make dev-berry         # Berry template
+```
+
+### 开发地址 / Development URLs
+
+- **Default Template**: http://localhost:3001
+- **Air Template**: http://localhost:3002
+- **Berry Template**: http://localhost:3003
+
+所有模板自动代理API调用到Go后端: `http://100.113.170.10:3000`
+All templates automatically proxy API calls to Go backend: `http://100.113.170.10:3000`
+
+### 生产构建 / Production Build
+
+```bash
+# 构建单个模板 / Build individual template
+./dev.sh default build     # or: make build-frontend-default
+./dev.sh air build         # or: make build-frontend-air
+./dev.sh berry build       # or: make build-frontend-berry
+
+# 构建所有模板 / Build all templates
+make build-all-templates
+```
+
+详细开发指南请参阅: [`../docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md)
+For detailed development guide, see: [`../docs/DEVELOPMENT.md`](../docs/DEVELOPMENT.md)
 
 ## 提交新的主题
 
