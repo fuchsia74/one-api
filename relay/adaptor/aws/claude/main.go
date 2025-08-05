@@ -38,6 +38,7 @@ var AwsModelIDMap = map[string]string{
 	"claude-3-sonnet-20240229":     "anthropic.claude-3-sonnet-20240229-v1:0",
 	"claude-3-opus-20240229":       "anthropic.claude-3-opus-20240229-v1:0",
 	"claude-opus-4-20250514":       "anthropic.claude-opus-4-20250514-v1:0",
+	"claude-opus-4-1-20250805":     "anthropic.claude-opus-4-1-20250805-v1:0",
 	"claude-3-5-sonnet-20240620":   "anthropic.claude-3-5-sonnet-20240620-v1:0",
 	"claude-3-5-sonnet-20241022":   "anthropic.claude-3-5-sonnet-20241022-v2:0",
 	"claude-3-5-sonnet-latest":     "anthropic.claude-3-5-sonnet-20241022-v2:0",

@@ -97,6 +97,7 @@ var CrossRegionInferences = []string{
 	"us.anthropic.claude-3-opus-20240229-v1:0",
 	"us.anthropic.claude-3-sonnet-20240229-v1:0",
 	"us.anthropic.claude-opus-4-20250514-v1:0",
+	"us.anthropic.claude-opus-4-1-20250805-v1:0",
 	"us.anthropic.claude-sonnet-4-20250514-v1:0",
 	"us.deepseek.r1-v1:0",
 	"us.meta.llama3-1-405b-instruct-v1:0",

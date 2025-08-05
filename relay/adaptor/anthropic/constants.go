@@ -32,7 +32,10 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 
 	// Claude 3 Opus Models
 	"claude-3-opus-20240229": {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5.0},
-	"claude-opus-4-20250514": {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5.0},
+
+	// Claude 4 Opus Models
+	"claude-opus-4-20250514":   {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5.0},
+	"claude-opus-4-1-20250805": {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5.0},
 
 	// Claude 4 Sonnet Models
 	"claude-sonnet-4-20250514": {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5.0},

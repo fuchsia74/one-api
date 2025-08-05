@@ -22,6 +22,7 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"claude-3-haiku@20240307":       {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $0.25/$1.25 per 1M tokens
 	"claude-3-opus@20240229":        {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $15/$75 per 1M tokens
 	"claude-opus-4@20250514":        {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $15/$75 per 1M tokens
+	"claude-opus-4-1@20250805":      {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $15/$75 per 1M tokens
 	"claude-3-sonnet@20240229":      {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
 	"claude-3-5-sonnet@20240620":    {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
 	"claude-3-5-sonnet-v2@20241022": {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens

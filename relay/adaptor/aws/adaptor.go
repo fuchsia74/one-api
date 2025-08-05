@@ -263,6 +263,7 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 		"claude-3-sonnet-20240229":   {Ratio: 3 * MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-3-opus-20240229":     {Ratio: 15 * MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
 		"claude-opus-4-20250514":     {Ratio: 15 * MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
+		"claude-opus-4-1-20250805":   {Ratio: 15 * MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
 		"claude-3-5-sonnet-20240620": {Ratio: 3 * MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-3-5-sonnet-20241022": {Ratio: 3 * MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-3-5-sonnet-latest":   {Ratio: 3 * MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
