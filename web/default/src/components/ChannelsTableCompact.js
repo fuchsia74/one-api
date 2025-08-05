@@ -366,12 +366,7 @@ const ChannelsTableCompact = () => {
         </Table.Header>
 
         <Table.Body>
-          {channels
-            .slice(
-              (activePage - 1) * ITEMS_PER_PAGE,
-              activePage * ITEMS_PER_PAGE
-            )
-            .map((channel, idx) => {
+          {channels.map((channel, idx) => {
               if (channel.deleted) return <></>;
               return (
                 <Table.Row key={channel.id}>

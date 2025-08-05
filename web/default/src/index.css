@@ -1513,14 +1513,9 @@ div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .i
     margin-left: 10px !important;
 }
 
-/* Remove table footer pagination (since we use fixed pagination) */
-.ui.table tfoot .ui.pagination {
-    display: none !important;
-}
-
-/* Ensure tables have bottom padding for fixed pagination */
+/* Ensure tables have bottom padding */
 .ui.table {
-    margin-bottom: 100px !important;
+    margin-bottom: 20px !important;
 }
 
 

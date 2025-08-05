@@ -585,12 +585,7 @@ const LogsTableCompact = () => {
         </Table.Header>
 
         <Table.Body>
-          {logs
-            .slice(
-              (activePage - 1) * ITEMS_PER_PAGE,
-              activePage * ITEMS_PER_PAGE
-            )
-            .map((log, idx) => {
+          {logs.map((log, idx) => {
               if (log.deleted) return null;
               return (
                 <Table.Row key={log.id}>

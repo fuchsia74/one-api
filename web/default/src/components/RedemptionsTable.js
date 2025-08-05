@@ -245,12 +245,7 @@ const RedemptionsTable = () => {
         </Table.Header>
 
         <Table.Body>
-          {redemptions
-            .slice(
-              (activePage - 1) * ITEMS_PER_PAGE,
-              activePage * ITEMS_PER_PAGE
-            )
-            .map((redemption, idx) => {
+          {redemptions.map((redemption, idx) => {
               if (redemption.deleted) return <></>;
               return (
                 <Table.Row key={redemption.id}>

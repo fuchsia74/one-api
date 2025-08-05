@@ -76,9 +76,7 @@ const TokensTableCompact = () => {
     const { success, message, data, total } = res.data;
     if (success) {
       setTokens(data);
-      const calculatedTotalPages = Math.ceil(total / ITEMS_PER_PAGE);
-      console.log('DEBUG: total =', total, 'ITEMS_PER_PAGE =', ITEMS_PER_PAGE, 'calculatedTotalPages =', calculatedTotalPages);
-      setTotalPages(calculatedTotalPages);
+      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
     } else {
       showError(message);
     }
@@ -121,11 +119,10 @@ const TokensTableCompact = () => {
       showSuccess(t('token.messages.operation_success'));
       let token = res.data.data;
       let newTokens = [...tokens];
-      let realIdx = (activePage - 1) * ITEMS_PER_PAGE + idx;
       if (action === 'delete') {
-        newTokens[realIdx].deleted = true;
+        newTokens[idx].deleted = true;
       } else {
-        newTokens[realIdx].status = token.status;
+        newTokens[idx].status = token.status;
       }
       setTokens(newTokens);
     } else {
@@ -254,94 +251,89 @@ const TokensTableCompact = () => {
         </Table.Header>
 
         <Table.Body>
-          {tokens
-            .slice(
-              (activePage - 1) * ITEMS_PER_PAGE,
-              activePage * ITEMS_PER_PAGE
-            )
-            .map((token, idx) => {
-              if (token.deleted) return <></>;
-              return (
-                <Table.Row key={token.id}>
-                  <Table.Cell>{token.id}</Table.Cell>
-                  <Table.Cell>
-                    {cleanDisplay(token.name)}
-                  </Table.Cell>
-                  <Table.Cell>{renderTokenStatus(token.status, t)}</Table.Cell>
-                  <Table.Cell>{renderQuota(token.used_quota, t)}</Table.Cell>
-                  <Table.Cell>
-                    {token.unlimited_quota ? (
-                      <Label basic color="green">
-                        {t('unlimited')}
-                      </Label>
-                    ) : (
-                      renderQuota(token.remain_quota, t)
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {renderTimestamp(token.created_time)}
-                  </Table.Cell>
-                  <Table.Cell>
-                    <div>
-                      <Button
-                        size={'tiny'}
-                        positive
-                        onClick={async () => {
-                          if (await copy(token.key)) {
-                            showSuccess(t('token.messages.copy_success'));
-                          } else {
-                            showWarning(t('token.messages.copy_failed'));
-                            setSearchKeyword(token.key);
-                          }
-                        }}
-                      >
-                        {t('token.buttons.copy')}
-                      </Button>
-                      <Popup
-                        trigger={
-                          <Button size='tiny' negative>
-                            {t('token.buttons.delete')}
-                          </Button>
+          {tokens.map((token, idx) => {
+            if (token.deleted) return <></>;
+            return (
+              <Table.Row key={token.id}>
+                <Table.Cell>{token.id}</Table.Cell>
+                <Table.Cell>
+                  {cleanDisplay(token.name)}
+                </Table.Cell>
+                <Table.Cell>{renderTokenStatus(token.status, t)}</Table.Cell>
+                <Table.Cell>{renderQuota(token.used_quota, t)}</Table.Cell>
+                <Table.Cell>
+                  {token.unlimited_quota ? (
+                    <Label basic color="green">
+                      {t('unlimited')}
+                    </Label>
+                  ) : (
+                    renderQuota(token.remain_quota, t)
+                  )}
+                </Table.Cell>
+                <Table.Cell>
+                  {renderTimestamp(token.created_time)}
+                </Table.Cell>
+                <Table.Cell>
+                  <div>
+                    <Button
+                      size={'tiny'}
+                      positive
+                      onClick={async () => {
+                        if (await copy(token.key)) {
+                          showSuccess(t('token.messages.copy_success'));
+                        } else {
+                          showWarning(t('token.messages.copy_failed'));
+                          setSearchKeyword(token.key);
                         }
-                        on='click'
-                        flowing
-                        hoverable
-                      >
-                        <Button
-                          negative
-                          onClick={() => {
-                            manageToken(token.id, 'delete', idx);
-                          }}
-                        >
-                          {t('token.buttons.confirm_delete')}
+                      }}
+                    >
+                      {t('token.buttons.copy')}
+                    </Button>
+                    <Popup
+                      trigger={
+                        <Button size='tiny' negative>
+                          {t('token.buttons.delete')}
                         </Button>
-                      </Popup>
+                      }
+                      on='click'
+                      flowing
+                      hoverable
+                    >
                       <Button
-                        size={'tiny'}
+                        negative
                         onClick={() => {
-                          manageToken(
-                            token.id,
-                            token.status === 1 ? 'disable' : 'enable',
-                            idx
-                          );
+                          manageToken(token.id, 'delete', idx);
                         }}
                       >
-                        {token.status === 1
-                          ? t('token.buttons.disable')
-                          : t('token.buttons.enable')}
+                        {t('token.buttons.confirm_delete')}
                       </Button>
-                      <Button
-                        size={'tiny'}
-                        as={Link}
-                        to={'/token/edit/' + token.id}
-                      >
-                        {t('token.buttons.edit')}
-                      </Button>
-                    </div>
-                  </Table.Cell>
-                </Table.Row>
-              );
-            })}
+                    </Popup>
+                    <Button
+                      size={'tiny'}
+                      onClick={() => {
+                        manageToken(
+                          token.id,
+                          token.status === 1 ? 'disable' : 'enable',
+                          idx
+                        );
+                      }}
+                    >
+                      {token.status === 1
+                        ? t('token.buttons.disable')
+                        : t('token.buttons.enable')}
+                    </Button>
+                    <Button
+                      size={'tiny'}
+                      as={Link}
+                      to={'/token/edit/' + token.id}
+                    >
+                      {t('token.buttons.edit')}
+                    </Button>
+                  </div>
+                </Table.Cell>
+              </Table.Row>
+            );
+          })}
         </Table.Body>
 
         <Table.Footer>
@@ -358,57 +350,18 @@ const TokensTableCompact = () => {
               <Button size='small' onClick={refresh} loading={loading}>
                 {t('token.buttons.refresh')}
               </Button>
+              <Pagination
+                floated='right'
+                activePage={activePage}
+                onPageChange={onPaginationChange}
+                size='small'
+                siblingRange={1}
+                totalPages={Math.max(totalPages, 2)}
+              />
             </Table.HeaderCell>
           </Table.Row>
         </Table.Footer>
       </Table>
-
-      {/* DEBUG SECTION OUTSIDE TABLE */}
-      <div style={{
-        position: 'fixed',
-        top: '10px',
-        right: '10px',
-        backgroundColor: 'yellow',
-        border: '3px solid red',
-        padding: '20px',
-        zIndex: 9999
-      }}>
-        <div>🔥 DEBUG: totalPages = {totalPages} | activePage = {activePage}</div>
-
-        {/* Simple manual pagination for testing */}
-        <div style={{ marginTop: '10px', border: '2px solid green', padding: '10px' }}>
-          <div>Manual Pagination:</div>
-          {Array.from({ length: Math.max(totalPages, 2) }, (_, i) => i + 1).map(pageNum => (
-            <button
-              key={pageNum}
-              onClick={() => onPaginationChange(null, { activePage: pageNum })}
-              style={{
-                margin: '0 5px',
-                padding: '8px 12px',
-                backgroundColor: pageNum === activePage ? '#007bff' : '#f8f9fa',
-                color: pageNum === activePage ? 'white' : '#333',
-                border: '2px solid #333',
-                cursor: 'pointer',
-                fontSize: '14px'
-              }}
-            >
-              Page {pageNum}
-            </button>
-          ))}
-        </div>
-
-        {/* Original Semantic UI Pagination */}
-        <div style={{ marginTop: '10px', border: '2px solid blue', padding: '10px' }}>
-          <div>Semantic UI Pagination:</div>
-          <Pagination
-            activePage={activePage}
-            onPageChange={onPaginationChange}
-            size='small'
-            siblingRange={1}
-            totalPages={Math.max(totalPages, 2)}
-          />
-        </div>
-      </div>
     </>
   );
 };

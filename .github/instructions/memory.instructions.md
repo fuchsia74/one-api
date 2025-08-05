@@ -2,6 +2,9 @@
 applyTo: "**/*"
 ---
 
+# Memory
+
+This document contains essential information about the entire project, collaboratively maintained by all developers. Please ensure it is concise and abstract, only including the most important and subtle key details.
 
 
 ## Pricing & Billing Architecture (2025-07)
@@ -28,7 +31,14 @@ applyTo: "**/*"
 - **Adaptor Pattern:** All new API formats should follow the Claude Messages pattern: interface method + universal conversion + context marking.
 
 ---
-**Recent Developments (2025-07):**
+**Recent Developments (2025-08):**
+
+- **Frontend Pagination Bug (2025-08):**
+    - **Root Cause:** Pagination controls in all management tables (Tokens, Channels, Users, Logs, Redemptions) were hidden due to a legacy CSS rule: `.ui.table tfoot .ui.pagination { display: none !important; }`.
+    - **Symptoms:** Pagination logic and API were correct, but the UI did not show pagination controls, leading to confusion and apparent missing functionality.
+    - **Resolution:** The problematic CSS rule was removed from `web/default/src/index.css`. All table components now use server-side pagination, and the Semantic UI Pagination component is visible and functional in the table footer.
+    - **Subtlety:** Always check for global or legacy CSS overrides when UI elements are unexpectedly missing, especially with third-party UI libraries. Avoid inline style overrides; prefer maintainable CSS fixes.
+    - **Best Practice:** Pagination logic should match the data loading strategy (server-side vs. client-side). For server-side pagination, do not slice data in the component; render the API result directly.
 
 - Major refactor to unify and clarify model pricing logic, reduce duplication, and standardize on "per 1M tokens" as the pricing unit. All adaptors now use shared pricing maps and fallback logic. This change is critical for maintainability and billing accuracy.
 - When handing over, ensure the new assistant is aware of the pricing unit change, the centralized pricing logic, and the importance of keeping documentation and UI in sync with backend logic.

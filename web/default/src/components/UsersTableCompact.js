@@ -261,12 +261,7 @@ const UsersTableCompact = () => {
         </Table.Header>
 
         <Table.Body>
-          {users
-            .slice(
-              (activePage - 1) * ITEMS_PER_PAGE,
-              activePage * ITEMS_PER_PAGE
-            )
-            .map((user, idx) => {
+          {users.map((user, idx) => {
               if (user.deleted) return <></>;
               return (
                 <Table.Row key={user.id}>
