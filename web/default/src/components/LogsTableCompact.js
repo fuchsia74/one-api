@@ -11,6 +11,7 @@ import {
   Dropdown,
   Header,
   Segment,
+  Icon,
 } from 'semantic-ui-react';
 import {
   API,
@@ -25,15 +26,53 @@ import {
 
 import { ITEMS_PER_PAGE } from '../constants';
 
+function ExpandableDetail({ content, isStream, systemPromptReset }) {
+  const [expanded, setExpanded] = useState(false);
+  const maxLength = 100;
+  const shouldTruncate = content && content.length > maxLength;
+
+  return (
+    <div style={{ maxWidth: '300px' }}>
+      <div style={{
+        wordBreak: 'break-word',
+        whiteSpace: expanded ? 'normal' : 'nowrap',
+        overflow: 'hidden',
+        textOverflow: shouldTruncate && !expanded ? 'ellipsis' : 'visible'
+      }}>
+        {expanded || !shouldTruncate ? content : content.slice(0, maxLength)}
+        {shouldTruncate && (
+          <Button
+            basic
+            size="mini"
+            style={{ marginLeft: '4px', padding: '2px 6px' }}
+            onClick={() => setExpanded(!expanded)}
+          >
+            {expanded ? 'Show Less' : 'Show More'}
+          </Button>
+        )}
+      </div>
+      <div style={{ marginTop: '4px' }}>
+        {isStream && (
+          <Label size="mini" color="pink" style={{ marginRight: '4px' }}>
+            Stream
+          </Label>
+        )}
+        {systemPromptReset && (
+          <Label basic size="mini" color="red">
+            System Prompt Reset
+          </Label>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function renderTimestamp(timestamp, request_id) {
   const fullTimestamp = timestamp2string(timestamp);
-  const compactTimestamp = fullTimestamp.length > 10 && fullTimestamp.includes('-')
-    ? fullTimestamp.slice(5)
-    : fullTimestamp;
 
   return (
     <Popup
-      content={`Full time: ${fullTimestamp}${request_id ? `\nRequest ID: ${request_id}` : ''}`}
+      content={`${fullTimestamp}${request_id ? `\nRequest ID: ${request_id}` : ''}`}
       trigger={
         <code
           onClick={async () => {
@@ -46,7 +85,7 @@ function renderTimestamp(timestamp, request_id) {
           className="timestamp-code"
           style={{ cursor: request_id ? 'pointer' : 'default' }}
         >
-          {compactTimestamp}
+          {fullTimestamp}
         </code>
       }
     />
@@ -314,10 +353,10 @@ const LogsTableCompact = () => {
   };
 
   const getSortIcon = (columnKey) => {
-    if (columnKey !== sortBy) {
-      return null;
+    if (sortBy !== columnKey) {
+      return <Icon name="sort" style={{ opacity: 0.5 }} />;
     }
-    return sortOrder === 'asc' ? ' ↑' : ' ↓';
+    return <Icon name={sortOrder === 'asc' ? 'sort up' : 'sort down'} />;
   };
 
   return (
@@ -652,30 +691,11 @@ const LogsTableCompact = () => {
                     </>
                   )}
                   <Table.Cell>
-                    <div style={{
-                      maxWidth: '200px',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
-                    }}>
-                      {log.content}
-                      {log.is_stream && (
-                        <>
-                          {' '}
-                          <Label size={'mini'} color='pink'>
-                            Stream
-                          </Label>
-                        </>
-                      )}
-                      {log.system_prompt_reset && (
-                        <>
-                          {' '}
-                          <Label basic size={'mini'} color='red'>
-                            System Prompt Reset
-                          </Label>
-                        </>
-                      )}
-                    </div>
+                    <ExpandableDetail
+                      content={log.content}
+                      isStream={log.is_stream}
+                      systemPromptReset={log.system_prompt_reset}
+                    />
                   </Table.Cell>
                 </Table.Row>
               );

@@ -45,7 +45,13 @@ func GetAllTokens(c *gin.Context) {
 	}
 
 	order := c.Query("order")
-	tokens, err := model.GetAllUserTokens(userId, p*config.MaxItemsPerPage, config.MaxItemsPerPage, order)
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	tokens, err := model.GetAllUserTokens(userId, p*config.MaxItemsPerPage, config.MaxItemsPerPage, order, sortBy, sortOrder)
 
 	if err != nil {
 		helper.RespondError(c, err)
@@ -71,7 +77,13 @@ func GetAllTokens(c *gin.Context) {
 func SearchTokens(c *gin.Context) {
 	userId := c.GetInt(ctxkey.Id)
 	keyword := c.Query("keyword")
-	tokens, err := model.SearchUserTokens(userId, keyword)
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	tokens, err := model.SearchUserTokens(userId, keyword, sortBy, sortOrder)
 	if err != nil {
 		helper.RespondError(c, err)
 		return

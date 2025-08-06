@@ -261,7 +261,13 @@ func GetAllUsers(c *gin.Context) {
 	}
 
 	order := c.DefaultQuery("order", "")
-	users, err := model.GetAllUsers(p*config.MaxItemsPerPage, config.MaxItemsPerPage, order)
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	users, err := model.GetAllUsers(p*config.MaxItemsPerPage, config.MaxItemsPerPage, order, sortBy, sortOrder)
 
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -291,7 +297,13 @@ func GetAllUsers(c *gin.Context) {
 
 func SearchUsers(c *gin.Context) {
 	keyword := c.Query("keyword")
-	users, err := model.SearchUsers(keyword)
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	users, err := model.SearchUsers(keyword, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -471,7 +483,7 @@ func GetDashboardUsers(c *gin.Context) {
 	}
 
 	// Get all users with basic info (id, username, display_name)
-	users, err := model.GetAllUsers(0, 1000, "") // Get up to 1000 users
+	users, err := model.GetAllUsers(0, 1000, "", "", "") // Get up to 1000 users
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

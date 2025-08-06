@@ -63,18 +63,30 @@ func GetMaxUserId() int {
 	return user.Id
 }
 
-func GetAllUsers(startIdx int, num int, order string) (users []*User, err error) {
+func GetAllUsers(startIdx int, num int, order string, sortBy string, sortOrder string) (users []*User, err error) {
 	query := DB.Limit(num).Offset(startIdx).Omit("password").Where("status != ?", UserStatusDeleted)
 
-	switch order {
-	case "quota":
-		query = query.Order("quota desc")
-	case "used_quota":
-		query = query.Order("used_quota desc")
-	case "request_count":
-		query = query.Order("request_count desc")
-	default:
-		query = query.Order("id desc")
+	// Handle new sorting parameters first
+	if sortBy != "" {
+		orderClause := sortBy
+		if sortOrder == "asc" {
+			orderClause += " asc"
+		} else {
+			orderClause += " desc"
+		}
+		query = query.Order(orderClause)
+	} else {
+		// Fallback to legacy order parameter for backward compatibility
+		switch order {
+		case "quota":
+			query = query.Order("quota desc")
+		case "used_quota":
+			query = query.Order("used_quota desc")
+		case "request_count":
+			query = query.Order("request_count desc")
+		default:
+			query = query.Order("id desc")
+		}
 	}
 
 	err = query.Find(&users).Error
@@ -86,11 +98,21 @@ func GetUserCount() (count int64, err error) {
 	return count, err
 }
 
-func SearchUsers(keyword string) (users []*User, err error) {
+func SearchUsers(keyword string, sortBy string, sortOrder string) (users []*User, err error) {
+	// Default sorting
+	orderClause := "id desc"
+	if sortBy != "" {
+		if sortOrder == "asc" {
+			orderClause = sortBy + " asc"
+		} else {
+			orderClause = sortBy + " desc"
+		}
+	}
+
 	if !common.UsingPostgreSQL {
-		err = DB.Omit("password").Where("id = ? or username LIKE ? or email LIKE ? or display_name LIKE ?", keyword, keyword+"%", keyword+"%", keyword+"%").Find(&users).Error
+		err = DB.Omit("password").Where("id = ? or username LIKE ? or email LIKE ? or display_name LIKE ?", keyword, keyword+"%", keyword+"%", keyword+"%").Order(orderClause).Find(&users).Error
 	} else {
-		err = DB.Omit("password").Where("username LIKE ? or email LIKE ? or display_name LIKE ?", keyword+"%", keyword+"%", keyword+"%").Find(&users).Error
+		err = DB.Omit("password").Where("username LIKE ? or email LIKE ? or display_name LIKE ?", keyword+"%", keyword+"%", keyword+"%").Order(orderClause).Find(&users).Error
 	}
 	return users, err
 }

@@ -79,16 +79,27 @@ type ModelConfigLocal struct {
 	MaxTokens       int32   `json:"max_tokens,omitempty"`
 }
 
-func GetAllChannels(startIdx int, num int, scope string) ([]*Channel, error) {
+func GetAllChannels(startIdx int, num int, scope string, sortBy string, sortOrder string) ([]*Channel, error) {
 	var channels []*Channel
 	var err error
+
+	// Default sorting
+	orderClause := "id desc"
+	if sortBy != "" {
+		if sortOrder == "asc" {
+			orderClause = sortBy + " asc"
+		} else {
+			orderClause = sortBy + " desc"
+		}
+	}
+
 	switch scope {
 	case "all":
-		err = DB.Order("id desc").Find(&channels).Error
+		err = DB.Order(orderClause).Find(&channels).Error
 	case "disabled":
-		err = DB.Order("id desc").Where("status = ? or status = ?", ChannelStatusAutoDisabled, ChannelStatusManuallyDisabled).Find(&channels).Error
+		err = DB.Order(orderClause).Where("status = ? or status = ?", ChannelStatusAutoDisabled, ChannelStatusManuallyDisabled).Find(&channels).Error
 	default:
-		err = DB.Order("id desc").Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
+		err = DB.Order(orderClause).Limit(num).Offset(startIdx).Omit("key").Find(&channels).Error
 	}
 	return channels, err
 }
@@ -98,8 +109,18 @@ func GetChannelCount() (count int64, err error) {
 	return count, err
 }
 
-func SearchChannels(keyword string) (channels []*Channel, err error) {
-	err = DB.Omit("key").Where("id = ? or name LIKE ?", helper.String2Int(keyword), keyword+"%").Find(&channels).Error
+func SearchChannels(keyword string, sortBy string, sortOrder string) (channels []*Channel, err error) {
+	// Default sorting
+	orderClause := "id desc"
+	if sortBy != "" {
+		if sortOrder == "asc" {
+			orderClause = sortBy + " asc"
+		} else {
+			orderClause = sortBy + " desc"
+		}
+	}
+
+	err = DB.Omit("key").Where("id = ? or name LIKE ?", helper.String2Int(keyword), keyword+"%").Order(orderClause).Find(&channels).Error
 	return channels, err
 }
 

@@ -48,18 +48,30 @@ func clearTokenCache(key string) {
 	}
 }
 
-func GetAllUserTokens(userId int, startIdx int, num int, order string) ([]*Token, error) {
+func GetAllUserTokens(userId int, startIdx int, num int, order string, sortBy string, sortOrder string) ([]*Token, error) {
 	var tokens []*Token
 	var err error
 	query := DB.Where("user_id = ?", userId)
 
-	switch order {
-	case "remain_quota":
-		query = query.Order("unlimited_quota desc, remain_quota desc")
-	case "used_quota":
-		query = query.Order("used_quota desc")
-	default:
-		query = query.Order("id desc")
+	// Handle new sorting parameters first
+	if sortBy != "" {
+		orderClause := sortBy
+		if sortOrder == "asc" {
+			orderClause += " asc"
+		} else {
+			orderClause += " desc"
+		}
+		query = query.Order(orderClause)
+	} else {
+		// Fallback to legacy order parameter for backward compatibility
+		switch order {
+		case "remain_quota":
+			query = query.Order("unlimited_quota desc, remain_quota desc")
+		case "used_quota":
+			query = query.Order("used_quota desc")
+		default:
+			query = query.Order("id desc")
+		}
 	}
 
 	err = query.Limit(num).Offset(startIdx).Find(&tokens).Error
@@ -71,8 +83,18 @@ func GetUserTokenCount(userId int) (count int64, err error) {
 	return count, err
 }
 
-func SearchUserTokens(userId int, keyword string) (tokens []*Token, err error) {
-	err = DB.Where("user_id = ?", userId).Where("name LIKE ?", keyword+"%").Find(&tokens).Error
+func SearchUserTokens(userId int, keyword string, sortBy string, sortOrder string) (tokens []*Token, err error) {
+	// Default sorting
+	orderClause := "id desc"
+	if sortBy != "" {
+		if sortOrder == "asc" {
+			orderClause = sortBy + " asc"
+		} else {
+			orderClause = sortBy + " desc"
+		}
+	}
+
+	err = DB.Where("user_id = ?", userId).Where("name LIKE ?", keyword+"%").Order(orderClause).Find(&tokens).Error
 	return tokens, err
 }
 

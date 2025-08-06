@@ -8,6 +8,7 @@ import {
   Pagination,
   Popup,
   Table,
+  Dropdown,
 } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 import {
@@ -69,9 +70,10 @@ const TokensTableCompact = () => {
   const [activePage, setActivePage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [searching, setSearching] = useState(false);
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [tokenOptions, setTokenOptions] = useState([]);
+  const [tokenSearchLoading, setTokenSearchLoading] = useState(false);
 
   const SORT_OPTIONS = [
     { key: '', text: t('tokens.sort.default', 'Default'), value: '' },
@@ -147,6 +149,41 @@ const TokensTableCompact = () => {
     }
   };
 
+  const searchTokensByName = async (searchQuery) => {
+    if (!searchQuery.trim()) {
+      setTokenOptions([]);
+      return;
+    }
+
+    setTokenSearchLoading(true);
+    try {
+      const res = await API.get(`/api/token/search?keyword=${searchQuery}`);
+      const { success, data } = res.data;
+      if (success) {
+        const options = data.map(token => ({
+          key: token.id,
+          value: token.name,
+          text: `${token.name}`,
+          content: (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontWeight: 'bold' }}>
+                {token.name}
+              </div>
+              <div style={{ fontSize: '0.9em', color: '#666' }}>
+                ID: {token.id} • Status: {token.status === 1 ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+          )
+        }));
+        setTokenOptions(options);
+      }
+    } catch (error) {
+      console.error('Failed to search tokens:', error);
+    } finally {
+      setTokenSearchLoading(false);
+    }
+  };
+
   const searchTokens = async () => {
     if (searchKeyword === '') {
       // if keyword is blank, load tokens instead.
@@ -154,7 +191,6 @@ const TokensTableCompact = () => {
       setActivePage(1);
       return;
     }
-    setSearching(true);
     let url = `/api/token/search?keyword=${searchKeyword}`;
     if (sortBy) {
       url += `&sort=${sortBy}&order=${sortOrder}`;
@@ -167,7 +203,6 @@ const TokensTableCompact = () => {
     } else {
       showError(message);
     }
-    setSearching(false);
   };
 
   const sortToken = async (key) => {
@@ -191,10 +226,6 @@ const TokensTableCompact = () => {
     await loadTokens(0, value, 'desc');
   };
 
-  const handleKeywordChange = async (e, { value }) => {
-    setSearchKeyword(value.trim());
-  };
-
   const refresh = async () => {
     setLoading(true);
     await loadTokens(0, sortBy, sortOrder);
@@ -205,15 +236,31 @@ const TokensTableCompact = () => {
     <>
       <Form onSubmit={searchTokens}>
         <Form.Group>
-          <Form.Input
-            width={12}
-            icon='search'
-            iconPosition='left'
-            placeholder={t('tokens.search.placeholder', 'Search tokens...')}
-            value={searchKeyword}
-            loading={searching}
-            onChange={handleKeywordChange}
-          />
+          <Form.Field width={12}>
+            <Dropdown
+              fluid
+              selection
+              search
+              clearable
+              allowAdditions
+              placeholder={t('tokens.search.placeholder', 'Search by token name...')}
+              value={searchKeyword}
+              options={tokenOptions}
+              onSearchChange={(_, { searchQuery }) => searchTokensByName(searchQuery)}
+              onChange={(_, { value }) => setSearchKeyword(value)}
+              loading={tokenSearchLoading}
+              noResultsMessage={t('tokens.no_tokens_found', 'No tokens found')}
+              additionLabel={t('tokens.use_token_name', 'Use token name: ')}
+              onAddItem={(_, { value }) => {
+                const newOption = {
+                  key: value,
+                  value: value,
+                  text: value
+                };
+                setTokenOptions([...tokenOptions, newOption]);
+              }}
+            />
+          </Form.Field>
           <Form.Dropdown
             width={4}
             selection

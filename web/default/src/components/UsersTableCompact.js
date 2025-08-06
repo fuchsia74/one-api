@@ -8,6 +8,7 @@ import {
   Pagination,
   Popup,
   Table,
+  Dropdown,
 } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 import {
@@ -79,9 +80,10 @@ const UsersTableCompact = () => {
   const [activePage, setActivePage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
-  const [searching, setSearching] = useState(false);
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
+  const [userOptions, setUserOptions] = useState([]);
+  const [userSearchLoading, setUserSearchLoading] = useState(false);
 
   const SORT_OPTIONS = [
     { key: '', text: t('users.sort.default', 'Default'), value: '' },
@@ -156,14 +158,48 @@ const UsersTableCompact = () => {
     }
   };
 
-  const searchUsers = async () => {
+  const searchUsers = async (searchQuery) => {
+    if (!searchQuery.trim()) {
+      setUserOptions([]);
+      return;
+    }
+
+    setUserSearchLoading(true);
+    try {
+      const res = await API.get(`/api/user/search?keyword=${searchQuery}`);
+      const { success, data } = res.data;
+      if (success) {
+        const options = data.map(user => ({
+          key: user.id,
+          value: user.username,
+          text: `${user.display_name || user.username} (@${user.username})`,
+          content: (
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <div style={{ fontWeight: 'bold' }}>
+                {user.display_name || user.username}
+              </div>
+              <div style={{ fontSize: '0.9em', color: '#666' }}>
+                @{user.username} • ID: {user.id}
+              </div>
+            </div>
+          )
+        }));
+        setUserOptions(options);
+      }
+    } catch (error) {
+      console.error('Failed to search users:', error);
+    } finally {
+      setUserSearchLoading(false);
+    }
+  };
+
+  const searchUsersByKeyword = async () => {
     if (searchKeyword === '') {
       // if keyword is blank, load users instead.
       await loadUsers(0, sortBy, sortOrder);
       setActivePage(1);
       return;
     }
-    setSearching(true);
     let url = `/api/user/search?keyword=${searchKeyword}`;
     if (sortBy) {
       url += `&sort=${sortBy}&order=${sortOrder}`;
@@ -176,7 +212,6 @@ const UsersTableCompact = () => {
     } else {
       showError(message);
     }
-    setSearching(false);
   };
 
   const handleKeywordChange = async (e, { value }) => {
@@ -212,17 +247,33 @@ const UsersTableCompact = () => {
 
   return (
     <>
-      <Form onSubmit={searchUsers}>
+      <Form onSubmit={searchUsersByKeyword}>
         <Form.Group>
-          <Form.Input
-            width={12}
-            icon='search'
-            iconPosition='left'
-            placeholder={t('users.search.placeholder', 'Search by username...')}
-            value={searchKeyword}
-            loading={searching}
-            onChange={handleKeywordChange}
-          />
+          <Form.Field width={12}>
+            <Dropdown
+              fluid
+              selection
+              search
+              clearable
+              allowAdditions
+              placeholder={t('users.search.placeholder', 'Search by username...')}
+              value={searchKeyword}
+              options={userOptions}
+              onSearchChange={(_, { searchQuery }) => searchUsers(searchQuery)}
+              onChange={(_, { value }) => setSearchKeyword(value)}
+              loading={userSearchLoading}
+              noResultsMessage={t('users.no_users_found', 'No users found')}
+              additionLabel={t('users.use_username', 'Use username: ')}
+              onAddItem={(_, { value }) => {
+                const newOption = {
+                  key: value,
+                  value: value,
+                  text: value
+                };
+                setUserOptions([...userOptions, newOption]);
+              }}
+            />
+          </Form.Field>
           <Form.Dropdown
             width={4}
             selection

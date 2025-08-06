@@ -24,7 +24,14 @@ func GetAllChannels(c *gin.Context) {
 	if p < 0 {
 		p = 0
 	}
-	channels, err := model.GetAllChannels(p*config.MaxItemsPerPage, config.MaxItemsPerPage, "limited")
+
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	channels, err := model.GetAllChannels(p*config.MaxItemsPerPage, config.MaxItemsPerPage, "limited", sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -54,7 +61,13 @@ func GetAllChannels(c *gin.Context) {
 
 func SearchChannels(c *gin.Context) {
 	keyword := c.Query("keyword")
-	channels, err := model.SearchChannels(keyword)
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+
+	channels, err := model.SearchChannels(keyword, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

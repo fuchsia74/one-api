@@ -16,11 +16,9 @@ import {
   showSuccess,
   timestamp2string,
 } from '../helpers';
-import { CHANNEL_OPTIONS } from '../constants';
+import { CHANNEL_OPTIONS, ITEMS_PER_PAGE } from '../constants';
 import { renderGroup, renderNumber } from '../helpers/render';
 import { cleanDisplay } from './shared/tableUtils';
-
-import { ITEMS_PER_PAGE } from '../constants';
 
 function renderTimestamp(timestamp) {
   return <>{timestamp2string(timestamp)}</>;
