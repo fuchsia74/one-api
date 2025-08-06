@@ -247,20 +247,38 @@ const EditChannel = () => {
     }
   };
 
-  const handleInputChange = (e, { name, value }) => {
-    setInputs((inputs) => ({ ...inputs, [name]: value }));
-    if (name === 'type') {
-      let localModels = getChannelModels(value);
-      if (inputs.models.length === 0) {
-        setInputs((inputs) => ({ ...inputs, models: localModels }));
+  const fetchChannelSpecificModels = async (channelType) => {
+    try {
+      const res = await API.get('/api/models');
+      if (res.data.success && res.data.data) {
+        // channelId2Models maps channel type to model list
+        const channelModels = res.data.data[channelType] || [];
+        return channelModels;
       }
-      setBasicModels(localModels);
-      // Load default pricing for the new channel type
-      loadDefaultPricing(value);
+      return [];
+    } catch (error) {
+      console.error('Failed to fetch channel-specific models:', error);
+      return [];
     }
   };
 
-  const handleConfigChange = (e, { name, value }) => {
+  const handleInputChange = (e, { name, value }) => {
+    setInputs((inputs) => ({ ...inputs, [name]: value }));
+    if (name === 'type') {
+      // Fetch channel-specific models for the selected channel type
+      fetchChannelSpecificModels(value).then((channelSpecificModels) => {
+        setBasicModels(channelSpecificModels);
+        console.log('setBasicModels called with channel-specific models for type', value, ':', channelSpecificModels);
+
+        if (inputs.models.length === 0) {
+          setInputs((inputs) => ({ ...inputs, models: channelSpecificModels }));
+        }
+      });
+
+      // Load default pricing for the new channel type
+      loadDefaultPricing(value);
+    }
+  };  const handleConfigChange = (e, { name, value }) => {
     setConfig((inputs) => ({ ...inputs, [name]: value }));
   };
 
@@ -324,7 +342,13 @@ const EditChannel = () => {
       if (data.config !== '') {
         setConfig(JSON.parse(data.config));
       }
-      setBasicModels(getChannelModels(data.type));
+
+      // Fetch channel-specific models for this channel type
+      fetchChannelSpecificModels(data.type).then((channelSpecificModels) => {
+        setBasicModels(channelSpecificModels);
+        console.log('setBasicModels called with channel-specific models for existing channel:', channelSpecificModels);
+      });
+
       // Load default pricing for this channel type, but don't override existing model_configs
       loadDefaultPricing(data.type, data.model_configs);
     } else {
@@ -336,11 +360,14 @@ const EditChannel = () => {
   const fetchModels = async () => {
     try {
       let res = await API.get(`/api/channel/models`);
-      let localModelOptions = res.data.data.map((model) => ({
-        key: model.id,
-        text: model.id,
-        value: model.id,
-      }));
+      // Ensure all models are included, even those with '/' in their name
+      let localModelOptions = res.data.data
+        .filter((model) => typeof model.id === 'string' && model.id.length > 0)
+        .map((model) => ({
+          key: model.id,
+          text: model.id,
+          value: model.id,
+        }));
       setOriginModelOptions(localModelOptions);
       setFullModels(res.data.data.map((model) => model.id));
     } catch (error) {
@@ -381,8 +408,11 @@ const EditChannel = () => {
     if (isEdit) {
       loadChannel().then();
     } else {
-      let localModels = getChannelModels(inputs.type);
-      setBasicModels(localModels);
+      // For new channels, fetch channel-specific models for the default type
+      fetchChannelSpecificModels(inputs.type).then((channelSpecificModels) => {
+        setBasicModels(channelSpecificModels);
+        console.log('setBasicModels called with channel-specific models for new channel:', channelSpecificModels);
+      });
       // Load default pricing for new channels
       loadDefaultPricing(inputs.type);
     }
@@ -748,9 +778,20 @@ const EditChannel = () => {
                 <Button
                   type={'button'}
                   onClick={() => {
+                    // Use channel-specific models (basicModels) and deduplicate with existing models
+                    const currentModels = inputs.models || [];
+                    const channelModels = basicModels || [];
+
+                    // Merge and deduplicate
+                    const uniqueModels = [...new Set([...currentModels, ...channelModels])];
+
+                    console.log('Fill Related Models clicked - using channel-specific models:', channelModels);
+                    console.log('Current models:', currentModels);
+                    console.log('Merged and deduplicated models:', uniqueModels);
+
                     handleInputChange(null, {
                       name: 'models',
-                      value: basicModels,
+                      value: uniqueModels,
                     });
                   }}
                 >
@@ -759,9 +800,16 @@ const EditChannel = () => {
                 <Button
                   type={'button'}
                   onClick={() => {
+                    // Use all models and deduplicate with existing models
+                    const currentModels = inputs.models || [];
+                    const allModels = fullModels || [];
+
+                    // Merge and deduplicate
+                    const uniqueModels = [...new Set([...currentModels, ...allModels])];
+
                     handleInputChange(null, {
                       name: 'models',
-                      value: fullModels,
+                      value: uniqueModels,
                     });
                   }}
                 >

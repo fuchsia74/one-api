@@ -3,11 +3,11 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Form,
+  Icon,
   Label,
   Pagination,
   Popup,
   Table,
-  Icon,
 } from 'semantic-ui-react';
 import { Link } from 'react-router-dom';
 import {
@@ -149,10 +149,26 @@ const ChannelsTableCompact = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
 
-  const loadChannels = async (page = 0) => {
+  const SORT_OPTIONS = [
+    { key: '', text: t('channels.sort.default', 'Default'), value: '' },
+    { key: 'id', text: t('channels.sort.id', 'ID'), value: 'id' },
+    { key: 'name', text: t('channels.sort.name', 'Name'), value: 'name' },
+    { key: 'type', text: t('channels.sort.type', 'Type'), value: 'type' },
+    { key: 'status', text: t('channels.sort.status', 'Status'), value: 'status' },
+    { key: 'response_time', text: t('channels.sort.response_time', 'Response Time'), value: 'response_time' },
+    { key: 'created_time', text: t('channels.sort.created_time', 'Created Time'), value: 'created_time' },
+  ];
+
+  const loadChannels = async (page = 0, sortBy = '', sortOrder = 'desc') => {
     setLoading(true);
-    const res = await API.get(`/api/channel/?p=${page}`);
+    let url = `/api/channel/?p=${page}`;
+    if (sortBy) {
+      url += `&sort=${sortBy}&order=${sortOrder}`;
+    }
+    const res = await API.get(url);
     const { success, message, data, total } = res.data;
     if (success) {
       const processedChannels = (data || []).map(processChannelData);
@@ -187,16 +203,16 @@ const ChannelsTableCompact = () => {
 
   const onPaginationChange = (e, { activePage }) => {
     setActivePage(activePage);
-    loadChannels(activePage - 1);
+    loadChannels(activePage - 1, sortBy, sortOrder);
   };
 
   useEffect(() => {
-    loadChannels(0)
+    loadChannels(0, sortBy, sortOrder)
       .then()
       .catch((reason) => {
         showError(reason);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sortBy, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const manageChannel = async (id, action, idx) => {
     let res;
@@ -246,68 +262,80 @@ const ChannelsTableCompact = () => {
   const searchChannels = async () => {
     if (searchKeyword === '') {
       // if keyword is blank, load channels instead.
-      await loadChannels(0);
+      await loadChannels(0, sortBy, sortOrder);
       setActivePage(1);
       return;
     }
     setSearching(true);
-    const res = await API.get(
-      `/api/channel/search?keyword=${searchKeyword}`
-    );
+    let url = `/api/channel/search?keyword=${searchKeyword}`;
+    if (sortBy) {
+      url += `&sort=${sortBy}&order=${sortOrder}`;
+    }
+    const res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
       const processedChannels = (data || []).map(processChannelData);
       setChannels(processedChannels);
       setActivePage(1);
-      setTotalPages(Math.ceil(data.length / ITEMS_PER_PAGE));
     } else {
       showError(message);
     }
     setSearching(false);
   };
 
+  const sortChannel = async (key) => {
+    const newSortOrder = sortBy === key && sortOrder === 'desc' ? 'asc' : 'desc';
+    setSortBy(key);
+    setSortOrder(newSortOrder);
+    await loadChannels(activePage - 1, key, newSortOrder);
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortBy !== columnKey) {
+      return <Icon name="sort" style={{ opacity: 0.5 }} />;
+    }
+    return <Icon name={sortOrder === 'asc' ? 'sort up' : 'sort down'} />;
+  };
+
+  const handleSortChange = async (e, { value }) => {
+    setSortBy(value);
+    setSortOrder('desc');
+    setActivePage(1);
+    await loadChannels(0, value, 'desc');
+  };
+
   const handleKeywordChange = async (e, { value }) => {
     setSearchKeyword(value.trim());
   };
 
-  const sortChannel = (key) => {
-    if (channels.length === 0) return;
-    setLoading(true);
-    let sortedChannels = [...channels];
-    sortedChannels.sort((a, b) => {
-      if (!isNaN(a[key])) {
-        // If the value is numeric, subtract to sort
-        return a[key] - b[key];
-      } else {
-        // If the value is not numeric, sort as strings
-        return ('' + a[key]).localeCompare(b[key]);
-      }
-    });
-    if (sortedChannels[0].id === channels[0].id) {
-      sortedChannels.reverse();
-    }
-    setChannels(sortedChannels);
-    setLoading(false);
-  };
-
   const refresh = async () => {
     setLoading(true);
-    await loadChannels(0);
+    await loadChannels(0, sortBy, sortOrder);
     setActivePage(1);
   };
 
   return (
     <>
       <Form onSubmit={searchChannels}>
-        <Form.Input
-          icon='search'
-          fluid
-          iconPosition='left'
-          placeholder={t('channel.search_placeholder')}
-          value={searchKeyword}
-          loading={searching}
-          onChange={handleKeywordChange}
-        />
+        <Form.Group>
+          <Form.Input
+            width={12}
+            icon='search'
+            iconPosition='left'
+            placeholder={t('channels.search.placeholder', 'Search channels...')}
+            value={searchKeyword}
+            loading={searching}
+            onChange={handleKeywordChange}
+          />
+          <Form.Dropdown
+            width={4}
+            selection
+            placeholder={t('channels.sort.placeholder', 'Sort by...')}
+            options={SORT_OPTIONS}
+            value={sortBy}
+            onChange={handleSortChange}
+          />
+        </Form.Group>
       </Form>
 
       <Table basic={'very'} compact size='small'>
@@ -318,48 +346,54 @@ const ChannelsTableCompact = () => {
               onClick={() => {
                 sortChannel('id');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              ID
+              ID {getSortIcon('id')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortChannel('name');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('name')}
+              {t('name')} {getSortIcon('name')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortChannel('type');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('type')}
+              {t('type')} {getSortIcon('type')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortChannel('status');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('status')}
+              {t('status')} {getSortIcon('status')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortChannel('response_time');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('response_time')}
+              {t('response_time')} {getSortIcon('response_time')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortChannel('created_time');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('created_time')}
+              {t('created_time')} {getSortIcon('created_time')}
             </Table.HeaderCell>
             <Table.HeaderCell>{t('actions')}</Table.HeaderCell>
           </Table.Row>

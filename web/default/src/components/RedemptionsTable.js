@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Form,
+  Icon,
   Label,
   Pagination,
   Popup,
@@ -62,10 +63,26 @@ const RedemptionsTable = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
 
-  const loadRedemptions = async (page = 0) => {
+  const SORT_OPTIONS = [
+    { key: '', text: t('redemptions.sort.default', 'Default'), value: '' },
+    { key: 'id', text: t('redemptions.sort.id', 'ID'), value: 'id' },
+    { key: 'name', text: t('redemptions.sort.name', 'Name'), value: 'name' },
+    { key: 'status', text: t('redemptions.sort.status', 'Status'), value: 'status' },
+    { key: 'quota', text: t('redemptions.sort.quota', 'Quota'), value: 'quota' },
+    { key: 'created_time', text: t('redemptions.sort.created_time', 'Created Time'), value: 'created_time' },
+    { key: 'redeemed_time', text: t('redemptions.sort.redeemed_time', 'Redeemed Time'), value: 'redeemed_time' },
+  ];
+
+  const loadRedemptions = async (page = 0, sortBy = '', sortOrder = 'desc') => {
     setLoading(true);
-    const res = await API.get(`/api/redemption/?p=${page}`);
+    let url = `/api/redemption/?p=${page}`;
+    if (sortBy) {
+      url += `&sort=${sortBy}&order=${sortOrder}`;
+    }
+    const res = await API.get(url);
     const { success, message, data, total } = res.data;
     if (success) {
       setRedemptions(data);
@@ -78,16 +95,16 @@ const RedemptionsTable = () => {
 
   const onPaginationChange = (e, { activePage }) => {
     setActivePage(activePage);
-    loadRedemptions(activePage - 1);
+    loadRedemptions(activePage - 1, sortBy, sortOrder);
   };
 
   useEffect(() => {
-    loadRedemptions(0)
+    loadRedemptions(0, sortBy, sortOrder)
       .then()
       .catch((reason) => {
         showError(reason);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sortBy, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const manageRedemption = async (id, action, idx) => {
     let data = { id };
@@ -127,14 +144,16 @@ const RedemptionsTable = () => {
   const searchRedemptions = async () => {
     if (searchKeyword === '') {
       // if keyword is blank, load files instead.
-      await loadRedemptions(0);
+      await loadRedemptions(0, sortBy, sortOrder);
       setActivePage(1);
       return;
     }
     setSearching(true);
-    const res = await API.get(
-      `/api/redemption/search?keyword=${searchKeyword}`
-    );
+    let url = `/api/redemption/search?keyword=${searchKeyword}`;
+    if (sortBy) {
+      url += `&sort=${sortBy}&order=${sortOrder}`;
+    }
+    const res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
       setRedemptions(data);
@@ -149,44 +168,55 @@ const RedemptionsTable = () => {
     setSearchKeyword(value.trim());
   };
 
-  const sortRedemption = (key) => {
-    if (redemptions.length === 0) return;
-    setLoading(true);
-    let sortedRedemptions = [...redemptions];
-    sortedRedemptions.sort((a, b) => {
-      if (!isNaN(a[key])) {
-        // If the value is numeric, subtract to sort
-        return a[key] - b[key];
-      } else {
-        // If the value is not numeric, sort as strings
-        return ('' + a[key]).localeCompare(b[key]);
-      }
-    });
-    if (sortedRedemptions[0].id === redemptions[0].id) {
-      sortedRedemptions.reverse();
+  const sortRedemption = async (key) => {
+    const newSortOrder = sortBy === key && sortOrder === 'desc' ? 'asc' : 'desc';
+    setSortBy(key);
+    setSortOrder(newSortOrder);
+    await loadRedemptions(activePage - 1, key, newSortOrder);
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortBy !== columnKey) {
+      return <Icon name="sort" style={{ opacity: 0.5 }} />;
     }
-    setRedemptions(sortedRedemptions);
-    setLoading(false);
+    return <Icon name={sortOrder === 'asc' ? 'sort up' : 'sort down'} />;
+  };
+
+  const handleSortChange = async (e, { value }) => {
+    setSortBy(value);
+    setSortOrder('desc');
+    setActivePage(1);
+    await loadRedemptions(0, value, 'desc');
   };
 
   const refresh = async () => {
     setLoading(true);
-    await loadRedemptions(0);
+    await loadRedemptions(0, sortBy, sortOrder);
     setActivePage(1);
   };
 
   return (
     <>
       <Form onSubmit={searchRedemptions}>
-        <Form.Input
-          icon='search'
-          fluid
-          iconPosition='left'
-          placeholder={t('redemption.search')}
-          value={searchKeyword}
-          loading={searching}
-          onChange={handleKeywordChange}
-        />
+        <Form.Group>
+          <Form.Input
+            width={12}
+            icon='search'
+            iconPosition='left'
+            placeholder={t('redemptions.search.placeholder', 'Search redemptions...')}
+            value={searchKeyword}
+            loading={searching}
+            onChange={handleKeywordChange}
+          />
+          <Form.Dropdown
+            width={4}
+            selection
+            placeholder={t('redemptions.sort.placeholder', 'Sort by...')}
+            options={SORT_OPTIONS}
+            value={sortBy}
+            onChange={handleSortChange}
+          />
+        </Form.Group>
       </Form>
 
       <Table basic={'very'} compact size='small'>
@@ -197,48 +227,54 @@ const RedemptionsTable = () => {
               onClick={() => {
                 sortRedemption('id');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('redemption.table.id')}
+              {t('redemption.table.id')} {getSortIcon('id')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortRedemption('name');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('redemption.table.name')}
+              {t('redemption.table.name')} {getSortIcon('name')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortRedemption('status');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('redemption.table.status')}
+              {t('redemption.table.status')} {getSortIcon('status')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortRedemption('quota');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('redemption.table.quota')}
+              {t('redemption.table.quota')} {getSortIcon('quota')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortRedemption('created_time');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('redemption.table.created_time')}
+              {t('redemption.table.created_time')} {getSortIcon('created_time')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortRedemption('redeemed_time');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              {t('redemption.table.redeemed_time')}
+              {t('redemption.table.redeemed_time')} {getSortIcon('redeemed_time')}
             </Table.HeaderCell>
             <Table.HeaderCell>{t('redemption.table.actions')}</Table.HeaderCell>
           </Table.Row>

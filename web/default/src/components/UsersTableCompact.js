@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   Button,
   Form,
+  Icon,
   Label,
   Pagination,
   Popup,
@@ -79,10 +80,25 @@ const UsersTableCompact = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
+  const [sortBy, setSortBy] = useState('');
+  const [sortOrder, setSortOrder] = useState('desc');
 
-  const loadUsers = async (page = 0) => {
+  const SORT_OPTIONS = [
+    { key: '', text: t('users.sort.default', 'Default'), value: '' },
+    { key: 'quota', text: t('users.sort.remaining_quota', 'Remaining Quota'), value: 'quota' },
+    { key: 'used_quota', text: t('users.sort.used_quota', 'Used Quota'), value: 'used_quota' },
+    { key: 'username', text: t('users.sort.username', 'Username'), value: 'username' },
+    { key: 'id', text: t('users.sort.id', 'ID'), value: 'id' },
+    { key: 'created_time', text: t('users.sort.created_time', 'Created Time'), value: 'created_time' },
+  ];
+
+  const loadUsers = async (page = 0, sortBy = '', sortOrder = 'desc') => {
     setLoading(true);
-    const res = await API.get(`/api/user/?p=${page}`);
+    let url = `/api/user/?p=${page}`;
+    if (sortBy) {
+      url += `&sort=${sortBy}&order=${sortOrder}`;
+    }
+    const res = await API.get(url);
     const { success, message, data, total } = res.data;
     if (success) {
       setUsers(data);
@@ -95,16 +111,16 @@ const UsersTableCompact = () => {
 
   const onPaginationChange = (e, { activePage }) => {
     setActivePage(activePage);
-    loadUsers(activePage - 1);
+    loadUsers(activePage - 1, sortBy, sortOrder);
   };
 
   useEffect(() => {
-    loadUsers(0)
+    loadUsers(0, sortBy, sortOrder)
       .then()
       .catch((reason) => {
         showError(reason);
       });
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sortBy, sortOrder]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const manageUser = async (id, action, idx) => {
     let data = { id };
@@ -143,14 +159,16 @@ const UsersTableCompact = () => {
   const searchUsers = async () => {
     if (searchKeyword === '') {
       // if keyword is blank, load users instead.
-      await loadUsers(0);
+      await loadUsers(0, sortBy, sortOrder);
       setActivePage(1);
       return;
     }
     setSearching(true);
-    const res = await API.get(
-      `/api/user/search?keyword=${searchKeyword}`
-    );
+    let url = `/api/user/search?keyword=${searchKeyword}`;
+    if (sortBy) {
+      url += `&sort=${sortBy}&order=${sortOrder}`;
+    }
+    const res = await API.get(url);
     const { success, message, data } = res.data;
     if (success) {
       setUsers(data);
@@ -165,44 +183,55 @@ const UsersTableCompact = () => {
     setSearchKeyword(value.trim());
   };
 
-  const sortUser = (key) => {
-    if (users.length === 0) return;
-    setLoading(true);
-    let sortedUsers = [...users];
-    sortedUsers.sort((a, b) => {
-      if (!isNaN(a[key])) {
-        // If the value is numeric, subtract to sort
-        return a[key] - b[key];
-      } else {
-        // If the value is not numeric, sort as strings
-        return ('' + a[key]).localeCompare(b[key]);
-      }
-    });
-    if (sortedUsers[0].id === users[0].id) {
-      sortedUsers.reverse();
+  const sortUser = async (key) => {
+    const newSortOrder = sortBy === key && sortOrder === 'desc' ? 'asc' : 'desc';
+    setSortBy(key);
+    setSortOrder(newSortOrder);
+    await loadUsers(activePage - 1, key, newSortOrder);
+  };
+
+  const handleSortChange = async (e, { value }) => {
+    setSortBy(value);
+    setSortOrder('desc');
+    setActivePage(1);
+    await loadUsers(0, value, 'desc');
+  };
+
+  const getSortIcon = (columnKey) => {
+    if (sortBy !== columnKey) {
+      return <Icon name="sort" style={{ opacity: 0.5 }} />;
     }
-    setUsers(sortedUsers);
-    setLoading(false);
+    return <Icon name={sortOrder === 'asc' ? 'sort up' : 'sort down'} />;
   };
 
   const refresh = async () => {
     setLoading(true);
-    await loadUsers(0);
+    await loadUsers(0, sortBy, sortOrder);
     setActivePage(1);
   };
 
   return (
     <>
       <Form onSubmit={searchUsers}>
-        <Form.Input
-          icon='search'
-          fluid
-          iconPosition='left'
-          placeholder='Search by username...'
-          value={searchKeyword}
-          loading={searching}
-          onChange={handleKeywordChange}
-        />
+        <Form.Group>
+          <Form.Input
+            width={12}
+            icon='search'
+            iconPosition='left'
+            placeholder={t('users.search.placeholder', 'Search by username...')}
+            value={searchKeyword}
+            loading={searching}
+            onChange={handleKeywordChange}
+          />
+          <Form.Dropdown
+            width={4}
+            selection
+            placeholder={t('users.sort.placeholder', 'Sort by...')}
+            options={SORT_OPTIONS}
+            value={sortBy}
+            onChange={handleSortChange}
+          />
+        </Form.Group>
       </Form>
 
       <Table basic={'very'} compact size='small'>
@@ -213,50 +242,65 @@ const UsersTableCompact = () => {
               onClick={() => {
                 sortUser('id');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              ID
+              ID {getSortIcon('id')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortUser('username');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              Username
+              {t('users.table.username', 'Username')} {getSortIcon('username')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortUser('role');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              Role
+              {t('users.table.role', 'Role')} {getSortIcon('role')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortUser('status');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              Status
+              {t('users.table.status', 'Status')} {getSortIcon('status')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortUser('quota');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              Quota
+              {t('users.table.remaining_quota', 'Remaining Quota')} {getSortIcon('quota')}
+            </Table.HeaderCell>
+            <Table.HeaderCell
+              className='sortable-header'
+              onClick={() => {
+                sortUser('used_quota');
+              }}
+              style={{ cursor: 'pointer' }}
+            >
+              {t('users.table.used_quota', 'Used Quota')} {getSortIcon('used_quota')}
             </Table.HeaderCell>
             <Table.HeaderCell
               className='sortable-header'
               onClick={() => {
                 sortUser('group');
               }}
+              style={{ cursor: 'pointer' }}
             >
-              Group
+              {t('users.table.group', 'Group')} {getSortIcon('group')}
             </Table.HeaderCell>
-            <Table.HeaderCell>Actions</Table.HeaderCell>
+            <Table.HeaderCell>{t('users.table.actions', 'Actions')}</Table.HeaderCell>
           </Table.Row>
         </Table.Header>
 
@@ -279,6 +323,9 @@ const UsersTableCompact = () => {
                     ) : (
                       renderQuota(user.quota, t)
                     )}
+                  </Table.Cell>
+                  <Table.Cell>
+                    {user.used_quota ? renderQuota(user.used_quota, t) : '0'}
                   </Table.Cell>
                   <Table.Cell>
                     {cleanDisplay(user.group, 'default')}
@@ -334,7 +381,7 @@ const UsersTableCompact = () => {
 
         <Table.Footer>
           <Table.Row>
-            <Table.HeaderCell colSpan='7'>
+            <Table.HeaderCell colSpan='8'>
               <Button
                 size='small'
                 as={Link}
