@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/relay/adaptor"
@@ -89,15 +91,46 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {
+	// Log request details for debugging
+	logger := gmw.GetLogger(c)
+	logger.Debug("sending request to groq",
+		zap.String("model", meta.ActualModelName),
+		zap.String("url_path", meta.RequestURLPath),
+		zap.Bool("is_stream", meta.IsStream))
+
 	return adaptor.DoRequestHelper(a, c, meta, requestBody)
 }
 
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+	// Add logging for debugging
+	logger := gmw.GetLogger(c)
+	logger.Debug("processing groq response",
+		zap.String("model", meta.ActualModelName),
+		zap.Bool("is_stream", meta.IsStream),
+		zap.Int("status_code", resp.StatusCode),
+		zap.String("content_type", resp.Header.Get("Content-Type")))
+
 	// Use the shared OpenAI-compatible response handling
 	if meta.IsStream {
 		err, usage = openai_compatible.StreamHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
 	} else {
 		err, usage = openai_compatible.Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
 	}
+
+	// Log any errors for debugging
+	if err != nil {
+		logger.Error("groq response processing failed",
+			zap.String("model", meta.ActualModelName),
+			zap.Any("error_code", err.Error.Code),
+			zap.String("error_message", err.Error.Message),
+			zap.Int("error_status", err.StatusCode))
+	} else if usage != nil {
+		logger.Debug("groq response processed successfully",
+			zap.String("model", meta.ActualModelName),
+			zap.Int("prompt_tokens", usage.PromptTokens),
+			zap.Int("completion_tokens", usage.CompletionTokens),
+			zap.Int("total_tokens", usage.TotalTokens))
+	}
+
 	return
 }

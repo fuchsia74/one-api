@@ -97,6 +97,41 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 	responseText := ""
 	var usage *model.Usage
 
+	logger := gmw.GetLogger(c).With(
+		zap.String("model", modelName),
+	)
+
+	// Check if response content type indicates an error (non-streaming response)
+	contentType := resp.Header.Get("Content-Type")
+	if strings.Contains(contentType, "application/json") &&
+		!strings.Contains(contentType, "text/event-stream") {
+		logger.Error("unexpected content type for streaming request, possible error response",
+			zap.String("content_type", contentType),
+			zap.Int("status_code", resp.StatusCode))
+
+		// Read response as potential error
+		responseBody, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return ErrorWrapper(err, "read_error_response_failed", http.StatusInternalServerError), nil
+		}
+
+		logger.Error("received error response in stream handler",
+			zap.ByteString("response_body", responseBody))
+
+		// Try to parse as error response
+		var errorResponse SlimTextResponse
+		if err := json.Unmarshal(responseBody, &errorResponse); err == nil && errorResponse.Error.Type != "" {
+			return &model.ErrorWithStatusCode{
+				Error:      errorResponse.Error,
+				StatusCode: resp.StatusCode,
+			}, nil
+		}
+
+		// Return generic error if parsing fails
+		return ErrorWrapper(fmt.Errorf("unexpected non-streaming response: %s", string(responseBody)),
+			"unexpected_response_format", resp.StatusCode), nil
+	}
+
 	scanner := bufio.NewScanner(resp.Body)
 	buffer := make([]byte, 1024*1024) // 1MB buffer
 	scanner.Buffer(buffer, len(buffer))
@@ -104,9 +139,13 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 
 	common.SetEventStreamHeaders(c)
 	doneRendered := false
+	chunksProcessed := 0
 
 	for scanner.Scan() {
 		data := NormalizeDataLine(scanner.Text())
+		logger.Debug("processing streaming chunk",
+			zap.String("chunk_data", data),
+			zap.Int("chunks_processed", chunksProcessed))
 
 		if len(data) < DataPrefixLength {
 			continue
@@ -126,8 +165,13 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		var streamResponse ChatCompletionsStreamResponse
 		jsonData := data[DataPrefixLength:]
 		if err := json.Unmarshal([]byte(jsonData), &streamResponse); err != nil {
+			logger.Warn("failed to parse streaming chunk, skipping",
+				zap.String("chunk_data", jsonData),
+				zap.Error(err))
 			continue // Skip malformed chunks
 		}
+
+		chunksProcessed++
 
 		// Accumulate response text
 		for _, choice := range streamResponse.Choices {
@@ -145,6 +189,15 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 
 	if err := scanner.Err(); err != nil {
 		return ErrorWrapper(err, "read_stream_failed", http.StatusInternalServerError), usage
+	}
+
+	// Check if we processed any chunks - if not, this might indicate an error
+	if chunksProcessed == 0 && responseText == "" {
+		logger.Error("stream processing completed but no chunks were processed",
+			zap.String("model", modelName),
+			zap.String("content_type", resp.Header.Get("Content-Type")))
+		return ErrorWrapper(fmt.Errorf("no streaming data received from upstream"),
+			"empty_stream_response", http.StatusInternalServerError), usage
 	}
 
 	if !doneRendered {
@@ -180,16 +233,40 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
+	// Check if response body is empty
+	if len(responseBody) == 0 {
+		logger.Error("received empty response body from upstream",
+			zap.String("model", modelName),
+			zap.Int("status_code", resp.StatusCode))
+		return ErrorWrapper(fmt.Errorf("empty response body from upstream"),
+			"empty_response_body", http.StatusInternalServerError), nil
+	}
+
 	var textResponse SlimTextResponse
 	if err = json.Unmarshal(responseBody, &textResponse); err != nil {
+		logger.Error("failed to unmarshal response body",
+			zap.ByteString("response_body", responseBody),
+			zap.Error(err))
 		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 
 	if textResponse.Error.Type != "" {
+		logger.Debug("upstream returned error response",
+			zap.String("error_type", textResponse.Error.Type),
+			zap.String("error_message", textResponse.Error.Message))
 		return &model.ErrorWithStatusCode{
 			Error:      textResponse.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
+	}
+
+	// Check if response has choices - empty choices might indicate an error
+	if len(textResponse.Choices) == 0 {
+		logger.Error("response has no choices, possible upstream error",
+			zap.String("model", modelName),
+			zap.ByteString("response_body", responseBody))
+		return ErrorWrapper(fmt.Errorf("no choices in response from upstream"),
+			"no_choices_in_response", http.StatusInternalServerError), nil
 	}
 
 	// Forward the response to client
