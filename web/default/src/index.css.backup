@@ -1399,137 +1399,135 @@ code {
 
 /* Table container with proper responsive layout */
 .table-container {
-    width: 100%;
-    overflow-x: auto;
-    margin-bottom: 20px;
+  width: 100%;
+  overflow-x: auto;
+  margin-bottom: 20px;
 }
 
 /* Table footer layout - prevents pagination from jumping to top */
 .table-footer-content {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    position: relative;
-    /* Prevents floating to top */
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative; /* Prevents floating to top */
 }
 
 /* Responsive table footer for larger screens */
 @media (min-width: 768px) {
-    .table-footer-content {
-        flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-        gap: 16px;
-    }
+  .table-footer-content {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
 }
 
 /* Table footer buttons container */
 .table-footer-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* Table action buttons - responsive sizing */
 .table-action-button {
-    min-width: auto;
-    padding: 6px 10px;
-    font-size: 11px;
-    white-space: nowrap;
-    flex: 0 0 auto;
+  min-width: auto;
+  padding: 6px 10px;
+  font-size: 11px;
+  white-space: nowrap;
+  flex: 0 0 auto;
 }
 
 @media (min-width: 768px) {
-    .table-action-button {
-        padding: 8px 14px;
-        font-size: 13px;
-    }
+  .table-action-button {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
 }
 
 /* Table pagination container */
 .table-pagination-container {
-    display: flex;
-    justify-content: center;
+  display: flex;
+  justify-content: center;
 }
 
 @media (min-width: 768px) {
-    .table-pagination-container {
-        justify-content: flex-end;
-    }
+  .table-pagination-container {
+    justify-content: flex-end;
+  }
 }
 
 /* Compact pagination styling - like the screenshot */
 .table-pagination.ui.pagination,
 .ui.table .ui.pagination,
 div.table-pagination-container .ui.pagination {
-    margin: 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
+  margin: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
 }
 
 .table-pagination.ui.pagination .item,
 .ui.table .ui.pagination .item,
 div.table-pagination-container .ui.pagination .item {
-    background-color: var(--bg-secondary, #ffffff);
-    color: var(--text-primary, #333333);
-    border: 1px solid var(--border-color, #e0e0e0);
-    margin: 2px;
-    border-radius: 4px;
-    min-width: 32px;
-    max-width: 60px;
-    height: 32px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-    font-size: 13px;
-    font-weight: 500;
-    text-decoration: none;
-    padding: 4px 8px;
-    overflow: hidden;
-    cursor: pointer;
+  background-color: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #333333);
+  border: 1px solid var(--border-color, #e0e0e0);
+  margin: 2px;
+  border-radius: 4px;
+  min-width: 32px;
+  max-width: 60px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  padding: 4px 8px;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 @media (max-width: 767px) {
-
-    .table-pagination.ui.pagination .item,
-    .ui.table .ui.pagination .item,
-    div.table-pagination-container .ui.pagination .item {
-        min-width: 28px;
-        height: 28px;
-        font-size: 11px;
-        padding: 2px 6px;
-        margin: 1px;
-    }
+  .table-pagination.ui.pagination .item,
+  .ui.table .ui.pagination .item,
+  div.table-pagination-container .ui.pagination .item {
+    min-width: 28px;
+    height: 28px;
+    font-size: 11px;
+    padding: 2px 6px;
+    margin: 1px;
+  }
 }
 
 .table-pagination.ui.pagination .item:hover,
 .ui.table .ui.pagination .item:hover,
 div.table-pagination-container .ui.pagination .item:hover {
-    background-color: var(--button-primary, #007bff);
-    color: white;
-    border-color: var(--button-primary, #007bff);
+  background-color: var(--button-primary, #007bff);
+  color: white;
+  border-color: var(--button-primary, #007bff);
 }
 
 .table-pagination.ui.pagination .item.active,
 .ui.table .ui.pagination .item.active,
 div.table-pagination-container .ui.pagination .item.active {
-    background-color: var(--button-primary, #007bff);
-    color: white;
-    border-color: var(--button-primary, #007bff);
-    font-weight: 600;
+  background-color: var(--button-primary, #007bff);
+  color: white;
+  border-color: var(--button-primary, #007bff);
+  font-weight: 600;
 }
 
 /* Disable pagination during loading */
 .table-pagination.ui.pagination.loading .item,
 .ui.table .ui.pagination.loading .item,
 div.table-pagination-container .ui.pagination.loading .item {
-    pointer-events: none;
-    opacity: 0.7;
+  pointer-events: none;
+  opacity: 0.7;
 }
 
 /* Legacy pagination container - exclude our new FixedPagination component */
@@ -1883,279 +1881,143 @@ div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .i
         color: var(--text-primary) !important;
     }
 
-    /* Reset containers for mobile */
+    /* Reset containers for mobile - NO padding */
     .ui.container {
-        width: 100%;
-        margin: 0;
-        padding: 8px;
-        max-width: none;
+        width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        /* Remove all padding */
+        max-width: none !important;
     }
 
-    /* Main content with proper padding */
+    /* Main content with minimal padding */
     .main-content {
-        padding: 8px;
+        padding: 4px !important;
+        /* Minimal padding */
     }
 
-    /* Dashboard container with proper padding */
+    /* Dashboard container with minimal padding */
     .dashboard-container {
-        padding: 8px;
+        padding: 4px !important;
+        /* Minimal padding */
     }
 
-    /* Card styling - clean and minimal */
+    /* Card styling - minimal margins, no borders */
     .ui.card,
     .ui.cards>.card {
-        margin: 8px 0;
-        border: 1px solid var(--border-color, #e0e0e0);
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        padding: 12px;
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        border: none !important;
+        /* Remove borders */
+        border-radius: 4px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
     }
 
-    /* Segment styling */
+    /* Segment styling - minimal margins, no borders */
     .ui.segment {
-        margin: 8px 0;
-        border: 1px solid var(--border-color, #e0e0e0);
-        border-radius: 8px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-        padding: 12px;
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        border: none !important;
+        /* Remove borders */
+        border-radius: 4px !important;
+        box-shadow: none !important;
     }
 
-    /* Form styling - mobile optimized */
+    /* Table styling - no borders */
+    .ui.table {
+        border: none !important;
+        /* Remove borders */
+        border-radius: 4px !important;
+        margin: 2px 0 !important;
+        /* Minimal vertical margin only */
+        box-shadow: none !important;
+    }
+
+    /* Remove all horizontal margins and padding from common elements */
+    .ui.segment,
+    .ui.card,
+    .ui.form,
+    .ui.table,
+    .ui.container {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+    }
+
+    /* Form styling - remove all borders */
     .ui.form {
-        margin: 0;
-        border: none;
+        margin: 0 !important;
+        border: none !important;
     }
 
+    .ui.form .ui.segment {
+        border: none !important;
+        box-shadow: none !important;
+        padding: 4px !important;
+        /* Reduced padding */
+        margin: 0 !important;
+        background: var(--bg-primary) !important;
+    }
+
+    /* Ensure form fields take full width with minimal padding */
     .ui.form .field,
     .ui.form .fields {
-        margin: 8px 0;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 4px !important;
+        padding-right: 4px !important;
     }
 
-    .ui.form .field>label {
-        font-size: 14px;
-        font-weight: 600;
-        margin-bottom: 4px;
+    .ui.form .field {
+        margin-bottom: 0.75rem !important;
     }
 
-    /* Form groups - stack vertically on mobile */
-    .ui.form .fields {
-        flex-direction: column;
-    }
-
-    .ui.form .fields>.field {
-        width: 100%;
-        margin: 4px 0;
-    }
-
-    /* Input styling */
-    .ui.input,
-    .ui.dropdown {
-        width: 100%;
-        font-size: 16px;
-        /* Prevent zoom on iOS */
-    }
-
-    /* ==============================|| MOBILE TABLE DESIGN ||============================== */
-
-    /* Hide desktop table structure */
-    .ui.table thead {
-        display: none;
-    }
-
-    /* Table container */
+    /* Table responsive design - convert to mobile layout */
     .ui.table {
-        border: none;
-        box-shadow: none;
-        margin: 8px 0;
-        background: transparent;
+        border: none !important;
+        box-shadow: none !important;
+        margin: 0 !important;
+        background: var(--bg-primary) !important;
     }
 
-    /* Transform table rows into cards */
-    .ui.table tbody tr {
-        display: block;
-        background: var(--bg-secondary, #ffffff);
-        border: 1px solid var(--border-color, #e0e0e0);
-        border-radius: 8px;
-        margin-bottom: 12px;
-        padding: 16px;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    .ui.table thead {
+        display: none !important;
+        /* Hide table headers on mobile */
     }
 
-    /* Hide deleted rows */
-    .ui.table tbody tr[style*="display: none"] {
-        display: none;
-    }
-
-    /* Table cells as flex items */
-    .ui.table tbody tr td {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        border: none;
-        padding: 8px 0;
-        border-bottom: 1px solid var(--border-color, #f0f0f0);
-        position: relative;
-    }
-
-    .ui.table tbody tr td:last-child {
-        border-bottom: none;
-        padding-top: 12px;
-        flex-direction: column;
-        align-items: stretch;
-        gap: 8px;
-    }
-
-    /* Data labels for mobile */
-    .ui.table tbody tr td:before {
-        content: attr(data-label);
-        font-weight: 600;
-        color: var(--text-secondary, #666);
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        flex: 0 0 auto;
-        margin-right: 12px;
-        position: absolute;
-        left: 0;
-        width: 35%;
-    }
-
-    /* Data content */
-    .ui.table tbody tr td>*:not(.ui.button) {
-        flex: 1;
-        text-align: right;
-        padding-left: 40%;
-    }
-
-    /* Button container in mobile - grid layout */
-    .ui.table tbody tr td>div {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 6px;
-        width: 100%;
-        padding-left: 0;
-    }
-
-    /* Mobile button styling - compact and responsive */
-    .ui.table tbody .ui.button {
-        padding: 6px 8px;
-        font-size: 11px;
-        font-weight: 500;
-        border-radius: 4px;
-        min-height: 28px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        white-space: nowrap;
-        width: 100%;
-        margin: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-
-    /* Edit button spans full width */
-    .ui.table tbody .ui.button[color="blue"],
-    .ui.table tbody .ui.button.primary {
-        grid-column: 1 / -1;
-        margin-bottom: 4px;
-    }
-
-    /* ==============================|| MOBILE TABLE FOOTER ||============================== */
-
-    /* Table footer - mobile optimized */
     .ui.table tfoot {
-        display: block;
-        padding: 16px 8px;
-        border-top: 1px solid var(--border-color, #e0e0e0);
-        background: var(--bg-primary, #ffffff);
+        display: table-footer-group !important;
+        /* Ensure footer stays at bottom on mobile */
     }
 
-    .ui.table tfoot tr {
-        display: block;
+    .ui.table tbody tr {
+        display: block !important;
+        border: none !important;
+        border-radius: 0 !important;
+        margin-bottom: 8px !important;
+        padding: 12px !important;
+        background: var(--bg-primary) !important;
+        box-shadow: none !important;
     }
 
-    .ui.table tfoot td {
-        display: block;
-        padding: 0;
-        border: none;
+    .ui.table tbody tr td {
+        display: block !important;
+        border: none !important;
+        padding: 4px 0 !important;
+        text-align: left !important;
+        position: relative !important;
+        padding-left: 40% !important;
     }
 
-    /* Footer content layout */
-    .table-footer-content {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-        align-items: center;
-    }
-
-    /* Footer buttons */
-    .table-footer-buttons {
-        display: flex;
-        gap: 8px;
-        justify-content: center;
-        flex-wrap: wrap;
-    }
-
-    .table-footer-buttons .ui.button {
-        padding: 8px 16px;
-        font-size: 13px;
-        border-radius: 6px;
-        min-width: 70px;
-        flex: 0 1 auto;
-    }
-
-    /* Mobile pagination */
-    .table-pagination-container {
-        display: flex;
-        justify-content: center;
-        width: 100%;
-    }
-
-    .ui.table tfoot .ui.pagination {
-        display: flex;
-        justify-content: center;
-        gap: 3px;
-        margin: 0;
-        background: transparent;
-        border: none;
-        box-shadow: none;
-        flex-wrap: wrap;
-    }
-
-    .ui.table tfoot .ui.pagination .item {
-        min-width: 32px;
-        height: 32px;
-        padding: 0;
-        margin: 0;
-        border: 1px solid var(--border-color, #e0e0e0);
-        border-radius: 6px;
-        background: var(--bg-secondary, #ffffff);
-        color: var(--text-primary, #333);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 13px;
-        font-weight: 500;
-        text-decoration: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
-    }
-
-    .ui.table tfoot .ui.pagination .item:hover {
-        background: var(--button-primary, #007bff);
-        color: white;
-        border-color: var(--button-primary, #007bff);
-        transform: translateY(-1px);
-        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
-    }
-
-    .ui.table tfoot .ui.pagination .item.active {
-        background: var(--button-primary, #007bff);
-        color: white;
-        border-color: var(--button-primary, #007bff);
-        font-weight: 600;
-        box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
+    .ui.table tbody tr td:before {
+        content: attr(data-label) !important;
+        position: absolute !important;
+        left: 0 !important;
+        width: 35% !important;
+        font-weight: bold !important;
+        color: var(--text-secondary) !important;
+        font-size: 0.9em !important;
     }
 
     /* Button groups - stack vertically */
@@ -2349,130 +2211,130 @@ div.pagination-container:not(.fixed-pagination-container) .ui.pagination.menu .i
 
 /* Table pagination styling - compact and visually appealing like screenshot */
 .ui.table tfoot .ui.pagination {
-    position: static;
-    margin-top: 10px;
-    margin-bottom: 0;
-    background: transparent;
-    border: none;
-    box-shadow: none;
-    display: inline-flex;
-    gap: 2px;
+  position: static;
+  margin-top: 10px;
+  margin-bottom: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  display: inline-flex;
+  gap: 2px;
 }
 
 .ui.table tfoot .ui.pagination .item {
-    min-width: 32px;
-    max-width: 60px;
-    font-size: 13px;
-    padding: 6px 8px;
-    margin: 0;
-    transition: background-color 0.15s ease, border-color 0.15s ease;
-    background-color: var(--bg-secondary, #ffffff);
-    color: var(--text-primary, #333333);
-    border: 1px solid var(--border-color, #e0e0e0);
-    border-radius: 4px;
-    height: 32px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    text-decoration: none;
-    cursor: pointer;
-    font-weight: 500;
-    line-height: 1;
+  min-width: 32px;
+  max-width: 60px;
+  font-size: 13px;
+  padding: 6px 8px;
+  margin: 0;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  background-color: var(--bg-secondary, #ffffff);
+  color: var(--text-primary, #333333);
+  border: 1px solid var(--border-color, #e0e0e0);
+  border-radius: 4px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  cursor: pointer;
+  font-weight: 500;
+  line-height: 1;
 }
 
 @media (max-width: 767px) {
-    .ui.table tfoot .ui.pagination .item {
-        min-width: 28px;
-        font-size: 11px;
-        padding: 4px 6px;
-        height: 28px;
-    }
+  .ui.table tfoot .ui.pagination .item {
+    min-width: 28px;
+    font-size: 11px;
+    padding: 4px 6px;
+    height: 28px;
+  }
 }
 
 .ui.table tfoot .ui.pagination .item:hover {
-    background-color: var(--button-primary, #007bff);
-    color: white;
-    border-color: var(--button-primary, #007bff);
+  background-color: var(--button-primary, #007bff);
+  color: white;
+  border-color: var(--button-primary, #007bff);
 }
 
 .ui.table tfoot .ui.pagination .item.active {
-    background-color: var(--button-primary, #007bff);
-    color: white;
-    border-color: var(--button-primary, #007bff);
-    font-weight: 600;
+  background-color: var(--button-primary, #007bff);
+  color: white;
+  border-color: var(--button-primary, #007bff);
+  font-weight: 600;
 }
 
 /* Table footer button styling */
 .ui.table tfoot .ui.button {
-    min-width: auto;
-    padding: 6px 10px;
-    font-size: 11px;
-    margin-right: 4px;
+  min-width: auto;
+  padding: 6px 10px;
+  font-size: 11px;
+  margin-right: 4px;
 }
 
 @media (min-width: 768px) {
-    .ui.table tfoot .ui.button {
-        padding: 8px 12px;
-        font-size: 13px;
-        margin-right: 6px;
-    }
+  .ui.table tfoot .ui.button {
+    padding: 8px 12px;
+    font-size: 13px;
+    margin-right: 6px;
+  }
 }
 
 /* Override Semantic UI button behavior when needed */
 .ui.table .ui.button.ui.button {
-    width: auto;
-    min-width: auto;
-    flex-shrink: 1;
+  width: auto;
+  min-width: auto;
+  flex-shrink: 1;
 }
 
 /* Table action buttons - responsive and compact */
 .ui.table tbody .ui.button {
-    min-width: auto;
-    max-width: 120px;
-    padding: 4px 8px;
-    font-size: 10px;
-    margin: 1px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    width: auto;
-    flex: 0 0 auto;
+  min-width: auto;
+  max-width: 120px;
+  padding: 4px 8px;
+  font-size: 10px;
+  margin: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: auto;
+  flex: 0 0 auto;
 }
 
 @media (min-width: 768px) {
-    .ui.table tbody .ui.button {
-        padding: 6px 10px;
-        font-size: 12px;
-        margin: 2px;
-        max-width: 150px;
-    }
+  .ui.table tbody .ui.button {
+    padding: 6px 10px;
+    font-size: 12px;
+    margin: 2px;
+    max-width: 150px;
+  }
 }
 
 /* Action buttons container layout */
-.ui.table tbody td>div {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px;
-    align-items: center;
+.ui.table tbody td > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  align-items: center;
 }
 
 @media (max-width: 767px) {
-    .ui.table .ui.button.ui.button {
-        width: auto;
-        max-width: 80px;
-        min-width: 40px;
-    }
-
-    .ui.table tbody td>div {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 1px;
-    }
-
-    .ui.table tbody .ui.button {
-        width: auto;
-        max-width: 80px;
-        padding: 3px 6px;
-        font-size: 9px;
-    }
+  .ui.table .ui.button.ui.button {
+    width: auto;
+    max-width: 80px;
+    min-width: 40px;
+  }
+  
+  .ui.table tbody td > div {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 1px;
+  }
+  
+  .ui.table tbody .ui.button {
+    width: auto;
+    max-width: 80px;
+    padding: 3px 6px;
+    font-size: 9px;
+  }
 }

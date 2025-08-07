@@ -30,17 +30,32 @@ This document contains essential, abstract, and up-to-date information about the
 - **Adaptor Pattern:** All new API formats follow the Claude Messages pattern: interface method + universal conversion + context marking.
 
 ---
-**Recent Developments (2025-08):**
 
-- **Frontend Pagination Bug (2025-08):**
-    - **Root Cause:** Pagination controls in all management tables (Tokens, Channels, Users, Logs, Redemptions) were hidden due to a legacy CSS rule: `.ui.table tfoot .ui.pagination { display: none !important; }`.
-    - **Symptoms:** Pagination logic and API were correct, but the UI did not show pagination controls, leading to confusion and apparent missing functionality.
-    - **Resolution:** The problematic CSS rule was removed from `web/default/src/index.css`. All table components now use server-side pagination, and the Semantic UI Pagination component is visible and functional in the table footer.
-    - **Subtlety:** Always check for global or legacy CSS overrides when UI elements are unexpectedly missing, especially with third-party UI libraries. Avoid inline style overrides; prefer maintainable CSS fixes.
-    - **Best Practice:** Pagination logic should match the data loading strategy (server-side vs. client-side). For server-side pagination, do not slice data in the component; render the API result directly.
+## Frontend Table & Mobile UX Architecture (2025-08)
 
-- Major refactor to unify and clarify model pricing logic, reduce duplication, and standardize on "per 1M tokens" as the pricing unit. All adaptors now use shared pricing maps and fallback logic. This change is critical for maintainability and billing accuracy.
-- When handing over, ensure the new assistant is aware of the pricing unit change, the centralized pricing logic, and the importance of keeping documentation and UI in sync with backend logic.
+- **Table & Pagination Refactor:**
+    - All management tables (Users, Channels, Tokens, Redemptions, Logs) now use a unified, server-side pagination and sorting pattern. Table sorting is handled via dropdown and clickable column headers with icons. All tables fetch data in real-time from the server; no local cache is used for editing or display.
+    - Pagination controls are always visible and styled for both desktop and mobile. Legacy CSS overrides that hid or broke pagination have been removed. Always check for global/legacy CSS overrides when UI elements are missing, especially with third-party UI libraries.
+    - Pagination logic must match the data loading strategy. For server-side pagination, render API results directly—never slice data in the component.
+    - Table action buttons and pagination controls are compact, visually consistent, and touch-friendly. Button and pagination sizing is responsive and modern.
+
+- **Mobile Table Redesign:**
+    - Mobile view uses a card-based layout: each table row is rendered as a card with clear label-value pairs (using `data-label` attributes for accessibility and clarity).
+    - Action buttons are arranged in a 2-column grid for touch usability, with primary actions (like Edit) spanning full width. All buttons are sized for touch targets (min 32px height) and have clear visual feedback.
+    - Pagination on mobile is touch-friendly, with large, visually distinct buttons and proper spacing. Hover/active states use transform and shadow for feedback.
+    - All table components (UsersTable, ChannelsTable, TokensTable, RedemptionsTable) have been updated to include `data-label` attributes for every cell, ensuring clarity and accessibility in mobile layouts.
+    - Mobile CSS is modular, with minimal use of `!important`. Only use `!important` when absolutely necessary to override third-party library conflicts. Prefer maintainable, specific selectors.
+
+- **General Frontend Practices:**
+    - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
+    - All table and UI changes must be reflected in both desktop and mobile views. Always validate both after any refactor.
+    - When handing over, ensure the new assistant is aware of the mobile/table/pagination architecture, the importance of data-labels for mobile, and the need to keep UI/UX in sync with backend and documentation.
+
+- **Subtle Implementation Details:**
+    - Never use inline style overrides for critical layout/visibility issues; always prefer maintainable CSS fixes.
+    - When updating table or pagination styles, always test on both desktop and mobile. Mobile usability is a first-class concern.
+    - Remove outdated or redundant CSS as part of any major UI refactor. Keep the codebase clean and maintainable.
+
 
 ## Claude Messages API: Universal Conversion
 

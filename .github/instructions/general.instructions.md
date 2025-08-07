@@ -45,3 +45,9 @@ db.Model(&User{}).
     Scan(&result{})
 
 ```
+
+## CSS Style
+
+Avoid using `!important` in CSS. If you find yourself needing to use it, consider whether the CSS can be refactored to avoid this necessity.
+
+Avoid inline styles in HTML or JSX. Instead, use CSS classes to manage styles. This approach promotes better maintainability and separation of concerns in your codebase.
