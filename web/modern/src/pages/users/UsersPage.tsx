@@ -5,6 +5,11 @@ import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { useForm } from 'react-hook-form'
+import * as z from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 interface UserRow {
   id: number
@@ -27,6 +32,8 @@ export function UsersPage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [openCreate, setOpenCreate] = useState(false)
+  const [openTopup, setOpenTopup] = useState<{open: boolean, userId?: number, username?: string}>({open: false})
 
   const load = async (p = 0) => {
     setLoading(true)
@@ -82,6 +89,10 @@ export function UsersPage() {
           <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'enable', row.index)}>Enable</Button>
           <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'disable', row.index)}>Disable</Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenTopup({open:true, userId: row.original.id, username: row.original.username})}>Top Up</Button>
+          <Button variant="outline" size="sm" onClick={() => onManageRole(row.original.username, 'promote')}>Promote</Button>
+          <Button variant="outline" size="sm" onClick={() => onManageRole(row.original.username, 'demote')}>Demote</Button>
+          <Button variant="outline" size="sm" onClick={() => onDisableTotp(row.original.id)}>Disable TOTP</Button>
         </div>
       ),
     },
@@ -118,6 +129,7 @@ export function UsersPage() {
               <CardDescription>Manage users</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setOpenCreate(true)}>New User</Button>
               <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
                 <option value="">Default</option>
                 <option value="quota">Remaining Quota</option>
@@ -146,6 +158,117 @@ export function UsersPage() {
           />
         </CardContent>
       </Card>
+
+      {/* Create User Dialog */}
+      <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex)} />
+      {/* Top Up Dialog */}
+      <TopUpDialog open={openTopup.open} onOpenChange={(v)=>setOpenTopup({open:v})} userId={openTopup.userId} username={openTopup.username} onDone={()=>load(pageIndex)} />
     </div>
   )
+}
+
+// Create User Dialog
+function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, onOpenChange: (v:boolean)=>void, onCreated: ()=>void }) {
+  const schema = z.object({
+    username: z.string().min(1),
+    password: z.string().min(6),
+    display_name: z.string().optional(),
+  })
+  type FormT = z.infer<typeof schema>
+  const form = useForm<FormT>({ resolver: zodResolver(schema), defaultValues: { username: '', password: '', display_name: '' } })
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Create User</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
+            const res = await api.post('/user/', { username: values.username, password: values.password, display_name: values.display_name || values.username })
+            if (res.data?.success) {
+              onOpenChange(false)
+              form.reset()
+              onCreated()
+            }
+          })}>
+            <FormField control={form.control} name="username" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Username</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="password" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Password</FormLabel>
+                <FormControl><Input type="password" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="display_name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Display Name</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="pt-2 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+              <Button type="submit">Create</Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// Top Up Dialog
+function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: boolean, onOpenChange: (v:boolean)=>void, userId?: number, username?: string, onDone: ()=>void }) {
+  const schema = z.object({ quota: z.coerce.number().int(), remark: z.string().optional() })
+  type FormT = z.infer<typeof schema>
+  const form = useForm<FormT>({ resolver: zodResolver(schema), defaultValues: { quota: 0, remark: '' } })
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Top Up {username ? `@${username}` : ''}</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
+            if (!userId) return
+            const res = await api.post('/topup', { user_id: userId, quota: values.quota, remark: values.remark })
+            if (res.data?.success) {
+              onOpenChange(false)
+              form.reset()
+              onDone()
+            }
+          })}>
+            <FormField control={form.control} name="quota" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Quota</FormLabel>
+                <FormControl><Input type="number" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="remark" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Remark</FormLabel>
+                <FormControl><Input placeholder="Optional" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="pt-2 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+              <Button type="submit">Submit</Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+async function onManageRole(username: string, action: 'promote'|'demote') {
+  await api.post('/user/manage', { username, action })
+}
+
+async function onDisableTotp(id: number) {
+  await api.post(`/user/totp/disable/${id}`)
 }

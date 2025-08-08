@@ -34,3 +34,24 @@ export function formatTimestamp(timestamp: number | string) {
   const date = new Date((ts || 0) * 1000)
   return isNaN(date.getTime()) ? '-' : date.toLocaleString()
 }
+
+// Convert epoch seconds to an input[type="datetime-local"] string in local time (YYYY-MM-DDTHH:MM)
+export function toDateTimeLocal(epochSeconds: number): string {
+  if (!epochSeconds) return ''
+  const d = new Date(epochSeconds * 1000)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  const mm = pad(d.getMonth() + 1)
+  const dd = pad(d.getDate())
+  const hh = pad(d.getHours())
+  const mi = pad(d.getMinutes())
+  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
+}
+
+// Parse input[type="datetime-local"] string to epoch seconds
+export function fromDateTimeLocal(input: string): number {
+  if (!input) return 0
+  const d = new Date(input)
+  if (isNaN(d.getTime())) return 0
+  return Math.floor(d.getTime() / 1000)
+}

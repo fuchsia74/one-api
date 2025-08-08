@@ -685,6 +685,7 @@ The phased approach ensures minimal disruption to users while providing clear mi
 ### Current Status: Planning & Assessment Phase ✅
 
 **Completed:**
+
 - ✅ Analyzed existing codebase structure
 - ✅ Identified pain points with Semantic UI React implementation
 - ✅ Documented current component inventory:
@@ -694,6 +695,7 @@ The phased approach ensures minimal disruption to users while providing clear mi
   - UI utilities: Loading, Modal components
 
 **Current State Analysis:**
+
 - **Technology Stack**: React 18.2.0 + Semantic UI React 2.1.5
 - **Build Tool**: React Scripts 5.0.1 (Create React App)
 - **Bundle Size**: ~2MB (estimated from dependencies)
@@ -701,15 +703,17 @@ The phased approach ensures minimal disruption to users while providing clear mi
 - **Accessibility**: Basic, needs improvement
 - **Developer Experience**: Challenging due to Semantic UI limitations
 
-### Phase 1: Foundation Setup ✅ *[COMPLETED]*
+### Phase 1: Foundation Setup ✅ _[COMPLETED]_
 
 **Objectives:**
+
 - Migrate from Create React App to Vite
 - Install and configure shadcn/ui with Tailwind CSS
 - Setup development environment with TypeScript
 - Create design system foundation
 
 **Progress:**
+
 - ✅ **Completed Tasks**:
   1. ✅ Created new Vite-based project structure (`/web/modern/`)
   2. ✅ Configured Tailwind CSS with custom design tokens
@@ -722,6 +726,7 @@ The phased approach ensures minimal disruption to users while providing clear mi
   9. ✅ Successful build verification (bundle size: ~365KB total)
 
 **Technical Achievements:**
+
 - **Bundle Size**: Achieved 365KB total build size (vs 2MB target reduction)
 - **Build Tool**: Vite configuration with code splitting and optimizations
 - **Component System**: shadcn/ui integration with custom design tokens
@@ -732,45 +737,59 @@ The phased approach ensures minimal disruption to users while providing clear mi
 **Timeline:** 2 weeks → **Completed in 1 day**
 **Status:** ✅ **COMPLETED AHEAD OF SCHEDULE**
 
-### Phase 2: Component System Development � *[READY TO START]*
+### Phase 2: Component System Development ✅ _[PARTIALLY COMPLETED]_
 
 **Objectives:**
+
 - Build universal DataTable component with shadcn/ui
 - Create form system with React Hook Form + Zod validation
 - Implement responsive design patterns
 - Setup internationalization
 
 **Key Deliverables:**
+
 - Universal DataTable with server-side operations
 - Responsive form components
 - Mobile-first layout system
 - Design token system
 
+**Progress:**
+
+- ✅ Shared DataTable pattern in place (server-side pagination/sorting; mobile data-labels)
+- ✅ Logs page migrated with full feature parity (filters, search, sorting, stats, admin clear) using shadcn/ui
+- ✅ Tokens, Users, Channels, Redemptions pages use unified DataTable with server-side pagination/sorting and search
+- ✅ Dialog + React Hook Form + Zod implemented for Redemptions creation
+- ✅ Minimal unit tests added (datetime helpers) with Vitest
+- 🔄 i18n wiring pending for modern pages
+
 **Next Steps:**
-1. 🔄 Create universal DataTable component
-2. 🔄 Build comprehensive form system
-3. 🔄 Implement internationalization (i18next)
-4. 🔄 Create responsive navigation component
-5. 🔄 Add mobile-specific optimizations
+
+1. 🔄 Extract DataTable toolbar/pagination into components under components/shared/data-table
+2. 🔄 Build comprehensive form system (field, section, validation schemas) and refactor existing forms to it
+3. 🔄 Implement internationalization (i18next) for modern UI texts
+4. 🔄 Create responsive navigation and command palette
+5. 🔄 Add mobile-specific enhancements (cards on xs, touch-optimized actions)
 
 **Timeline:** 2-3 weeks
-**Status:** Ready to Start
+**Status:** In Progress
 
-### Phase 3: Progressive Migration 🔄 *[PLANNED]*
+### Phase 3: Progressive Migration 🔄 _[IN PROGRESS]_
 
 **Migration Order (by complexity):**
+
 1. **Authentication Pages** (Login, Register, Reset Password)
 2. **Dashboard & Settings Pages**
-3. **Simple Tables** (TokensTable, RedemptionsTable)
-4. **Complex Tables** (UsersTable, ChannelsTable)
-5. **Advanced Features** (LogsTable with filtering/sorting)
+3. **Simple Tables** (TokensTable, RedemptionsTable) ✅
+4. **Complex Tables** (UsersTable, ChannelsTable) ✅
+5. **Advanced Features** (LogsTable with filtering/sorting) ✅
 
 **Timeline:** 4-5 weeks
 **Status:** Planned
 
-### Phase 4: Performance & Polish ✨ *[PLANNED]*
+### Phase 4: Performance & Polish ✨ _[PLANNED]_
 
 **Objectives:**
+
 - Code splitting and lazy loading
 - Accessibility improvements (WCAG 2.1 AA)
 - Performance optimization
@@ -793,20 +812,24 @@ The phased approach ensures minimal disruption to users while providing clear mi
 ### Risk Assessment & Mitigation
 
 **High Risk:**
+
 - Breaking existing functionality during migration
 - **Mitigation**: Incremental migration with feature flags
 
 **Medium Risk:**
+
 - Performance regression during transition
 - **Mitigation**: Continuous monitoring and optimization
 
 **Low Risk:**
+
 - User adoption of new interface
 - **Mitigation**: Maintain familiar workflows and provide migration guide
 
 ### Success Metrics
 
 **Target Improvements:**
+
 - Bundle size reduction: 2MB → <800KB
 - First Contentful Paint: <1.5s
 - Mobile usability score: >95%
@@ -814,6 +837,7 @@ The phased approach ensures minimal disruption to users while providing clear mi
 - Developer build time: <30s
 
 **Current Baseline:**
+
 - Bundle size: ~2MB
 - Build time: ~45s (estimated)
 - Mobile usability: Limited
@@ -822,15 +846,17 @@ The phased approach ensures minimal disruption to users while providing clear mi
 ### Next Actions Required
 
 1. **Immediate (This Week)**:
+
    - [x] Create new Vite project structure ✅
    - [x] Setup development environment ✅
    - [x] Configure basic tooling (ESLint, Prettier, TypeScript) ✅
 
 2. **Short Term (Next 2 Weeks)**:
-   - [ ] Create universal DataTable component
-   - [ ] Build comprehensive form validation system
-   - [ ] Setup internationalization (i18next)
-   - [ ] Implement responsive navigation and mobile optimizations
+
+- [ ] Extract DataTable toolbar/pagination and reuse across pages
+- [ ] Build comprehensive form validation system and refactor existing forms
+- [ ] Setup internationalization (i18next) in modern UI and port strings
+- [ ] Implement responsive navigation (sidebar, breadcrumbs) and mobile optimizations
 
 3. **Medium Term (Next Month)**:
    - [ ] Begin authentication pages migration (basic structure ✅)
@@ -843,4 +869,4 @@ The phased approach ensures minimal disruption to users while providing clear mi
 **Updated By**: GitHub Copilot
 **Next Review**: August 15, 2025
 
-**Migration Status**: 🚀 **PHASE 1 COMPLETED SUCCESSFULLY** - Ahead of schedule with excellent foundation established.
+**Migration Status**: 🚀 **PHASE 2 UNDERWAY** — Logs and all management tables migrated to the unified DataTable with server-side ops; forms and i18n up next.

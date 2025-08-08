@@ -52,6 +52,10 @@ export function Header() {
                 >
                   Redemptions
                 </Link>
+                <Link to="/models" className="text-sm font-medium hover:text-primary">Models</Link>
+                <Link to="/topup" className="text-sm font-medium hover:text-primary">Top Up</Link>
+                <Link to="/about" className="text-sm font-medium hover:text-primary">About</Link>
+                <Link to="/settings" className="text-sm font-medium hover:text-primary">Settings</Link>
               </nav>
             )}
           </div>

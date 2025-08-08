@@ -10,6 +10,10 @@ import { LogsPage } from '@/pages/logs/LogsPage'
 import { UsersPage } from '@/pages/users/UsersPage'
 import { ChannelsPage } from '@/pages/channels/ChannelsPage'
 import { RedemptionsPage } from '@/pages/redemptions/RedemptionsPage'
+import { AboutPage } from '@/pages/about/AboutPage'
+import { SettingsPage } from '@/pages/settings/SettingsPage'
+import { ModelsPage } from '@/pages/models/ModelsPage'
+import { TopUpPage } from '@/pages/topup/TopUpPage'
 
 const queryClient = new QueryClient()
 
@@ -29,6 +33,10 @@ function App() {
               <Route path="users" element={<UsersPage />} />
               <Route path="channels" element={<ChannelsPage />} />
               <Route path="redemptions" element={<RedemptionsPage />} />
+              <Route path="about" element={<AboutPage />} />
+              <Route path="settings" element={<SettingsPage />} />
+              <Route path="models" element={<ModelsPage />} />
+              <Route path="topup" element={<TopUpPage />} />
             </Route>
             </Route>
           </Routes>

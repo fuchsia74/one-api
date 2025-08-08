@@ -5,6 +5,12 @@ import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { formatTimestamp } from '@/lib/utils'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { useForm } from 'react-hook-form'
+import * as z from 'zod'
+import { zodResolver } from '@hookform/resolvers/zod'
 
 interface ChannelRow {
   id: number
@@ -33,6 +39,7 @@ export function ChannelsPage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [openCreate, setOpenCreate] = useState(false)
 
   const load = async (p = 0) => {
     setLoading(true)
@@ -69,7 +76,7 @@ export function ChannelsPage() {
     } finally { setLoading(false) }
   }
 
-  const manage = async (id: number, action: 'enable' | 'disable' | 'delete' | 'test', idx: number) => {
+  const manage = async (id: number, action: 'enable' | 'disable' | 'delete' | 'test' | 'balance', idx: number) => {
     if (action === 'delete') {
   const res = await api.delete(`/channel/${id}`)
       if (res.data.success) load(pageIndex)
@@ -83,6 +90,11 @@ export function ChannelsPage() {
         next[idx].response_time = time
         setData(next)
       }
+      return
+    }
+    if (action === 'balance') {
+      await api.get(`/channel/update_balance/${id}`)
+      load(pageIndex)
       return
     }
     const body: any = { id, status: action === 'enable' ? 1 : 2 }
@@ -104,6 +116,7 @@ export function ChannelsPage() {
           <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'enable', row.index)}>Enable</Button>
           <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'disable', row.index)}>Disable</Button>
           <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'test', row.index)}>Test</Button>
+          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'balance', row.index)}>Update Balance</Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
         </div>
       ),
@@ -120,6 +133,7 @@ export function ChannelsPage() {
               <CardDescription>Configure and manage routing channels</CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setOpenCreate(true)}>New Channel</Button>
               <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
                 <option value="">Default</option>
                 <option value="id">ID</option>
@@ -138,10 +152,68 @@ export function ChannelsPage() {
           <div className="flex items-center gap-2 mb-3">
             <input className="h-9 border rounded-md px-2 text-sm w-full" placeholder="Search channels" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
             <Button onClick={search} disabled={loading}>Search</Button>
+            <Button variant="outline" onClick={async ()=>{ await api.get('/channel/test'); load(pageIndex) }}>Test All</Button>
+            <Button variant="outline" onClick={async ()=>{ await api.get('/channel/update_balance'); load(pageIndex) }}>Update All Balances</Button>
+            <Button variant="destructive" onClick={async ()=>{ await api.delete('/channel/disabled'); load(pageIndex) }}>Delete Disabled</Button>
           </div>
           <DataTable columns={columns} data={data} pageIndex={pageIndex} pageSize={pageSize} total={total} onPageChange={(pi) => load(pi)} />
         </CardContent>
       </Card>
+
+      <CreateChannelDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={()=>load(pageIndex)} />
     </div>
+  )
+}
+
+function CreateChannelDialog({ open, onOpenChange, onCreated }: { open: boolean, onOpenChange: (v:boolean)=>void, onCreated: ()=>void }) {
+  const schema = z.object({
+    name: z.string().min(1),
+    type: z.coerce.number().int().min(0),
+    key: z.string().min(1), // supports multi-line
+  })
+  type FormT = z.infer<typeof schema>
+  const form = useForm<FormT>({ resolver: zodResolver(schema), defaultValues: { name: '', type: 0, key: '' } })
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Create Channel</DialogTitle></DialogHeader>
+        <Form {...form}>
+          <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
+            const res = await api.post('/channel/', { name: values.name, type: values.type, key: values.key })
+            if (res.data?.success) {
+              onOpenChange(false)
+              form.reset()
+              onCreated()
+            }
+          })}>
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Name</FormLabel>
+                <FormControl><Input {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="type" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Type</FormLabel>
+                <FormControl><Input type="number" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="key" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Key(s)</FormLabel>
+                <FormControl><textarea className="w-full h-32 p-2 border rounded" placeholder="One key per line" {...field as any} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <div className="pt-2 flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+              <Button type="submit">Create</Button>
+            </div>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
   )
 }
