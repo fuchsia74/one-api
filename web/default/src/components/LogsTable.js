@@ -4,7 +4,6 @@ import {
   Button,
   Form,
   Label,
-  Pagination,
   Popup,
   Table,
   Select,
@@ -23,6 +22,7 @@ import {
   timestamp2string,
   renderQuota,
 } from '../helpers';
+import BaseTable from './shared/BaseTable';
 
 import { ITEMS_PER_PAGE } from '../constants';
 
@@ -359,6 +359,155 @@ const LogsTable = () => {
     return <Icon name={sortOrder === 'asc' ? 'sort up' : 'sort down'} />;
   };
 
+  const headerCells = [
+    {
+      content: (
+        <>
+          {t('log.table.time', 'Time')}{getSortIcon('created_time')}
+          {sortLoading && sortBy === 'created_time' && <span> ⏳</span>}
+        </>
+      ),
+      sortable: true,
+      onClick: () => sortLog('created_time'),
+    },
+    ...(isAdminUser ? [{
+      content: (
+        <>
+          {t('log.table.channel', 'Channel')}{getSortIcon('channel')}
+          {sortLoading && sortBy === 'channel' && <span> ⏳</span>}
+        </>
+      ),
+      sortable: true,
+      onClick: () => sortLog('channel'),
+    }] : []),
+    {
+      content: (
+        <>
+          {t('log.table.type', 'Type')}{getSortIcon('type')}
+          {sortLoading && sortBy === 'type' && <span> ⏳</span>}
+        </>
+      ),
+      sortable: true,
+      onClick: () => sortLog('type'),
+    },
+    {
+      content: (
+        <>
+          {t('log.table.model', 'Model')}{getSortIcon('model_name')}
+          {sortLoading && sortBy === 'model_name' && <span> ⏳</span>}
+        </>
+      ),
+      sortable: true,
+      onClick: () => sortLog('model_name'),
+    },
+    ...(showUserTokenQuota() ? [
+      ...(isAdminUser ? [{
+        content: (
+          <>
+            {t('log.table.username', 'Username')}{getSortIcon('username')}
+            {sortLoading && sortBy === 'username' && <span> ⏳</span>}
+          </>
+        ),
+        sortable: true,
+        onClick: () => sortLog('username'),
+      }] : []),
+      {
+        content: (
+          <>
+            {t('log.table.token_name', 'Token Name')}{getSortIcon('token_name')}
+            {sortLoading && sortBy === 'token_name' && <span> ⏳</span>}
+          </>
+        ),
+        sortable: true,
+        onClick: () => sortLog('token_name'),
+      },
+      {
+        content: (
+          <>
+            {t('log.table.prompt_tokens', 'Prompt Tokens')}{getSortIcon('prompt_tokens')}
+            {sortLoading && sortBy === 'prompt_tokens' && <span> ⏳</span>}
+          </>
+        ),
+        sortable: true,
+        onClick: () => sortLog('prompt_tokens'),
+      },
+      {
+        content: (
+          <>
+            {t('log.table.completion_tokens', 'Completion Tokens')}{getSortIcon('completion_tokens')}
+            {sortLoading && sortBy === 'completion_tokens' && <span> ⏳</span>}
+          </>
+        ),
+        sortable: true,
+        onClick: () => sortLog('completion_tokens'),
+      },
+      {
+        content: (
+          <>
+            {t('log.table.quota', 'Quota')}{getSortIcon('quota')}
+            {sortLoading && sortBy === 'quota' && <span> ⏳</span>}
+          </>
+        ),
+        sortable: true,
+        onClick: () => sortLog('quota'),
+      },
+      {
+        content: (
+          <>
+            {t('log.table.latency', 'Latency')}{getSortIcon('elapsed_time')}
+            {sortLoading && sortBy === 'elapsed_time' && <span> ⏳</span>}
+          </>
+        ),
+        sortable: true,
+        onClick: () => sortLog('elapsed_time'),
+      },
+    ] : []),
+    {
+      content: (
+        <>
+          {t('log.table.detail', 'Detail')}{getSortIcon('content')}
+          {sortLoading && sortBy === 'content' && <span> ⏳</span>}
+        </>
+      ),
+      sortable: true,
+      onClick: () => sortLog('content'),
+    },
+  ];
+
+  const footerButtons = [
+    {
+      content: t('log.buttons.refresh', 'Refresh'),
+      onClick: refresh,
+      loading: loading,
+    },
+    {
+      content: t('log.buttons.search', 'Search'),
+      onClick: searchLogs,
+      loading: searching,
+    },
+    ...(isAdmin() ? [{
+      content: t('log.buttons.clear', 'Clear'),
+      onClick: async () => {
+        try {
+          const res = await API.delete('/api/log');
+          const { success, message } = res.data;
+          if (success) {
+            showSuccess('Clear successful');
+            await refresh();
+          } else {
+            showError(message);
+          }
+        } catch (error) {
+          showError('Clear failed');
+        }
+      },
+      loading: false,
+    }] : []),
+  ];
+
+  // Calculate column span based on visible columns
+  const colSpan = headerCells.length;
+
   return (
     <>
       <Header as='h3'>
@@ -499,270 +648,113 @@ const LogsTable = () => {
         </Form>
       </Segment>
 
-      <Table basic={'very'} compact size='small'>
-        <Table.Header>
-          <Table.Row>
-            <Table.HeaderCell
-              className='sortable-header'
-              style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-              onClick={() => {
-                sortLog('created_time');
-              }}
-            >
-              {t('log.table.time', 'Time')}{getSortIcon('created_time')}
-              {sortLoading && sortBy === 'created_time' && <span> ⏳</span>}
-            </Table.HeaderCell>
-            {isAdminUser && (
-              <Table.HeaderCell
-                className='sortable-header'
-                style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                onClick={() => {
-                  sortLog('channel');
+      <Segment>
+        <Form>
+          <Form.Group>
+            <Form.Field width={4}>
+              <label>{t('log.type.select', 'Select log type')}</label>
+              <Select
+                placeholder={t('log.type.select', 'Select log type')}
+                options={LOG_OPTIONS}
+                name='logType'
+                value={logType}
+                onChange={(_, { value }) => {
+                  setLogType(value);
                 }}
-              >
-                {t('log.table.channel', 'Channel')}{getSortIcon('channel')}
-                {sortLoading && sortBy === 'channel' && <span> ⏳</span>}
-              </Table.HeaderCell>
-            )}
-            <Table.HeaderCell
-              className='sortable-header'
-              style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-              onClick={() => {
-                sortLog('type');
-              }}
-            >
-              {t('log.table.type', 'Type')}{getSortIcon('type')}
-              {sortLoading && sortBy === 'type' && <span> ⏳</span>}
-            </Table.HeaderCell>
-            <Table.HeaderCell
-              className='sortable-header'
-              style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-              onClick={() => {
-                sortLog('model_name');
-              }}
-            >
-              {t('log.table.model', 'Model')}{getSortIcon('model_name')}
-              {sortLoading && sortBy === 'model_name' && <span> ⏳</span>}
-            </Table.HeaderCell>
-            {showUserTokenQuota() && (
-              <>
-                {isAdminUser && (
-                  <Table.HeaderCell
-                    className='sortable-header'
-                    style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                    onClick={() => {
-                      sortLog('username');
-                    }}
-                  >
-                    {t('log.table.username', 'Username')}{getSortIcon('username')}
-                    {sortLoading && sortBy === 'username' && <span> ⏳</span>}
-                  </Table.HeaderCell>
-                )}
-                <Table.HeaderCell
-                  className='sortable-header'
-                  style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                  onClick={() => {
-                    sortLog('token_name');
-                  }}
-                >
-                  {t('log.table.token_name', 'Token Name')}{getSortIcon('token_name')}
-                  {sortLoading && sortBy === 'token_name' && <span> ⏳</span>}
-                </Table.HeaderCell>
-                <Table.HeaderCell
-                  className='sortable-header'
-                  style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                  onClick={() => {
-                    sortLog('prompt_tokens');
-                  }}
-                >
-                  {t('log.table.prompt_tokens', 'Prompt Tokens')}{getSortIcon('prompt_tokens')}
-                  {sortLoading && sortBy === 'prompt_tokens' && <span> ⏳</span>}
-                </Table.HeaderCell>
-                <Table.HeaderCell
-                  className='sortable-header'
-                  style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                  onClick={() => {
-                    sortLog('completion_tokens');
-                  }}
-                >
-                  {t('log.table.completion_tokens', 'Completion Tokens')}{getSortIcon('completion_tokens')}
-                  {sortLoading && sortBy === 'completion_tokens' && <span> ⏳</span>}
-                </Table.HeaderCell>
-                <Table.HeaderCell
-                  className='sortable-header'
-                  style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                  onClick={() => {
-                    sortLog('quota');
-                  }}
-                >
-                  {t('log.table.quota', 'Quota')}{getSortIcon('quota')}
-                  {sortLoading && sortBy === 'quota' && <span> ⏳</span>}
-                </Table.HeaderCell>
-                <Table.HeaderCell
-                  className='sortable-header'
-                  style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-                  onClick={() => {
-                    sortLog('elapsed_time');
-                  }}
-                >
-                  {t('log.table.latency', 'Latency')}{getSortIcon('elapsed_time')}
-                  {sortLoading && sortBy === 'elapsed_time' && <span> ⏳</span>}
-                </Table.HeaderCell>
-              </>
-            )}
-            <Table.HeaderCell
-              className='sortable-header'
-              style={{ cursor: sortLoading ? 'wait' : 'pointer', opacity: sortLoading ? 0.6 : 1 }}
-              onClick={() => {
-                sortLog('content');
-              }}
-            >
-              {t('log.table.detail', 'Detail')}{getSortIcon('content')}
-              {sortLoading && sortBy === 'content' && <span> ⏳</span>}
-            </Table.HeaderCell>
-          </Table.Row>
-        </Table.Header>
+                fluid
+              />
+            </Form.Field>
+          </Form.Group>
+        </Form>
+      </Segment>
 
-        <Table.Body>
-          {logs.map((log, idx) => {
-              if (log.deleted) return null;
-              return (
-                <Table.Row key={log.id}>
-                  <Table.Cell>
-                    {renderTimestamp(log.created_at, log.request_id)}
-                  </Table.Cell>
+      <BaseTable
+        loading={loading}
+        activePage={activePage}
+        totalPages={totalPages}
+        onPageChange={onPaginationChange}
+        headerCells={headerCells}
+        footerButtons={footerButtons}
+        colSpan={colSpan}
+        size="small"
+      >
+        {logs.map((log, idx) => {
+          if (log.deleted) return null;
+          return (
+            <Table.Row key={log.id} data-label={`Log ${log.id}`}>
+              <Table.Cell data-label={t('log.table.time', 'Time')}>
+                {renderTimestamp(log.created_at, log.request_id)}
+              </Table.Cell>
+              {isAdminUser && (
+                <Table.Cell data-label={t('log.table.channel', 'Channel')}>
+                  {log.channel ? (
+                    <Label basic>
+                      {log.channel}
+                    </Label>
+                  ) : (
+                    ''
+                  )}
+                </Table.Cell>
+              )}
+              <Table.Cell data-label={t('log.table.type', 'Type')}>
+                {renderLogType(log.type, t)}
+              </Table.Cell>
+              <Table.Cell data-label={t('log.table.model', 'Model')}>
+                {log.model_name ? (
+                  <Label basic color='blue'>
+                    {log.model_name}
+                  </Label>
+                ) : (
+                  ''
+                )}
+              </Table.Cell>
+              {showUserTokenQuota() && (
+                <>
                   {isAdminUser && (
-                    <Table.Cell>
-                      {log.channel ? (
+                    <Table.Cell data-label={t('log.table.username', 'Username')}>
+                      {log.username ? (
                         <Label basic>
-                          {log.channel}
+                          {log.username}
                         </Label>
                       ) : (
                         ''
                       )}
                     </Table.Cell>
                   )}
-                  <Table.Cell>
-                    {renderLogType(log.type, t)}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {log.model_name ? (
-                      <Label basic color='blue'>
-                        {log.model_name}
+                  <Table.Cell data-label={t('log.table.token_name', 'Token Name')}>
+                    {log.token_name ? (
+                      <Label basic color='teal'>
+                        {log.token_name}
                       </Label>
                     ) : (
                       ''
                     )}
                   </Table.Cell>
-                  {showUserTokenQuota() && (
-                    <>
-                      {isAdminUser && (
-                        <Table.Cell>
-                          {log.username ? (
-                            <Label basic>
-                              {log.username}
-                            </Label>
-                          ) : (
-                            ''
-                          )}
-                        </Table.Cell>
-                      )}
-                      <Table.Cell>
-                        {log.token_name ? (
-                          <Label basic color='teal'>
-                            {log.token_name}
-                          </Label>
-                        ) : (
-                          ''
-                        )}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {log.prompt_tokens || ''}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {log.completion_tokens || ''}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {log.quota ? renderQuota(log.quota, t, 6) : 'free'}
-                      </Table.Cell>
-                      <Table.Cell>
-                        {log.elapsed_time ? `${log.elapsed_time} ms` : ''}
-                      </Table.Cell>
-                    </>
-                  )}
-                  <Table.Cell>
-                    <ExpandableDetail
-                      content={log.content}
-                      isStream={log.is_stream}
-                      systemPromptReset={log.system_prompt_reset}
-                    />
+                  <Table.Cell data-label={t('log.table.prompt_tokens', 'Prompt Tokens')}>
+                    {log.prompt_tokens || ''}
                   </Table.Cell>
-                </Table.Row>
-              );
-            })}
-        </Table.Body>
-
-        <Table.Footer>
-          <Table.Row>
-            <Table.HeaderCell colSpan={isAdminUser ? (showUserTokenQuota() ? '10' : '4') : (showUserTokenQuota() ? '9' : '3')}>
-              <div className="table-footer-content">
-                <div className="table-footer-buttons">
-                  <Select
-                    placeholder={t('log.type.select', 'Select log type')}
-                    options={LOG_OPTIONS}
-                    style={{ marginRight: '8px' }}
-                    name='logType'
-                    value={logType}
-                    onChange={(_, { value }) => {
-                      setLogType(value);
-                    }}
-                  />
-                  <Button size='small' onClick={refresh} loading={loading} className="table-action-button">
-                    {t('log.buttons.refresh', 'Refresh')}
-                  </Button>
-                  <Button size='small' onClick={searchLogs} loading={searching} className="table-action-button">
-                    {t('log.buttons.search', 'Search')}
-                  </Button>
-                  {isAdmin() && (
-                    <Button
-                      size='small'
-                      className="table-action-button"
-                      onClick={async () => {
-                        try {
-                          const res = await API.delete('/api/log');
-                          const { success, message } = res.data;
-                          if (success) {
-                            showSuccess('Clear successful');
-                            await refresh();
-                          } else {
-                            showError(message);
-                          }
-                        } catch (error) {
-                          showError('Clear failed');
-                        }
-                      }}
-                    >
-                      {t('log.buttons.clear', 'Clear')}
-                    </Button>
-                  )}
-                </div>
-                {totalPages > 1 && (
-                  <div className="table-pagination-container">
-                    <Pagination
-                      activePage={activePage}
-                      onPageChange={onPaginationChange}
-                      size='small'
-                      siblingRange={1}
-                      totalPages={totalPages}
-                      className="table-pagination"
-                    />
-                  </div>
-                )}
-              </div>
-            </Table.HeaderCell>
-          </Table.Row>
-        </Table.Footer>
-      </Table>
+                  <Table.Cell data-label={t('log.table.completion_tokens', 'Completion Tokens')}>
+                    {log.completion_tokens || ''}
+                  </Table.Cell>
+                  <Table.Cell data-label={t('log.table.quota', 'Quota')}>
+                    {log.quota ? renderQuota(log.quota, t, 6) : 'free'}
+                  </Table.Cell>
+                  <Table.Cell data-label={t('log.table.latency', 'Latency')}>
+                    {log.elapsed_time ? `${log.elapsed_time} ms` : ''}
+                  </Table.Cell>
+                </>
+              )}
+              <Table.Cell data-label={t('log.table.detail', 'Detail')}>
+                <ExpandableDetail
+                  content={log.content}
+                  isStream={log.is_stream}
+                  systemPromptReset={log.system_prompt_reset}
+                />
+              </Table.Cell>
+            </Table.Row>
+          );
+        })}
+      </BaseTable>
     </>
   );
 };

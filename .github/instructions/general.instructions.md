@@ -1,3 +1,7 @@
+---
+applyTo: "**/*"
+---
+
 ## General
 
 ### TimeZone

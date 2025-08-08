@@ -7,7 +7,7 @@ const BaseTable = ({
   loading = false,
   activePage = 1,
   totalPages = 1,
-  onPageChange = () => {},
+  onPageChange = () => { },
   headerCells = [],
   footerButtons = [],
   colSpan = 5,
