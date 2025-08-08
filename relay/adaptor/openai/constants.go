@@ -65,6 +65,14 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"gpt-4.1-nano":            {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
 	"gpt-4.1-nano-2025-04-14": {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
 
+	// GPT-5 Models
+	"gpt-5":                 {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 10 / 1.25},
+	"gpt-5-2025-08-07":      {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 10 / 1.25},
+	"gpt-5-mini":            {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 2 / 0.25},
+	"gpt-5-mini-2025-08-07": {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 2 / 0.25},
+	"gpt-5-nano":            {Ratio: 0.05 * ratio.MilliTokensUsd, CompletionRatio: 0.4 / 0.05},
+	"gpt-5-nano-2025-08-07": {Ratio: 0.05 * ratio.MilliTokensUsd, CompletionRatio: 0.4 / 0.05},
+
 	// o1 Models
 	"o1":                    {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
 	"o1-2024-12-17":         {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
