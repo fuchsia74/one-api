@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
 import api from '@/lib/api'
@@ -32,6 +33,7 @@ const renderStatus = (status: number) => {
 }
 
 export function RedemptionsPage() {
+  const navigate = useNavigate()
   const [data, setData] = useState<RedemptionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -101,8 +103,20 @@ export function RedemptionsPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'enable', row.index)}>Enable</Button>
-          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'disable', row.index)}>Disable</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/redemptions/edit/${row.original.id}`)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => manage(row.original.id, row.original.status === 1 ? 'disable' : 'enable', row.index)}
+          >
+            {row.original.status === 1 ? 'Disable' : 'Enable'}
+          </Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
         </div>
       ),
@@ -135,7 +149,7 @@ export function RedemptionsPage() {
               <CardDescription>Manage recharge codes</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => { setOpen(true); setGeneratedKeys(null) }}>New Codes</Button>
+              <Button onClick={() => navigate('/redemptions/add')}>Add Redemption</Button>
               <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
                 <option value="">Default</option>
                 <option value="id">ID</option>
@@ -155,7 +169,21 @@ export function RedemptionsPage() {
             <Input placeholder="Search redemptions" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
             <Button onClick={search} disabled={loading}>Search</Button>
           </div>
-          <DataTable columns={columns} data={data} pageIndex={pageIndex} pageSize={pageSize} total={total} onPageChange={(pi) => load(pi)} />
+          <DataTable
+            columns={columns}
+            data={data}
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={(pi) => load(pi)}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={(newSortBy, newSortOrder) => {
+              setSortBy(newSortBy)
+              setSortOrder(newSortOrder)
+            }}
+            loading={loading}
+          />
         </CardContent>
       </Card>
 

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
 import api from '@/lib/api'
@@ -22,6 +23,7 @@ interface Token {
 }
 
 export function TokensPage() {
+  const navigate = useNavigate()
   const [data, setData] = useState<Token[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -99,9 +101,27 @@ export function TokensPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'enable')}>Enable</Button>
-          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'disable')}>Disable</Button>
-          <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete')}>Delete</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/tokens/edit/${row.original.id}`)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => manage(row.original.id, row.original.status === 1 ? 'disable' : 'enable')}
+          >
+            {row.original.status === 1 ? 'Disable' : 'Enable'}
+          </Button>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={() => manage(row.original.id, 'delete')}
+          >
+            Delete
+          </Button>
         </div>
       ),
     },
@@ -117,7 +137,9 @@ export function TokensPage() {
               <CardDescription>Manage your access tokens</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setOpen(true)}>New Token</Button>
+              <Button onClick={() => navigate('/tokens/add')}>
+                Add Token
+              </Button>
               <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
                 <option value="">Default</option>
                 <option value="id">ID</option>
@@ -135,7 +157,21 @@ export function TokensPage() {
             <Input placeholder="Search tokens" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
             <Button onClick={search} disabled={loading}>Search</Button>
           </div>
-          <DataTable columns={columns} data={data} pageIndex={pageIndex} pageSize={pageSize} total={total} onPageChange={(pi) => load(pi)} />
+          <DataTable
+            columns={columns}
+            data={data}
+            pageIndex={pageIndex}
+            pageSize={pageSize}
+            total={total}
+            onPageChange={(pi) => load(pi)}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={(newSortBy, newSortOrder) => {
+              setSortBy(newSortBy)
+              setSortOrder(newSortOrder)
+            }}
+            loading={loading}
+          />
         </CardContent>
       </Card>
 

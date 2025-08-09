@@ -1,47 +1,53 @@
-import { useEffect, useState } from 'react'
-import api from '@/lib/api'
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
-
-interface OptionRow { key: string; value: string }
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PersonalSettings } from './PersonalSettings'
+import { SystemSettings } from './SystemSettings'
+import { OperationSettings } from './OperationSettings'
+import { OtherSettings } from './OtherSettings'
+import { useAuthStore } from '@/lib/stores/auth'
 
 export function SettingsPage() {
-  const [options, setOptions] = useState<OptionRow[]>([])
-  const [loading, setLoading] = useState(false)
-
-  const load = async () => {
-    setLoading(true)
-    try { const res = await api.get('/option/'); if (res.data?.success) setOptions(res.data.data || []) } finally { setLoading(false) }
-  }
-  useEffect(() => { load() }, [])
-
-  const save = async (key: string, value: string) => {
-    await api.put('/option/', { key, value })
-  }
+  const { user } = useAuthStore()
+  const isRoot = user?.role >= 100
 
   return (
     <div className="container mx-auto px-4 py-8">
       <Card>
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle>System Settings</CardTitle>
-          <Button variant="outline" onClick={load} disabled={loading}>Refresh</Button>
+        <CardHeader>
+          <CardTitle>Settings</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {options.map((opt, idx) => (
-              <div key={idx} className="border rounded p-3">
-                <div className="text-xs text-muted-foreground mb-1">{opt.key}</div>
-                <div className="flex gap-2">
-                  <Input defaultValue={opt.value} onBlur={(e)=>save(opt.key, e.target.value)} />
-                  <Button variant="outline" onClick={(e)=>{
-                    const target = (e.currentTarget.previousSibling as HTMLInputElement); save(opt.key, target.value)
-                  }}>Save</Button>
-                </div>
-              </div>
-            ))}
-            {!options.length && <div className="text-sm text-muted-foreground">No options or insufficient permission.</div>}
-          </div>
+          <Tabs defaultValue="personal" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
+              <TabsTrigger value="personal">Personal</TabsTrigger>
+              {isRoot && <TabsTrigger value="operation">Operation</TabsTrigger>}
+              {isRoot && <TabsTrigger value="system">System</TabsTrigger>}
+              {isRoot && <TabsTrigger value="other">Other</TabsTrigger>}
+            </TabsList>
+
+            <TabsContent value="personal" className="mt-6">
+              <PersonalSettings />
+            </TabsContent>
+
+            {isRoot && (
+              <TabsContent value="operation" className="mt-6">
+                <OperationSettings />
+              </TabsContent>
+            )}
+
+            {isRoot && (
+              <TabsContent value="system" className="mt-6">
+                <SystemSettings />
+              </TabsContent>
+            )}
+
+            {isRoot && (
+              <TabsContent value="other" className="mt-6">
+                <OtherSettings />
+              </TabsContent>
+            )}
+          </Tabs>
         </CardContent>
       </Card>
     </div>

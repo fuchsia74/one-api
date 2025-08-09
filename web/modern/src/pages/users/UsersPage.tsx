@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
 import api from '@/lib/api'
@@ -24,6 +25,7 @@ interface UserRow {
 }
 
 export function UsersPage() {
+  const navigate = useNavigate()
   const [data, setData] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -86,13 +88,22 @@ export function UsersPage() {
       header: 'Actions',
       cell: ({ row }) => (
         <div className="space-x-2">
-          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'enable', row.index)}>Enable</Button>
-          <Button variant="outline" size="sm" onClick={() => manage(row.original.id, 'disable', row.index)}>Disable</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate(`/users/edit/${row.original.id}`)}
+          >
+            Edit
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => manage(row.original.id, row.original.status === 1 ? 'disable' : 'enable', row.index)}
+          >
+            {row.original.status === 1 ? 'Disable' : 'Enable'}
+          </Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
           <Button variant="outline" size="sm" onClick={() => setOpenTopup({open:true, userId: row.original.id, username: row.original.username})}>Top Up</Button>
-          <Button variant="outline" size="sm" onClick={() => onManageRole(row.original.username, 'promote')}>Promote</Button>
-          <Button variant="outline" size="sm" onClick={() => onManageRole(row.original.username, 'demote')}>Demote</Button>
-          <Button variant="outline" size="sm" onClick={() => onDisableTotp(row.original.id)}>Disable TOTP</Button>
         </div>
       ),
     },
@@ -129,7 +140,7 @@ export function UsersPage() {
               <CardDescription>Manage users</CardDescription>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setOpenCreate(true)}>New User</Button>
+              <Button onClick={() => navigate('/users/add')}>Add User</Button>
               <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
                 <option value="">Default</option>
                 <option value="quota">Remaining Quota</option>
@@ -155,6 +166,13 @@ export function UsersPage() {
             pageSize={pageSize}
             total={total}
             onPageChange={(pi) => load(pi)}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            onSortChange={(newSortBy, newSortOrder) => {
+              setSortBy(newSortBy)
+              setSortOrder(newSortOrder)
+            }}
+            loading={loading}
           />
         </CardContent>
       </Card>
