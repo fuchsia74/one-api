@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
+import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -27,9 +28,11 @@ export function TokensPage() {
   const [data, setData] = useState<Token[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [open, setOpen] = useState(false)
@@ -53,6 +56,39 @@ export function TokensPage() {
 
   useEffect(() => { load(0) }, [])
   useEffect(() => { load(0) }, [sortBy, sortOrder])
+
+  const searchTokens = async (query: string) => {
+    if (!query.trim()) {
+      setSearchOptions([])
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      const res = await api.get(`/token/search?keyword=${encodeURIComponent(query)}`)
+      const { success, data } = res.data
+      if (success && Array.isArray(data)) {
+        const options: SearchOption[] = data.map((token: Token) => ({
+          key: token.id.toString(),
+          value: token.name,
+          text: token.name,
+          content: (
+            <div className="flex flex-col">
+              <div className="font-medium">{token.name}</div>
+              <div className="text-sm text-muted-foreground">
+                ID: {token.id} • Status: {token.status === 1 ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+          )
+        }))
+        setSearchOptions(options)
+      }
+    } catch (error) {
+      console.error('Search failed:', error)
+    } finally {
+      setSearchLoading(false)
+    }
+  }
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete') => {
     let res
@@ -154,7 +190,29 @@ export function TokensPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 mb-3">
-            <Input placeholder="Search tokens" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
+            <div className="flex-1">
+              <SearchableDropdown
+                value={searchKeyword}
+                placeholder="Search tokens..."
+                searchPlaceholder="Search by token name..."
+                options={searchOptions}
+                onSearchChange={searchTokens}
+                onChange={(value) => setSearchKeyword(value)}
+                onAddItem={(value) => {
+                  const newOption: SearchOption = {
+                    key: value,
+                    value: value,
+                    text: value
+                  }
+                  setSearchOptions([...searchOptions, newOption])
+                }}
+                loading={searchLoading}
+                noResultsMessage="No tokens found"
+                additionLabel="Use token name: "
+                allowAdditions={true}
+                clearable={true}
+              />
+            </div>
             <Button onClick={search} disabled={loading}>Search</Button>
           </div>
           <DataTable
@@ -164,6 +222,10 @@ export function TokensPage() {
             pageSize={pageSize}
             total={total}
             onPageChange={(pi) => load(pi)}
+            onPageSizeChange={(newPageSize) => {
+              setPageSize(newPageSize)
+              setPageIndex(0) // Reset to first page
+            }}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSortChange={(newSortBy, newSortOrder) => {

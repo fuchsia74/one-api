@@ -5,53 +5,40 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const dm = decimals < 0 ? 0 : decimals
-  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i]
+// Date/time utility functions
+export function formatTimestamp(timestamp: number): string {
+  if (!timestamp) return '-'
+  const date = new Date(timestamp * 1000)
+  return date.toLocaleString()
 }
 
-export function formatNumber(num: number) {
-  return new Intl.NumberFormat().format(num)
+export function toDateTimeLocal(timestamp: number | undefined): string {
+  if (!timestamp) return ''
+  const date = new Date(timestamp * 1000)
+  return date.toISOString().slice(0, 16)
 }
 
-export function formatCurrency(amount: number, currency = 'USD') {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(amount)
+export function fromDateTimeLocal(dateTimeLocal: string): number {
+  if (!dateTimeLocal) return 0
+  return Math.floor(new Date(dateTimeLocal).getTime() / 1000)
 }
 
-export function copyToClipboard(text: string) {
-  return navigator.clipboard.writeText(text)
+// Number formatting
+export function formatNumber(num: number): string {
+  if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M'
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K'
+  }
+  return num.toString()
 }
 
-export function formatTimestamp(timestamp: number | string) {
-  const ts = typeof timestamp === 'string' ? parseInt(timestamp as string, 10) : timestamp
-  const date = new Date((ts || 0) * 1000)
-  return isNaN(date.getTime()) ? '-' : date.toLocaleString()
+// Quota formatting
+export function formatQuota(quota: number): string {
+  return `$${(quota / 500000).toFixed(4)}`
 }
 
-// Convert epoch seconds to an input[type="datetime-local"] string in local time (YYYY-MM-DDTHH:MM)
-export function toDateTimeLocal(epochSeconds: number): string {
-  if (!epochSeconds) return ''
-  const d = new Date(epochSeconds * 1000)
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const yyyy = d.getFullYear()
-  const mm = pad(d.getMonth() + 1)
-  const dd = pad(d.getDate())
-  const hh = pad(d.getHours())
-  const mi = pad(d.getMinutes())
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`
-}
-
-// Parse input[type="datetime-local"] string to epoch seconds
-export function fromDateTimeLocal(input: string): number {
-  if (!input) return 0
-  const d = new Date(input)
-  if (isNaN(d.getTime())) return 0
-  return Math.floor(d.getTime() / 1000)
+// Render quota with proper formatting
+export function renderQuota(quota: number): string {
+  return formatQuota(quota)
 }

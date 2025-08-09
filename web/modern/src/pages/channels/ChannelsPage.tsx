@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
+import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -36,9 +37,11 @@ export function ChannelsPage() {
   const [data, setData] = useState<ChannelRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [openCreate, setOpenCreate] = useState(false)

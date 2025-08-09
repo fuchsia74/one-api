@@ -8,9 +8,12 @@ import type { ColumnDef, SortingState } from '@tanstack/react-table'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Button } from '@/components/ui/button'
 import { AdvancedPagination } from '@/components/ui/advanced-pagination'
-import { ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
+import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { Input } from '@/components/ui/input'
+import { ArrowUpDown, ArrowUp, ArrowDown, Search, RotateCcw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
-export interface DataTableProps<TData, TValue> {
+export interface EnhancedDataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[]
   data: TData[]
   pageIndex?: number
@@ -18,14 +21,32 @@ export interface DataTableProps<TData, TValue> {
   total?: number
   onPageChange?: (pageIndex: number, pageSize: number) => void
   onPageSizeChange?: (pageSize: number) => void
+
   // Server-side sorting support
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
   onSortChange?: (sortBy: string, sortOrder: 'asc' | 'desc') => void
+
+  // Search functionality
+  searchValue?: string
+  searchOptions?: SearchOption[]
+  searchLoading?: boolean
+  onSearchChange?: (query: string) => void
+  onSearchValueChange?: (value: string) => void
+  onSearchSubmit?: () => void
+  searchPlaceholder?: string
+  allowSearchAdditions?: boolean
+
+  // Toolbar actions
+  toolbarActions?: React.ReactNode
+  onRefresh?: () => void
+
   loading?: boolean
+  className?: string
+  emptyMessage?: string
 }
 
-export function DataTable<TData, TValue>({
+export function EnhancedDataTable<TData, TValue>({
   columns,
   data,
   pageIndex = 0,
@@ -36,8 +57,20 @@ export function DataTable<TData, TValue>({
   sortBy = '',
   sortOrder = 'desc',
   onSortChange,
+  searchValue = '',
+  searchOptions = [],
+  searchLoading = false,
+  onSearchChange,
+  onSearchValueChange,
+  onSearchSubmit,
+  searchPlaceholder = 'Search...',
+  allowSearchAdditions = true,
+  toolbarActions,
+  onRefresh,
   loading = false,
-}: DataTableProps<TData, TValue>) {
+  className,
+  emptyMessage = 'No results found.',
+}: EnhancedDataTableProps<TData, TValue>) {
   // Client-side sorting state (for display only when no server-side sorting)
   const [sorting, setSorting] = React.useState<SortingState>([])
 
@@ -55,8 +88,9 @@ export function DataTable<TData, TValue>({
     }
   }
 
+  // Get sort icon based on current sort state
   const getSortIcon = (accessorKey: string) => {
-    if (!onSortChange) return null
+    if (!onSortChange) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-50" />
 
     if (sortBy === accessorKey) {
       return sortOrder === 'asc' ? (
@@ -108,18 +142,72 @@ export function DataTable<TData, TValue>({
     pageCount: Math.ceil(total / pageSize),
   })
 
+  const handleSearchAddition = (value: string) => {
+    if (onSearchValueChange) {
+      onSearchValueChange(value)
+    }
+  }
+
   return (
-    <div className="space-y-2">
+    <div className={cn('space-y-4', className)}>
+      {/* Search and Actions Toolbar */}
+      {(onSearchChange || toolbarActions || onRefresh) && (
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1 flex items-center gap-2">
+            {onSearchChange && (
+              <>
+                <div className="flex-1 max-w-md">
+                  <SearchableDropdown
+                    value={searchValue}
+                    placeholder={searchPlaceholder}
+                    searchPlaceholder={searchPlaceholder}
+                    options={searchOptions}
+                    onSearchChange={onSearchChange}
+                    onChange={onSearchValueChange}
+                    onAddItem={allowSearchAdditions ? handleSearchAddition : undefined}
+                    loading={searchLoading}
+                    noResultsMessage="No results found"
+                    additionLabel="Search for: "
+                    allowAdditions={allowSearchAdditions}
+                    clearable={true}
+                  />
+                </div>
+                {onSearchSubmit && (
+                  <Button onClick={onSearchSubmit} disabled={loading} variant="outline">
+                    <Search className="h-4 w-4 mr-2" />
+                    Search
+                  </Button>
+                )}
+              </>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {onRefresh && (
+              <Button onClick={onRefresh} disabled={loading} variant="outline" size="sm">
+                <RotateCcw className="h-4 w-4 mr-2" />
+                Refresh
+              </Button>
+            )}
+            {toolbarActions}
+          </div>
+        </div>
+      )}
+
+      {/* Data Table */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-left">
+                  <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
+                      : flexRender(
+                          header.column.columnDef.header,
+                          header.getContext()
+                        )}
                   </TableHead>
                 ))}
               </TableRow>
@@ -129,10 +217,7 @@ export function DataTable<TData, TValue>({
             {loading ? (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span>Loading...</span>
-                  </div>
+                  Loading...
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
@@ -152,7 +237,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  {emptyMessage}
                 </TableCell>
               </TableRow>
             )}

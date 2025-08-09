@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
+import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
 import api from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -29,9 +30,11 @@ export function UsersPage() {
   const [data, setData] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
+  const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
+  const [searchLoading, setSearchLoading] = useState(false)
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [openCreate, setOpenCreate] = useState(false)
@@ -51,6 +54,39 @@ export function UsersPage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const searchUsers = async (query: string) => {
+    if (!query.trim()) {
+      setSearchOptions([])
+      return
+    }
+
+    setSearchLoading(true)
+    try {
+      const res = await api.get(`/user/search?keyword=${encodeURIComponent(query)}`)
+      const { success, data } = res.data
+      if (success && Array.isArray(data)) {
+        const options: SearchOption[] = data.map((user: UserRow) => ({
+          key: user.id.toString(),
+          value: user.username,
+          text: user.username,
+          content: (
+            <div className="flex flex-col">
+              <div className="font-medium">{user.username}</div>
+              <div className="text-sm text-muted-foreground">
+                ID: {user.id} • Role: {user.role === 1 ? 'Admin' : user.role === 10 ? 'Super Admin' : 'User'} • Status: {user.status === 1 ? 'Enabled' : 'Disabled'}
+              </div>
+            </div>
+          )
+        }))
+        setSearchOptions(options)
+      }
+    } catch (error) {
+      console.error('Search failed:', error)
+    } finally {
+      setSearchLoading(false)
     }
   }
 
@@ -156,7 +192,29 @@ export function UsersPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 mb-3">
-            <Input placeholder="Search users" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
+            <div className="flex-1">
+              <SearchableDropdown
+                value={searchKeyword}
+                placeholder="Search users..."
+                searchPlaceholder="Search by username..."
+                options={searchOptions}
+                onSearchChange={searchUsers}
+                onChange={(value) => setSearchKeyword(value)}
+                onAddItem={(value) => {
+                  const newOption: SearchOption = {
+                    key: value,
+                    value: value,
+                    text: value
+                  }
+                  setSearchOptions([...searchOptions, newOption])
+                }}
+                loading={searchLoading}
+                noResultsMessage="No users found"
+                additionLabel="Use username: "
+                allowAdditions={true}
+                clearable={true}
+              />
+            </div>
             <Button onClick={search} disabled={loading}>Search</Button>
           </div>
           <DataTable
@@ -166,6 +224,10 @@ export function UsersPage() {
             pageSize={pageSize}
             total={total}
             onPageChange={(pi) => load(pi)}
+            onPageSizeChange={(newPageSize) => {
+              setPageSize(newPageSize)
+              setPageIndex(0)
+            }}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSortChange={(newSortBy, newSortOrder) => {

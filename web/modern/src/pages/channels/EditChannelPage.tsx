@@ -67,6 +67,7 @@ export function EditChannelPage() {
   const [channelModels, setChannelModels] = useState<string[]>([])
   const [modelSearchTerm, setModelSearchTerm] = useState('')
   const [groups, setGroups] = useState<string[]>([])
+  const [defaultPricing, setDefaultPricing] = useState<string>('')
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -90,7 +91,9 @@ export function EditChannelPage() {
     if (!channelId) return
 
     try {
-      const response = await api.get(`/channel/${channelId}`)
+      // Add cache busting parameter to ensure fresh data
+      const cacheBuster = Date.now()
+      const response = await api.get(`/channel/${channelId}?_cb=${cacheBuster}`)
       const { success, message, data } = response.data
 
       if (success && data) {
@@ -107,6 +110,21 @@ export function EditChannelPage() {
         } else {
           data.groups = data.groups.split(',')
         }
+
+        // Format JSON fields for display
+        if (data.model_mapping && data.model_mapping !== '') {
+          data.model_mapping = formatJSON(data.model_mapping)
+        }
+
+        if (data.other && data.other !== '') {
+          data.other = formatJSON(data.other)
+        }
+
+        // Load channel-specific models for this channel type
+        loadChannelModels(data.type)
+
+        // Load default pricing for this channel type
+        loadDefaultPricing(data.type)
 
         form.reset(data)
       } else {
@@ -149,6 +167,34 @@ export function EditChannelPage() {
     }
   }
 
+  const loadDefaultPricing = async (channelType: number) => {
+    try {
+      const response = await api.get(`/channel/default-pricing?type=${channelType}`)
+      const { success, data } = response.data
+      if (success && data?.model_configs) {
+        try {
+          const parsed = JSON.parse(data.model_configs)
+          const formatted = JSON.stringify(parsed, null, 2)
+          setDefaultPricing(formatted)
+        } catch (e) {
+          setDefaultPricing(data.model_configs)
+        }
+      }
+    } catch (error) {
+      console.error('Error loading default pricing:', error)
+    }
+  }
+
+  const formatJSON = (jsonString: string) => {
+    if (!jsonString || jsonString.trim() === '') return ''
+    try {
+      const parsed = JSON.parse(jsonString)
+      return JSON.stringify(parsed, null, 2)
+    } catch (e) {
+      return jsonString
+    }
+  }
+
   const loadGroups = async () => {
     try {
       const response = await api.get('/group/')
@@ -175,6 +221,18 @@ export function EditChannelPage() {
   useEffect(() => {
     if (watchType) {
       loadChannelModels(watchType)
+      loadDefaultPricing(watchType)
+
+      // Auto-populate models if none are selected
+      const currentModels = form.getValues('models')
+      if (currentModels.length === 0) {
+        // Load and set channel-specific models
+        loadChannelModels(watchType).then(() => {
+          if (channelModels.length > 0) {
+            form.setValue('models', channelModels)
+          }
+        })
+      }
     }
   }, [watchType])
 
@@ -478,6 +536,25 @@ export function EditChannelPage() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Model Mapping (JSON)</FormLabel>
+                    {defaultPricing && (
+                      <div className="bg-muted/50 p-4 rounded-lg mb-2">
+                        <h4 className="text-sm font-medium mb-2">Default Pricing for {CHANNEL_TYPES.find(t => t.value === watchType)?.text}</h4>
+                        <pre className="text-xs bg-background p-2 rounded border overflow-auto max-h-40">
+                          {defaultPricing}
+                        </pre>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="mt-2"
+                          onClick={() => {
+                            form.setValue('model_mapping', defaultPricing)
+                          }}
+                        >
+                          Apply Default Pricing
+                        </Button>
+                      </div>
+                    )}
                     <FormControl>
                       <Textarea
                         placeholder='{"original-model": "mapped-model"}'
