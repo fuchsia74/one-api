@@ -3,10 +3,16 @@ package model
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 	"gorm.io/gorm"
+
+	// MySQL driver error inspection (for robust error code detection)
+	mysql_driver "github.com/go-sql-driver/mysql"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
@@ -77,6 +83,29 @@ type ModelConfigLocal struct {
 	Ratio           float64 `json:"ratio"`
 	CompletionRatio float64 `json:"completion_ratio,omitempty"`
 	MaxTokens       int32   `json:"max_tokens,omitempty"`
+}
+
+// Migration control & state
+var (
+	channelFieldMigrationOnce sync.Once
+	channelFieldMigrated      atomic.Bool // true after successful schema migration
+)
+
+// isMySQLDataTooLongErr checks whether an error is a MySQL "data too long" error (code 1406)
+func isMySQLDataTooLongErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	if merr, ok := err.(*mysql_driver.MySQLError); ok {
+		if merr.Number == 1406 { // ER_DATA_TOO_LONG
+			return true
+		}
+	}
+	// fallback substring match (defensive for wrapped errors)
+	if strings.Contains(err.Error(), "Data too long for column") {
+		return true
+	}
+	return false
 }
 
 func GetAllChannels(startIdx int, num int, scope string, sortBy string, sortOrder string) ([]*Channel, error) {
@@ -916,24 +945,33 @@ func (channel *Channel) MigrateHistoricalPricingToModelConfigs() error {
 //
 // This function should be called during application startup before any channel operations.
 func MigrateChannelFieldsToText() error {
-	logger.Logger.Info("Starting migration of ModelConfigs and ModelMapping fields to TEXT type")
+	// Ensure only executed once even if called from multiple goroutines
+	var runErr error
+	channelFieldMigrationOnce.Do(func() {
+		logger.Logger.Info("Starting migration of ModelConfigs and ModelMapping fields to TEXT type")
 
-	// Check if migration is needed by examining current schema (idempotency check)
-	// This ensures the migration can be run multiple times safely
-	needsMigration, err := checkIfFieldMigrationNeeded()
-	if err != nil {
-		return errors.Wrap(err, "failed to check migration status")
-	}
+		// Skip if we already migrated in this process
+		if channelFieldMigrated.Load() {
+			logger.Logger.Info("Channel field migration already completed in this process - skipping")
+			return
+		}
 
-	if !needsMigration {
-		logger.Logger.Info("ModelConfigs and ModelMapping fields are already TEXT type - no migration needed")
-		return nil
-	}
+		needsMigration, err := checkIfFieldMigrationNeeded()
+		if err != nil {
+			runErr = errors.Wrap(err, "failed to check migration status")
+			return
+		}
 
-	logger.Logger.Info("Column type migration required - proceeding with migration")
+		if !needsMigration {
+			logger.Logger.Info("ModelConfigs and ModelMapping fields are already TEXT type - no migration needed")
+			channelFieldMigrated.Store(true)
+			return
+		}
 
-	// Perform the actual migration with proper transaction handling
-	return performFieldMigration()
+		logger.Logger.Info("Column type migration required - proceeding with migration")
+		runErr = performFieldMigration()
+	})
+	return runErr
 }
 
 // performFieldMigration executes the actual database schema changes to migrate fields to TEXT type.
@@ -985,17 +1023,19 @@ func performFieldMigration() error {
 func performMySQLFieldMigration(tx *gorm.DB) error {
 	logger.Logger.Info("Performing MySQL field migration")
 
-	// MySQL: Use MODIFY COLUMN to change type while preserving data
-	err := tx.Exec("ALTER TABLE channels MODIFY COLUMN model_configs TEXT DEFAULT ''").Error
+	// MySQL: Use MODIFY COLUMN to change type while preserving data.
+	// Do NOT set DEFAULT '' on TEXT columns (not allowed for TEXT/BLOB in MySQL).
+	err := tx.Exec("ALTER TABLE channels MODIFY COLUMN model_configs TEXT").Error
 	if err != nil {
 		return errors.Wrap(err, "failed to migrate model_configs column")
 	}
 
-	err = tx.Exec("ALTER TABLE channels MODIFY COLUMN model_mapping TEXT DEFAULT ''").Error
+	err = tx.Exec("ALTER TABLE channels MODIFY COLUMN model_mapping TEXT").Error
 	if err != nil {
 		return errors.Wrap(err, "failed to migrate model_mapping column")
 	}
 
+	channelFieldMigrated.Store(true)
 	logger.Logger.Info("MySQL field migration completed successfully")
 	return nil
 }
@@ -1043,8 +1083,20 @@ func checkIfFieldMigrationNeeded() (bool, error) {
 			return false, errors.Wrap(err, "failed to check model_mapping column type in MySQL")
 		}
 
-		// Migration needed if either field is still varchar
-		return modelConfigsType == "varchar" || modelMappingType == "varchar", nil
+		logger.Logger.Info("Detected MySQL column types for migration check",
+			zap.String("model_configs_type", modelConfigsType),
+			zap.String("model_mapping_type", modelMappingType))
+
+		// If we cannot read the column types (empty string), be conservative and attempt migration
+		if modelConfigsType == "" || modelMappingType == "" {
+			logger.Logger.Warn("Could not determine one or more column types from INFORMATION_SCHEMA; will attempt migration to ensure TEXT size")
+			return true, nil
+		}
+
+		// Migration needed unless both columns already some kind of TEXT.* (varchar is insufficient)
+		isTextType := func(tp string) bool { return strings.Contains(tp, "text") }
+		need := !(isTextType(modelConfigsType) && isTextType(modelMappingType))
+		return need, nil
 
 	} else if common.UsingPostgreSQL {
 		// Check PostgreSQL column types for both fields
@@ -1103,20 +1155,6 @@ func MigrateAllChannelModelConfigs() error {
 	historicalMigratedCount := 0
 	errorCount := 0
 	var migrationErrors []string
-
-	// Use transaction for data integrity
-	tx := DB.Begin()
-	if tx.Error != nil {
-		return errors.Wrap(tx.Error, "failed to start transaction")
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			logger.Logger.Error("Migration panicked, rolled back",
-				zap.Any("panic", r))
-		}
-	}()
 
 	for _, channel := range channels {
 		channelUpdated := false
@@ -1181,40 +1219,53 @@ func MigrateAllChannelModelConfigs() error {
 				continue
 			}
 
-			err = tx.Model(channel).Update("model_configs", channel.ModelConfigs).Error
-			if err != nil {
-				logger.Logger.Error("Failed to save migrated ModelConfigs for channel",
-					zap.Int("channel_id", channel.Id),
-					zap.Error(err))
-				errorMsg := fmt.Sprintf("Failed to save migrated ModelConfigs for channel %d: %s", channel.Id, err.Error())
-				migrationErrors = append(migrationErrors, errorMsg)
-				errorCount++
-				continue
+			saveErr := DB.Model(channel).Update("model_configs", channel.ModelConfigs).Error
+			if saveErr != nil {
+				// Detect MySQL column size overflow and attempt on-the-fly migration+retry
+				if common.UsingMySQL && isMySQLDataTooLongErr(saveErr) {
+					logger.Logger.Warn("Detected model_configs length overflow, attempting column type migration to TEXT and retry",
+						zap.Int("channel_id", channel.Id))
+					if migErr := performMySQLFieldMigration(DB); migErr != nil {
+						logger.Logger.Error("On-demand MySQL column migration failed",
+							zap.Int("channel_id", channel.Id),
+							zap.Error(migErr))
+						errorMsg := fmt.Sprintf("Failed to save migrated ModelConfigs for channel %d after overflow & migration attempt: %s", channel.Id, saveErr.Error())
+						migrationErrors = append(migrationErrors, errorMsg)
+						errorCount++
+						continue
+					}
+					// Retry save after migration
+					if retryErr := DB.Model(channel).Update("model_configs", channel.ModelConfigs).Error; retryErr != nil {
+						logger.Logger.Error("Retry save after column migration still failed",
+							zap.Int("channel_id", channel.Id),
+							zap.Error(retryErr))
+						errorMsg := fmt.Sprintf("Failed to save migrated ModelConfigs for channel %d after retry: %s", channel.Id, retryErr.Error())
+						migrationErrors = append(migrationErrors, errorMsg)
+						errorCount++
+						continue
+					}
+					logger.Logger.Info("Retry save after on-demand column migration succeeded",
+						zap.Int("channel_id", channel.Id))
+				} else {
+					logger.Logger.Error("Failed to save migrated ModelConfigs for channel",
+						zap.Int("channel_id", channel.Id),
+						zap.Error(saveErr))
+					errorMsg := fmt.Sprintf("Failed to save migrated ModelConfigs for channel %d: %s", channel.Id, saveErr.Error())
+					migrationErrors = append(migrationErrors, errorMsg)
+					errorCount++
+					continue
+				}
 			}
 		}
 	}
 
-	// Commit transaction if no critical errors
-	if errorCount == 0 {
-		if err := tx.Commit().Error; err != nil {
-			return errors.Wrap(err, "failed to commit migration")
-		}
-	} else {
-		tx.Rollback()
-		logger.Logger.Error("Migration had errors, rolled back transaction",
-			zap.Int("error_count", errorCount))
-
-		// If more than 50% of channels failed, return error to prevent silent data loss
+	// If more than 50% of channels failed, return error to prevent silent data loss
+	if len(channels) > 0 {
 		failureRate := float64(errorCount) / float64(len(channels))
 		if failureRate > 0.5 {
-			return errors.Errorf("migration failed for %d/%d channels (%.1f%%), rolled back to prevent data loss",
+			return errors.Errorf("migration failed for %d/%d channels (%.1f%%)",
 				errorCount, len(channels), failureRate*100)
 		}
-
-		// For lower failure rates, log errors but don't fail startup
-		logger.Logger.Error("Migration completed with errors",
-			zap.Int("error_count", errorCount),
-			zap.Int("total_channels", len(channels)))
 	}
 
 	// Log final results

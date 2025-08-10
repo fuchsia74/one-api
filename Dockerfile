@@ -22,7 +22,7 @@ RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run buil
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/berry
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/air
 
-FROM golang:1.24.4-bookworm AS builder2
+FROM golang:1.24.6-bookworm AS builder2
 
 # Make sure to use ARG with a default value
 ARG TARGETARCH=amd64
