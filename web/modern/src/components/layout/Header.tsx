@@ -1,7 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
 import { useAuthStore } from '@/lib/stores/auth'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { Menu, X } from 'lucide-react'
 import { useState } from 'react'
 
@@ -59,6 +60,7 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
+            <ThemeToggle />
             {user ? (
               <>
                 <span className="hidden md:inline text-sm text-muted-foreground">

@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Separator } from '@/components/ui/separator'
 import { useAuthStore } from '@/lib/stores/auth'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 const loginSchema = z.object({
   username: z.string().min(1, 'Username is required'),

@@ -12,7 +12,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: '../build/default',
+    outDir: '../build/modern',
     sourcemap: true,
     rollupOptions: {
       output: {

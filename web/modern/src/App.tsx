@@ -1,5 +1,7 @@
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { useEffect } from 'react'
+import { ThemeProvider } from '@/components/theme-provider'
 import { Layout } from '@/components/layout/Layout'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { HomePage } from '@/pages/HomePage'
@@ -24,15 +26,51 @@ import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { ModelsPage } from '@/pages/models/ModelsPage'
 import { TopUpPage } from '@/pages/topup/TopUpPage'
 import { ChatPage } from '@/pages/chat/ChatPage'
+import { api } from '@/lib/api'
 
 const queryClient = new QueryClient()
 
+// Initialize system settings from backend
+const initializeSystem = async () => {
+  try {
+    const response = await api.get('/status')
+    const { success, data } = response.data
+
+    if (success && data) {
+      // Set up localStorage with system settings
+      localStorage.setItem('status', JSON.stringify(data))
+      localStorage.setItem('system_name', data.system_name || 'One API')
+      localStorage.setItem('logo', data.logo || '')
+      localStorage.setItem('footer_html', data.footer_html || '')
+      localStorage.setItem('quota_per_unit', data.quota_per_unit || '500000')
+      localStorage.setItem('display_in_currency', data.display_in_currency || 'true')
+
+      if (data.chat_link) {
+        localStorage.setItem('chat_link', data.chat_link)
+      } else {
+        localStorage.removeItem('chat_link')
+      }
+    }
+  } catch (error) {
+    console.error('Failed to initialize system settings:', error)
+    // Set defaults
+    localStorage.setItem('quota_per_unit', '500000')
+    localStorage.setItem('display_in_currency', 'true')
+    localStorage.setItem('system_name', 'One API')
+  }
+}
+
 function App() {
+  useEffect(() => {
+    initializeSystem()
+  }, [])
+
   return (
-    <QueryClientProvider client={queryClient}>
-      <Router>
-        <div className="min-h-screen bg-background">
-          <Routes>
+    <ThemeProvider defaultTheme="system" storageKey="one-api-theme">
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <div className="min-h-screen bg-background">
+            <Routes>
             {/* Public auth routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -71,6 +109,7 @@ function App() {
         </div>
       </Router>
     </QueryClientProvider>
+    </ThemeProvider>
   )
 }
 

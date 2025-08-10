@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/lib/stores/auth'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 export function GitHubOAuthPage() {
   const [searchParams] = useSearchParams()

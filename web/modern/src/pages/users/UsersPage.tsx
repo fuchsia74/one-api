@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +12,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { renderQuota } from '@/lib/utils'
 
 interface UserRow {
   id: number
@@ -118,8 +119,32 @@ export function UsersPage() {
     { header: 'Role', cell: ({ row }) => (row.original.role >= 10 ? 'Admin' : 'Normal') },
     { header: 'Status', cell: ({ row }) => (row.original.status === 1 ? 'Enabled' : 'Disabled') },
     { header: 'Group', accessorKey: 'group' },
-    { header: 'Quota', accessorKey: 'quota' },
-    { header: 'Used', accessorKey: 'used_quota' },
+    {
+      header: 'Total Quota',
+      accessorKey: 'quota',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">
+          {renderQuota(row.original.quota)}
+        </span>
+      )
+    },
+    {
+      header: 'Used Quota',
+      accessorKey: 'used_quota',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">
+          {row.original.used_quota ? renderQuota(row.original.used_quota) : renderQuota(0)}
+        </span>
+      )
+    },
+    {
+      header: 'Remaining',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">
+          {renderQuota(row.original.quota - (row.original.used_quota || 0))}
+        </span>
+      )
+    },
     {
       header: 'Actions',
       cell: ({ row }) => (
@@ -233,6 +258,12 @@ export function UsersPage() {
             onSortChange={(newSortBy, newSortOrder) => {
               setSortBy(newSortBy)
               setSortOrder(newSortOrder)
+              // Reload data with new sort order
+              if (searchKeyword.trim()) {
+                search()
+              } else {
+                load(0)
+              }
             }}
             loading={loading}
           />

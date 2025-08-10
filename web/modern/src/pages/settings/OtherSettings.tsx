@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Separator } from '@/components/ui/separator'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 const otherSchema = z.object({
   Footer: z.string().default(''),

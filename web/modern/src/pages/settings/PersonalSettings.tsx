@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { useAuthStore } from '@/lib/stores/auth'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 const personalSchema = z.object({
   username: z.string().min(1, 'Username is required'),

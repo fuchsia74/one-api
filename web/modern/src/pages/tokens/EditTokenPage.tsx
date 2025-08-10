@@ -10,7 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 const tokenSchema = z.object({
   name: z.string().min(1, 'Token name is required'),

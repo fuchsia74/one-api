@@ -1,26 +1,62 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
-import { DataTable } from '@/components/ui/data-table'
+import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { useForm } from 'react-hook-form'
-import * as z from 'zod'
-import { zodResolver } from '@hookform/resolvers/zod'
-import { fromDateTimeLocal, toDateTimeLocal } from '@/lib/utils'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
+import { renderQuota } from '@/lib/utils'
+import { Plus, Copy, Eye, EyeOff } from 'lucide-react'
 
 interface Token {
   id: number
   name: string
   key: string
-  remain_quota: number
   status: number
+  remain_quota: number
+  unlimited_quota: boolean
+  used_quota: number
   created_time: number
+  accessed_time: number
+  expired_time: number
+  models?: string
+  subnet?: string
+}
+
+// Status constants
+const TOKEN_STATUS = {
+  ENABLED: 1,
+  DISABLED: 2,
+  EXPIRED: 3,
+  EXHAUSTED: 4,
+} as const
+
+const formatQuota = (quota: number, unlimited = false) => {
+  if (unlimited) return 'Unlimited'
+  return renderQuota(quota)
+}
+
+const formatTimestamp = (timestamp: number) => {
+  if (timestamp === -1) return 'Never'
+  return new Date(timestamp * 1000).toLocaleString()
+}
+
+const getStatusBadge = (status: number) => {
+  switch (status) {
+    case TOKEN_STATUS.ENABLED:
+      return <Badge variant="default" className="bg-green-100 text-green-800">Enabled</Badge>
+    case TOKEN_STATUS.DISABLED:
+      return <Badge variant="secondary" className="bg-gray-100 text-gray-800">Disabled</Badge>
+    case TOKEN_STATUS.EXPIRED:
+      return <Badge variant="destructive" className="bg-red-100 text-red-800">Expired</Badge>
+    case TOKEN_STATUS.EXHAUSTED:
+      return <Badge variant="destructive" className="bg-yellow-100 text-yellow-800">Exhausted</Badge>
+    default:
+      return <Badge variant="outline">Unknown</Badge>
+  }
 }
 
 export function TokensPage() {
@@ -33,29 +69,41 @@ export function TokensPage() {
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
-  const [sortBy, setSortBy] = useState('')
+  const [sortBy, setSortBy] = useState('id')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [open, setOpen] = useState(false)
+  const [showKeys, setShowKeys] = useState<Record<number, boolean>>({})
 
-  const load = async (p = 0) => {
+  const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
-      let url = `/token/?p=${p}`
+      let url = `/token/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+
       const res = await api.get(url)
-      const { success, data, total } = res.data
+      const { success, data: responseData, total: responseTotal } = res.data
+
       if (success) {
-        setData(data)
-        setTotal(total)
+        setData(responseData || [])
+        setTotal(responseTotal || 0)
         setPageIndex(p)
+        setPageSize(size)
       }
+    } catch (error) {
+      console.error('Failed to load tokens:', error)
+      setData([])
+      setTotal(0)
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load(0) }, [])
-  useEffect(() => { load(0) }, [sortBy, sortOrder])
+  useEffect(() => {
+    load(0, pageSize)
+  }, [pageSize])
+
+  useEffect(() => {
+    load(0, pageSize)
+  }, [sortBy, sortOrder])
 
   const searchTokens = async (query: string) => {
     if (!query.trim()) {
@@ -65,10 +113,14 @@ export function TokensPage() {
 
     setSearchLoading(true)
     try {
-      const res = await api.get(`/token/search?keyword=${encodeURIComponent(query)}`)
-      const { success, data } = res.data
-      if (success && Array.isArray(data)) {
-        const options: SearchOption[] = data.map((token: Token) => ({
+      let url = `/token/search?keyword=${encodeURIComponent(query)}`
+      if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+
+      const res = await api.get(url)
+      const { success, data: responseData } = res.data
+
+      if (success && Array.isArray(responseData)) {
+        const options: SearchOption[] = responseData.map((token: Token) => ({
           key: token.id.toString(),
           value: token.name,
           text: token.name,
@@ -76,7 +128,7 @@ export function TokensPage() {
             <div className="flex flex-col">
               <div className="font-medium">{token.name}</div>
               <div className="text-sm text-muted-foreground">
-                ID: {token.id} • Status: {token.status === 1 ? 'Enabled' : 'Disabled'}
+                ID: {token.id} • {getStatusBadge(token.status)} • Quota: {formatQuota(token.remain_quota, token.unlimited_quota)}
               </div>
             </div>
           )
@@ -85,83 +137,249 @@ export function TokensPage() {
       }
     } catch (error) {
       console.error('Search failed:', error)
+      setSearchOptions([])
     } finally {
       setSearchLoading(false)
     }
   }
 
-  const manage = async (id: number, action: 'enable' | 'disable' | 'delete') => {
-    let res
-    if (action === 'delete') res = await api.delete(`/token/${id}`)
-    else res = await api.put('/token/?status_only=true', { id, status: action === 'enable' ? 1 : 2 })
-    if (res.data?.success) load(pageIndex)
-  }
+  const performSearch = async () => {
+    if (!searchKeyword.trim()) {
+      return load(0, pageSize)
+    }
 
-  const search = async () => {
-    if (!searchKeyword.trim()) return load(0)
     setLoading(true)
     try {
       let url = `/token/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+
       const res = await api.get(url)
-      const { success, data } = res.data
+      const { success, data: responseData } = res.data
+
       if (success) {
-        setData(data)
+        setData(responseData || [])
         setPageIndex(0)
-        setTotal(data.length)
+        setTotal(responseData?.length || 0)
       }
-    } finally { setLoading(false) }
+    } catch (error) {
+      console.error('Search failed:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Create token dialog
-  const schema = z.object({
-    name: z.string().min(1, 'Name is required').max(30),
-    unlimited_quota: z.boolean().default(false),
-    remain_quota: z.coerce.number().int().min(0).default(0),
-    expired_time: z.string().optional(), // datetime-local, empty => -1
-    subnet: z.string().optional(),
-  })
-  type CreateForm = z.infer<typeof schema>
-  const form = useForm<CreateForm>({
-    resolver: zodResolver(schema),
-    defaultValues: { name: '', unlimited_quota: false, remain_quota: 0, expired_time: '', subnet: '' },
-  })
+  const manage = async (id: number, action: 'enable' | 'disable' | 'delete') => {
+    try {
+      let res
+      if (action === 'delete') {
+        res = await api.delete(`/token/${id}`)
+      } else {
+        res = await api.put('/token/', {
+          id,
+          status: action === 'enable' ? TOKEN_STATUS.ENABLED : TOKEN_STATUS.DISABLED
+        })
+      }
+
+      if (res.data?.success) {
+        if (searchKeyword.trim()) {
+          performSearch()
+        } else {
+          load(pageIndex, pageSize)
+        }
+      }
+    } catch (error) {
+      console.error(`Failed to ${action} token:`, error)
+    }
+  }
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+    }
+  }
+
+  const toggleKeyVisibility = (tokenId: number) => {
+    setShowKeys(prev => ({
+      ...prev,
+      [tokenId]: !prev[tokenId]
+    }))
+  }
+
+  const maskKey = (key: string) => {
+    if (key.length <= 8) return '***'
+    return key.substring(0, 4) + '***' + key.substring(key.length - 4)
+  }
 
   const columns: ColumnDef<Token>[] = [
-    { header: 'ID', accessorKey: 'id' },
-    { header: 'Name', accessorKey: 'name' },
-    { header: 'Key', accessorKey: 'key' },
-    { header: 'Remain', accessorKey: 'remain_quota' },
-    { header: 'Created', accessorKey: 'created_time' },
     {
-      header: 'Actions',
+      accessorKey: 'id',
+      header: 'ID',
       cell: ({ row }) => (
-        <div className="space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate(`/tokens/edit/${row.original.id}`)}
-          >
-            Edit
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => manage(row.original.id, row.original.status === 1 ? 'disable' : 'enable')}
-          >
-            {row.original.status === 1 ? 'Disable' : 'Enable'}
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            onClick={() => manage(row.original.id, 'delete')}
-          >
-            Delete
-          </Button>
-        </div>
+        <span className="font-mono text-sm">{row.original.id}</span>
       ),
     },
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => (
+        <div className="font-medium">{row.original.name}</div>
+      ),
+    },
+    {
+      accessorKey: 'key',
+      header: 'Key',
+      cell: ({ row }) => {
+        const token = row.original
+        const isVisible = showKeys[token.id]
+        return (
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs">
+              {isVisible ? token.key : maskKey(token.key)}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => toggleKeyVisibility(token.id)}
+              className="h-6 w-6 p-0"
+            >
+              {isVisible ? <EyeOff className="h-3 w-3" /> : <Eye className="h-3 w-3" />}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => copyToClipboard(token.key)}
+              className="h-6 w-6 p-0"
+            >
+              <Copy className="h-3 w-3" />
+            </Button>
+          </div>
+        )
+      },
+    },
+    {
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => getStatusBadge(row.original.status),
+    },
+    {
+      accessorKey: 'remain_quota',
+      header: 'Remaining Quota',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">
+          {formatQuota(row.original.remain_quota, row.original.unlimited_quota)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'used_quota',
+      header: 'Used Quota',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm">
+          {formatQuota(row.original.used_quota)}
+        </span>
+      ),
+    },
+    {
+      accessorKey: 'created_time',
+      header: 'Created',
+      cell: ({ row }) => (
+        <span className="text-sm">{formatTimestamp(row.original.created_time)}</span>
+      ),
+    },
+    {
+      accessorKey: 'accessed_time',
+      header: 'Last Access',
+      cell: ({ row }) => (
+        <span className="text-sm">{formatTimestamp(row.original.accessed_time)}</span>
+      ),
+    },
+    {
+      accessorKey: 'expired_time',
+      header: 'Expires',
+      cell: ({ row }) => (
+        <span className="text-sm">{formatTimestamp(row.original.expired_time)}</span>
+      ),
+    },
+    {
+      header: 'Actions',
+      cell: ({ row }) => {
+        const token = row.original
+        return (
+          <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/tokens/edit/${token.id}`)}
+            >
+              Edit
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => manage(token.id, token.status === TOKEN_STATUS.ENABLED ? 'disable' : 'enable')}
+              className={cn(
+                token.status === TOKEN_STATUS.ENABLED
+                  ? 'text-orange-600 hover:text-orange-700'
+                  : 'text-green-600 hover:text-green-700'
+              )}
+            >
+              {token.status === TOKEN_STATUS.ENABLED ? 'Disable' : 'Enable'}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() => {
+                if (confirm(`Are you sure you want to delete token "${token.name}"?`)) {
+                  manage(token.id, 'delete')
+                }
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        )
+      },
+    },
   ]
+
+  const handlePageChange = (newPageIndex: number, newPageSize: number) => {
+    if (searchKeyword.trim()) {
+      // For search results, we don't do server-side pagination
+      setPageIndex(newPageIndex)
+    } else {
+      load(newPageIndex, newPageSize)
+    }
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(0, newPageSize)
+    }
+  }
+
+  const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
+    setSortBy(newSortBy)
+    setSortOrder(newSortOrder)
+    // Reload data with new sort order
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(0, pageSize)
+    }
+  }
+
+  const refresh = () => {
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(pageIndex, pageSize)
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -170,143 +388,42 @@ export function TokensPage() {
           <div className="flex items-center justify-between">
             <div>
               <CardTitle>Tokens</CardTitle>
-              <CardDescription>Manage your access tokens</CardDescription>
+              <CardDescription>
+                Manage your API access tokens
+              </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => navigate('/tokens/add')}>
-                Add Token
-              </Button>
-              <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
-                <option value="">Default</option>
-                <option value="id">ID</option>
-                <option value="name">Name</option>
-                <option value="remain_quota">Remain</option>
-                <option value="created_time">Created Time</option>
-              </select>
-              <Button variant="outline" size="sm" onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}>{sortOrder.toUpperCase()}</Button>
-              <Button onClick={() => load(pageIndex)} disabled={loading} variant="outline">Refresh</Button>
-            </div>
+            <Button onClick={() => navigate('/tokens/add')} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Token
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="flex-1">
-              <SearchableDropdown
-                value={searchKeyword}
-                placeholder="Search tokens..."
-                searchPlaceholder="Search by token name..."
-                options={searchOptions}
-                onSearchChange={searchTokens}
-                onChange={(value) => setSearchKeyword(value)}
-                onAddItem={(value) => {
-                  const newOption: SearchOption = {
-                    key: value,
-                    value: value,
-                    text: value
-                  }
-                  setSearchOptions([...searchOptions, newOption])
-                }}
-                loading={searchLoading}
-                noResultsMessage="No tokens found"
-                additionLabel="Use token name: "
-                allowAdditions={true}
-                clearable={true}
-              />
-            </div>
-            <Button onClick={search} disabled={loading}>Search</Button>
-          </div>
-          <DataTable
+          <EnhancedDataTable
             columns={columns}
             data={data}
             pageIndex={pageIndex}
             pageSize={pageSize}
             total={total}
-            onPageChange={(pi) => load(pi)}
-            onPageSizeChange={(newPageSize) => {
-              setPageSize(newPageSize)
-              setPageIndex(0) // Reset to first page
-            }}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
             sortBy={sortBy}
             sortOrder={sortOrder}
-            onSortChange={(newSortBy, newSortOrder) => {
-              setSortBy(newSortBy)
-              setSortOrder(newSortOrder)
-            }}
+            onSortChange={handleSortChange}
+            searchValue={searchKeyword}
+            searchOptions={searchOptions}
+            searchLoading={searchLoading}
+            onSearchChange={searchTokens}
+            onSearchValueChange={setSearchKeyword}
+            onSearchSubmit={performSearch}
+            searchPlaceholder="Search tokens by name..."
+            allowSearchAdditions={true}
+            onRefresh={refresh}
             loading={loading}
+            emptyMessage="No tokens found. Create your first token to get started."
           />
         </CardContent>
       </Card>
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>Create Token</DialogTitle></DialogHeader>
-          <Form {...form}>
-            <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
-              const expired = values.expired_time ? fromDateTimeLocal(values.expired_time) : -1
-              const payload: any = {
-                name: values.name,
-                unlimited_quota: values.unlimited_quota,
-                remain_quota: values.unlimited_quota ? 0 : values.remain_quota,
-                expired_time: expired,
-              }
-              if (values.subnet) payload.subnet = values.subnet
-              const res = await api.post('/token/', payload)
-              if (res.data?.success) {
-                setOpen(false)
-                form.reset()
-                load(pageIndex)
-              }
-            })}>
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl><Input {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField control={form.control} name="remain_quota" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Remain Quota</FormLabel>
-                    <FormControl><Input type="number" {...field} disabled={form.watch('unlimited_quota')} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="expired_time" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expired Time</FormLabel>
-                    <FormControl><Input type="datetime-local" placeholder="Never" {...field} /></FormControl>
-                    <div className="text-xs text-muted-foreground">Leave empty for never expire</div>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <FormField control={form.control} name="unlimited_quota" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unlimited Quota</FormLabel>
-                    <FormControl>
-                      <input type="checkbox" className="h-4 w-4" checked={field.value} onChange={(e)=>field.onChange(e.target.checked)} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-                <FormField control={form.control} name="subnet" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Subnet (optional)</FormLabel>
-                    <FormControl><Input placeholder="192.168.0.0/24,10.0.0.0/8" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-              </div>
-              <div className="pt-2 flex justify-end gap-2">
-                <Button type="button" variant="outline" onClick={() => setOpen(false)}>Close</Button>
-                <Button type="submit">Create</Button>
-              </div>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

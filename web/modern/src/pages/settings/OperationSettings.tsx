@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Separator } from '@/components/ui/separator'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 
 const operationSchema = z.object({
   QuotaForNewUser: z.number().min(0).default(0),

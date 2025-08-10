@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import api from '@/lib/api'
+import { api } from '@/lib/api'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'

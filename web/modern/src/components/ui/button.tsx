@@ -3,8 +3,8 @@ import { Slot } from '@radix-ui/react-slot'
 import { cn } from '@/lib/utils'
 
 type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: 'default' | 'outline' | 'destructive' | 'ghost'
-  size?: 'sm' | 'md' | 'lg'
+  variant?: 'default' | 'outline' | 'destructive' | 'ghost' | 'secondary'
+  size?: 'sm' | 'md' | 'lg' | 'icon'
   asChild?: boolean
 }
 
@@ -16,11 +16,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       outline: 'border border-input bg-transparent hover:bg-accent',
       destructive: 'bg-destructive text-white hover:opacity-90',
       ghost: 'bg-transparent hover:bg-accent',
+      secondary: 'bg-secondary text-secondary-foreground hover:opacity-90',
     }
     const sizes: Record<string, string> = {
       sm: 'h-8 px-3 text-sm',
       md: 'h-9 px-4 text-sm',
       lg: 'h-10 px-6',
+      icon: 'h-9 w-9',
     }
 
     const Comp = asChild ? Slot : 'button'

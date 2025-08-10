@@ -1,35 +1,12 @@
+/* Import mobile responsive styles */
+@import './styles/mobile.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-:root {
-	--background: 0 0% 100%;
-	--foreground: 222.2 47.4% 11.2%;
-	--muted: 210 40% 96.1%;
-	--muted-foreground: 215.4 16.3% 46.9%;
-	--popover: 0 0% 100%;
-	--popover-foreground: 222.2 47.4% 11.2%;
-	--card: 0 0% 100%;
-	--card-foreground: 222.2 47.4% 11.2%;
-	--border: 214.3 31.8% 91.4%;
-	--input: 214.3 31.8% 91.4%;
-	--primary: 221.2 83.2% 53.3%;
-	--primary-foreground: 210 40% 98%;
-	--secondary: 210 40% 96.1%;
-	--secondary-foreground: 222.2 47.4% 11.2%;
-	--accent: 210 40% 96.1%;
-	--accent-foreground: 222.2 47.4% 11.2%;
-	--destructive: 0 84.2% 60.2%;
-	--destructive-foreground: 210 40% 98%;
-	--ring: 221.2 83.2% 53.3%;
-	--radius: 0.5rem;
-}
-
-* { border-color: hsl(var(--border)); }
-body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); }
-
 @layer base {
-  :root {
+	:root {
 		--background: 0 0% 100%;
 		--foreground: 222.2 84% 4.9%;
 		--card: 0 0% 100%;
@@ -56,7 +33,8 @@ body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); 
 		--chart-5: 27 87% 67%;
 		--radius: 0.5rem;
 	}
-  .dark {
+
+	.dark {
 		--background: 222.2 84% 4.9%;
 		--foreground: 210 40% 98%;
 		--card: 222.2 84% 4.9%;
@@ -85,10 +63,64 @@ body { background-color: hsl(var(--background)); color: hsl(var(--foreground)); 
 }
 
 @layer base {
-  * {
-    @apply border-border;
+	* {
+		@apply border-border;
 	}
-  body {
-    @apply bg-background text-foreground;
+
+	body {
+		@apply bg-background text-foreground;
+	}
+}
+
+/* Enhanced data table styles */
+@layer components {
+	.data-table {
+		@apply w-full border-collapse;
+	}
+
+	.data-table th {
+		@apply bg-muted/50 font-medium text-left px-4 py-3 border-b;
+	}
+
+	.data-table td {
+		@apply px-4 py-3 border-b;
+	}
+
+	.data-table tbody tr:hover {
+		@apply bg-muted/30;
+	}
+
+	/* Mobile table enhancements */
+	@media (max-width: 768px) {
+		.data-table {
+			@apply mobile-table;
+		}
+	}
+}
+
+/* Form enhancements */
+@layer components {
+	.form-grid {
+		@apply grid grid-cols-1 md: grid-cols-2 lg:grid-cols-3 gap-4;
+	}
+
+	.form-row {
+		@apply flex flex-col md: flex-row gap-4;
+	}
+
+	.form-actions {
+		@apply flex flex-col md: flex-row gap-2 pt-4;
+	}
+
+	.json-editor {
+		@apply font-mono text-sm bg-muted/20 border rounded-md p-3;
+	}
+
+	.json-valid {
+		@apply border-green-300 bg-green-50;
+	}
+
+	.json-invalid {
+		@apply border-red-300 bg-red-50;
 	}
 }

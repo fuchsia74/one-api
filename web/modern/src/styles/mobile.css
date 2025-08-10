@@ -1,0 +1,240 @@
+/* Mobile-responsive table styles */
+@media (max-width: 768px) {
+  /* Hide table headers on mobile */
+  .mobile-table thead {
+    display: none;
+  }
+
+  /* Convert table rows to cards on mobile */
+  .mobile-table tbody tr {
+    display: block;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background-color: white;
+    box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  }
+
+  /* Style table cells as label-value pairs */
+  .mobile-table tbody td {
+    display: block;
+    text-align: left !important;
+    padding: 0.5rem 0;
+    border: none;
+    position: relative;
+  }
+
+  /* Add labels before content using data-label attribute */
+  .mobile-table tbody td:before {
+    content: attr(data-label) ': ';
+    font-weight: 600;
+    color: #374151;
+    display: inline-block;
+    min-width: 80px;
+    margin-right: 0.5rem;
+  }
+
+  /* Special handling for action buttons */
+  .mobile-table tbody td:last-child {
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+    border-top: 1px solid #e2e8f0;
+  }
+
+  .mobile-table tbody td:last-child:before {
+    content: '';
+    display: none;
+  }
+
+  /* Make action buttons responsive */
+  .mobile-table .actions-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .mobile-table .actions-grid .primary-action {
+    grid-column: span 2;
+  }
+
+  /* Touch-friendly button sizing */
+  .mobile-table button {
+    min-height: 44px;
+    font-size: 0.875rem;
+  }
+
+  /* Responsive pagination */
+  .pagination-mobile {
+    flex-direction: column;
+    gap: 1rem;
+    align-items: stretch;
+  }
+
+  .pagination-mobile .pagination-info {
+    text-align: center;
+    order: 1;
+  }
+
+  .pagination-mobile .pagination-controls {
+    justify-content: center;
+    order: 2;
+  }
+
+  .pagination-mobile .pagination-size {
+    justify-content: center;
+    order: 3;
+  }
+
+  /* Hide some pagination buttons on small screens */
+  @media (max-width: 480px) {
+    .pagination-mobile .pagination-controls button:first-child,
+    .pagination-mobile .pagination-controls button:last-child {
+      display: none;
+    }
+  }
+}
+
+/* Enhanced touch targets */
+@media (hover: none) and (pointer: coarse) {
+  button, [role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  .touch-friendly {
+    padding: 0.75rem;
+  }
+}
+
+/* Search dropdown mobile styles */
+@media (max-width: 768px) {
+  .search-dropdown {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    max-height: none !important;
+    border-radius: 0 !important;
+    z-index: 50;
+  }
+
+  .search-dropdown .search-content {
+    height: 100%;
+    overflow-y: auto;
+    padding: 1rem;
+  }
+
+  .search-dropdown .search-close {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 51;
+  }
+}
+
+/* Form improvements for mobile */
+@media (max-width: 768px) {
+  .form-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .form-row {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .form-actions {
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .form-actions button {
+    width: 100%;
+  }
+
+  /* JSON editor improvements */
+  .json-editor {
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  /* Model selection improvements */
+  .model-grid {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+
+  .model-item {
+    padding: 0.75rem;
+    margin: 0.25rem 0;
+  }
+}
+
+/* Loading states */
+.loading-skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .card {
+    border: 2px solid;
+  }
+
+  button {
+    border: 2px solid;
+  }
+
+  .badge {
+    border: 1px solid;
+  }
+}
+
+/* Focus management */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .mobile-table tbody tr {
+    background-color: #1f2937;
+    border-color: #374151;
+  }
+
+  .mobile-table tbody td:before {
+    color: #d1d5db;
+  }
+
+  .mobile-table tbody td:last-child {
+    border-top-color: #374151;
+  }
+}

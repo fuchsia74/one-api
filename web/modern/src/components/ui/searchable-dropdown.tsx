@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Check, ChevronsUpDown, Loader2, Plus } from 'lucide-react'
+import { Check, ChevronsUpDown, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -37,13 +37,18 @@ interface SearchableDropdownProps {
   allowAdditions?: boolean
   clearable?: boolean
   className?: string
+  // API-based search props
+  searchEndpoint?: string
+  transformResponse?: (data: any[]) => SearchOption[]
+  debounceMs?: number
+  minQueryLength?: number
 }
 
 export function SearchableDropdown({
   value,
   placeholder = "Select option...",
   searchPlaceholder = "Search...",
-  options,
+  options: initialOptions,
   onSearchChange,
   onChange,
   onAddItem,
@@ -53,15 +58,63 @@ export function SearchableDropdown({
   allowAdditions = false,
   clearable = false,
   className,
+  searchEndpoint,
+  transformResponse,
+  debounceMs = 300,
+  minQueryLength = 2,
 }: SearchableDropdownProps) {
   const [open, setOpen] = React.useState(false)
   const [searchValue, setSearchValue] = React.useState('')
+  const [apiOptions, setApiOptions] = React.useState<SearchOption[]>([])
+  const [apiLoading, setApiLoading] = React.useState(false)
+  const searchTimeoutRef = React.useRef<NodeJS.Timeout>()
 
-  const selectedOption = options.find((option) => option.value === value)
+  // Use API options if available, otherwise use initial options
+  const options = searchEndpoint && searchValue.length >= minQueryLength ? apiOptions : initialOptions
+
+  const selectedOption = [...initialOptions, ...apiOptions].find((option) => option.value === value)
+
+  // API search with debouncing
+  const performApiSearch = React.useCallback(async (query: string) => {
+    if (!searchEndpoint || !transformResponse || query.length < minQueryLength) {
+      setApiOptions([])
+      return
+    }
+
+    setApiLoading(true)
+    try {
+      const response = await fetch(`${searchEndpoint}?keyword=${encodeURIComponent(query)}`)
+      const result = await response.json()
+
+      if (result.success && result.data) {
+        const transformedOptions = transformResponse(result.data)
+        setApiOptions(transformedOptions)
+      } else {
+        setApiOptions([])
+      }
+    } catch (error) {
+      console.error('API search failed:', error)
+      setApiOptions([])
+    } finally {
+      setApiLoading(false)
+    }
+  }, [searchEndpoint, transformResponse, minQueryLength])
 
   const handleSearchChange = (query: string) => {
     setSearchValue(query)
     onSearchChange?.(query)
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+    }
+
+    // Debounce API search
+    if (searchEndpoint && transformResponse) {
+      searchTimeoutRef.current = setTimeout(() => {
+        performApiSearch(query)
+      }, debounceMs)
+    }
   }
 
   const handleSelect = (selectedValue: string) => {
@@ -71,6 +124,7 @@ export function SearchableDropdown({
       onChange?.(selectedValue)
     }
     setOpen(false)
+    setSearchValue('') // Clear search when selecting
   }
 
   const handleAddItem = () => {
@@ -82,19 +136,36 @@ export function SearchableDropdown({
     }
   }
 
+  const handleClear = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onChange?.('')
+  }
+
+  // Local filtering for initial options when not using API search
   const filteredOptions = React.useMemo(() => {
-    if (!searchValue) return options
+    if (searchEndpoint || !searchValue) return options
     return options.filter((option) =>
       option.text.toLowerCase().includes(searchValue.toLowerCase()) ||
       option.value.toLowerCase().includes(searchValue.toLowerCase())
     )
-  }, [options, searchValue])
+  }, [options, searchValue, searchEndpoint])
 
   const showAddition = allowAdditions &&
     searchValue &&
     !filteredOptions.some(option =>
       option.value.toLowerCase() === searchValue.toLowerCase()
     )
+
+  const currentLoading = loading || apiLoading
+
+  // Cleanup timeout on unmount
+  React.useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -110,26 +181,39 @@ export function SearchableDropdown({
           ) : (
             <span className="text-muted-foreground">{placeholder}</span>
           )}
-          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          <div className="flex items-center ml-2 shrink-0">
+            {clearable && selectedOption && (
+              <X
+                className="h-4 w-4 opacity-50 hover:opacity-100 mr-1"
+                onClick={handleClear}
+              />
+            )}
+            <ChevronsUpDown className="h-4 w-4 opacity-50" />
+          </div>
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
-        <Command>
+        <Command shouldFilter={!searchEndpoint}>
           <CommandInput
             placeholder={searchPlaceholder}
             value={searchValue}
             onValueChange={handleSearchChange}
           />
           <CommandList>
-            {loading ? (
+            {currentLoading ? (
               <div className="flex items-center justify-center py-6">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="ml-2 text-sm text-muted-foreground">Loading...</span>
+                <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
               </div>
             ) : (
               <>
                 {filteredOptions.length === 0 && !showAddition ? (
-                  <CommandEmpty>{noResultsMessage}</CommandEmpty>
+                  <CommandEmpty>
+                    {searchValue.length < minQueryLength && searchEndpoint
+                      ? `Type at least ${minQueryLength} characters to search`
+                      : noResultsMessage
+                    }
+                  </CommandEmpty>
                 ) : (
                   <CommandGroup>
                     {filteredOptions.map((option) => (
@@ -137,6 +221,7 @@ export function SearchableDropdown({
                         key={option.key}
                         value={option.value}
                         onSelect={handleSelect}
+                        className="cursor-pointer"
                       >
                         <Check
                           className={cn(
@@ -144,13 +229,16 @@ export function SearchableDropdown({
                             value === option.value ? "opacity-100" : "opacity-0"
                           )}
                         />
-                        {option.content || option.text}
+                        <div className="flex-1">
+                          {option.content || option.text}
+                        </div>
                       </CommandItem>
                     ))}
                     {showAddition && (
-                      <CommandItem onSelect={handleAddItem}>
+                      <CommandItem onSelect={handleAddItem} className="cursor-pointer">
                         <Plus className="mr-2 h-4 w-4" />
-                        {additionLabel}{searchValue}
+                        <span className="text-muted-foreground">{additionLabel}</span>
+                        <span className="font-medium">{searchValue}</span>
                       </CommandItem>
                     )}
                   </CommandGroup>
