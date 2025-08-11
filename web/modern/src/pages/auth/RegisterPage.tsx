@@ -40,10 +40,16 @@ export function RegisterPage() {
     },
   })
 
+  // Watch email field to enable/disable send code button
+  const emailValue = form.watch('email')
+
   const sendVerificationCode = async () => {
     const email = form.getValues('email')
-    if (!email) {
-      form.setError('email', { message: 'Please enter your email first' })
+
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      form.setError('email', { message: 'Please enter a valid email address' })
       return
     }
 
@@ -167,9 +173,9 @@ export function RegisterPage() {
                           type="button"
                           variant="outline"
                           onClick={sendVerificationCode}
-                          disabled={isLoading || !field.value}
+                          disabled={isLoading || !emailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)}
                         >
-                          {isEmailSent ? 'Sent' : 'Send Code'}
+                          {isLoading ? 'Sending...' : isEmailSent ? 'Sent' : 'Send Code'}
                         </Button>
                       </div>
                     </FormControl>
