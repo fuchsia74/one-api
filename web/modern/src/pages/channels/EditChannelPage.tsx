@@ -334,7 +334,8 @@ export function EditChannelPage() {
     console.log('[CHANNEL_TYPE_DEBUG] Current form values before load:', form.getValues())
 
     try {
-      const response = await api.get(`/channel/${channelId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/channel/${channelId}`)
       const { success, message, data } = response.data
 
       console.log('[CHANNEL_TYPE_DEBUG] API response:', { success, message, data })
@@ -467,7 +468,8 @@ export function EditChannelPage() {
 
   const loadAllModels = async () => {
     try {
-      const response = await api.get('/models')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/models')
       const { success, data } = response.data
 
       if (success && data) {
@@ -492,7 +494,8 @@ export function EditChannelPage() {
 
   const loadChannelModels = async (type: number) => {
     try {
-      const response = await api.get('/models')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/models')
       const { success, data } = response.data
 
       if (success && data) {
@@ -507,7 +510,8 @@ export function EditChannelPage() {
 
   const loadDefaultPricing = async (channelType: number) => {
     try {
-      const response = await api.get(`/channel/default-pricing?type=${channelType}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/channel/default-pricing?type=${channelType}`)
       const { success, data } = response.data
       if (success && data?.model_configs) {
         try {
@@ -535,7 +539,8 @@ export function EditChannelPage() {
 
   const loadGroups = async () => {
     try {
-      const response = await api.get('/option/')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/option/')
       const { success, data } = response.data
 
       if (success && data) {
@@ -708,9 +713,10 @@ export function EditChannelPage() {
 
       let response
       if (isEdit && channelId) {
-        response = await api.put('/channel/', { ...payload, id: parseInt(channelId) })
+        // Unified API call - complete URL with /api prefix
+        response = await api.put('/api/channel/', { ...payload, id: parseInt(channelId) })
       } else {
-        response = await api.post('/channel/', payload)
+        response = await api.post('/api/channel/', payload)
       }
 
       const { success, message } = response.data
@@ -737,7 +743,8 @@ export function EditChannelPage() {
 
     try {
       setIsSubmitting(true)
-      const response = await api.get(`/channel/test/${channelId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/channel/test/${channelId}`)
       const { success, message } = response.data
 
       if (success) {
@@ -1646,7 +1653,7 @@ export function EditChannelPage() {
                       </span>
                       {field.value && field.value.trim() !== '' && (
                         <span className={`font-bold text-xs ${isValidJSON(field.value) && validateModelConfigs(field.value).valid
-                            ? 'text-green-600' : 'text-red-600'
+                          ? 'text-green-600' : 'text-red-600'
                           }`}>
                           {isValidJSON(field.value) && validateModelConfigs(field.value).valid
                             ? '✓ Valid Config' : '✗ Invalid Config'}

@@ -30,7 +30,8 @@ export function ModelsPage() {
   const fetchModelsData = async () => {
     try {
       setLoading(true)
-      const res = await api.get('/models/display')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/models/display')
       const { success, message, data } = res.data
       if (success) {
         setModelsData(data || {})

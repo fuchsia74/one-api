@@ -55,7 +55,8 @@ export function RegisterPage() {
 
     try {
       setIsLoading(true)
-      const response = await api.get(`/verification?email=${encodeURIComponent(email)}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/verification?email=${encodeURIComponent(email)}`)
       const { success, message } = response.data
 
       if (success) {
@@ -84,7 +85,8 @@ export function RegisterPage() {
         ...(data.invitation_code && { invitation_code: data.invitation_code }),
       }
 
-      const response = await api.post('/user/register', payload)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.post('/api/user/register', payload)
       const { success, message } = response.data
 
       if (success) {

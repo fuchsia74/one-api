@@ -7,6 +7,51 @@ applyTo: "**/*"
 This document contains essential, abstract, and up-to-date information about the project, collaboratively maintained by all developers. It is regularly updated to reflect key architectural decisions, subtle implementation details, and recent developments. Outdated content is removed to maintain clarity and relevance.
 
 
+
+## Frontend API Path Unification & Verification (2025-08)
+
+- **API Path Convention:**
+    - All frontend API calls must use explicit, full URLs with the `/api` prefix. The shared Axios client no longer sets a `baseURL`.
+    - Every API call (GET, POST, PUT, DELETE) must include `/api/` in the path. This applies to all pages, components, and utility functions.
+    - Inline comments (`// Unified API call - complete URL with /api prefix`) are used to clarify this convention for maintainers.
+
+- **Verification & Migration:**
+    - A verification script (`grep -r "api\.get|api\.post|api\.put|api\.delete" ... | grep -v "/api/" | grep -v "Unified API call"`) is used to ensure no legacy or missing `/api` prefixes remain.
+    - As of August 2025, all API calls in the modern frontend have been verified and fixed to use the `/api` prefix. The migration is complete and consistent.
+    - Any future code or third-party integration must follow this invariant. If the backend route structure changes, a full review is required.
+
+- **Subtle Implementation Details & Risks:**
+    - Any missed API call without `/api` will fail (404 or unexpected behavior). All new code must be checked for compliance.
+    - Components using `fetch()` or other HTTP clients directly must also use the `/api` prefix.
+    - Tests, mocks, and documentation must be kept in sync with this convention.
+    - If the backend changes the `/api` prefix, both frontend and backend must be updated in lockstep.
+
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the explicit API path requirement, the verification process, and the need to keep this invariant in all future work. Use the verification script after any major refactor or dependency update.
+
+## Frontend Authentication, Validation, and Testing (2025-08)
+
+- **Login & Registration:**
+    - TOTP (Two-Factor Authentication) is strictly validated in the login flow. The UI disables the submit button unless a 6-digit code is entered when required. TOTP state is managed separately from the form state.
+    - Success messages (e.g., after registration or password reset) are passed via navigation state and displayed on the login page (not for direct URL access).
+    - Email validation in registration is regex-based and enforced before sending verification codes. The "Send Code" button is disabled unless a valid email is entered.
+    - Form error handling is decoupled from form context, improving maintainability.
+
+- **Testing Infrastructure:**
+    - The modern frontend uses Vitest as the test runner, with `jsdom` as the default environment. All test scripts and TypeScript configs are updated accordingly.
+    - All test files must use the correct mocking API for Vitest (e.g., `vi.mock`).
+    - The global Vitest setup may affect tests that expect a Node environment or use other runners. All new dependencies must be kept up to date.
+
+- **Subtle Implementation Details & Risks:**
+    - TOTP and email validation are stricter; if backend or other clients expect different behavior, login or registration may fail.
+    - The use of navigation state for success messages means direct URL access will not show these messages.
+    - The refactor of error handling may break custom error handling in other forms if they relied on the previous implementation.
+    - The global Vitest setup may affect tests that expect a Node environment or use other runners.
+
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the stricter validation logic, the decoupled error handling, and the global Vitest test environment. All authentication and registration flows must be tested after changes. Any test runner or environment changes must be validated for compatibility.
+
+
 ## Pricing & Billing Architecture (2025-07)
 
 - **Pricing Unit Standardization:** All model pricing, quota, and billing calculations use "per 1M tokens". This is reflected in backend, UI, and documentation. Always keep user-facing messages and docs in sync with backend logic.
@@ -113,6 +158,11 @@ This document contains essential, abstract, and up-to-date information about the
 
 - **Handover Best Practices:**
     - When handing over, ensure the new assistant is aware of the pricing unit change, centralized pricing logic, table sorting/pagination patterns, and the importance of keeping documentation and UI in sync with backend logic. Remove outdated content and keep this file concise and abstract.
+
+- **Frontend Authentication & Testing:**
+    - Login and registration flows now enforce stricter TOTP and email validation, with improved error and success message handling. The login page now displays navigation-passed success messages and disables submission unless TOTP is valid. Registration email validation is regex-based and enforced before sending codes.
+    - The modern frontend has migrated to Vitest with `jsdom` as the default environment. All test scripts, configs, and setup files are updated. All test files must use Vitest APIs.
+    - Form error handling is now decoupled from form context, improving maintainability but requiring updates to custom forms.
 
 ## Claude Messages API: Universal Conversion
 

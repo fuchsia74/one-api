@@ -35,7 +35,8 @@ const queryClient = new QueryClient()
 // Initialize system settings from backend
 const initializeSystem = async () => {
   try {
-    const response = await api.get('/status')
+    // Unified API call - complete URL with /api prefix
+    const response = await api.get('/api/status')
     const { success, data } = response.data
 
     if (success && data) {
@@ -73,52 +74,52 @@ function App() {
         <Router>
           <div className="bg-background">
             <Routes>
-            {/* Public auth routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/reset" element={<PasswordResetPage />} />
-            <Route path="/user/reset" element={<PasswordResetConfirmPage />} />
-            <Route path="/oauth/github" element={<GitHubOAuthPage />} />
-            <Route path="/oauth/lark" element={<LarkOAuthPage />} />
+              {/* Public auth routes */}
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/reset" element={<PasswordResetPage />} />
+              <Route path="/user/reset" element={<PasswordResetConfirmPage />} />
+              <Route path="/oauth/github" element={<GitHubOAuthPage />} />
+              <Route path="/oauth/lark" element={<LarkOAuthPage />} />
 
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/" element={<Layout />}>
-                <Route index element={<HomePage />} />
-                <Route path="dashboard" element={<DashboardPage />} />
-                <Route path="tokens" element={<TokensPage />} />
-                <Route path="tokens/add" element={<EditTokenPage />} />
-                <Route path="tokens/edit/:id" element={<EditTokenPage />} />
-                <Route path="logs" element={<LogsPage />} />
-                <Route path="users" element={<UsersPage />} />
-                <Route path="users/add" element={<EditUserPage />} />
-                <Route path="users/edit/:id" element={<EditUserPage />} />
-                <Route path="users/edit" element={<EditUserPage />} />
-                <Route path="channels" element={<ChannelsPage />} />
-                <Route path="channels/add" element={<EditChannelPage />} />
-                <Route path="channels/edit/:id" element={<EditChannelPage />} />
-                <Route path="redemptions" element={<RedemptionsPage />} />
-                <Route path="redemptions/add" element={<EditRedemptionPage />} />
-                <Route path="redemptions/edit/:id" element={<EditRedemptionPage />} />
-                <Route path="about" element={<AboutPage />} />
-                <Route path="settings" element={<SettingsPage />} />
-                <Route path="models" element={<ModelsPage />} />
-                <Route path="topup" element={<TopUpPage />} />
-                <Route path="chat" element={<ChatPage />} />
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute />}>
+                <Route path="/" element={<Layout />}>
+                  <Route index element={<HomePage />} />
+                  <Route path="dashboard" element={<DashboardPage />} />
+                  <Route path="tokens" element={<TokensPage />} />
+                  <Route path="tokens/add" element={<EditTokenPage />} />
+                  <Route path="tokens/edit/:id" element={<EditTokenPage />} />
+                  <Route path="logs" element={<LogsPage />} />
+                  <Route path="users" element={<UsersPage />} />
+                  <Route path="users/add" element={<EditUserPage />} />
+                  <Route path="users/edit/:id" element={<EditUserPage />} />
+                  <Route path="users/edit" element={<EditUserPage />} />
+                  <Route path="channels" element={<ChannelsPage />} />
+                  <Route path="channels/add" element={<EditChannelPage />} />
+                  <Route path="channels/edit/:id" element={<EditChannelPage />} />
+                  <Route path="redemptions" element={<RedemptionsPage />} />
+                  <Route path="redemptions/add" element={<EditRedemptionPage />} />
+                  <Route path="redemptions/edit/:id" element={<EditRedemptionPage />} />
+                  <Route path="about" element={<AboutPage />} />
+                  <Route path="settings" element={<SettingsPage />} />
+                  <Route path="models" element={<ModelsPage />} />
+                  <Route path="topup" element={<TopUpPage />} />
+                  <Route path="chat" element={<ChatPage />} />
+                </Route>
               </Route>
-            </Route>
-          </Routes>
-        </div>
+            </Routes>
+          </div>
 
-        {/* Development tools */}
-        {process.env.NODE_ENV === 'development' && (
-          <>
-            <ResponsiveDebugger />
-            <ResponsiveValidator />
-          </>
-        )}
-      </Router>
-    </QueryClientProvider>
+          {/* Development tools */}
+          {process.env.NODE_ENV === 'development' && (
+            <>
+              <ResponsiveDebugger />
+              <ResponsiveValidator />
+            </>
+          )}
+        </Router>
+      </QueryClientProvider>
     </ThemeProvider>
   )
 }

@@ -126,7 +126,8 @@ export function ChannelsPage() {
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
-      let url = `/channel/?p=${p}&size=${size}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/channel/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -155,7 +156,8 @@ export function ChannelsPage() {
 
     setSearchLoading(true)
     try {
-      let url = `/channel/search?keyword=${encodeURIComponent(query)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/channel/search?keyword=${encodeURIComponent(query)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -192,7 +194,8 @@ export function ChannelsPage() {
 
     setLoading(true)
     try {
-      let url = `/channel/search?keyword=${encodeURIComponent(searchKeyword)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/channel/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -226,7 +229,8 @@ export function ChannelsPage() {
     try {
       if (action === 'delete') {
         if (!confirm('Are you sure you want to delete this channel?')) return
-        const res = await api.delete(`/channel/${id}`)
+        // Unified API call - complete URL with /api prefix
+        const res = await api.delete(`/api/channel/${id}`)
         if (res.data?.success) {
           if (searchKeyword.trim()) {
             performSearch()
@@ -238,7 +242,8 @@ export function ChannelsPage() {
       }
 
       if (action === 'test') {
-        const res = await api.get(`/channel/test/${id}`)
+        // Unified API call - complete URL with /api prefix
+        const res = await api.get(`/api/channel/test/${id}`)
         const { success, time } = res.data
         if (success && index !== undefined) {
           const newData = [...data]
@@ -249,7 +254,8 @@ export function ChannelsPage() {
       }
 
       if (action === 'balance') {
-        const res = await api.get(`/channel/update_balance/${id}`)
+        // Unified API call - complete URL with /api prefix
+        const res = await api.get(`/api/channel/update_balance/${id}`)
         if (res.data?.success) {
           if (searchKeyword.trim()) {
             performSearch()
@@ -260,9 +266,9 @@ export function ChannelsPage() {
         return
       }
 
-      // Enable/disable
+      // Enable/disable - Unified API call with complete URL
       const payload = { id, status: action === 'enable' ? 1 : 2 }
-      const res = await api.put('/channel/', payload)
+      const res = await api.put('/api/channel/', payload)
       if (res.data?.success) {
         if (searchKeyword.trim()) {
           performSearch()
@@ -278,7 +284,8 @@ export function ChannelsPage() {
   const handleBulkTest = async () => {
     setBulkTesting(true)
     try {
-      await api.get('/channel/test')
+      // Unified API call - complete URL with /api prefix
+      await api.get('/api/channel/test')
       load(pageIndex, pageSize)
     } catch (error) {
       console.error('Bulk test failed:', error)
@@ -290,7 +297,8 @@ export function ChannelsPage() {
   const handleBulkUpdateBalance = async () => {
     setBulkUpdating(true)
     try {
-      await api.get('/channel/update_balance')
+      // Unified API call - complete URL with /api prefix
+      await api.get('/api/channel/update_balance')
       load(pageIndex, pageSize)
     } catch (error) {
       console.error('Bulk balance update failed:', error)
@@ -303,7 +311,8 @@ export function ChannelsPage() {
     if (!confirm('Are you sure you want to delete all disabled channels? This action cannot be undone.')) return
 
     try {
-      await api.delete('/channel/disabled')
+      // Unified API call - complete URL with /api prefix
+      await api.delete('/api/channel/disabled')
       load(pageIndex, pageSize)
     } catch (error) {
       console.error('Failed to delete disabled channels:', error)

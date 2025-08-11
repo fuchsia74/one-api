@@ -1,7 +1,8 @@
 import axios from 'axios'
 
+// Unified API client - callers must provide complete URLs including /api prefix
+// This eliminates ambiguity and ensures consistency across all API calls
 export const api = axios.create({
-  baseURL: '/api',
   timeout: 10000,
 })
 

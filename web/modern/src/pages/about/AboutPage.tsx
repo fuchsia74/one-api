@@ -13,7 +13,8 @@ export function AboutPage() {
       // Load cached content first
       setAbout(localStorage.getItem('about') || '')
 
-      const res = await api.get('/about')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/about')
       const { success, data } = res.data
 
       if (success && data) {

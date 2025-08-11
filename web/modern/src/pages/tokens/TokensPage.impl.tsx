@@ -79,7 +79,8 @@ export function TokensPage() {
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
-      let url = `/token/?p=${p}&size=${size}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/token/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -120,7 +121,8 @@ export function TokensPage() {
 
     setSearchLoading(true)
     try {
-      let url = `/token/search?keyword=${encodeURIComponent(query)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/token/search?keyword=${encodeURIComponent(query)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -157,7 +159,8 @@ export function TokensPage() {
 
     setLoading(true)
     try {
-      let url = `/token/search?keyword=${encodeURIComponent(searchKeyword)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/token/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -177,11 +180,12 @@ export function TokensPage() {
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete') => {
     try {
-      let res
+      let res: any
       if (action === 'delete') {
-        res = await api.delete(`/token/${id}`)
+        // Unified API call - complete URL with /api prefix
+        res = await api.delete(`/api/token/${id}`)
       } else {
-        res = await api.put('/token/', {
+        res = await api.put('/api/token/', {
           id,
           status: action === 'enable' ? TOKEN_STATUS.ENABLED : TOKEN_STATUS.DISABLED
         })

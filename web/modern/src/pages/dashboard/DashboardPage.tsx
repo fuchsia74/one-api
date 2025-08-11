@@ -58,7 +58,8 @@ export function DashboardPage() {
 
   const loadUsers = async () => {
     if (!isAdmin) return
-    const res = await api.get('/user/dashboard/users')
+    // Unified API call - complete URL with /api prefix
+    const res = await api.get('/api/user/dashboard/users')
     if (res.data?.success) {
       setUserOptions(res.data.data || [])
     }
@@ -73,7 +74,8 @@ export function DashboardPage() {
       if (isAdmin) {
         params.set('user_id', dashUser || 'all')
       }
-      const res = await api.get('/user/dashboard?' + params.toString())
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/user/dashboard?' + params.toString())
       const { success, data, message } = res.data
       if (success) {
         setRows(data || [])
@@ -320,16 +322,16 @@ export function DashboardPage() {
         )}>
           <div className={cn(isMobile ? "" : "md:col-span-3")}>
             <label className="text-xs block mb-1">From</label>
-            <Input type="date" value={fromDate} onChange={(e)=>setFromDate(e.target.value)} />
+            <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
           </div>
           <div className={cn(isMobile ? "" : "md:col-span-3")}>
             <label className="text-xs block mb-1">To</label>
-            <Input type="date" value={toDate} onChange={(e)=>setToDate(e.target.value)} />
+            <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
           </div>
           {isAdmin && (
             <div className={cn(isMobile ? "" : "md:col-span-3")}>
               <label className="text-xs block mb-1">User</label>
-              <select className="h-9 w-full border rounded-md px-2 text-sm" value={dashUser} onChange={(e)=>setDashUser(e.target.value)}>
+              <select className="h-9 w-full border rounded-md px-2 text-sm" value={dashUser} onChange={(e) => setDashUser(e.target.value)}>
                 <option value="all">All Users (Site-wide)</option>
                 {userOptions.map(u => (
                   <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
@@ -471,7 +473,7 @@ export function DashboardPage() {
             <div className="text-xs text-muted-foreground mt-2">Daily Average</div>
             <div className="text-base font-medium">{formatNumber(usagePatterns.avgDaily)}</div>
             <div className="text-xs mt-2">
-              Trend: <span className={usagePatterns.trend==='Rising'?'text-green-600':'text-red-600'}>
+              Trend: <span className={usagePatterns.trend === 'Rising' ? 'text-green-600' : 'text-red-600'}>
                 {usagePatterns.trend}
               </span>
             </div>
@@ -518,101 +520,101 @@ export function DashboardPage() {
                 <XAxis dataKey="date" tickLine={false} axisLine={false} />
                 <YAxis tickLine={false} axisLine={false} width={40} />
                 <Tooltip />
-              <Line type="monotone" dataKey="tokens" stroke="#FF5E7D" strokeWidth={2} dot={false} />
-            </LineChart>
+                <Line type="monotone" dataKey="tokens" stroke="#FF5E7D" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+        </AdaptiveGrid>
+
+        {/* Token Statistics Chart */}
+        <Card className="p-3 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm">Statistics - Tokens</div>
+          </div>
+          <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+            <BarChart data={stackedByTokens}>
+              <CartesianGrid strokeOpacity={0.2} vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} />
+              <YAxis tickLine={false} axisLine={false} width={40} />
+              <Tooltip />
+              <Legend wrapperStyle={{ fontSize: 12 }} height={24} />
+              {uniqueModels.map((m, idx) => (
+                <Bar key={m} dataKey={m} stackId="tokens" fill={barColor(idx)} />
+              ))}
+            </BarChart>
           </ResponsiveContainer>
         </Card>
-      </AdaptiveGrid>
 
-      {/* Token Statistics Chart */}
-      <Card className="p-3 mb-6">
-        <div className="flex items-center justify-between mb-2">
-          <div className="text-sm">Statistics - Tokens</div>
-        </div>
-        <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
-          <BarChart data={stackedByTokens}>
-            <CartesianGrid strokeOpacity={0.2} vertical={false} />
-            <XAxis dataKey="date" tickLine={false} axisLine={false} />
-            <YAxis tickLine={false} axisLine={false} width={40} />
-            <Tooltip />
-            <Legend wrapperStyle={{ fontSize: 12 }} height={24} />
-            {uniqueModels.map((m, idx) => (
-              <Bar key={m} dataKey={m} stackId="tokens" fill={barColor(idx)} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
-
-      {/* Model Efficiency Analysis */}
-      <Card className="p-3 mb-6">
-        <div className="text-sm mb-3">Model Efficiency Analysis</div>
-        <div className="overflow-auto">
-          <table className={cn("w-full", isMobile ? "text-xs" : "text-sm")}>
-            <thead>
-              <tr className="text-left text-muted-foreground">
-                <th className="py-2 pr-2">#</th>
-                <th className="py-2 pr-2">Model</th>
-                <th className="py-2 pr-2">Requests</th>
-                <th className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>Avg Cost</th>
-                <th className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>Avg Tokens</th>
-                <th className="py-2 pr-2">Efficiency</th>
-              </tr>
-            </thead>
-            <tbody>
-              {efficiency.slice(0, 10).map((m, i) => (
-                <tr key={m.model} className="border-t">
-                  <td className="py-2 pr-2">{i+1}</td>
-                  <td className="py-2 pr-2 font-medium">{m.model}</td>
-                  <td className="py-2 pr-2">{formatNumber(m.requests)}</td>
-                  <td className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>{m.avgCost.toFixed(4)}</td>
-                  <td className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>{Math.round(m.avgTokens)}</td>
-                  <td className="py-2 pr-2">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className="h-2 bg-accent rounded"
-                        style={{
-                          width: Math.min(100, Math.round(m.efficiency / (efficiency[0]?.efficiency || 1) * 100)) + '%'
-                        }}
-                      />
-                      <span className={cn(isMobile ? "text-xs" : "")}>
-                        {m.efficiency ? m.efficiency.toFixed(0) : 0}
-                      </span>
-                    </div>
-                  </td>
+        {/* Model Efficiency Analysis */}
+        <Card className="p-3 mb-6">
+          <div className="text-sm mb-3">Model Efficiency Analysis</div>
+          <div className="overflow-auto">
+            <table className={cn("w-full", isMobile ? "text-xs" : "text-sm")}>
+              <thead>
+                <tr className="text-left text-muted-foreground">
+                  <th className="py-2 pr-2">#</th>
+                  <th className="py-2 pr-2">Model</th>
+                  <th className="py-2 pr-2">Requests</th>
+                  <th className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>Avg Cost</th>
+                  <th className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>Avg Tokens</th>
+                  <th className="py-2 pr-2">Efficiency</th>
                 </tr>
-              ))}
-              {efficiency.length === 0 && (
-                <tr><td className="py-3 text-muted-foreground" colSpan={6}>No data</td></tr>
-              )}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+              </thead>
+              <tbody>
+                {efficiency.slice(0, 10).map((m, i) => (
+                  <tr key={m.model} className="border-t">
+                    <td className="py-2 pr-2">{i + 1}</td>
+                    <td className="py-2 pr-2 font-medium">{m.model}</td>
+                    <td className="py-2 pr-2">{formatNumber(m.requests)}</td>
+                    <td className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>{m.avgCost.toFixed(4)}</td>
+                    <td className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>{Math.round(m.avgTokens)}</td>
+                    <td className="py-2 pr-2">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-2 bg-accent rounded"
+                          style={{
+                            width: Math.min(100, Math.round(m.efficiency / (efficiency[0]?.efficiency || 1) * 100)) + '%'
+                          }}
+                        />
+                        <span className={cn(isMobile ? "text-xs" : "")}>
+                          {m.efficiency ? m.efficiency.toFixed(0) : 0}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {efficiency.length === 0 && (
+                  <tr><td className="py-3 text-muted-foreground" colSpan={6}>No data</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </Card>
 
-    {/* Cost Optimization Recommendations */}
-    <Card className="p-3 mb-6">
-      <div className="text-sm mb-2">Cost Optimization Recommendations</div>
-      <ul className={cn("list-disc pl-5 space-y-1", isMobile ? "text-xs" : "text-sm")}>
-        {recommendations.map((r, idx) => (<li key={idx}>{r}</li>))}
-      </ul>
-    </Card>
+        {/* Cost Optimization Recommendations */}
+        <Card className="p-3 mb-6">
+          <div className="text-sm mb-2">Cost Optimization Recommendations</div>
+          <ul className={cn("list-disc pl-5 space-y-1", isMobile ? "text-xs" : "text-sm")}>
+            {recommendations.map((r, idx) => (<li key={idx}>{r}</li>))}
+          </ul>
+        </Card>
 
-    {/* Data Table */}
-    <Card>
-      <CardContent className={cn(isMobile ? "p-4" : "p-6")}>
-        <DataTable
-          columns={columns}
-          data={rows}
-          pageIndex={0}
-          pageSize={rows.length || 10}
-          total={rows.length}
-          onPageChange={() => {}}
-        />
-      </CardContent>
-    </Card>
-  </ResponsiveSection>
-</ResponsivePageContainer>
-)
+        {/* Data Table */}
+        <Card>
+          <CardContent className={cn(isMobile ? "p-4" : "p-6")}>
+            <DataTable
+              columns={columns}
+              data={rows}
+              pageIndex={0}
+              pageSize={rows.length || 10}
+              total={rows.length}
+              onPageChange={() => { }}
+            />
+          </CardContent>
+        </Card>
+      </ResponsiveSection>
+    </ResponsivePageContainer>
+  )
 }
 
 export function barColor(i: number) {

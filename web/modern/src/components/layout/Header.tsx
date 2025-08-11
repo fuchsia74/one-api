@@ -69,7 +69,8 @@ export function Header() {
 
   const handleLogout = async () => {
     try {
-      await api.get('/user/logout')
+      // Unified API call - complete URL with /api prefix
+      await api.get('/api/user/logout')
       logout()
       navigate('/login')
     } catch (error) {
@@ -100,11 +101,10 @@ export function Header() {
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      isActivePage(item.to)
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActivePage(item.to)
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
+                      }`}
                   >
                     {item.name}
                   </Link>
@@ -151,9 +151,8 @@ export function Header() {
               <div className="flex items-center space-x-2">
                 <Link
                   to="/register"
-                  className={`font-medium text-muted-foreground hover:text-primary transition-colors ${
-                    isMobile ? 'text-sm' : 'text-sm'
-                  }`}
+                  className={`font-medium text-muted-foreground hover:text-primary transition-colors ${isMobile ? 'text-sm' : 'text-sm'
+                    }`}
                 >
                   Register
                 </Link>

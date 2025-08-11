@@ -114,7 +114,8 @@ export function LoginPage() {
         password: data.password,
       };
       if (totpRequired && totpValue) payload.totp_code = totpValue;
-      const response = await api.post("/user/login", payload);
+      // Unified API call - complete URL with /api prefix
+      const response = await api.post("/api/user/login", payload);
       const { success, message, data: respData } = response.data;
       const m = typeof message === "string" ? message.trim().toLowerCase() : "";
       const dataTotp = !!(

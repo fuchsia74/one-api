@@ -42,12 +42,13 @@ export function UsersPage() {
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [openCreate, setOpenCreate] = useState(false)
-  const [openTopup, setOpenTopup] = useState<{open: boolean, userId?: number, username?: string}>({open: false})
+  const [openTopup, setOpenTopup] = useState<{ open: boolean, userId?: number, username?: string }>({ open: false })
 
   const load = async (p = 0) => {
     setLoading(true)
     try {
-      let url = `/user/?p=${p}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/user/?p=${p}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data, total } = res.data
@@ -69,7 +70,8 @@ export function UsersPage() {
 
     setSearchLoading(true)
     try {
-      const res = await api.get(`/user/search?keyword=${encodeURIComponent(query)}`)
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get(`/api/user/search?keyword=${encodeURIComponent(query)}`)
       const { success, data } = res.data
       if (success && Array.isArray(data)) {
         const options: SearchOption[] = data.map((user: UserRow) => ({
@@ -106,7 +108,8 @@ export function UsersPage() {
     setLoading(true)
     try {
       if (!searchKeyword.trim()) return load(0)
-      let url = `/user/search?keyword=${encodeURIComponent(searchKeyword)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/user/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data } = res.data
@@ -167,7 +170,7 @@ export function UsersPage() {
             {row.original.status === 1 ? 'Disable' : 'Enable'}
           </Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
-          <Button variant="outline" size="sm" onClick={() => setOpenTopup({open:true, userId: row.original.id, username: row.original.username})}>Top Up</Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenTopup({ open: true, userId: row.original.id, username: row.original.username })}>Top Up</Button>
         </div>
       ),
     },
@@ -176,10 +179,11 @@ export function UsersPage() {
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete', idx: number) => {
     let res: any
     if (action === 'delete') {
-      res = await api.delete(`/user/${id}`)
+      // Unified API call - complete URL with /api prefix
+      res = await api.delete(`/api/user/${id}`)
     } else {
       const body: any = { id, status: action === 'enable' ? 1 : 2 }
-      res = await api.put('/user/?status_only=true', body)
+      res = await api.put('/api/user/?status_only=true', body)
     }
     const { success } = res.data
     if (success) {
@@ -262,6 +266,8 @@ export function UsersPage() {
               // Let useEffect handle the reload to avoid double requests
             }}
             searchValue={searchKeyword}
+            searchOptions={searchOptions}
+            searchLoading={searchLoading}
             onSearchChange={searchUsers}
             onSearchValueChange={setSearchKeyword}
             onSearchSubmit={search}
@@ -280,13 +286,13 @@ export function UsersPage() {
       {/* Create User Dialog */}
       <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex)} />
       {/* Top Up Dialog */}
-      <TopUpDialog open={openTopup.open} onOpenChange={(v)=>setOpenTopup({open:v})} userId={openTopup.userId} username={openTopup.username} onDone={()=>load(pageIndex)} />
+      <TopUpDialog open={openTopup.open} onOpenChange={(v) => setOpenTopup({ open: v })} userId={openTopup.userId} username={openTopup.username} onDone={() => load(pageIndex)} />
     </ResponsivePageContainer>
   )
 }
 
 // Create User Dialog
-function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, onOpenChange: (v:boolean)=>void, onCreated: ()=>void }) {
+function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, onOpenChange: (v: boolean) => void, onCreated: () => void }) {
   const schema = z.object({
     username: z.string().min(1),
     password: z.string().min(6),
@@ -300,7 +306,8 @@ function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, on
         <DialogHeader><DialogTitle>Create User</DialogTitle></DialogHeader>
         <Form {...form}>
           <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
-            const res = await api.post('/user/', { username: values.username, password: values.password, display_name: values.display_name || values.username })
+            // Unified API call - complete URL with /api prefix
+            const res = await api.post('/api/user/', { username: values.username, password: values.password, display_name: values.display_name || values.username })
             if (res.data?.success) {
               onOpenChange(false)
               form.reset()
@@ -340,7 +347,7 @@ function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, on
 }
 
 // Top Up Dialog
-function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: boolean, onOpenChange: (v:boolean)=>void, userId?: number, username?: string, onDone: ()=>void }) {
+function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: boolean, onOpenChange: (v: boolean) => void, userId?: number, username?: string, onDone: () => void }) {
   const schema = z.object({ quota: z.coerce.number().int(), remark: z.string().optional() })
   type FormT = z.infer<typeof schema>
   const form = useForm<FormT>({ resolver: zodResolver(schema), defaultValues: { quota: 0, remark: '' } })
@@ -351,7 +358,8 @@ function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: b
         <Form {...form}>
           <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
             if (!userId) return
-            const res = await api.post('/topup', { user_id: userId, quota: values.quota, remark: values.remark })
+            // Unified API call - complete URL with /api prefix
+            const res = await api.post('/api/topup', { user_id: userId, quota: values.quota, remark: values.remark })
             if (res.data?.success) {
               onOpenChange(false)
               form.reset()

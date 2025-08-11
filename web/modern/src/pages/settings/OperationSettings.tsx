@@ -59,7 +59,8 @@ export function OperationSettings() {
 
   const loadOptions = async () => {
     try {
-      const res = await api.get('/option/')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/option/')
       const { success, data } = res.data
       if (success && data) {
         const formData: any = {}
@@ -85,7 +86,8 @@ export function OperationSettings() {
 
   const updateOption = async (key: string, value: string | number | boolean) => {
     try {
-      await api.put('/option/', { key, value: String(value) })
+      // Unified API call - complete URL with /api prefix
+      await api.put('/api/option/', { key, value: String(value) })
       console.log(`Updated ${key}: ${value}`)
     } catch (error) {
       console.error(`Error updating ${key}:`, error)
@@ -119,7 +121,8 @@ export function OperationSettings() {
     if (!historyTimestamp) return
     try {
       const timestamp = Date.parse(historyTimestamp) / 1000
-      const res = await api.delete(`/log/?target_timestamp=${timestamp}`)
+      // Unified API call - complete URL with /api prefix
+      const res = await api.delete(`/api/log/?target_timestamp=${timestamp}`)
       const { success, message, data } = res.data
       if (success) {
         console.log(`Cleared ${data} logs!`)

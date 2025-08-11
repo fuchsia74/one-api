@@ -60,7 +60,8 @@ export function RedemptionsPage() {
   const load = async (p = 0) => {
     setLoading(true)
     try {
-      let url = `/redemption/?p=${p}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/redemption/?p=${p}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data, total } = res.data
@@ -88,7 +89,8 @@ export function RedemptionsPage() {
     if (!searchKeyword.trim()) return load(0)
     setLoading(true)
     try {
-      let url = `/redemption/search?keyword=${encodeURIComponent(searchKeyword)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/redemption/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data } = res.data
@@ -146,12 +148,13 @@ export function RedemptionsPage() {
   ]
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete', idx: number) => {
-    let res
+    let res: any
     if (action === 'delete') {
-      res = await api.delete(`/redemption/${id}`)
+      // Unified API call - complete URL with /api prefix
+      res = await api.delete(`/api/redemption/${id}`)
     } else {
       const body: any = { id, status: action === 'enable' ? 1 : 2 }
-      res = await api.put('/redemption/?status_only=true', body)
+      res = await api.put('/api/redemption/?status_only=true', body)
     }
     if (res.data?.success) {
       const next = [...data]
@@ -193,7 +196,7 @@ export function RedemptionsPage() {
               placeholder="Search redemptions by name..."
               searchPlaceholder="Type redemption name..."
               options={[]}
-              searchEndpoint="/redemption/search"
+              searchEndpoint="/api/redemption/search" // SearchableDropdown uses fetch() directly, needs /api prefix
               transformResponse={(data) => (
                 Array.isArray(data) ? data.map((r: any) => ({ key: String(r.id), value: r.name, text: r.name })) : []
               )}
@@ -227,7 +230,8 @@ export function RedemptionsPage() {
           </DialogHeader>
           <Form {...form}>
             <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
-              const res = await api.post('/redemption/', { name: values.name, count: values.count, quota: values.quota })
+              // Unified API call - complete URL with /api prefix
+              const res = await api.post('/api/redemption/', { name: values.name, count: values.count, quota: values.quota })
               if (res.data?.success) {
                 setGeneratedKeys(res.data.data || [])
                 load(pageIndex)

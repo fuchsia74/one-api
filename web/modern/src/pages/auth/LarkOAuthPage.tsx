@@ -12,7 +12,8 @@ export function LarkOAuthPage() {
 
   const sendCode = async (code: string, state: string, retryCount = 0): Promise<void> => {
     try {
-      const response = await api.get(`/oauth/lark?code=${code}&state=${state}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/oauth/lark?code=${code}&state=${state}`)
       const { success, message, data } = response.data
 
       if (success) {

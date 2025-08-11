@@ -65,7 +65,8 @@ export function EditUserPage() {
     if (!userId) return
 
     try {
-      const response = await api.get(`/user/${userId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/user/${userId}`)
       const { success, message, data } = response.data
 
       if (success && data) {
@@ -85,7 +86,8 @@ export function EditUserPage() {
 
   const loadGroups = async () => {
     try {
-      const response = await api.get('/group/')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/group/')
       const { success, data } = response.data
 
       if (success && data) {
@@ -120,11 +122,12 @@ export function EditUserPage() {
         delete payload.password
       }
 
-      let response
+      let response: any
       if (isEdit && userId) {
-        response = await api.put('/user/', { ...payload, id: parseInt(userId) })
+        // Unified API call - complete URL with /api prefix
+        response = await api.put('/api/user/', { ...payload, id: parseInt(userId) })
       } else {
-        response = await api.post('/user/', payload)
+        response = await api.post('/api/user/', payload)
       }
 
       const { success, message } = response.data

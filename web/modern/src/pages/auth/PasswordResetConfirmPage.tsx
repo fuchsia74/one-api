@@ -44,7 +44,8 @@ export function PasswordResetConfirmPage() {
 
     setIsLoading(true)
     try {
-      const response = await api.post('/user/reset', {
+      // Unified API call - complete URL with /api prefix
+      const response = await api.post('/api/user/reset', {
         email,
         token,
         password: data.password,
