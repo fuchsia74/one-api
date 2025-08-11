@@ -92,7 +92,11 @@ export function UsersPage() {
   }
 
   useEffect(() => {
-    load(0)
+    if (searchKeyword.trim()) {
+      search()
+    } else {
+      load(0)
+    }
   }, [sortBy, sortOrder])
 
   const search = async () => {
@@ -120,28 +124,24 @@ export function UsersPage() {
     { header: 'Status', cell: ({ row }) => (row.original.status === 1 ? 'Enabled' : 'Disabled') },
     { header: 'Group', accessorKey: 'group' },
     {
-      header: 'Total Quota',
-      accessorKey: 'quota',
-      cell: ({ row }) => (
-        <span className="font-mono text-sm">
-          {renderQuota(row.original.quota)}
-        </span>
-      )
-    },
-    {
       header: 'Used Quota',
       accessorKey: 'used_quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
+        <span className="font-mono text-sm" title={`Used: ${renderQuota(row.original.used_quota || 0)}`}>
           {row.original.used_quota ? renderQuota(row.original.used_quota) : renderQuota(0)}
         </span>
       )
     },
     {
-      header: 'Remaining',
+      header: 'Remaining Quota',
+      accessorKey: 'quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
-          {renderQuota(row.original.quota - (row.original.used_quota || 0))}
+        <span className="font-mono text-sm" title={`Remaining: ${renderQuota(row.original.quota)}`}>
+          {row.original.quota === -1 ? (
+            <span className="text-green-600 font-semibold">Unlimited</span>
+          ) : (
+            renderQuota(row.original.quota)
+          )}
         </span>
       )
     },
@@ -171,7 +171,7 @@ export function UsersPage() {
   ]
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete', idx: number) => {
-    let res
+    let res: any
     if (action === 'delete') {
       res = await api.delete(`/user/${id}`)
     } else {
@@ -258,12 +258,7 @@ export function UsersPage() {
             onSortChange={(newSortBy, newSortOrder) => {
               setSortBy(newSortBy)
               setSortOrder(newSortOrder)
-              // Reload data with new sort order
-              if (searchKeyword.trim()) {
-                search()
-              } else {
-                load(0)
-              }
+              // Let useEffect handle the reload to avoid double requests
             }}
             loading={loading}
           />
@@ -374,12 +369,4 @@ function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: b
       </DialogContent>
     </Dialog>
   )
-}
-
-async function onManageRole(username: string, action: 'promote'|'demote') {
-  await api.post('/user/manage', { username, action })
-}
-
-async function onDisableTotp(id: number) {
-  await api.post(`/user/totp/disable/${id}`)
 }

@@ -1,23 +1,28 @@
 /* Mobile-responsive table styles */
 @media (max-width: 768px) {
   /* Hide table headers on mobile */
-  .mobile-table thead {
+  .mobile-table thead,
+  table thead {
     display: none;
   }
 
   /* Convert table rows to cards on mobile */
-  .mobile-table tbody tr {
+  .mobile-table tbody tr,
+  .mobile-table-row,
+  table tbody tr {
     display: block;
     margin-bottom: 1rem;
     padding: 1rem;
-    border: 1px solid #e2e8f0;
+    border: 1px solid hsl(var(--border));
     border-radius: 0.5rem;
-    background-color: white;
+    background-color: hsl(var(--card));
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
   }
 
   /* Style table cells as label-value pairs */
-  .mobile-table tbody td {
+  .mobile-table tbody td,
+  .mobile-table-cell,
+  table tbody td {
     display: block;
     text-align: left !important;
     padding: 0.5rem 0;
@@ -26,29 +31,36 @@
   }
 
   /* Add labels before content using data-label attribute */
-  .mobile-table tbody td:before {
+  .mobile-table tbody td:before,
+  .mobile-table-cell:before,
+  table tbody td:before {
     content: attr(data-label) ': ';
     font-weight: 600;
-    color: #374151;
+    color: hsl(var(--muted-foreground));
     display: inline-block;
     min-width: 80px;
     margin-right: 0.5rem;
   }
 
   /* Special handling for action buttons */
-  .mobile-table tbody td:last-child {
+  .mobile-table tbody td:last-child,
+  .mobile-table-cell:last-child,
+  table tbody td:last-child {
     padding-top: 1rem;
     margin-top: 0.5rem;
-    border-top: 1px solid #e2e8f0;
+    border-top: 1px solid hsl(var(--border));
   }
 
-  .mobile-table tbody td:last-child:before {
+  .mobile-table tbody td:last-child:before,
+  .mobile-table-cell:last-child:before,
+  table tbody td:last-child:before {
     content: '';
     display: none;
   }
 
   /* Make action buttons responsive */
-  .mobile-table .actions-grid {
+  .mobile-table .actions-grid,
+  .mobile-table-cell .space-x-2 {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
@@ -59,7 +71,9 @@
   }
 
   /* Touch-friendly button sizing */
-  .mobile-table button {
+  .mobile-table button,
+  .mobile-table-cell button,
+  table button {
     min-height: 44px;
     font-size: 0.875rem;
   }

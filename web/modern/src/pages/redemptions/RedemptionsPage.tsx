@@ -76,7 +76,13 @@ export function RedemptionsPage() {
 
   useEffect(() => { load(0) }, [])
 
-  useEffect(() => { load(0) }, [sortBy, sortOrder])
+  useEffect(() => {
+    if (searchKeyword.trim()) {
+      search()
+    } else {
+      load(0)
+    }
+  }, [sortBy, sortOrder])
 
   const search = async () => {
     if (!searchKeyword.trim()) return load(0)
@@ -97,9 +103,24 @@ export function RedemptionsPage() {
     { header: 'ID', accessorKey: 'id' },
     { header: 'Name', accessorKey: 'name' },
     { header: 'Code', accessorKey: 'key' },
-    { header: 'Quota', accessorKey: 'quota' },
+    {
+      header: 'Quota',
+      accessorKey: 'quota',
+      cell: ({ row }) => (
+        <span className="font-mono text-sm" title={`Quota: ${row.original.quota ? `$${(row.original.quota / 500000).toFixed(2)}` : '$0.00'}`}>
+          {row.original.quota ? `$${(row.original.quota / 500000).toFixed(2)}` : '$0.00'}
+        </span>
+      )
+    },
     { header: 'Status', cell: ({ row }) => renderStatus(row.original.status) },
-    { header: 'Created', cell: ({ row }) => formatTimestamp(row.original.created_time) },
+    {
+      header: 'Created',
+      cell: ({ row }) => (
+        <span className="text-sm" title={formatTimestamp(row.original.created_time)}>
+          {formatTimestamp(row.original.created_time)}
+        </span>
+      )
+    },
     {
       header: 'Actions',
       cell: ({ row }) => (
@@ -167,7 +188,18 @@ export function RedemptionsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2 mb-3">
-            <Input placeholder="Search redemptions" value={searchKeyword} onChange={(e) => setSearchKeyword(e.target.value)} />
+            <SearchableDropdown
+              value={searchKeyword}
+              placeholder="Search redemptions by name..."
+              searchPlaceholder="Type redemption name..."
+              options={[]}
+              searchEndpoint="/redemption/search"
+              transformResponse={(data) => (
+                Array.isArray(data) ? data.map((r: any) => ({ key: String(r.id), value: r.name, text: r.name })) : []
+              )}
+              onChange={(value) => setSearchKeyword(value)}
+              clearable
+            />
             <Button onClick={search} disabled={loading}>Search</Button>
           </div>
           <DataTable

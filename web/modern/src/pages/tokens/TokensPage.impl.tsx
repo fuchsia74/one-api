@@ -102,7 +102,11 @@ export function TokensPage() {
   }, [pageSize])
 
   useEffect(() => {
-    load(0, pageSize)
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(0, pageSize)
+    }
   }, [sortBy, sortOrder])
 
   const searchTokens = async (query: string) => {
@@ -267,7 +271,7 @@ export function TokensPage() {
       accessorKey: 'remain_quota',
       header: 'Remaining Quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
+        <span className="font-mono text-sm" title={`Remaining: ${formatQuota(row.original.remain_quota, row.original.unlimited_quota)}`}>
           {formatQuota(row.original.remain_quota, row.original.unlimited_quota)}
         </span>
       ),
@@ -276,7 +280,7 @@ export function TokensPage() {
       accessorKey: 'used_quota',
       header: 'Used Quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
+        <span className="font-mono text-sm" title={`Used: ${formatQuota(row.original.used_quota)}`}>
           {formatQuota(row.original.used_quota)}
         </span>
       ),
@@ -365,12 +369,7 @@ export function TokensPage() {
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
     setSortBy(newSortBy)
     setSortOrder(newSortOrder)
-    // Reload data with new sort order
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, pageSize)
-    }
+    // Let useEffect handle the reload to avoid double requests
   }
 
   const refresh = () => {

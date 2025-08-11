@@ -69,7 +69,7 @@ function App() {
     <ThemeProvider defaultTheme="system" storageKey="one-api-theme">
       <QueryClientProvider client={queryClient}>
         <Router>
-          <div className="min-h-screen bg-background">
+          <div className="bg-background">
             <Routes>
             {/* Public auth routes */}
             <Route path="/login" element={<LoginPage />} />

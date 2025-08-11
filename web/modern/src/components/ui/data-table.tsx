@@ -44,6 +44,7 @@ export function DataTable<TData, TValue>({
   // Handle column header click for server-side sorting
   const handleSort = (accessorKey: string) => {
     if (!onSortChange) return
+    if (loading) return // Prevent repeated actions while loading
 
     // If clicking the same column, toggle order
     if (sortBy === accessorKey) {
@@ -110,8 +111,14 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-2">
-      <div className="rounded-md border">
-        <Table>
+      <div className="relative rounded-md border">
+        {/* Loading overlay to prevent repeated actions */}
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          </div>
+        )}
+        <Table className={loading ? 'pointer-events-none opacity-60' : ''}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -126,23 +133,14 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  <div className="flex items-center justify-center space-x-2">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <span>Loading...</span>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows?.length ? (
+            {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className="mobile-table-row">
                   {row.getVisibleCells().map((cell) => {
                     const headerDef = cell.column.columnDef.header
                     const label = typeof headerDef === 'string' ? headerDef : (cell.column.id || '')
                     return (
-                      <TableCell key={cell.id} data-label={label}>
+                      <TableCell key={cell.id} data-label={label} className="mobile-table-cell">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     )
@@ -152,7 +150,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  No results.
+                  {loading ? 'Loading...' : 'No results.'}
                 </TableCell>
               </TableRow>
             )}

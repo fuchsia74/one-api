@@ -9,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { AdvancedPagination } from '@/components/ui/advanced-pagination'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
-import { Input } from '@/components/ui/input'
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -77,6 +76,7 @@ export function EnhancedDataTable<TData, TValue>({
   // Handle column header click for server-side sorting
   const handleSort = (accessorKey: string) => {
     if (!onSortChange) return
+    if (loading) return // Prevent repeated actions while loading
 
     // If clicking the same column, toggle order
     if (sortBy === accessorKey) {
@@ -195,8 +195,14 @@ export function EnhancedDataTable<TData, TValue>({
       )}
 
       {/* Data Table */}
-      <div className="rounded-md border">
-        <Table>
+      <div className="relative rounded-md border">
+        {/* Loading overlay to prevent repeated actions */}
+        {loading && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          </div>
+        )}
+        <Table className={cn(loading && 'pointer-events-none opacity-60')}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
@@ -214,20 +220,14 @@ export function EnhancedDataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
-                  Loading...
-                </TableCell>
-              </TableRow>
-            ) : table.getRowModel().rows?.length ? (
+            {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className="mobile-table-row">
                   {row.getVisibleCells().map((cell) => {
                     const headerDef = cell.column.columnDef.header
                     const label = typeof headerDef === 'string' ? headerDef : (cell.column.id || '')
                     return (
-                      <TableCell key={cell.id} data-label={label}>
+                      <TableCell key={cell.id} data-label={label} className="mobile-table-cell">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     )
@@ -237,7 +237,7 @@ export function EnhancedDataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
-                  {emptyMessage}
+                  {loading ? 'Loading...' : emptyMessage}
                 </TableCell>
               </TableRow>
             )}

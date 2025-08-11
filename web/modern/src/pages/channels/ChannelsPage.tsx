@@ -212,7 +212,11 @@ export function ChannelsPage() {
   }, [pageSize])
 
   useEffect(() => {
-    load(0, pageSize)
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(0, pageSize)
+    }
   }, [sortBy, sortOrder])
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete' | 'test' | 'balance', index?: number) => {
@@ -353,7 +357,7 @@ export function ChannelsPage() {
       accessorKey: 'balance',
       header: 'Balance',
       cell: ({ row }) => (
-        <div className="text-sm">
+        <div className="text-sm" title={`Balance: ${formatBalance(row.original.balance)}${row.original.balance_updated_time ? ` (Updated: ${formatTimestamp(row.original.balance_updated_time)})` : ''}`}>
           {formatBalance(row.original.balance)}
           {row.original.balance_updated_time && (
             <div className="text-xs text-muted-foreground">
@@ -367,7 +371,7 @@ export function ChannelsPage() {
       accessorKey: 'response_time',
       header: 'Response',
       cell: ({ row }) => (
-        <div className="text-center">
+        <div className="text-center" title={`Response time: ${row.original.response_time ? `${row.original.response_time}ms` : 'Not tested'}${row.original.test_time ? ` (Tested: ${formatTimestamp(row.original.test_time)})` : ''}`}>
           {formatResponseTime(row.original.response_time)}
           {row.original.test_time && (
             <div className="text-xs text-muted-foreground">
@@ -465,12 +469,7 @@ export function ChannelsPage() {
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
     setSortBy(newSortBy)
     setSortOrder(newSortOrder)
-    // Reload data with new sort order
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, pageSize)
-    }
+    // Let useEffect handle the reload to avoid double requests
   }
 
   const refresh = () => {
