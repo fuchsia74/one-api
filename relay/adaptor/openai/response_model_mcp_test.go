@@ -2,6 +2,7 @@ package openai_test
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -335,12 +336,6 @@ func TestConvertResponseAPIToChatCompletionWithMCP(t *testing.T) {
 	}
 }
 
-// Helper function to check if string contains substring
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
+// Helper function to check if a string contains a substring.
+// It simplifies the use of the standard library.
+func containsSubstring(s, substr string) bool { return strings.Contains(s, substr) }
