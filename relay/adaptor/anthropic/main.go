@@ -205,13 +205,19 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 	claudeTools := make([]Tool, 0, len(textRequest.Tools))
 
 	for _, tool := range textRequest.Tools {
+		// Convert Parameters from any to map[string]interface{} before indexing
+		params, ok := tool.Function.Parameters.(map[string]interface{})
+		if !ok {
+			params = make(map[string]interface{})
+		}
+
 		claudeTools = append(claudeTools, Tool{
 			Name:        tool.Function.Name,
 			Description: tool.Function.Description,
 			InputSchema: InputSchema{
-				Type:       tool.Function.Parameters["type"].(string),
-				Properties: tool.Function.Parameters["properties"],
-				Required:   tool.Function.Parameters["required"],
+				Type:       params["type"].(string),
+				Properties: params["properties"],
+				Required:   params["required"],
 			},
 		})
 	}

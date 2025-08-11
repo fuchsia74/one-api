@@ -446,7 +446,11 @@ func TestConvertRequestWithToolsRegression(t *testing.T) {
 	}
 
 	// Verify that unsupported fields were removed
-	params := function.Parameters
+	// Convert Parameters from any to map[string]interface{} before indexing
+	params, ok := function.Parameters.(map[string]any)
+	if !ok {
+		t.Fatal("function.Parameters should be map[string]interface{}")
+	}
 
 	// Check that additionalProperties was removed
 	if _, exists := params["additionalProperties"]; exists {
@@ -735,7 +739,11 @@ func TestOriginalErrorScenario(t *testing.T) {
 	}
 
 	function := functions[0]
-	params := function.Parameters
+	// Convert Parameters from any to map[string]interface{} before indexing
+	params, ok := function.Parameters.(map[string]any)
+	if !ok {
+		t.Fatal("function.Parameters should be map[string]interface{}")
+	}
 
 	// Verify the critical fix: date format should be converted to date-time
 	if properties, ok := params["properties"].(map[string]interface{}); ok {

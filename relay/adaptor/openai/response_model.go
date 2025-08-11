@@ -93,11 +93,19 @@ type ResponseAPIPrompt struct {
 
 // ResponseAPITool represents the tool format for Response API requests
 // This differs from the ChatCompletion tool format where function properties are nested
+// Supports both function tools and MCP tools
 type ResponseAPITool struct {
-	Type        string                 `json:"type"`                  // Required: "function"
-	Name        string                 `json:"name"`                  // Required: Function name
-	Description string                 `json:"description,omitempty"` // Optional: Function description
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`  // Optional: Function parameters schema
+	Type        string                 `json:"type"`                  // Required: "function" or "mcp"
+	Name        string                 `json:"name,omitempty"`        // Function name (for function tools)
+	Description string                 `json:"description,omitempty"` // Function description (for function tools)
+	Parameters  map[string]interface{} `json:"parameters,omitempty"`  // Function parameters (for function tools)
+
+	// MCP-specific fields (for MCP tools)
+	ServerLabel     string            `json:"server_label,omitempty"`
+	ServerUrl       string            `json:"server_url,omitempty"`
+	RequireApproval any               `json:"require_approval,omitempty"`
+	AllowedTools    []string          `json:"allowed_tools,omitempty"`
+	Headers         map[string]string `json:"headers,omitempty"`
 }
 
 // ResponseTextConfig represents the text configuration for Response API
@@ -112,6 +120,14 @@ type ResponseTextFormat struct {
 	Description string                 `json:"description,omitempty"` // Optional: Schema description
 	Schema      map[string]interface{} `json:"schema,omitempty"`      // Optional: JSON schema definition
 	Strict      *bool                  `json:"strict,omitempty"`      // Optional: Whether to use strict mode
+}
+
+// MCPApprovalResponseInput represents the input structure for MCP approval responses
+// Used when responding to mcp_approval_request output items to approve or deny MCP tool calls
+type MCPApprovalResponseInput struct {
+	Type              string `json:"type"`                // Required: Always "mcp_approval_response"
+	Approve           bool   `json:"approve"`             // Required: Whether to approve the MCP tool call
+	ApprovalRequestId string `json:"approval_request_id"` // Required: ID of the approval request being responded to
 }
 
 // convertResponseAPIIDToToolCall converts Response API function call IDs back to ChatCompletion format
@@ -268,13 +284,34 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 		// Convert ChatCompletion tools to Response API tool format
 		responseAPITools := make([]ResponseAPITool, 0, len(request.Tools))
 		for _, tool := range request.Tools {
-			responseAPITool := ResponseAPITool{
-				Type:        tool.Type,
-				Name:        tool.Function.Name,
-				Description: tool.Function.Description,
-				Parameters:  tool.Function.Parameters,
+			if tool.Type == "mcp" {
+				// For MCP tools, preserve the original MCP structure
+				// Response API expects MCP tools to maintain their MCP-specific fields
+				responseAPITools = append(responseAPITools, ResponseAPITool{
+					Type:            tool.Type,
+					ServerLabel:     tool.ServerLabel,
+					ServerUrl:       tool.ServerUrl,
+					RequireApproval: tool.RequireApproval,
+					AllowedTools:    tool.AllowedTools,
+					Headers:         tool.Headers,
+				})
+			} else {
+				// For function tools, use the existing logic
+				responseAPITool := ResponseAPITool{
+					Type:        tool.Type,
+					Name:        tool.Function.Name,
+					Description: tool.Function.Description,
+				}
+
+				// Convert Parameters from any to map[string]interface{}
+				if tool.Function.Parameters != nil {
+					if params, ok := tool.Function.Parameters.(map[string]interface{}); ok {
+						responseAPITool.Parameters = params
+					}
+				}
+
+				responseAPITools = append(responseAPITools, responseAPITool)
 			}
-			responseAPITools = append(responseAPITools, responseAPITool)
 		}
 		responseReq.Tools = responseAPITools
 		responseReq.ToolChoice = request.ToolChoice
@@ -286,8 +323,15 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 				Type:        "function",
 				Name:        function.Name,
 				Description: function.Description,
-				Parameters:  function.Parameters,
 			}
+
+			// Convert Parameters from any to map[string]interface{}
+			if function.Parameters != nil {
+				if params, ok := function.Parameters.(map[string]interface{}); ok {
+					responseAPITool.Parameters = params
+				}
+			}
+
 			responseAPITools = append(responseAPITools, responseAPITool)
 		}
 		responseReq.Tools = responseAPITools
@@ -411,16 +455,24 @@ type ResponseAPIResponse struct {
 
 // OutputItem represents an item in the response output array
 type OutputItem struct {
-	Type    string          `json:"type"`              // Type of output item (e.g., "message", "reasoning", "function_call")
+	Type    string          `json:"type"`              // Type of output item (e.g., "message", "reasoning", "function_call", "mcp_list_tools", "mcp_call", "mcp_approval_request")
 	Id      string          `json:"id,omitempty"`      // Unique identifier for this item
 	Status  string          `json:"status,omitempty"`  // Status of this item (e.g., "completed")
 	Role    string          `json:"role,omitempty"`    // Role of the message (e.g., "assistant")
 	Content []OutputContent `json:"content,omitempty"` // Array of content items
 	Summary []OutputContent `json:"summary,omitempty"` // Array of summary items (for reasoning)
+
 	// Function call fields
 	CallId    string `json:"call_id,omitempty"`   // Call ID for function calls
 	Name      string `json:"name,omitempty"`      // Function name for function calls
 	Arguments string `json:"arguments,omitempty"` // Function arguments for function calls
+
+	// MCP-specific fields
+	ServerLabel       string       `json:"server_label,omitempty"`        // Label for the MCP server (for mcp_list_tools, mcp_call, mcp_approval_request)
+	Tools             []model.Tool `json:"tools,omitempty"`               // Array of tools from MCP server (for mcp_list_tools)
+	ApprovalRequestId *string      `json:"approval_request_id,omitempty"` // ID of approval request (for mcp_call)
+	Error             *string      `json:"error,omitempty"`               // Error message if MCP call failed (for mcp_call)
+	Output            string       `json:"output,omitempty"`              // Output from MCP tool call (for mcp_call)
 }
 
 // OutputContent represents content within an output item
@@ -477,6 +529,25 @@ func ConvertResponseAPIToChatCompletion(responseAPIResp *ResponseAPIResponse) *T
 					},
 				}
 				tools = append(tools, tool)
+			}
+		case "mcp_list_tools":
+			// Handle MCP list tools output - add server tools information to response text
+			if outputItem.ServerLabel != "" && len(outputItem.Tools) > 0 {
+				responseText += fmt.Sprintf("\nMCP Server '%s' tools imported: %d tools available",
+					outputItem.ServerLabel, len(outputItem.Tools))
+			}
+		case "mcp_call":
+			// Handle MCP tool call output - add call result to response text
+			if outputItem.Name != "" && outputItem.Output != "" {
+				responseText += fmt.Sprintf("\nMCP Tool '%s' result: %s", outputItem.Name, outputItem.Output)
+			} else if outputItem.Error != nil && *outputItem.Error != "" {
+				responseText += fmt.Sprintf("\nMCP Tool '%s' error: %s", outputItem.Name, *outputItem.Error)
+			}
+		case "mcp_approval_request":
+			// Handle MCP approval request - add approval request info to response text
+			if outputItem.ServerLabel != "" && outputItem.Name != "" {
+				responseText += fmt.Sprintf("\nMCP Approval Required: Server '%s' requests approval to call '%s'",
+					outputItem.ServerLabel, outputItem.Name)
 			}
 		}
 	}
@@ -597,6 +668,25 @@ func ConvertResponseAPIStreamToChatCompletionWithIndex(responseAPIChunk *Respons
 					Index: &index, // Set index for streaming delta accumulation
 				}
 				toolCalls = append(toolCalls, tool)
+			}
+		case "mcp_list_tools":
+			// Handle MCP list tools output in streaming - add server tools information as delta content
+			if outputItem.ServerLabel != "" && len(outputItem.Tools) > 0 {
+				deltaContent += fmt.Sprintf("\nMCP Server '%s' tools imported: %d tools available",
+					outputItem.ServerLabel, len(outputItem.Tools))
+			}
+		case "mcp_call":
+			// Handle MCP tool call output in streaming - add call result as delta content
+			if outputItem.Name != "" && outputItem.Output != "" {
+				deltaContent += fmt.Sprintf("\nMCP Tool '%s' result: %s", outputItem.Name, outputItem.Output)
+			} else if outputItem.Error != nil && *outputItem.Error != "" {
+				deltaContent += fmt.Sprintf("\nMCP Tool '%s' error: %s", outputItem.Name, *outputItem.Error)
+			}
+		case "mcp_approval_request":
+			// Handle MCP approval request in streaming - add approval request info as delta content
+			if outputItem.ServerLabel != "" && outputItem.Name != "" {
+				deltaContent += fmt.Sprintf("\nMCP Approval Required: Server '%s' requests approval to call '%s'",
+					outputItem.ServerLabel, outputItem.Name)
 			}
 		}
 	}

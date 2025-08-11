@@ -250,9 +250,11 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			if !ok {
 				// If type assertion fails, fallback to original parameters without additionalProperties
 				cleanedParamsMap = make(map[string]interface{})
-				for k, v := range tool.Function.Parameters {
-					if k != "additionalProperties" && k != "description" && k != "strict" {
-						cleanedParamsMap[k] = v
+				if originalParams, ok := tool.Function.Parameters.(map[string]interface{}); ok {
+					for k, v := range originalParams {
+						if k != "additionalProperties" && k != "description" && k != "strict" {
+							cleanedParamsMap[k] = v
+						}
 					}
 				}
 			}
@@ -277,9 +279,11 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			if !ok {
 				// If type assertion fails, fallback to original parameters without additionalProperties
 				cleanedParamsMap = make(map[string]interface{})
-				for k, v := range function.Parameters {
-					if k != "additionalProperties" && k != "description" && k != "strict" {
-						cleanedParamsMap[k] = v
+				if originalParams, ok := function.Parameters.(map[string]interface{}); ok {
+					for k, v := range originalParams {
+						if k != "additionalProperties" && k != "description" && k != "strict" {
+							cleanedParamsMap[k] = v
+						}
 					}
 				}
 			}
