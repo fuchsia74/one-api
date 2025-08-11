@@ -1,16 +1,17 @@
-package openai
+package openai_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
 // TestMCPOutputItemSerialization tests that MCP-specific OutputItem fields are properly serialized
 func TestMCPOutputItemSerialization(t *testing.T) {
 	// Test mcp_list_tools output item
-	mcpListTools := OutputItem{
+	mcpListTools := openai.OutputItem{
 		Type:        "mcp_list_tools",
 		Id:          "mcpl_682d4379df088191886b70f4ec39f90403937d5f622d7a90",
 		ServerLabel: "deepwiki",
@@ -61,7 +62,7 @@ func TestMCPOutputItemSerialization(t *testing.T) {
 // TestMCPCallOutputItem tests mcp_call output item serialization
 func TestMCPCallOutputItem(t *testing.T) {
 	// Test successful mcp_call
-	mcpCall := OutputItem{
+	mcpCall := openai.OutputItem{
 		Type:        "mcp_call",
 		Id:          "mcp_682d437d90a88191bf88cd03aae0c3e503937d5f622d7a90",
 		ServerLabel: "deepwiki",
@@ -99,7 +100,7 @@ func TestMCPCallOutputItem(t *testing.T) {
 // TestMCPCallWithError tests mcp_call output item with error
 func TestMCPCallWithError(t *testing.T) {
 	errorMsg := "Connection failed"
-	mcpCallError := OutputItem{
+	mcpCallError := openai.OutputItem{
 		Type:        "mcp_call",
 		Id:          "mcp_error_123",
 		ServerLabel: "stripe",
@@ -126,7 +127,7 @@ func TestMCPCallWithError(t *testing.T) {
 
 // TestMCPApprovalRequest tests mcp_approval_request output item
 func TestMCPApprovalRequest(t *testing.T) {
-	approvalRequest := OutputItem{
+	approvalRequest := openai.OutputItem{
 		Type:        "mcp_approval_request",
 		Id:          "mcpr_682d498e3bd4819196a0ce1664f8e77b04ad1e533afccbfa",
 		ServerLabel: "deepwiki",
@@ -156,7 +157,7 @@ func TestMCPApprovalRequest(t *testing.T) {
 
 // TestMCPApprovalResponseInput tests the MCP approval response input structure
 func TestMCPApprovalResponseInput(t *testing.T) {
-	approvalResponse := MCPApprovalResponseInput{
+	approvalResponse := openai.MCPApprovalResponseInput{
 		Type:              "mcp_approval_response",
 		Approve:           true,
 		ApprovalRequestId: "mcpr_682d498e3bd4819196a0ce1664f8e77b04ad1e533afccbfa",
@@ -185,7 +186,7 @@ func TestMCPApprovalResponseInput(t *testing.T) {
 	}
 
 	// Test deserialization
-	var deserializedResponse MCPApprovalResponseInput
+	var deserializedResponse openai.MCPApprovalResponseInput
 	err = json.Unmarshal(jsonData, &deserializedResponse)
 	if err != nil {
 		t.Fatalf("Failed to deserialize MCPApprovalResponseInput: %v", err)
@@ -204,13 +205,13 @@ func TestMCPApprovalResponseInput(t *testing.T) {
 
 // TestResponseAPIResponseWithMCPOutput tests complete ResponseAPIResponse with MCP output items
 func TestResponseAPIResponseWithMCPOutput(t *testing.T) {
-	response := ResponseAPIResponse{
+	response := openai.ResponseAPIResponse{
 		Id:        "resp_123",
 		Object:    "response",
 		Model:     "gpt-4.1",
 		Status:    "completed",
 		CreatedAt: 1234567890,
-		Output: []OutputItem{
+		Output: []openai.OutputItem{
 			{
 				Type:        "mcp_list_tools",
 				Id:          "mcpl_456",
@@ -241,7 +242,7 @@ func TestResponseAPIResponseWithMCPOutput(t *testing.T) {
 		t.Fatalf("Failed to marshal ResponseAPIResponse with MCP output: %v", err)
 	}
 
-	var deserializedResponse ResponseAPIResponse
+	var deserializedResponse openai.ResponseAPIResponse
 	err = json.Unmarshal(jsonData, &deserializedResponse)
 	if err != nil {
 		t.Fatalf("Failed to deserialize ResponseAPIResponse: %v", err)
@@ -272,16 +273,16 @@ func TestResponseAPIResponseWithMCPOutput(t *testing.T) {
 
 // TestConvertResponseAPIToChatCompletionWithMCP tests MCP output conversion to ChatCompletion
 func TestConvertResponseAPIToChatCompletionWithMCP(t *testing.T) {
-	responseAPIResp := &ResponseAPIResponse{
+	responseAPIResp := &openai.ResponseAPIResponse{
 		Id:        "resp_mcp_test",
 		Model:     "gpt-4.1",
 		Status:    "completed",
 		CreatedAt: 1234567890,
-		Output: []OutputItem{
+		Output: []openai.OutputItem{
 			{
 				Type: "message",
 				Role: "assistant",
-				Content: []OutputContent{
+				Content: []openai.OutputContent{
 					{
 						Type: "output_text",
 						Text: "Hello! I'll help you with that.",
@@ -305,7 +306,7 @@ func TestConvertResponseAPIToChatCompletionWithMCP(t *testing.T) {
 		},
 	}
 
-	chatResponse := ConvertResponseAPIToChatCompletion(responseAPIResp)
+	chatResponse := openai.ConvertResponseAPIToChatCompletion(responseAPIResp)
 
 	if chatResponse == nil {
 		t.Fatal("Expected non-nil chat response")

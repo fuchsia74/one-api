@@ -1,9 +1,10 @@
-package openai
+package openai_test
 
 import (
 	"encoding/json"
 	"testing"
 
+	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -30,7 +31,7 @@ func TestConvertChatCompletionToResponseAPIWithMCP(t *testing.T) {
 	}
 
 	// Convert to Response API format
-	responseAPI := ConvertChatCompletionToResponseAPI(chatRequest)
+	responseAPI := openai.ConvertChatCompletionToResponseAPI(chatRequest)
 
 	// Verify the conversion succeeded
 	if responseAPI == nil {
@@ -139,7 +140,7 @@ func TestConvertChatCompletionToResponseAPIWithMCPAndFunction(t *testing.T) {
 		},
 	}
 
-	responseAPI := ConvertChatCompletionToResponseAPI(chatRequest)
+	responseAPI := openai.ConvertChatCompletionToResponseAPI(chatRequest)
 
 	if len(responseAPI.Tools) != 2 {
 		t.Fatalf("Expected 2 tools, got %d", len(responseAPI.Tools))
@@ -193,7 +194,7 @@ func TestMCPToolJSONSerialization(t *testing.T) {
 		},
 	}
 
-	responseAPI := ConvertChatCompletionToResponseAPI(chatRequest)
+	responseAPI := openai.ConvertChatCompletionToResponseAPI(chatRequest)
 
 	// Marshal the entire request to JSON
 	jsonData, err := json.Marshal(responseAPI)
@@ -202,7 +203,7 @@ func TestMCPToolJSONSerialization(t *testing.T) {
 	}
 
 	// Verify it can be unmarshaled back
-	var unmarshaled ResponseAPIRequest
+	var unmarshaled openai.ResponseAPIRequest
 	err = json.Unmarshal(jsonData, &unmarshaled)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal Response API request: %v", err)
