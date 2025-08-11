@@ -669,6 +669,8 @@ func ConvertResponseAPIStreamToChatCompletionWithIndex(responseAPIChunk *Respons
 				}
 				toolCalls = append(toolCalls, tool)
 			}
+		// Note: This is currently unavailable in the OpenAI Docs.
+		// It's added here for reference because OpenAI's Remote MCP is included in their tools, unlike other Remote MCPs such as Anthropic Claude.
 		case "mcp_list_tools":
 			// Handle MCP list tools output in streaming - add server tools information as delta content
 			if outputItem.ServerLabel != "" && len(outputItem.Tools) > 0 {
