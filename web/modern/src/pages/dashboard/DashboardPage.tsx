@@ -6,7 +6,10 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { api } from '@/lib/api'
 import { DataTable } from '@/components/ui/data-table'
-import { formatNumber } from '@/lib/utils'
+import { ResponsivePageContainer, ResponsiveSection } from '@/components/ui/responsive-container'
+import { AdaptiveGrid } from '@/components/ui/adaptive-grid'
+import { useResponsive } from '@/hooks/useResponsive'
+import { formatNumber, cn } from '@/lib/utils'
 import {
   ResponsiveContainer,
   LineChart,
@@ -22,6 +25,7 @@ import {
 
 export function DashboardPage() {
   const { user } = useAuthStore()
+  const { isMobile, isTablet } = useResponsive()
   const isAdmin = useMemo(() => (user?.role ?? 0) >= 10, [user])
 
   // date range defaults: last 7 days (inclusive)
@@ -219,18 +223,25 @@ export function DashboardPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+    <ResponsivePageContainer
+      title="Dashboard"
+      description="Monitor your API usage and account statistics"
+    >
+      {/* Account Overview Cards */}
+      <ResponsiveSection title="Account Overview">
+        <AdaptiveGrid
+          cols={{ default: 1, sm: 2, lg: 3 }}
+          gap={isMobile ? "md" : "lg"}
+        >
           <Card>
-            <CardHeader>
-              <CardTitle>Account Info</CardTitle>
-              <CardDescription>Your account details</CardDescription>
+            <CardHeader className={cn(isMobile ? "pb-3" : "pb-4")}>
+              <CardTitle className={cn(isMobile ? "text-base" : "text-lg")}>Account Info</CardTitle>
+              <CardDescription className={cn(isMobile ? "text-xs" : "text-sm")}>
+                Your account details
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardContent className={cn(isMobile ? "pt-0" : "")}>
+              <div className={cn("space-y-2", isMobile ? "text-sm" : "")}>
                 <p><strong>Username:</strong> {user.username}</p>
                 <p><strong>Display Name:</strong> {user.display_name || 'Not set'}</p>
                 <p><strong>Role:</strong> {isAdmin ? 'Admin' : 'User'}</p>
@@ -240,12 +251,14 @@ export function DashboardPage() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Quota Usage</CardTitle>
-              <CardDescription>Your API usage statistics</CardDescription>
+            <CardHeader className={cn(isMobile ? "pb-3" : "pb-4")}>
+              <CardTitle className={cn(isMobile ? "text-base" : "text-lg")}>Quota Usage</CardTitle>
+              <CardDescription className={cn(isMobile ? "text-xs" : "text-sm")}>
+                Your API usage statistics
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardContent className={cn(isMobile ? "pt-0" : "")}>
+              <div className={cn("space-y-2", isMobile ? "text-sm" : "")}>
                 <p><strong>Total Quota:</strong> {user.quota?.toLocaleString() || 'N/A'}</p>
                 <p><strong>Used:</strong> {user.used_quota?.toLocaleString() || 'N/A'}</p>
                 <p><strong>Remaining:</strong> {user.quota && user.used_quota ? (user.quota - user.used_quota).toLocaleString() : 'N/A'}</p>
@@ -254,226 +267,352 @@ export function DashboardPage() {
           </Card>
 
           <Card>
-            <CardHeader>
-              <CardTitle>Status</CardTitle>
-              <CardDescription>Account status</CardDescription>
+            <CardHeader className={cn(isMobile ? "pb-3" : "pb-4")}>
+              <CardTitle className={cn(isMobile ? "text-base" : "text-lg")}>Status</CardTitle>
+              <CardDescription className={cn(isMobile ? "text-xs" : "text-sm")}>
+                Account status
+              </CardDescription>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardContent className={cn(isMobile ? "pt-0" : "")}>
+              <div className={cn("space-y-2", isMobile ? "text-sm" : "")}>
                 <p><strong>Status:</strong> {user.status === 1 ? 'Active' : 'Inactive'}</p>
                 <p><strong>Email:</strong> {user.email || 'Not set'}</p>
               </div>
             </CardContent>
           </Card>
+        </AdaptiveGrid>
+      </ResponsiveSection>
+
+      {/* Usage Overview Section */}
+      <ResponsiveSection
+        title="Usage Overview"
+        description="Daily requests and quota by model"
+        actions={
+          <div className={cn(
+            "flex gap-2",
+            isMobile ? "flex-col w-full" : "items-center"
+          )}>
+            {lastUpdated && (
+              <span className={cn(
+                "px-2 py-1 rounded-full bg-accent/40 text-xs text-muted-foreground",
+                isMobile ? "text-center" : ""
+              )}>
+                Updated: {lastUpdated}
+              </span>
+            )}
+            <Button
+              variant="outline"
+              onClick={loadStats}
+              disabled={loading}
+              size="sm"
+              className={cn(isMobile ? "w-full touch-target" : "")}
+            >
+              Refresh
+            </Button>
+          </div>
+        }
+        variant="card"
+      >
+        {/* Date Range and User Filter */}
+        <div className={cn(
+          "grid gap-3 mb-4",
+          isMobile ? "grid-cols-1" : "grid-cols-1 md:grid-cols-12"
+        )}>
+          <div className={cn(isMobile ? "" : "md:col-span-3")}>
+            <label className="text-xs block mb-1">From</label>
+            <Input type="date" value={fromDate} onChange={(e)=>setFromDate(e.target.value)} />
+          </div>
+          <div className={cn(isMobile ? "" : "md:col-span-3")}>
+            <label className="text-xs block mb-1">To</label>
+            <Input type="date" value={toDate} onChange={(e)=>setToDate(e.target.value)} />
+          </div>
+          {isAdmin && (
+            <div className={cn(isMobile ? "" : "md:col-span-3")}>
+              <label className="text-xs block mb-1">User</label>
+              <select className="h-9 w-full border rounded-md px-2 text-sm" value={dashUser} onChange={(e)=>setDashUser(e.target.value)}>
+                <option value="all">All Users (Site-wide)</option>
+                {userOptions.map(u => (
+                  <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
+                ))}
+              </select>
+              <div className="text-[11px] text-muted-foreground mt-1">As root, you can select up to 1 year of data.</div>
+            </div>
+          )}
+          <div className={cn(
+            isMobile ? "col-span-full" : "md:col-span-3",
+            "flex items-end"
+          )}>
+            <div className={cn(
+              "flex gap-2",
+              isMobile ? "flex-col w-full" : "flex-row"
+            )}>
+              <div className={cn(
+                "flex gap-1",
+                isMobile ? "w-full" : ""
+              )}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => applyPreset('today')}
+                  className={cn(isMobile ? "flex-1 text-xs" : "")}
+                >
+                  Today
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => applyPreset('7d')}
+                  className={cn(isMobile ? "flex-1 text-xs" : "")}
+                >
+                  7 Days
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => applyPreset('30d')}
+                  className={cn(isMobile ? "flex-1 text-xs" : "")}
+                >
+                  30 Days
+                </Button>
+              </div>
+              <Button
+                onClick={loadStats}
+                disabled={loading}
+                className={cn(isMobile ? "w-full touch-target" : "")}
+              >
+                Apply
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div className="mt-8">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Usage Overview</CardTitle>
-                  <CardDescription>Daily requests and quota by model</CardDescription>
-                </div>
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  {lastUpdated && <span className="px-2 py-1 rounded-full bg-accent/40">Updated: {lastUpdated}</span>}
-                  <Button variant="outline" onClick={loadStats} disabled={loading}>Refresh</Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mb-4">
-                <div className="md:col-span-3">
-                  <label className="text-xs block mb-1">From</label>
-                  <Input type="date" value={fromDate} onChange={(e)=>setFromDate(e.target.value)} />
-                </div>
-                <div className="md:col-span-3">
-                  <label className="text-xs block mb-1">To</label>
-                  <Input type="date" value={toDate} onChange={(e)=>setToDate(e.target.value)} />
-                </div>
-                {isAdmin && (
-                  <div className="md:col-span-3">
-                    <label className="text-xs block mb-1">User</label>
-                    <select className="h-9 w-full border rounded-md px-2 text-sm" value={dashUser} onChange={(e)=>setDashUser(e.target.value)}>
-                      <option value="all">All Users (Site-wide)</option>
-                      {userOptions.map(u => (
-                        <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
-                      ))}
-                    </select>
-                    <div className="text-[11px] text-muted-foreground mt-1">As root, you can select up to 1 year of data.</div>
-                  </div>
-                )}
-                <div className="md:col-span-3 flex items-end">
-                  <Button size="sm" variant="outline" onClick={() => applyPreset('today')}>Today</Button>
-                  <Button size="sm" variant="outline" onClick={() => applyPreset('7d')}>Last 7 Days</Button>
-                  <Button size="sm" variant="outline" onClick={() => applyPreset('30d')}>Last 30 Days</Button>
-                  <Button onClick={loadStats} disabled={loading}>Apply</Button>
-                </div>
-              </div>
-
-              {/* Summary cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                <div className="rounded-lg border p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Total Requests (Today)</div>
-                  <div className="text-2xl font-semibold">{formatNumber(todayAgg.requests)}</div>
-                  <div className={`text-xs mt-1 ${requestTrend>=0?'text-green-600':'text-red-600'}`}>{requestTrend>=0?'+':''}{requestTrend.toFixed(1)}%</div>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Total Quota (Today)</div>
-                  <div className="text-2xl font-semibold">{formatNumber(todayAgg.quota)}</div>
-                  <div className={`text-xs mt-1 ${quotaTrend>=0?'text-green-600':'text-red-600'}`}>{quotaTrend>=0?'+':''}{quotaTrend.toFixed(1)}%</div>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Total Tokens (Today)</div>
-                  <div className="text-2xl font-semibold">{formatNumber(todayAgg.tokens)}</div>
-                  <div className={`text-xs mt-1 ${tokenTrend>=0?'text-green-600':'text-red-600'}`}>{tokenTrend>=0?'+':''}{tokenTrend.toFixed(1)}%</div>
-                </div>
-                <div className="rounded-lg border p-3">
-                  <div className="text-xs text-muted-foreground mb-1">Avg Cost / Request</div>
-                  <div className="text-2xl font-semibold">{avgCostPerRequest ? avgCostPerRequest.toFixed(4) : '0'}</div>
-                  <div className="text-xs mt-1">Avg Tokens: {avgTokensPerRequest ? Math.round(avgTokensPerRequest) : 0}</div>
-                </div>
-              </div>
-
-              {/* Insights */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm mb-2">Model Usage Insights</div>
-                  <div className="text-xs text-muted-foreground">Most Used Model</div>
-                  <div className="text-base font-medium">{topModel || '-'}</div>
-                  <div className="text-xs text-muted-foreground mt-2">Active Models</div>
-                  <div className="text-base font-medium">{totalModels}</div>
-                </div>
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm mb-2">Performance Metrics</div>
-                  <div className="text-xs text-muted-foreground">Avg Tokens/Req</div>
-                  <div className="text-base font-medium">{avgTokensPerRequest ? Math.round(avgTokensPerRequest) : 0}</div>
-                  <div className="text-xs text-muted-foreground mt-2">Throughput (req/day)</div>
-                  <div className="text-base font-medium">{todayAgg.requests}</div>
-                </div>
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm mb-2">Usage Patterns</div>
-                  <div className="text-xs text-muted-foreground">Peak Day</div>
-                  <div className="text-base font-medium">{usagePatterns.peakDay || '-'}</div>
-                  <div className="text-xs text-muted-foreground mt-2">Daily Average</div>
-                  <div className="text-base font-medium">{formatNumber(usagePatterns.avgDaily)}</div>
-                  <div className="text-xs mt-2">Trend: <span className={usagePatterns.trend==='Rising'?'text-green-600':'text-red-600'}>{usagePatterns.trend}</span></div>
-                </div>
-              </div>
-
-              {/* Trends */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm mb-2">Model Request Trend</div>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={timeSeries}>
-                      <CartesianGrid strokeOpacity={0.2} vertical={false} />
-                      <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} width={40} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="requests" stroke="#4318FF" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm mb-2">Quota Usage Trend</div>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={timeSeries}>
-                      <CartesianGrid strokeOpacity={0.2} vertical={false} />
-                      <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} width={40} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="quota" stroke="#00B5D8" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="border rounded-lg p-3">
-                  <div className="text-sm mb-2">Token Usage Trend</div>
-                  <ResponsiveContainer width="100%" height={160}>
-                    <LineChart data={timeSeries}>
-                      <CartesianGrid strokeOpacity={0.2} vertical={false} />
-                      <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                      <YAxis tickLine={false} axisLine={false} width={40} />
-                      <Tooltip />
-                      <Line type="monotone" dataKey="tokens" stroke="#FF5E7D" strokeWidth={2} dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Stacked by model (tokens) */}
-              <div className="border rounded-lg p-3 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="text-sm">Statistics - Tokens</div>
-                </div>
-                <ResponsiveContainer width="100%" height={260}>
-                  <BarChart data={stackedByTokens}>
-                    <CartesianGrid strokeOpacity={0.2} vertical={false} />
-                    <XAxis dataKey="date" tickLine={false} axisLine={false} />
-                    <YAxis tickLine={false} axisLine={false} width={40} />
-                    <Tooltip />
-                    <Legend wrapperStyle={{ fontSize: 12 }} height={24} />
-                    {uniqueModels.map((m, idx) => (
-                      <Bar key={m} dataKey={m} stackId="tokens" fill={barColor(idx)} />
-                    ))}
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Model Efficiency Analysis */}
-              <div className="border rounded-lg p-3 mb-6">
-                <div className="text-sm mb-3">Model Efficiency Analysis</div>
-                <div className="overflow-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-muted-foreground">
-                        <th className="py-2 pr-2">#</th>
-                        <th className="py-2 pr-2">Model</th>
-                        <th className="py-2 pr-2">Requests</th>
-                        <th className="py-2 pr-2">Avg Cost</th>
-                        <th className="py-2 pr-2">Avg Tokens</th>
-                        <th className="py-2 pr-2">Efficiency (tokens/quota)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {efficiency.slice(0, 10).map((m, i) => (
-                        <tr key={m.model} className="border-t">
-                          <td className="py-2 pr-2">{i+1}</td>
-                          <td className="py-2 pr-2 font-medium">{m.model}</td>
-                          <td className="py-2 pr-2">{formatNumber(m.requests)}</td>
-                          <td className="py-2 pr-2">{m.avgCost.toFixed(4)}</td>
-                          <td className="py-2 pr-2">{Math.round(m.avgTokens)}</td>
-                          <td className="py-2 pr-2">
-                            <div className="flex items-center gap-2">
-                              <div className="h-2 bg-accent rounded" style={{ width: Math.min(100, Math.round(m.efficiency / (efficiency[0]?.efficiency || 1) * 100)) + '%' }} />
-                              <span>{m.efficiency ? m.efficiency.toFixed(0) : 0}</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {efficiency.length === 0 && (
-                        <tr><td className="py-3 text-muted-foreground" colSpan={6}>No data</td></tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Cost Optimization Recommendations */}
-              <div className="border rounded-lg p-3">
-                <div className="text-sm mb-2">Cost Optimization Recommendations</div>
-                <ul className="list-disc pl-5 text-sm space-y-1">
-                  {recommendations.map((r, idx) => (<li key={idx}>{r}</li>))}
-                </ul>
-              </div>
-
-              <DataTable columns={columns} data={rows} pageIndex={0} pageSize={rows.length || 10} total={rows.length} onPageChange={() => {}} />
-            </CardContent>
+        {/* Summary Cards */}
+        <AdaptiveGrid
+          cols={{ default: 1, sm: 2, lg: 4 }}
+          gap={isMobile ? "sm" : "md"}
+          className="mb-4"
+        >
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground mb-1">Total Requests (Today)</div>
+            <div className={cn("font-semibold", isMobile ? "text-xl" : "text-2xl")}>
+              {formatNumber(todayAgg.requests)}
+            </div>
+            <div className={cn(
+              "text-xs mt-1",
+              requestTrend >= 0 ? 'text-green-600' : 'text-red-600'
+            )}>
+              {requestTrend >= 0 ? '+' : ''}{requestTrend.toFixed(1)}%
+            </div>
           </Card>
+
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground mb-1">Total Quota (Today)</div>
+            <div className={cn("font-semibold", isMobile ? "text-xl" : "text-2xl")}>
+              {formatNumber(todayAgg.quota)}
+            </div>
+            <div className={cn(
+              "text-xs mt-1",
+              quotaTrend >= 0 ? 'text-green-600' : 'text-red-600'
+            )}>
+              {quotaTrend >= 0 ? '+' : ''}{quotaTrend.toFixed(1)}%
+            </div>
+          </Card>
+
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground mb-1">Total Tokens (Today)</div>
+            <div className={cn("font-semibold", isMobile ? "text-xl" : "text-2xl")}>
+              {formatNumber(todayAgg.tokens)}
+            </div>
+            <div className={cn(
+              "text-xs mt-1",
+              tokenTrend >= 0 ? 'text-green-600' : 'text-red-600'
+            )}>
+              {tokenTrend >= 0 ? '+' : ''}{tokenTrend.toFixed(1)}%
+            </div>
+          </Card>
+
+          <Card className="p-3">
+            <div className="text-xs text-muted-foreground mb-1">Avg Cost / Request</div>
+            <div className={cn("font-semibold", isMobile ? "text-xl" : "text-2xl")}>
+              {avgCostPerRequest ? avgCostPerRequest.toFixed(4) : '0'}
+            </div>
+            <div className="text-xs mt-1">
+              Avg Tokens: {avgTokensPerRequest ? Math.round(avgTokensPerRequest) : 0}
+            </div>
+          </Card>
+        </AdaptiveGrid>
+
+        {/* Insights */}
+        <AdaptiveGrid
+          cols={{ default: 1, lg: 3 }}
+          gap={isMobile ? "sm" : "md"}
+          className="mb-6"
+        >
+          <Card className="p-3">
+            <div className={cn("mb-2", isMobile ? "text-sm" : "text-sm")}>Model Usage Insights</div>
+            <div className="text-xs text-muted-foreground">Most Used Model</div>
+            <div className="text-base font-medium">{topModel || '-'}</div>
+            <div className="text-xs text-muted-foreground mt-2">Active Models</div>
+            <div className="text-base font-medium">{totalModels}</div>
+          </Card>
+
+          <Card className="p-3">
+            <div className={cn("mb-2", isMobile ? "text-sm" : "text-sm")}>Performance Metrics</div>
+            <div className="text-xs text-muted-foreground">Avg Tokens/Req</div>
+            <div className="text-base font-medium">{avgTokensPerRequest ? Math.round(avgTokensPerRequest) : 0}</div>
+            <div className="text-xs text-muted-foreground mt-2">Throughput (req/day)</div>
+            <div className="text-base font-medium">{todayAgg.requests}</div>
+          </Card>
+
+          <Card className="p-3">
+            <div className={cn("mb-2", isMobile ? "text-sm" : "text-sm")}>Usage Patterns</div>
+            <div className="text-xs text-muted-foreground">Peak Day</div>
+            <div className="text-base font-medium">{usagePatterns.peakDay || '-'}</div>
+            <div className="text-xs text-muted-foreground mt-2">Daily Average</div>
+            <div className="text-base font-medium">{formatNumber(usagePatterns.avgDaily)}</div>
+            <div className="text-xs mt-2">
+              Trend: <span className={usagePatterns.trend==='Rising'?'text-green-600':'text-red-600'}>
+                {usagePatterns.trend}
+              </span>
+            </div>
+          </Card>
+        </AdaptiveGrid>
+
+        {/* Trends */}
+        <AdaptiveGrid
+          cols={{ default: 1, lg: 3 }}
+          gap={isMobile ? "sm" : "md"}
+          className="mb-6"
+        >
+          <Card className="p-3">
+            <div className="text-sm mb-2">Model Request Trend</div>
+            <ResponsiveContainer width="100%" height={isMobile ? 120 : 160}>
+              <LineChart data={timeSeries}>
+                <CartesianGrid strokeOpacity={0.2} vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} width={40} />
+                <Tooltip />
+                <Line type="monotone" dataKey="requests" stroke="#4318FF" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className="p-3">
+            <div className="text-sm mb-2">Quota Usage Trend</div>
+            <ResponsiveContainer width="100%" height={isMobile ? 120 : 160}>
+              <LineChart data={timeSeries}>
+                <CartesianGrid strokeOpacity={0.2} vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} width={40} />
+                <Tooltip />
+                <Line type="monotone" dataKey="quota" stroke="#00B5D8" strokeWidth={2} dot={false} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card className="p-3">
+            <div className="text-sm mb-2">Token Usage Trend</div>
+            <ResponsiveContainer width="100%" height={isMobile ? 120 : 160}>
+              <LineChart data={timeSeries}>
+                <CartesianGrid strokeOpacity={0.2} vertical={false} />
+                <XAxis dataKey="date" tickLine={false} axisLine={false} />
+                <YAxis tickLine={false} axisLine={false} width={40} />
+                <Tooltip />
+              <Line type="monotone" dataKey="tokens" stroke="#FF5E7D" strokeWidth={2} dot={false} />
+            </LineChart>
+          </ResponsiveContainer>
+        </Card>
+      </AdaptiveGrid>
+
+      {/* Token Statistics Chart */}
+      <Card className="p-3 mb-6">
+        <div className="flex items-center justify-between mb-2">
+          <div className="text-sm">Statistics - Tokens</div>
         </div>
+        <ResponsiveContainer width="100%" height={isMobile ? 200 : 260}>
+          <BarChart data={stackedByTokens}>
+            <CartesianGrid strokeOpacity={0.2} vertical={false} />
+            <XAxis dataKey="date" tickLine={false} axisLine={false} />
+            <YAxis tickLine={false} axisLine={false} width={40} />
+            <Tooltip />
+            <Legend wrapperStyle={{ fontSize: 12 }} height={24} />
+            {uniqueModels.map((m, idx) => (
+              <Bar key={m} dataKey={m} stackId="tokens" fill={barColor(idx)} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Model Efficiency Analysis */}
+      <Card className="p-3 mb-6">
+        <div className="text-sm mb-3">Model Efficiency Analysis</div>
+        <div className="overflow-auto">
+          <table className={cn("w-full", isMobile ? "text-xs" : "text-sm")}>
+            <thead>
+              <tr className="text-left text-muted-foreground">
+                <th className="py-2 pr-2">#</th>
+                <th className="py-2 pr-2">Model</th>
+                <th className="py-2 pr-2">Requests</th>
+                <th className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>Avg Cost</th>
+                <th className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>Avg Tokens</th>
+                <th className="py-2 pr-2">Efficiency</th>
+              </tr>
+            </thead>
+            <tbody>
+              {efficiency.slice(0, 10).map((m, i) => (
+                <tr key={m.model} className="border-t">
+                  <td className="py-2 pr-2">{i+1}</td>
+                  <td className="py-2 pr-2 font-medium">{m.model}</td>
+                  <td className="py-2 pr-2">{formatNumber(m.requests)}</td>
+                  <td className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>{m.avgCost.toFixed(4)}</td>
+                  <td className={cn("py-2 pr-2", isMobile ? "hidden" : "")}>{Math.round(m.avgTokens)}</td>
+                  <td className="py-2 pr-2">
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2 bg-accent rounded"
+                        style={{
+                          width: Math.min(100, Math.round(m.efficiency / (efficiency[0]?.efficiency || 1) * 100)) + '%'
+                        }}
+                      />
+                      <span className={cn(isMobile ? "text-xs" : "")}>
+                        {m.efficiency ? m.efficiency.toFixed(0) : 0}
+                      </span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {efficiency.length === 0 && (
+                <tr><td className="py-3 text-muted-foreground" colSpan={6}>No data</td></tr>
+              )}
+          </tbody>
+        </table>
       </div>
-    </div>
-  )
+    </Card>
+
+    {/* Cost Optimization Recommendations */}
+    <Card className="p-3 mb-6">
+      <div className="text-sm mb-2">Cost Optimization Recommendations</div>
+      <ul className={cn("list-disc pl-5 space-y-1", isMobile ? "text-xs" : "text-sm")}>
+        {recommendations.map((r, idx) => (<li key={idx}>{r}</li>))}
+      </ul>
+    </Card>
+
+    {/* Data Table */}
+    <Card>
+      <CardContent className={cn(isMobile ? "p-4" : "p-6")}>
+        <DataTable
+          columns={columns}
+          data={rows}
+          pageIndex={0}
+          pageSize={rows.length || 10}
+          total={rows.length}
+          onPageChange={() => {}}
+        />
+      </CardContent>
+    </Card>
+  </ResponsiveSection>
+</ResponsivePageContainer>
+)
 }
 
 export function barColor(i: number) {

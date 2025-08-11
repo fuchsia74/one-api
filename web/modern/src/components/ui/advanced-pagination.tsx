@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, MoreHorizontal } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useResponsive } from '@/hooks/useResponsive'
 import { Button } from '@/components/ui/button'
 import {
   Select,
@@ -35,12 +36,14 @@ export function AdvancedPagination({
   className,
   loading = false,
 }: AdvancedPaginationProps) {
-  // Calculate page range to show
+  const { isMobile, isTablet } = useResponsive()
+  // Calculate page range to show - responsive version
   const getPageNumbers = () => {
     const pages: (number | 'ellipsis')[] = []
-    const siblingCount = 1 // Number of pages to show on each side of current page
+    const siblingCount = isMobile ? 0 : isTablet ? 1 : 1 // Fewer pages on mobile
+    const maxPages = isMobile ? 3 : isTablet ? 5 : 7 // Responsive max pages
 
-    if (totalPages <= 7) {
+    if (totalPages <= maxPages) {
       // If total pages is small, show all pages
       for (let i = 1; i <= totalPages; i++) {
         pages.push(i)
@@ -98,22 +101,42 @@ export function AdvancedPagination({
   }
 
   return (
-    <div className={cn("flex items-center justify-between px-2 py-4", className)}>
+    <div className={cn(
+      "flex px-2 py-4",
+      isMobile ? "flex-col gap-4" : "items-center justify-between",
+      className
+    )}>
       {/* Page info and size selector */}
-      <div className="flex items-center gap-4">
-        <div className="text-sm text-muted-foreground">
+      <div className={cn(
+        "flex gap-4",
+        isMobile ? "flex-col gap-2 items-center text-center" : "items-center"
+      )}>
+        <div className={cn(
+          "text-muted-foreground",
+          isMobile ? "text-xs order-1" : "text-sm"
+        )}>
           Showing {startItem}-{endItem} of {totalItems} items
         </div>
 
         {showPageSizeSelector && onPageSizeChange && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">Rows per page:</span>
+          <div className={cn(
+            "flex items-center gap-2",
+            isMobile ? "order-3 justify-center" : ""
+          )}>
+            <span className={cn(
+              "text-muted-foreground whitespace-nowrap",
+              isMobile ? "text-xs" : "text-sm"
+            )}>
+              {isMobile ? "Per page:" : "Rows per page:"}
+            </span>
             <Select
               value={pageSize.toString()}
               onValueChange={handlePageSizeChange}
               disabled={loading}
             >
-              <SelectTrigger className="h-8 w-16">
+              <SelectTrigger className={cn(
+                isMobile ? "h-8 w-14" : "h-8 w-16"
+              )}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -130,18 +153,23 @@ export function AdvancedPagination({
 
       {/* Pagination controls */}
       {totalPages > 1 && (
-        <div className="flex items-center gap-1">
-          {/* First page */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(1)}
-            disabled={currentPage === 1 || loading}
-            className="h-8 w-8 p-0"
-          >
-            <ChevronsLeft className="h-4 w-4" />
-            <span className="sr-only">First page</span>
-          </Button>
+        <div className={cn(
+          "flex items-center gap-1",
+          isMobile ? "order-2 justify-center" : ""
+        )}>
+          {/* First page - Hide on mobile if too many controls */}
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(1)}
+              disabled={currentPage === 1 || loading}
+              className="h-8 w-8 p-0 touch-target"
+            >
+              <ChevronsLeft className="h-4 w-4" />
+              <span className="sr-only">First page</span>
+            </Button>
+          )}
 
           {/* Previous page */}
           <Button
@@ -149,7 +177,10 @@ export function AdvancedPagination({
             size="sm"
             onClick={() => handlePageChange(currentPage - 1)}
             disabled={currentPage === 1 || loading}
-            className="h-8 w-8 p-0"
+            className={cn(
+              "h-8 p-0 touch-target",
+              isMobile ? "w-10" : "w-8"
+            )}
           >
             <ChevronLeft className="h-4 w-4" />
             <span className="sr-only">Previous page</span>
@@ -159,7 +190,10 @@ export function AdvancedPagination({
           {pageNumbers.map((page, index) => (
             <React.Fragment key={index}>
               {page === 'ellipsis' ? (
-                <span className="flex h-8 w-8 items-center justify-center">
+                <span className={cn(
+                  "flex items-center justify-center",
+                  isMobile ? "h-8 w-6" : "h-8 w-8"
+                )}>
                   <MoreHorizontal className="h-4 w-4" />
                 </span>
               ) : (
@@ -168,7 +202,10 @@ export function AdvancedPagination({
                   size="sm"
                   onClick={() => handlePageChange(page)}
                   disabled={loading}
-                  className="h-8 w-8 p-0"
+                  className={cn(
+                    "h-8 p-0 touch-target",
+                    isMobile ? "w-10 text-sm" : "w-8"
+                  )}
                 >
                   {page}
                 </Button>
@@ -182,23 +219,28 @@ export function AdvancedPagination({
             size="sm"
             onClick={() => handlePageChange(currentPage + 1)}
             disabled={currentPage === totalPages || loading}
-            className="h-8 w-8 p-0"
+            className={cn(
+              "h-8 p-0 touch-target",
+              isMobile ? "w-10" : "w-8"
+            )}
           >
             <ChevronRight className="h-4 w-4" />
             <span className="sr-only">Next page</span>
           </Button>
 
-          {/* Last page */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(totalPages)}
-            disabled={currentPage === totalPages || loading}
-            className="h-8 w-8 p-0"
-          >
-            <ChevronsRight className="h-4 w-4" />
-            <span className="sr-only">Last page</span>
-          </Button>
+          {/* Last page - Hide on mobile if too many controls */}
+          {!isMobile && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handlePageChange(totalPages)}
+              disabled={currentPage === totalPages || loading}
+              className="h-8 w-8 p-0 touch-target"
+            >
+              <ChevronsRight className="h-4 w-4" />
+              <span className="sr-only">Last page</span>
+            </Button>
+          )}
         </div>
       )}
     </div>

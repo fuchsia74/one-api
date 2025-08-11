@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
-import { DataTable } from '@/components/ui/data-table'
+import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -12,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { renderQuota } from '@/lib/utils'
+import { renderQuota, cn } from '@/lib/utils'
 
 interface UserRow {
   id: number
@@ -28,6 +30,7 @@ interface UserRow {
 
 export function UsersPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -191,58 +194,56 @@ export function UsersPage() {
     }
   }
 
+  const toolbarActions = (
+    <div className={cn(
+      "flex gap-2",
+      isMobile ? "flex-col w-full" : "items-center"
+    )}>
+      <Button
+        onClick={() => navigate('/users/add')}
+        className={cn(
+          isMobile ? "w-full touch-target" : ""
+        )}
+      >
+        Add User
+      </Button>
+      <select
+        className={cn(
+          "h-9 border rounded-md px-2 text-sm",
+          isMobile ? "w-full" : ""
+        )}
+        value={sortBy}
+        onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}
+      >
+        <option value="">Default</option>
+        <option value="quota">Remaining Quota</option>
+        <option value="used_quota">Used Quota</option>
+        <option value="username">Username</option>
+        <option value="id">ID</option>
+        <option value="created_time">Created Time</option>
+      </select>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+        className={cn(isMobile ? "w-full touch-target" : "")}
+      >
+        {sortOrder.toUpperCase()}
+      </Button>
+    </div>
+  )
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Users"
+      description="Manage users"
+      actions={toolbarActions}
+    >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Users</CardTitle>
-              <CardDescription>Manage users</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => navigate('/users/add')}>Add User</Button>
-              <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
-                <option value="">Default</option>
-                <option value="quota">Remaining Quota</option>
-                <option value="used_quota">Used Quota</option>
-                <option value="username">Username</option>
-                <option value="id">ID</option>
-                <option value="created_time">Created Time</option>
-              </select>
-              <Button variant="outline" size="sm" onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}>{sortOrder.toUpperCase()}</Button>
-              <Button onClick={() => load(pageIndex)} disabled={loading} variant="outline">Refresh</Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="flex-1">
-              <SearchableDropdown
-                value={searchKeyword}
-                placeholder="Search users..."
-                searchPlaceholder="Search by username..."
-                options={searchOptions}
-                onSearchChange={searchUsers}
-                onChange={(value) => setSearchKeyword(value)}
-                onAddItem={(value) => {
-                  const newOption: SearchOption = {
-                    key: value,
-                    value: value,
-                    text: value
-                  }
-                  setSearchOptions([...searchOptions, newOption])
-                }}
-                loading={searchLoading}
-                noResultsMessage="No users found"
-                additionLabel="Use username: "
-                allowAdditions={true}
-                clearable={true}
-              />
-            </div>
-            <Button onClick={search} disabled={loading}>Search</Button>
-          </div>
-          <DataTable
+        <CardContent className={cn(
+          isMobile ? "p-4" : "p-6"
+        )}>
+          <EnhancedDataTable
             columns={columns}
             data={data}
             pageIndex={pageIndex}
@@ -260,7 +261,18 @@ export function UsersPage() {
               setSortOrder(newSortOrder)
               // Let useEffect handle the reload to avoid double requests
             }}
+            searchValue={searchKeyword}
+            onSearchChange={searchUsers}
+            onSearchValueChange={setSearchKeyword}
+            onSearchSubmit={search}
+            searchPlaceholder="Search users by username..."
+            allowSearchAdditions={true}
+            onRefresh={() => load(pageIndex)}
             loading={loading}
+            emptyMessage="No users found. Add your first user to get started."
+            mobileCardLayout={true}
+            hideColumnsOnMobile={['created_time', 'accessed_time']}
+            compactMode={isMobile}
           />
         </CardContent>
       </Card>
@@ -269,7 +281,7 @@ export function UsersPage() {
       <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex)} />
       {/* Top Up Dialog */}
       <TopUpDialog open={openTopup.open} onOpenChange={(v)=>setOpenTopup({open:v})} userId={openTopup.userId} username={openTopup.username} onDone={()=>load(pageIndex)} />
-    </div>
+    </ResponsivePageContainer>
   )
 }
 

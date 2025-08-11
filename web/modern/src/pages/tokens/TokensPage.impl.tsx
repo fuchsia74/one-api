@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { renderQuota } from '@/lib/utils'
@@ -61,6 +63,7 @@ const getStatusBadge = (status: number) => {
 
 export function TokensPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<Token[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -311,11 +314,12 @@ export function TokensPage() {
       cell: ({ row }) => {
         const token = row.original
         return (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 mobile-table-cell">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate(`/tokens/edit/${token.id}`)}
+              className="touch-target"
             >
               Edit
             </Button>
@@ -324,6 +328,7 @@ export function TokensPage() {
               size="sm"
               onClick={() => manage(token.id, token.status === TOKEN_STATUS.ENABLED ? 'disable' : 'enable')}
               className={cn(
+                "touch-target",
                 token.status === TOKEN_STATUS.ENABLED
                   ? 'text-orange-600 hover:text-orange-700'
                   : 'text-green-600 hover:text-green-700'
@@ -339,6 +344,7 @@ export function TokensPage() {
                   manage(token.id, 'delete')
                 }
               }}
+              className="touch-target"
             >
               Delete
             </Button>
@@ -381,23 +387,26 @@ export function TokensPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Tokens"
+      description="Manage your API access tokens"
+      actions={
+        <Button
+          onClick={() => navigate('/tokens/add')}
+          className={cn(
+            "gap-2",
+            isMobile ? "w-full touch-target" : ""
+          )}
+        >
+          <Plus className="h-4 w-4" />
+          {isMobile ? "Add New Token" : "Add Token"}
+        </Button>
+      }
+    >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Tokens</CardTitle>
-              <CardDescription>
-                Manage your API access tokens
-              </CardDescription>
-            </div>
-            <Button onClick={() => navigate('/tokens/add')} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Token
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className={cn(
+          isMobile ? "p-4" : "p-6"
+        )}>
           <EnhancedDataTable
             columns={columns}
             data={data}
@@ -420,10 +429,13 @@ export function TokensPage() {
             onRefresh={refresh}
             loading={loading}
             emptyMessage="No tokens found. Create your first token to get started."
+            mobileCardLayout={true}
+            hideColumnsOnMobile={['created_time', 'accessed_time', 'expired_time']}
+            compactMode={isMobile}
           />
         </CardContent>
       </Card>
-    </div>
+    </ResponsivePageContainer>
   )
 }
 

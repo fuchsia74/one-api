@@ -1,15 +1,47 @@
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuthStore } from '@/lib/stores/auth'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Menu, X } from 'lucide-react'
+import { NavigationDrawer } from '@/components/ui/mobile-drawer'
+import { useResponsive } from '@/hooks/useResponsive'
+import {
+  Menu,
+  Home,
+  Settings,
+  Users,
+  CreditCard,
+  BarChart3,
+  MessageSquare,
+  Info,
+  Zap,
+  Gift,
+  DollarSign,
+  FileText
+} from 'lucide-react'
 import { useState } from 'react'
+
+// Icon mapping for navigation items
+const navigationIcons = {
+  '/dashboard': Home,
+  '/channels': Zap,
+  '/tokens': CreditCard,
+  '/logs': FileText,
+  '/users': Users,
+  '/redemptions': Gift,
+  '/topup': DollarSign,
+  '/models': BarChart3,
+  '/chat': MessageSquare,
+  '/about': Info,
+  '/settings': Settings,
+}
 
 export function Header() {
   const { user, logout } = useAuthStore()
   const location = useLocation()
+  const navigate = useNavigate()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const { isMobile, isTablet } = useResponsive()
 
   const isAdmin = user?.role >= 10
   const chatLink = localStorage.getItem('chat_link')
@@ -26,30 +58,52 @@ export function Header() {
     { name: 'Chat', to: '/chat', show: !!chatLink },
     { name: 'About', to: '/about', show: true },
     { name: 'Settings', to: '/settings', show: isAdmin },
-  ].filter(item => item.show)
+  ].filter(item => item.show).map(item => ({
+    ...item,
+    href: item.to,
+    icon: navigationIcons[item.to as keyof typeof navigationIcons],
+    isActive: location.pathname === item.to
+  }))
 
   const isActivePage = (path: string) => location.pathname === path
 
+  const handleLogout = async () => {
+    try {
+      await api.get('/user/logout')
+      logout()
+      navigate('/login')
+    } catch (error) {
+      console.error('Logout failed:', error)
+      // Force logout even if API call fails
+      logout()
+      navigate('/login')
+    }
+  }
+
   return (
-    <header className="border-b bg-background sticky top-0 z-50">
-      <div className="container mx-auto px-4 py-4">
-        <div className="flex items-center justify-between">
+    <header className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          {/* Logo and Brand */}
           <div className="flex items-center space-x-4">
-            <Link to="/" className="text-xl font-bold">
+            <Link
+              to="/"
+              className="text-xl font-bold hover:text-primary transition-colors"
+            >
               {localStorage.getItem('system_name') || 'OneAPI'}
             </Link>
 
-            {/* Desktop Navigation */}
-            {user && (
-              <nav className="hidden lg:flex space-x-4">
+            {/* Desktop Navigation - Only show on large screens */}
+            {user && !isMobile && !isTablet && (
+              <nav className="hidden lg:flex items-center space-x-1">
                 {navigationItems.map((item) => (
                   <Link
                     key={item.to}
                     to={item.to}
-                    className={`text-sm font-medium transition-colors ${
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                       isActivePage(item.to)
-                        ? 'text-primary'
-                        : 'text-muted-foreground hover:text-primary'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                   >
                     {item.name}
@@ -59,75 +113,87 @@ export function Header() {
             )}
           </div>
 
-          <div className="flex items-center space-x-4">
+          {/* Actions and User Menu */}
+          <div className="flex items-center space-x-2">
             <ThemeToggle />
+
             {user ? (
               <>
-                <span className="hidden md:inline text-sm text-muted-foreground">
+                {/* User Welcome - Hide on mobile */}
+                <span className="hidden md:inline text-sm text-muted-foreground truncate max-w-32">
                   Welcome, {user.display_name || user.username}
                 </span>
+
+                {/* Logout Button - Responsive sizing */}
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={async () => {
-                    await api.get('/user/logout');
-                    logout();
-                  }}
+                  onClick={handleLogout}
+                  className="hidden sm:inline-flex"
                 >
                   Logout
                 </Button>
 
-                {/* Mobile menu button */}
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="lg:hidden"
-                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                >
-                  {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-                </Button>
+                {/* Mobile menu button - Show when navigation is hidden */}
+                {(isMobile || isTablet) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setMobileMenuOpen(true)}
+                    className="lg:hidden touch-target"
+                    aria-label="Open navigation menu"
+                  >
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                )}
               </>
             ) : (
               <div className="flex items-center space-x-2">
                 <Link
                   to="/register"
-                  className="text-sm font-medium text-muted-foreground hover:text-primary"
+                  className={`font-medium text-muted-foreground hover:text-primary transition-colors ${
+                    isMobile ? 'text-sm' : 'text-sm'
+                  }`}
                 >
                   Register
                 </Link>
-                <Link
-                  to="/login"
-                  className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 text-sm text-primary-foreground hover:bg-primary/90"
+                <Button
+                  asChild
+                  size="sm"
+                  className="touch-target"
                 >
-                  Login
-                </Link>
+                  <Link to="/login">
+                    Login
+                  </Link>
+                </Button>
               </div>
             )}
           </div>
         </div>
-
-        {/* Mobile Navigation */}
-        {user && mobileMenuOpen && (
-          <nav className="lg:hidden mt-4 pb-4 border-t pt-4">
-            <div className="flex flex-col space-y-2">
-              {navigationItems.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={`text-sm font-medium py-2 px-3 rounded-md transition-colors ${
-                    isActivePage(item.to)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:text-primary hover:bg-muted'
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  {item.name}
-                </Link>
-              ))}
-            </div>
-          </nav>
-        )}
       </div>
+
+      {/* Mobile Navigation Drawer */}
+      {user && (
+        <NavigationDrawer
+          isOpen={mobileMenuOpen}
+          onClose={() => setMobileMenuOpen(false)}
+          navigationItems={navigationItems}
+          title="Navigation"
+        />
+      )}
+
+      {/* Mobile Logout Button in Drawer */}
+      {user && mobileMenuOpen && (
+        <div className="fixed bottom-4 left-4 right-4 z-60 sm:hidden">
+          <Button
+            variant="outline"
+            onClick={handleLogout}
+            className="w-full touch-target"
+          >
+            Logout
+          </Button>
+        </div>
+      )}
     </header>
   )
 }

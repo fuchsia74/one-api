@@ -27,6 +27,8 @@ import { ModelsPage } from '@/pages/models/ModelsPage'
 import { TopUpPage } from '@/pages/topup/TopUpPage'
 import { ChatPage } from '@/pages/chat/ChatPage'
 import { api } from '@/lib/api'
+import { ResponsiveDebugger } from '@/components/dev/responsive-debugger'
+import { ResponsiveValidator } from '@/components/dev/responsive-validator'
 
 const queryClient = new QueryClient()
 
@@ -107,6 +109,14 @@ function App() {
             </Route>
           </Routes>
         </div>
+
+        {/* Development tools */}
+        {process.env.NODE_ENV === 'development' && (
+          <>
+            <ResponsiveDebugger />
+            <ResponsiveValidator />
+          </>
+        )}
       </Router>
     </QueryClientProvider>
     </ThemeProvider>

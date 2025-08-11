@@ -31,30 +31,39 @@ This document contains essential, abstract, and up-to-date information about the
 
 ---
 
-## Frontend Table & Mobile UX Architecture (2025-08)
 
-- **Table & Pagination Refactor:**
-    - All management tables (Users, Channels, Tokens, Redemptions, Logs) now use a unified, server-side pagination and sorting pattern. Table sorting is handled via dropdown and clickable column headers with icons. All tables fetch data in real-time from the server; no local cache is used for editing or display.
-    - Pagination controls are always visible and styled for both desktop and mobile. Legacy CSS overrides that hid or broke pagination have been removed. Always check for global/legacy CSS overrides when UI elements are missing, especially with third-party UI libraries.
-    - Pagination logic must match the data loading strategy. For server-side pagination, render API results directly—never slice data in the component.
-    - Table action buttons and pagination controls are compact, visually consistent, and touch-friendly. Button and pagination sizing is responsive and modern.
+## Frontend Responsive & Table Architecture (2025-08)
 
-- **Mobile Table Redesign:**
-    - Mobile view uses a card-based layout: each table row is rendered as a card with clear label-value pairs (using `data-label` attributes for accessibility and clarity).
-    - Action buttons are arranged in a 2-column grid for touch usability, with primary actions (like Edit) spanning full width. All buttons are sized for touch targets (min 32px height) and have clear visual feedback.
-    - Pagination on mobile is touch-friendly, with large, visually distinct buttons and proper spacing. Hover/active states use transform and shadow for feedback.
-    - All table components (UsersTable, ChannelsTable, TokensTable, RedemptionsTable) have been updated to include `data-label` attributes for every cell, ensuring clarity and accessibility in mobile layouts.
-    - Mobile CSS is modular, with minimal use of `!important`. Only use `!important` when absolutely necessary to override third-party library conflicts. Prefer maintainable, specific selectors.
+- **Unified Responsive System:**
+    - All management tables (Users, Channels, Tokens, Redemptions, Logs) and main pages now use a unified responsive architecture. This includes:
+        - `useResponsive` hook for device detection (`isMobile`, `isTablet`, etc.).
+        - `ResponsivePageContainer`, `ResponsiveSection`, and `AdaptiveGrid` for consistent, adaptive layouts.
+        - Card-based mobile layouts for tables, with label-value pairs and touch-friendly controls.
+        - All table action buttons and pagination controls are touch-friendly, visually consistent, and use minimum 44px tap targets.
+        - Table columns can be hidden on mobile via `hideColumnsOnMobile` prop; all table cells use `data-label` for accessibility.
+        - Pagination is always visible, styled for both desktop and mobile, and never slices data locally for server-side pagination.
+        - All table and UI changes must be validated on both desktop and mobile after any refactor.
 
-- **General Frontend Practices:**
+- **CSS & Tailwind:**
+    - `mobile.css` and `tailwind.config.js` are extended for modular, maintainable responsive utilities (custom breakpoints, touch targets, responsive spacing, etc.).
+    - Legacy or global CSS overrides that break pagination or table layout have been removed. Always check for such overrides when UI elements are missing.
+    - Never use inline style overrides for layout/visibility; always prefer maintainable CSS fixes.
+    - Remove outdated or redundant CSS as part of any major UI refactor.
+
+- **Testing & Build:**
     - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
-    - All table and UI changes must be reflected in both desktop and mobile views. Always validate both after any refactor.
-    - When handing over, ensure the new assistant is aware of the mobile/table/pagination architecture, the importance of data-labels for mobile, and the need to keep UI/UX in sync with backend and documentation.
+    - Test files must use the correct mocking API for the test runner (e.g., `vi.mock` for Vitest, not `jest.mock`).
+    - After major refactors, always validate build and test integrity. Fixes for test runner compatibility (e.g., Vitest vs Jest) should be documented.
 
 - **Subtle Implementation Details:**
-    - Never use inline style overrides for critical layout/visibility issues; always prefer maintainable CSS fixes.
-    - When updating table or pagination styles, always test on both desktop and mobile. Mobile usability is a first-class concern.
-    - Remove outdated or redundant CSS as part of any major UI refactor. Keep the codebase clean and maintainable.
+    - All model lists for channel/adaptor editing are fetched in real-time from the backend, never from local cache.
+    - Table sorting dropdowns and icons are visually unified and always server-side.
+    - When adding models to a channel, deduplicate and never overwrite existing selections unless explicitly cleared.
+    - Mobile usability and accessibility (touch targets, `data-label`, focus/active states) are first-class concerns.
+    - Any new UI/UX or backend logic must be kept in sync with documentation and user-facing messages.
+
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the unified responsive/table architecture, the importance of data-labels for mobile, the need to keep UI/UX in sync with backend and documentation, and the requirement for proper test/build practices (including test runner compatibility).
 
 
 ## Claude Messages API: Universal Conversion

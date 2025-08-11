@@ -8,10 +8,42 @@ export default {
   theme: {
   	container: {
   		center: true,
-  		padding: '2rem',
+  		padding: {
+  			DEFAULT: '1rem',
+  			sm: '1.5rem',
+  			lg: '2rem',
+  			xl: '2.5rem',
+  			'2xl': '3rem'
+  		},
   		screens: {
+  			sm: '640px',
+  			md: '768px',
+  			lg: '1024px',
+  			xl: '1280px',
   			'2xl': '1400px'
   		}
+  	},
+  	screens: {
+  		'xs': '480px',
+  		'sm': '640px',
+  		'md': '768px',
+  		'lg': '1024px',
+  		'xl': '1280px',
+  		'2xl': '1536px',
+  		// Custom breakpoints for specific use cases
+  		'mobile': {'max': '767px'},
+  		'tablet': {'min': '768px', 'max': '1023px'},
+  		'desktop': {'min': '1024px'},
+  		// Touch device detection
+  		'touch': {'raw': '(hover: none) and (pointer: coarse)'},
+  		'no-touch': {'raw': '(hover: hover) and (pointer: fine)'},
+  		// Orientation
+  		'portrait': {'raw': '(orientation: portrait)'},
+  		'landscape': {'raw': '(orientation: landscape)'},
+  		// Reduced motion
+  		'reduce-motion': {'raw': '(prefers-reduced-motion: reduce)'},
+  		// High contrast
+  		'high-contrast': {'raw': '(prefers-contrast: high)'}
   	},
   	extend: {
   		colors: {
@@ -60,8 +92,91 @@ export default {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		spacing: {
+  			'safe-top': 'env(safe-area-inset-top)',
+  			'safe-bottom': 'env(safe-area-inset-bottom)',
+  			'safe-left': 'env(safe-area-inset-left)',
+  			'safe-right': 'env(safe-area-inset-right)',
+  		},
+  		minHeight: {
+  			'touch-target': '44px',
+  			'screen-safe': 'calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom))'
+  		},
+  		minWidth: {
+  			'touch-target': '44px'
+  		},
+  		fontSize: {
+  			'2xs': ['0.625rem', { lineHeight: '0.75rem' }],
+  		},
+  		animation: {
+  			'fade-in': 'fadeIn 0.2s ease-in-out',
+  			'fade-out': 'fadeOut 0.2s ease-in-out',
+  			'slide-in-right': 'slideInRight 0.3s ease-out',
+  			'slide-in-left': 'slideInLeft 0.3s ease-out',
+  			'slide-in-up': 'slideInUp 0.3s ease-out',
+  			'slide-in-down': 'slideInDown 0.3s ease-out',
+  		},
+  		keyframes: {
+  			fadeIn: {
+  				'0%': { opacity: '0' },
+  				'100%': { opacity: '1' },
+  			},
+  			fadeOut: {
+  				'0%': { opacity: '1' },
+  				'100%': { opacity: '0' },
+  			},
+  			slideInRight: {
+  				'0%': { transform: 'translateX(100%)' },
+  				'100%': { transform: 'translateX(0)' },
+  			},
+  			slideInLeft: {
+  				'0%': { transform: 'translateX(-100%)' },
+  				'100%': { transform: 'translateX(0)' },
+  			},
+  			slideInUp: {
+  				'0%': { transform: 'translateY(100%)' },
+  				'100%': { transform: 'translateY(0)' },
+  			},
+  			slideInDown: {
+  				'0%': { transform: 'translateY(-100%)' },
+  				'100%': { transform: 'translateY(0)' },
+  			},
   		}
   	}
   },
-  plugins: [require('tailwindcss-animate')],
+  plugins: [
+  	require('tailwindcss-animate'),
+  	// Custom plugin for responsive utilities
+  	function({ addUtilities, theme }) {
+  		const newUtilities = {
+  			'.touch-target': {
+  				minHeight: theme('minHeight.touch-target'),
+  				minWidth: theme('minWidth.touch-target'),
+  			},
+  			'.safe-area-inset': {
+  				paddingTop: 'env(safe-area-inset-top)',
+  				paddingBottom: 'env(safe-area-inset-bottom)',
+  				paddingLeft: 'env(safe-area-inset-left)',
+  				paddingRight: 'env(safe-area-inset-right)',
+  			},
+  			'.mobile-only': {
+  				'@media (min-width: 768px)': {
+  					display: 'none !important',
+  				},
+  			},
+  			'.tablet-up': {
+  				'@media (max-width: 767px)': {
+  					display: 'none !important',
+  				},
+  			},
+  			'.desktop-only': {
+  				'@media (max-width: 1023px)': {
+  					display: 'none !important',
+  				},
+  			},
+  		}
+  		addUtilities(newUtilities)
+  	}
+  ],
 }

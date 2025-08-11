@@ -1,4 +1,4 @@
-/* Mobile-responsive table styles */
+/* Enhanced Mobile-responsive table styles */
 @media (max-width: 768px) {
   /* Hide table headers on mobile */
   .mobile-table thead,
@@ -17,6 +17,13 @@
     border-radius: 0.5rem;
     background-color: hsl(var(--card));
     box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease-in-out;
+  }
+
+  .mobile-table tbody tr:hover,
+  .mobile-table-row:hover,
+  table tbody tr:hover {
+    box-shadow: 0 4px 12px 0 rgba(0, 0, 0, 0.15);
   }
 
   /* Style table cells as label-value pairs */
@@ -28,6 +35,7 @@
     padding: 0.5rem 0;
     border: none;
     position: relative;
+    word-break: break-word;
   }
 
   /* Add labels before content using data-label attribute */
@@ -40,6 +48,7 @@
     display: inline-block;
     min-width: 80px;
     margin-right: 0.5rem;
+    font-size: 0.875rem;
   }
 
   /* Special handling for action buttons */
@@ -58,15 +67,19 @@
     display: none;
   }
 
-  /* Make action buttons responsive */
+  /* Enhanced action buttons layout */
   .mobile-table .actions-grid,
-  .mobile-table-cell .space-x-2 {
-    display: grid;
+  .mobile-table-cell .space-x-2,
+  .mobile-table-cell .flex.gap-1,
+  .mobile-table-cell .flex.gap-2 {
+    display: grid !important;
     grid-template-columns: 1fr 1fr;
     gap: 0.5rem;
+    width: 100%;
   }
 
-  .mobile-table .actions-grid .primary-action {
+  .mobile-table .actions-grid .primary-action,
+  .mobile-table-cell .primary-action {
     grid-column: span 2;
   }
 
@@ -75,7 +88,18 @@
   .mobile-table-cell button,
   table button {
     min-height: 44px;
+    min-width: 44px;
     font-size: 0.875rem;
+    padding: 0.5rem 0.75rem;
+    border-radius: 0.375rem;
+  }
+
+  /* Compact buttons for mobile */
+  .mobile-table button.btn-compact,
+  .mobile-table-cell button.btn-compact {
+    min-height: 36px;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
   }
 
   /* Responsive pagination */
@@ -88,6 +112,7 @@
   .pagination-mobile .pagination-info {
     text-align: center;
     order: 1;
+    font-size: 0.75rem;
   }
 
   .pagination-mobile .pagination-controls {
@@ -100,6 +125,12 @@
     order: 3;
   }
 
+  /* Enhanced pagination button spacing */
+  .pagination-mobile .pagination-controls button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
   /* Hide some pagination buttons on small screens */
   @media (max-width: 480px) {
     .pagination-mobile .pagination-controls button:first-child,
@@ -109,15 +140,47 @@
   }
 }
 
-/* Enhanced touch targets */
+/* Enhanced touch targets and interactions */
 @media (hover: none) and (pointer: coarse) {
-  button, [role="button"] {
+  button, [role="button"], input[type="button"], input[type="submit"] {
     min-height: 44px;
     min-width: 44px;
+    touch-action: manipulation;
   }
 
   .touch-friendly {
     padding: 0.75rem;
+    touch-action: manipulation;
+  }
+
+  /* Larger tap targets for small interactive elements */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Enhanced focus styles for touch devices */
+  button:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 3px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+
+  /* Remove hover effects on touch devices */
+  button:hover,
+  [role="button"]:hover {
+    background-color: initial;
+    color: initial;
+  }
+
+  /* Enhanced active states for better feedback */
+  button:active,
+  [role="button"]:active {
+    transform: scale(0.98);
+    transition: transform 0.1s ease-in-out;
   }
 }
 
@@ -250,5 +313,197 @@ textarea:focus-visible {
 
   .mobile-table tbody td:last-child {
     border-top-color: #374151;
+  }
+}
+
+/* Additional responsive utilities */
+@layer utilities {
+  /* Responsive text sizing */
+  .text-responsive-xs {
+    font-size: 0.75rem;
+    line-height: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .text-responsive-xs {
+      font-size: 0.875rem;
+      line-height: 1.25rem;
+    }
+  }
+
+  .text-responsive-sm {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+  }
+
+  @media (min-width: 768px) {
+    .text-responsive-sm {
+      font-size: 1rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  .text-responsive-base {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .text-responsive-base {
+      font-size: 1.125rem;
+      line-height: 1.75rem;
+    }
+  }
+
+  .text-responsive-lg {
+    font-size: 1.125rem;
+    line-height: 1.75rem;
+  }
+
+  @media (min-width: 768px) {
+    .text-responsive-lg {
+      font-size: 1.25rem;
+      line-height: 1.75rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .text-responsive-lg {
+      font-size: 1.5rem;
+      line-height: 2rem;
+    }
+  }
+
+  /* Responsive spacing utilities */
+  .space-responsive-y > * + * {
+    margin-top: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .space-responsive-y > * + * {
+      margin-top: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .space-responsive-y > * + * {
+      margin-top: 2rem;
+    }
+  }
+
+  .space-responsive-x > * + * {
+    margin-left: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .space-responsive-x > * + * {
+      margin-left: 1rem;
+    }
+  }
+
+  /* Responsive padding utilities */
+  .p-responsive {
+    padding: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .p-responsive {
+      padding: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .p-responsive {
+      padding: 2rem;
+    }
+  }
+
+  .px-responsive {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .px-responsive {
+      padding-left: 1.5rem;
+      padding-right: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .px-responsive {
+      padding-left: 2rem;
+      padding-right: 2rem;
+    }
+  }
+
+  .py-responsive {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .py-responsive {
+      padding-top: 1.5rem;
+      padding-bottom: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .py-responsive {
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+    }
+  }
+
+  /* Responsive margin utilities */
+  .m-responsive {
+    margin: 1rem;
+  }
+
+  @media (min-width: 768px) {
+    .m-responsive {
+      margin: 1.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .m-responsive {
+      margin: 2rem;
+    }
+  }
+
+  /* Responsive gap utilities */
+  .gap-responsive {
+    gap: 0.5rem;
+  }
+
+  @media (min-width: 768px) {
+    .gap-responsive {
+      gap: 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .gap-responsive {
+      gap: 1.5rem;
+    }
+  }
+
+  /* Responsive border radius */
+  .rounded-responsive {
+    border-radius: 0.375rem;
+  }
+
+  @media (min-width: 768px) {
+    .rounded-responsive {
+      border-radius: 0.5rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .rounded-responsive {
+      border-radius: 0.75rem;
+    }
   }
 }

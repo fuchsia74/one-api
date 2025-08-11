@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button'
 import { AdvancedPagination } from '@/components/ui/advanced-pagination'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { useResponsive } from '@/hooks/useResponsive'
 import { ArrowUpDown, ArrowUp, ArrowDown, Search, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -40,6 +41,11 @@ export interface EnhancedDataTableProps<TData, TValue> {
   toolbarActions?: React.ReactNode
   onRefresh?: () => void
 
+  // Responsive options
+  mobileCardLayout?: boolean
+  hideColumnsOnMobile?: string[]
+  compactMode?: boolean
+
   loading?: boolean
   className?: string
   emptyMessage?: string
@@ -66,10 +72,14 @@ export function EnhancedDataTable<TData, TValue>({
   allowSearchAdditions = true,
   toolbarActions,
   onRefresh,
+  mobileCardLayout = true,
+  hideColumnsOnMobile = [],
+  compactMode = false,
   loading = false,
   className,
   emptyMessage = 'No results found.',
 }: EnhancedDataTableProps<TData, TValue>) {
+  const { isMobile, isTablet } = useResponsive()
   // Client-side sorting state (for display only when no server-side sorting)
   const [sorting, setSorting] = React.useState<SortingState>([])
 
@@ -148,15 +158,35 @@ export function EnhancedDataTable<TData, TValue>({
     }
   }
 
+  // Filter columns for mobile display
+  const getVisibleColumns = () => {
+    if (!isMobile || hideColumnsOnMobile.length === 0) return columns
+
+    return columns.filter(column => {
+      const accessorKey = 'accessorKey' in column ? column.accessorKey as string : ''
+      return !hideColumnsOnMobile.includes(accessorKey)
+    })
+  }
+
+  const visibleColumns = getVisibleColumns()
+
   return (
     <div className={cn('space-y-4', className)}>
       {/* Search and Actions Toolbar */}
       {(onSearchChange || toolbarActions || onRefresh) && (
-        <div className="flex items-center justify-between gap-4">
-          <div className="flex-1 flex items-center gap-2">
+        <div className={cn(
+          'flex gap-4',
+          isMobile ? 'flex-col space-y-4' : 'items-center justify-between'
+        )}>
+          <div className={cn(
+            'flex gap-2',
+            isMobile ? 'flex-col space-y-2' : 'flex-1 items-center'
+          )}>
             {onSearchChange && (
               <>
-                <div className="flex-1 max-w-md">
+                <div className={cn(
+                  isMobile ? 'w-full' : 'flex-1 max-w-md'
+                )}>
                   <SearchableDropdown
                     value={searchValue}
                     placeholder={searchPlaceholder}
@@ -173,76 +203,170 @@ export function EnhancedDataTable<TData, TValue>({
                   />
                 </div>
                 {onSearchSubmit && (
-                  <Button onClick={onSearchSubmit} disabled={loading} variant="outline">
-                    <Search className="h-4 w-4 mr-2" />
-                    Search
+                  <Button
+                    onClick={onSearchSubmit}
+                    disabled={loading}
+                    variant="outline"
+                    className={cn(
+                      isMobile ? 'w-full touch-target' : '',
+                      'gap-2'
+                    )}
+                  >
+                    <Search className="h-4 w-4" />
+                    {!isMobile && 'Search'}
                   </Button>
                 )}
               </>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className={cn(
+            'flex gap-2',
+            isMobile ? 'w-full' : 'items-center'
+          )}>
             {onRefresh && (
-              <Button onClick={onRefresh} disabled={loading} variant="outline" size="sm">
-                <RotateCcw className="h-4 w-4 mr-2" />
-                Refresh
+              <Button
+                onClick={onRefresh}
+                disabled={loading}
+                variant="outline"
+                size={compactMode || isMobile ? "sm" : "sm"}
+                className={cn(
+                  isMobile ? 'flex-1 touch-target' : '',
+                  'gap-2'
+                )}
+              >
+                <RotateCcw className="h-4 w-4" />
+                {!compactMode && !isMobile && 'Refresh'}
               </Button>
             )}
-            {toolbarActions}
+            <div className={cn(
+              isMobile ? 'flex gap-2 flex-1' : 'flex gap-2'
+            )}>
+              {toolbarActions}
+            </div>
           </div>
         </div>
       )}
 
       {/* Data Table */}
-      <div className="relative rounded-md border">
-        {/* Loading overlay to prevent repeated actions */}
+      <div className="relative">
+        {/* Loading overlay */}
         {loading && (
-          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm rounded-md">
             <div className="text-sm text-muted-foreground">Loading...</div>
           </div>
         )}
-        <Table className={cn(loading && 'pointer-events-none opacity-60')}>
-          <TableHeader>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id}>
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(
-                          header.column.columnDef.header,
-                          header.getContext()
-                        )}
-                  </TableHead>
-                ))}
-              </TableRow>
-            ))}
-          </TableHeader>
-          <TableBody>
+
+        {/* Mobile Card Layout */}
+        {isMobile && mobileCardLayout ? (
+          <div className="space-y-4">
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'} className="mobile-table-row">
+                <div key={row.id} className="bg-card border rounded-lg p-4 space-y-3">
                   {row.getVisibleCells().map((cell) => {
                     const headerDef = cell.column.columnDef.header
-                    const label = typeof headerDef === 'string' ? headerDef : (cell.column.id || '')
+                    const label = typeof headerDef === 'string' ? headerDef :
+                                 typeof headerDef === 'function' ? cell.column.id :
+                                 (cell.column.id || '')
+
+                    // Skip rendering if this column should be hidden on mobile
+                    const accessorKey = 'accessorKey' in cell.column.columnDef ?
+                                       cell.column.columnDef.accessorKey as string : ''
+                    if (hideColumnsOnMobile.includes(accessorKey)) {
+                      return null
+                    }
+
                     return (
-                      <TableCell key={cell.id} data-label={label} className="mobile-table-cell">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </TableCell>
+                      <div key={cell.id} className="flex justify-between items-start gap-3">
+                        <span className="text-sm font-medium text-muted-foreground min-w-0 flex-shrink-0">
+                          {label}:
+                        </span>
+                        <div className="text-right min-w-0 flex-1">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </div>
+                      </div>
                     )
                   })}
-                </TableRow>
+                </div>
               ))
             ) : (
-              <TableRow>
-                <TableCell colSpan={columns.length} className="h-24 text-center">
+              <div className="bg-card border rounded-lg p-8 text-center">
+                <div className="text-muted-foreground">
                   {loading ? 'Loading...' : emptyMessage}
-                </TableCell>
-              </TableRow>
+                </div>
+              </div>
             )}
-          </TableBody>
-        </Table>
+          </div>
+        ) : (
+          /* Desktop Table Layout */
+          <div className="rounded-md border overflow-hidden">
+            <div className="overflow-x-auto">
+              <Table className={cn(loading && 'pointer-events-none opacity-60')}>
+                <TableHeader>
+                  {table.getHeaderGroups().map((headerGroup) => (
+                    <TableRow key={headerGroup.id}>
+                      {headerGroup.headers.map((header) => {
+                        // Skip rendering if this column should be hidden on mobile/tablet
+                        const accessorKey = 'accessorKey' in header.column.columnDef ?
+                                           header.column.columnDef.accessorKey as string : ''
+                        if (isTablet && hideColumnsOnMobile.includes(accessorKey)) {
+                          return null
+                        }
+
+                        return (
+                          <TableHead key={header.id} className={cn(
+                            compactMode ? 'px-2 py-2' : 'px-4 py-3'
+                          )}>
+                            {header.isPlaceholder
+                              ? null
+                              : flexRender(
+                                  header.column.columnDef.header,
+                                  header.getContext()
+                                )}
+                          </TableHead>
+                        )
+                      })}
+                    </TableRow>
+                  ))}
+                </TableHeader>
+                <TableBody>
+                  {table.getRowModel().rows?.length ? (
+                    table.getRowModel().rows.map((row) => (
+                      <TableRow
+                        key={row.id}
+                        data-state={row.getIsSelected() && 'selected'}
+                        className="hover:bg-muted/50 transition-colors"
+                      >
+                        {row.getVisibleCells().map((cell) => {
+                          // Skip rendering if this column should be hidden on mobile/tablet
+                          const accessorKey = 'accessorKey' in cell.column.columnDef ?
+                                             cell.column.columnDef.accessorKey as string : ''
+                          if (isTablet && hideColumnsOnMobile.includes(accessorKey)) {
+                            return null
+                          }
+
+                          return (
+                            <TableCell key={cell.id} className={cn(
+                              compactMode ? 'px-2 py-2' : 'px-4 py-3'
+                            )}>
+                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                            </TableCell>
+                          )
+                        })}
+                      </TableRow>
+                    ))
+                  ) : (
+                    <TableRow>
+                      <TableCell colSpan={visibleColumns.length} className="h-24 text-center">
+                        {loading ? 'Loading...' : emptyMessage}
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Advanced Pagination */}

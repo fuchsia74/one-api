@@ -3,9 +3,11 @@ import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatTimestamp, cn } from '@/lib/utils'
 import { Plus, TestTube, RefreshCw, DollarSign, Trash2, Settings, AlertCircle } from 'lucide-react'
@@ -107,6 +109,7 @@ const formatResponseTime = (time?: number) => {
 
 export function ChannelsPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<Channel[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -481,62 +484,80 @@ export function ChannelsPage() {
   }
 
   const toolbarActions = (
-    <div className="flex items-center gap-2">
+    <div className={cn(
+      "flex gap-2",
+      isMobile ? "flex-col w-full" : "items-center"
+    )}>
       <Button
         variant="outline"
         onClick={handleBulkTest}
         disabled={bulkTesting || loading}
-        className="gap-2"
+        className={cn(
+          "gap-2",
+          isMobile ? "w-full touch-target" : ""
+        )}
+        size="sm"
       >
         {bulkTesting ? (
           <RefreshCw className="h-4 w-4 animate-spin" />
         ) : (
           <TestTube className="h-4 w-4" />
         )}
-        Test All
+        {isMobile ? "Test All Channels" : "Test All"}
       </Button>
       <Button
         variant="outline"
         onClick={handleBulkUpdateBalance}
         disabled={bulkUpdating || loading}
-        className="gap-2"
+        className={cn(
+          "gap-2",
+          isMobile ? "w-full touch-target" : ""
+        )}
+        size="sm"
       >
         {bulkUpdating ? (
           <RefreshCw className="h-4 w-4 animate-spin" />
         ) : (
           <DollarSign className="h-4 w-4" />
         )}
-        Update Balances
+        {isMobile ? "Update All Balances" : "Update Balances"}
       </Button>
       <Button
         variant="destructive"
         onClick={handleDeleteDisabled}
-        className="gap-2"
+        className={cn(
+          "gap-2",
+          isMobile ? "w-full touch-target" : ""
+        )}
+        size="sm"
       >
         <Trash2 className="h-4 w-4" />
-        Delete Disabled
+        {isMobile ? "Delete All Disabled" : "Delete Disabled"}
       </Button>
     </div>
   )
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Channels"
+      description="Configure and manage API routing channels"
+      actions={
+        <Button
+          onClick={() => navigate('/channels/add')}
+          className={cn(
+            "gap-2",
+            isMobile ? "w-full touch-target" : ""
+          )}
+        >
+          <Plus className="h-4 w-4" />
+          {isMobile ? "Add New Channel" : "Add Channel"}
+        </Button>
+      }
+    >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Channels</CardTitle>
-              <CardDescription>
-                Configure and manage API routing channels
-              </CardDescription>
-            </div>
-            <Button onClick={() => navigate('/channels/add')} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Channel
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className={cn(
+          isMobile ? "p-4" : "p-6"
+        )}>
           <EnhancedDataTable
             columns={columns}
             data={data}
@@ -560,9 +581,12 @@ export function ChannelsPage() {
             onRefresh={refresh}
             loading={loading}
             emptyMessage="No channels found. Create your first channel to get started."
+            mobileCardLayout={true}
+            hideColumnsOnMobile={['created_time', 'response_time']}
+            compactMode={isMobile}
           />
         </CardContent>
       </Card>
-    </div>
+    </ResponsivePageContainer>
   )
 }
