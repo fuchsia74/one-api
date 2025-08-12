@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Modal, Table, Tag, Typography, Space, Spin, Notification, Divider, Card, Row, Col } from '@douyinfe/semi-ui';
-import { IconClock, IconInfo, IconPlay, IconSend, IconReply, IconCheckCircle, IconFlag, IconArrowRight } from '@douyinfe/semi-icons';
+import { IconClock, IconAlertCircle, IconPlay, IconSend, IconReply, IconCheckCircleStroked, IconFlag, IconArrowRight } from '@douyinfe/semi-icons';
 import { API, timestamp2string } from '../helpers';
 
 const { Title, Text } = Typography;
@@ -64,7 +64,7 @@ const TracingModal = ({ visible, onCancel, logId }) => {
       case 'forwarded': return <IconArrowRight style={{ color: '#13c2c2' }} />;
       case 'upstream_response': return <IconReply style={{ color: '#722ed1' }} />;
       case 'client_response': return <IconSend style={{ color: '#fa8c16' }} />;
-      case 'upstream_completed': return <IconCheckCircle style={{ color: '#52c41a' }} />;
+      case 'upstream_completed': return <IconCheckCircleStroked style={{ color: '#52c41a' }} />;
       case 'completed': return <IconFlag style={{ color: '#52c41a' }} />;
       default: return <IconClock />;
     }
@@ -173,7 +173,7 @@ const TracingModal = ({ visible, onCancel, logId }) => {
           pagination={false}
           size="small"
         />
-        
+
         {durations?.total_time && (
           <div style={{ marginTop: 16, padding: 12, backgroundColor: '#e6f7ff', borderRadius: 6 }}>
             <Text strong style={{ color: '#1890ff' }}>
@@ -191,7 +191,7 @@ const TracingModal = ({ visible, onCancel, logId }) => {
     return (
       <Card title={
         <Space>
-          <IconInfo />
+          <IconAlertCircle />
           <Text>请求信息</Text>
         </Space>
       }>
@@ -273,7 +273,7 @@ const TracingModal = ({ visible, onCancel, logId }) => {
           </div>
         </div>
       )}
-      
+
       {traceData && !loading && (
         <div>
           {renderRequestInfo()}
