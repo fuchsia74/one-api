@@ -43,9 +43,24 @@ func GetRedemptionCount() (count int64, err error) {
 	return count, err
 }
 
-func SearchRedemptions(keyword string) (redemptions []*Redemption, err error) {
-	err = DB.Where("id = ? or name LIKE ?", keyword, keyword+"%").Find(&redemptions).Error
-	return redemptions, err
+func SearchRedemptions(keyword string, startIdx int, num int, sortBy string, sortOrder string) (redemptions []*Redemption, total int64, err error) {
+	db := DB.Model(&Redemption{})
+	if keyword != "" {
+		db = db.Where("id = ? or name LIKE ?", keyword, keyword+"%")
+	}
+	if sortBy != "" {
+		orderClause := sortBy
+		if sortOrder == "asc" {
+			orderClause += " asc"
+		} else {
+			orderClause += " desc"
+		}
+		db = db.Order(orderClause)
+	} else {
+		db = db.Order("id desc")
+	}
+	err = db.Count(&total).Limit(num).Offset(startIdx).Find(&redemptions).Error
+	return redemptions, total, err
 }
 
 func GetRedemptionById(id int) (*Redemption, error) {

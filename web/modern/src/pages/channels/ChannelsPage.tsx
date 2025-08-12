@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
@@ -113,7 +113,7 @@ export function ChannelsPage() {
   const [data, setData] = useState<Channel[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
@@ -122,6 +122,7 @@ export function ChannelsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [bulkTesting, setBulkTesting] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
+  const initializedRef = useRef(false)
 
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
@@ -159,6 +160,7 @@ export function ChannelsPage() {
       // Unified API call - complete URL with /api prefix
       let url = `/api/channel/search?keyword=${encodeURIComponent(query)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -197,6 +199,7 @@ export function ChannelsPage() {
       // Unified API call - complete URL with /api prefix
       let url = `/api/channel/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -213,15 +216,20 @@ export function ChannelsPage() {
     }
   }
 
+  // Load initial data
   useEffect(() => {
     load(0, pageSize)
-  }, [pageSize])
+    initializedRef.current = true
+  }, [])
 
+  // Handle sort changes (only after initialization)
   useEffect(() => {
+    if (!initializedRef.current) return
+
     if (searchKeyword.trim()) {
       performSearch()
     } else {
-      load(0, pageSize)
+      load(pageIndex, pageSize)
     }
   }, [sortBy, sortOrder])
 
@@ -462,20 +470,13 @@ export function ChannelsPage() {
   ]
 
   const handlePageChange = (newPageIndex: number, newPageSize: number) => {
-    if (searchKeyword.trim()) {
-      setPageIndex(newPageIndex)
-    } else {
-      load(newPageIndex, newPageSize)
-    }
+    load(newPageIndex, newPageSize)
   }
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, newPageSize)
-    }
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
   }
 
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {

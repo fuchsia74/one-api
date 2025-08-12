@@ -4,10 +4,11 @@ import (
 	"os"
 	"testing"
 
-	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/logger"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+
+	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/logger"
 )
 
 func TestMain(m *testing.M) {

@@ -34,7 +34,7 @@ export function UsersPage() {
   const [data, setData] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
@@ -44,11 +44,11 @@ export function UsersPage() {
   const [openCreate, setOpenCreate] = useState(false)
   const [openTopup, setOpenTopup] = useState<{ open: boolean, userId?: number, username?: string }>({ open: false })
 
-  const load = async (p = 0) => {
+  const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
-      let url = `/api/user/?p=${p}`
+      let url = `/api/user/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data, total } = res.data
@@ -56,6 +56,7 @@ export function UsersPage() {
         setData(data)
         setTotal(total || data.length)
         setPageIndex(p)
+        setPageSize(size)
       }
     } finally {
       setLoading(false)
@@ -100,17 +101,18 @@ export function UsersPage() {
     if (searchKeyword.trim()) {
       search()
     } else {
-      load(0)
+      load(0, pageSize)
     }
   }, [sortBy, sortOrder])
 
   const search = async () => {
     setLoading(true)
     try {
-      if (!searchKeyword.trim()) return load(0)
+      if (!searchKeyword.trim()) return load(0, pageSize)
       // Unified API call - complete URL with /api prefix
       let url = `/api/user/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
       const res = await api.get(url)
       const { success, data } = res.data
       if (success) {
@@ -237,6 +239,17 @@ export function UsersPage() {
     </div>
   )
 
+  // Handlers for page change and page size change
+  const handlePageChange = (newPageIndex: number, newPageSize: number) => {
+    load(newPageIndex, newPageSize)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
+  }
+
   return (
     <ResponsivePageContainer
       title="Users"
@@ -253,11 +266,8 @@ export function UsersPage() {
             pageIndex={pageIndex}
             pageSize={pageSize}
             total={total}
-            onPageChange={(pi) => load(pi)}
-            onPageSizeChange={(newPageSize) => {
-              setPageSize(newPageSize)
-              setPageIndex(0)
-            }}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSortChange={(newSortBy, newSortOrder) => {
@@ -273,7 +283,7 @@ export function UsersPage() {
             onSearchSubmit={search}
             searchPlaceholder="Search users by username..."
             allowSearchAdditions={true}
-            onRefresh={() => load(pageIndex)}
+            onRefresh={() => load(pageIndex, pageSize)}
             loading={loading}
             emptyMessage="No users found. Add your first user to get started."
             mobileCardLayout={true}
@@ -284,9 +294,9 @@ export function UsersPage() {
       </Card>
 
       {/* Create User Dialog */}
-      <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex)} />
+      <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex, pageSize)} />
       {/* Top Up Dialog */}
-      <TopUpDialog open={openTopup.open} onOpenChange={(v) => setOpenTopup({ open: v })} userId={openTopup.userId} username={openTopup.username} onDone={() => load(pageIndex)} />
+      <TopUpDialog open={openTopup.open} onOpenChange={(v) => setOpenTopup({ open: v })} userId={openTopup.userId} username={openTopup.username} onDone={() => load(pageIndex, pageSize)} />
     </ResponsivePageContainer>
   )
 }

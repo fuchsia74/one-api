@@ -25,13 +25,22 @@ func GetAllChannels(c *gin.Context) {
 		p = 0
 	}
 
+	// Get page size from query parameter, default to config value
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+
 	sortBy := c.Query("sort")
 	sortOrder := c.Query("order")
 	if sortOrder == "" {
 		sortOrder = "desc"
 	}
 
-	channels, err := model.GetAllChannels(p*config.MaxItemsPerPage, config.MaxItemsPerPage, "limited", sortBy, sortOrder)
+	channels, err := model.GetAllChannels(p*size, size, "limited", sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

@@ -83,8 +83,11 @@ func GetUserTokenCount(userId int) (count int64, err error) {
 	return count, err
 }
 
-func SearchUserTokens(userId int, keyword string, sortBy string, sortOrder string) (tokens []*Token, err error) {
-	// Default sorting
+func SearchUserTokens(userId int, keyword string, startIdx int, num int, sortBy string, sortOrder string) (tokens []*Token, total int64, err error) {
+	db := DB.Model(&Token{}).Where("user_id = ?", userId)
+	if keyword != "" {
+		db = db.Where("name LIKE ?", keyword+"%")
+	}
 	orderClause := "id desc"
 	if sortBy != "" {
 		if sortOrder == "asc" {
@@ -93,9 +96,9 @@ func SearchUserTokens(userId int, keyword string, sortBy string, sortOrder strin
 			orderClause = sortBy + " desc"
 		}
 	}
-
-	err = DB.Where("user_id = ?", userId).Where("name LIKE ?", keyword+"%").Order(orderClause).Find(&tokens).Error
-	return tokens, err
+	db = db.Order(orderClause)
+	err = db.Count(&total).Limit(num).Offset(startIdx).Find(&tokens).Error
+	return tokens, total, err
 }
 
 func ValidateUserToken(key string) (token *Token, err error) {

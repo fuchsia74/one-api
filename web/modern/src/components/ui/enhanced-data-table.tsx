@@ -144,6 +144,10 @@ export function EnhancedDataTable<TData, TValue>({
     columns: enhancedColumns,
     state: {
       sorting,
+      pagination: {
+        pageIndex,
+        pageSize,
+      },
     },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),

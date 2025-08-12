@@ -101,6 +101,10 @@ export function DataTable<TData, TValue>({
     columns: enhancedColumns,
     state: {
       sorting,
+      pagination: {
+        pageIndex,
+        pageSize,
+      },
     },
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),

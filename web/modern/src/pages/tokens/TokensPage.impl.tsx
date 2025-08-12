@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
@@ -67,13 +67,14 @@ export function TokensPage() {
   const [data, setData] = useState<Token[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [sortBy, setSortBy] = useState('id')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const initializedRef = useRef(false)
   const [showKeys, setShowKeys] = useState<Record<number, boolean>>({})
 
   const load = async (p = 0, size = pageSize) => {
@@ -101,15 +102,20 @@ export function TokensPage() {
     }
   }
 
+  // Load initial data
   useEffect(() => {
     load(0, pageSize)
-  }, [pageSize])
+    initializedRef.current = true
+  }, [])
 
+  // Handle sort changes (only after initialization)
   useEffect(() => {
+    if (!initializedRef.current) return
+
     if (searchKeyword.trim()) {
       performSearch()
     } else {
-      load(0, pageSize)
+      load(pageIndex, pageSize)
     }
   }, [sortBy, sortOrder])
 
@@ -124,6 +130,7 @@ export function TokensPage() {
       // Unified API call - complete URL with /api prefix
       let url = `/api/token/search?keyword=${encodeURIComponent(query)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -162,6 +169,7 @@ export function TokensPage() {
       // Unified API call - complete URL with /api prefix
       let url = `/api/token/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -359,21 +367,13 @@ export function TokensPage() {
   ]
 
   const handlePageChange = (newPageIndex: number, newPageSize: number) => {
-    if (searchKeyword.trim()) {
-      // For search results, we don't do server-side pagination
-      setPageIndex(newPageIndex)
-    } else {
-      load(newPageIndex, newPageSize)
-    }
+    load(newPageIndex, newPageSize)
   }
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, newPageSize)
-    }
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
   }
 
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {

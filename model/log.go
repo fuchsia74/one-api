@@ -237,14 +237,26 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	return logs, err
 }
 
-func SearchAllLogs(keyword string) (logs []*Log, err error) {
-	err = LOG_DB.Where("type = ? or content LIKE ?", keyword, keyword+"%").Order("id desc").Limit(config.MaxRecentItems).Find(&logs).Error
-	return logs, err
+func SearchAllLogs(keyword string, startIdx int, num int, sortBy string, sortOrder string) (logs []*Log, total int64, err error) {
+	db := LOG_DB.Model(&Log{})
+	if keyword != "" {
+		db = db.Where("content LIKE ?", "%"+keyword+"%")
+	}
+	orderClause := GetLogOrderClause(sortBy, sortOrder)
+	db = db.Order(orderClause)
+	err = db.Count(&total).Limit(num).Offset(startIdx).Find(&logs).Error
+	return logs, total, err
 }
 
-func SearchUserLogs(userId int, keyword string) (logs []*Log, err error) {
-	err = LOG_DB.Where("user_id = ? and type = ?", userId, keyword).Order("id desc").Limit(config.MaxRecentItems).Omit("id").Find(&logs).Error
-	return logs, err
+func SearchUserLogs(userId int, keyword string, startIdx int, num int, sortBy string, sortOrder string) (logs []*Log, total int64, err error) {
+	db := LOG_DB.Model(&Log{}).Where("user_id = ?", userId)
+	if keyword != "" {
+		db = db.Where("content LIKE ?", "%"+keyword+"%")
+	}
+	orderClause := GetLogOrderClause(sortBy, sortOrder)
+	db = db.Order(orderClause)
+	err = db.Count(&total).Limit(num).Offset(startIdx).Find(&logs).Error
+	return logs, total, err
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int) (quota int64) {

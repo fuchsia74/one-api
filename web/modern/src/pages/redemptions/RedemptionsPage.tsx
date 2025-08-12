@@ -38,7 +38,7 @@ export function RedemptionsPage() {
   const [data, setData] = useState<RedemptionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [sortBy, setSortBy] = useState('')
@@ -57,11 +57,11 @@ export function RedemptionsPage() {
     defaultValues: { name: '', count: 1, quota: 0 },
   })
 
-  const load = async (p = 0) => {
+  const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
-      let url = `/api/redemption/?p=${p}`
+      let url = `/api/redemption/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data, total } = res.data
@@ -75,7 +75,7 @@ export function RedemptionsPage() {
     }
   }
 
-  useEffect(() => { load(0) }, [])
+  useEffect(() => { load(0, pageSize) }, [])
 
   useEffect(() => {
     if (searchKeyword.trim()) {
@@ -86,12 +86,13 @@ export function RedemptionsPage() {
   }, [sortBy, sortOrder])
 
   const search = async () => {
-    if (!searchKeyword.trim()) return load(0)
+    if (!searchKeyword.trim()) return load(0, pageSize)
     setLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
       let url = `/api/redemption/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
       const res = await api.get(url)
       const { success, data } = res.data
       if (success) {
@@ -164,6 +165,17 @@ export function RedemptionsPage() {
     }
   }
 
+  // Handlers for page change and page size change
+  const handlePageChange = (newPageIndex: number, newPageSize: number) => {
+    load(newPageIndex, newPageSize)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <Card>
@@ -185,7 +197,7 @@ export function RedemptionsPage() {
                 <option value="redeemed_time">Redeemed Time</option>
               </select>
               <Button variant="outline" size="sm" onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}>{sortOrder.toUpperCase()}</Button>
-              <Button onClick={() => load(pageIndex)} disabled={loading} variant="outline">Refresh</Button>
+              <Button onClick={() => load(pageIndex, pageSize)} disabled={loading} variant="outline">Refresh</Button>
             </div>
           </div>
         </CardHeader>
@@ -211,7 +223,8 @@ export function RedemptionsPage() {
             pageIndex={pageIndex}
             pageSize={pageSize}
             total={total}
-            onPageChange={(pi) => load(pi)}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSortChange={(newSortBy, newSortOrder) => {
@@ -234,7 +247,7 @@ export function RedemptionsPage() {
               const res = await api.post('/api/redemption/', { name: values.name, count: values.count, quota: values.quota })
               if (res.data?.success) {
                 setGeneratedKeys(res.data.data || [])
-                load(pageIndex)
+                load(pageIndex, pageSize)
               }
             })}>
               <FormField control={form.control} name="name" render={({ field }) => (

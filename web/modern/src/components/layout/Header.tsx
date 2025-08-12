@@ -102,8 +102,8 @@ export function Header() {
                     key={item.to}
                     to={item.to}
                     className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${isActivePage(item.to)
-                        ? 'bg-primary text-primary-foreground'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                       }`}
                   >
                     {item.name}
@@ -121,7 +121,7 @@ export function Header() {
               <>
                 {/* User Welcome - Hide on mobile */}
                 <span className="hidden md:inline text-sm text-muted-foreground truncate max-w-32">
-                  Welcome, {user.display_name || user.username}
+                  {user.username}
                 </span>
 
                 {/* Logout Button - Responsive sizing */}
