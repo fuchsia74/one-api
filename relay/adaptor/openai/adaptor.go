@@ -155,6 +155,16 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	return request, nil
 }
 
+func isModelSupportedReasoning(modelName string) bool {
+	switch {
+	case strings.HasPrefix(modelName, "o"),
+		strings.HasPrefix(modelName, "gpt-5"):
+		return true
+	default:
+		return false
+	}
+}
+
 // applyRequestTransformations applies the existing request transformations
 func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.GeneralOpenAIRequest) error {
 	switch meta.ChannelType {
@@ -185,7 +195,7 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	}
 
 	// o1/o3/o4 do not support system prompt/max_tokens/temperature
-	if strings.HasPrefix(meta.ActualModelName, "o") {
+	if isModelSupportedReasoning(meta.ActualModelName) {
 		temperature := float64(1)
 		request.Temperature = &temperature // Only the default (1) value is supported
 		request.MaxTokens = 0
@@ -204,8 +214,6 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 
 			return
 		}(request.Messages)
-	} else {
-		request.ReasoningEffort = nil
 	}
 
 	// web search do not support system prompt/max_tokens/temperature

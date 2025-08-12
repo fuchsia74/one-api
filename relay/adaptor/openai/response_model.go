@@ -295,10 +295,12 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 	}
 
 	// Handle thinking/reasoning
-	if request.ReasoningEffort != nil || request.Thinking != nil {
-		if responseReq.Reasoning == nil {
-			responseReq.Reasoning = &model.OpenAIResponseReasoning{
-				Effort: request.ReasoningEffort,
+	if isModelSupportedReasoning(request.Model) {
+		if request.ReasoningEffort != nil || request.Thinking != nil {
+			if responseReq.Reasoning == nil {
+				responseReq.Reasoning = &model.OpenAIResponseReasoning{
+					Effort: request.ReasoningEffort,
+				}
 			}
 		}
 
@@ -311,6 +313,8 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			reasoningEffort := "high"
 			responseReq.Reasoning.Effort = &reasoningEffort
 		}
+	} else {
+		request.ReasoningEffort = nil
 	}
 
 	// Handle response format
