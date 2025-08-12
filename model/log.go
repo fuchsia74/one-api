@@ -291,7 +291,7 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 		defer cancel()
 		err = tx.WithContext(ctx).Order(orderClause).Limit(num).Offset(startIdx).Find(&logs).Error
 	} else {
-		err = tx.Order(orderClause).Limit(num).Offset(startIdx).Omit("id").Find(&logs).Error
+		err = tx.Order(orderClause).Limit(num).Offset(startIdx).Find(&logs).Error
 	}
 	return logs, err
 }

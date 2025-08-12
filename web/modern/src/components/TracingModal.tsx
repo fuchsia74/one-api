@@ -68,6 +68,7 @@ interface TracingModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   logId: number | null
+  traceId?: string | null
 }
 
 const formatDuration = (milliseconds?: number): string => {
@@ -142,20 +143,24 @@ const timelineEvents = [
   }
 ]
 
-export function TracingModal({ open, onOpenChange, logId }: TracingModalProps) {
+export function TracingModal({ open, onOpenChange, logId, traceId }: TracingModalProps) {
   const [loading, setLoading] = useState(false)
   const [traceData, setTraceData] = useState<TraceData | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
 
+
   useEffect(() => {
-    if (open && logId) {
+    if (open && logId && traceId && traceId.trim() !== '') {
       fetchTraceData()
+    } else if (open && (!traceId || traceId.trim() === '')) {
+      setTraceData(null)
+      setError('No trace information available for this log entry.')
     }
-  }, [open, logId])
+  }, [open, logId, traceId])
 
   const fetchTraceData = async () => {
-    if (!logId) return
+    if (!logId || !traceId || traceId.trim() === '') return
 
     setLoading(true)
     setError(null)

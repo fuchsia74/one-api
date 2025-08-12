@@ -136,13 +136,20 @@ func GetRequestID(ctx context.Context) string {
 
 // GetTraceIDFromContext extracts TraceID from standard context using gin-middlewares
 func GetTraceIDFromContext(ctx context.Context) string {
+	logger := gmw.GetLogger(ctx)
+
 	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
 		traceID, err := gmw.TraceID(ginCtx)
 		if err != nil {
+			// Log the error for debugging
+			logger.Error("failed to get trace ID from gin-middlewares", zap.Error(err))
 			return ""
 		}
 		return traceID.String()
 	}
+
+	// Log when we can't get gin context for debugging
+	logger.Error("failed to get gin context from standard context for trace ID extraction")
 	return ""
 }
 
