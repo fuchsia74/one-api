@@ -13,6 +13,7 @@ COPY ./web .
 RUN cd /web/default && yarn install
 RUN cd /web/berry && yarn install
 RUN cd /web/air && yarn install
+RUN cd /web/modern && yarn install
 
 RUN mkdir -p /web/build
 
@@ -21,6 +22,7 @@ RUN mkdir -p /web/build
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/default
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/berry
 RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/air
+RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/modern
 
 FROM golang:1.24.6-bookworm AS builder2
 
@@ -93,7 +95,6 @@ COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/
 COPY --from=ffmpeg /usr/local/bin/ffprobe /usr/local/bin/
 
 COPY --from=builder2 /build/one-api /
-# COPY --from=builder /web/build /web/build
 
 # RUN if [ "${TARGETARCH}" = "arm64" ]; then \
 #     else \
