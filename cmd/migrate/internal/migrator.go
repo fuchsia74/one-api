@@ -238,6 +238,9 @@ func (m *Migrator) runAutoMigration() error {
 	if err := model.DB.AutoMigrate(&model.UserRequestCost{}); err != nil {
 		return fmt.Errorf("failed to migrate UserRequestCost: %w", err)
 	}
+	if err := model.DB.AutoMigrate(&model.Trace{}); err != nil {
+		return fmt.Errorf("failed to migrate Trace: %w", err)
+	}
 
 	logger.Logger.Info("GORM auto-migration completed successfully")
 	return nil
@@ -369,6 +372,7 @@ func (m *Migrator) fixPostgreSQLSequences() error {
 		"abilities",
 		"logs",
 		"user_request_costs",
+		"traces",
 	}
 
 	for _, tableName := range tablesWithSequences {

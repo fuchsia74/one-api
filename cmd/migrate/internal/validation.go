@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
+
 	"github.com/songquanpeng/one-api/common/logger"
 )
 
@@ -98,7 +100,7 @@ func (v *PreMigrationValidator) validateSourceDatabase(result *ValidationResult)
 	logger.Logger.Info("Validating source database...")
 
 	// Check if source database has expected tables
-	expectedTables := []string{"users", "tokens", "channels", "options", "redemptions", "abilities", "logs", "user_request_costs"}
+	expectedTables := []string{"users", "tokens", "channels", "options", "redemptions", "abilities", "logs", "user_request_costs", "traces"}
 
 	for _, tableName := range expectedTables {
 		exists, err := v.migrator.sourceConn.TableExists(tableName)
@@ -278,14 +280,14 @@ func ExtractDatabaseTypeFromDSN(dsn string) (string, error) {
 		return "sqlite", nil
 	}
 
-	return "", fmt.Errorf("unable to determine database type from DSN: %s", dsn)
+	return "", errors.Wrapf(fmt.Errorf("unable to determine database type from DSN: %s", dsn), "invalid DSN")
 }
 
 // ValidateDSN validates a database connection string
 func ValidateDSN(dsn string) error {
 	dbType, err := ExtractDatabaseTypeFromDSN(dsn)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "failed to extract database type from DSN")
 	}
 
 	switch strings.ToLower(dbType) {
@@ -319,7 +321,7 @@ func validateSQLiteDSN(dsn string) error {
 	dir := filepath.Dir(path)
 	if dir != "." {
 		if _, err := os.Stat(dir); os.IsNotExist(err) {
-			return fmt.Errorf("directory does not exist: %s", dir)
+			return errors.Wrapf(err, "directory does not exist: %s", dir)
 		}
 	}
 
@@ -332,14 +334,14 @@ func validateMySQLDSN(dsn string) error {
 	if strings.HasPrefix(dsn, "mysql://") {
 		// For mysql:// scheme, we expect: mysql://user:password@host:port/database
 		if !strings.Contains(dsn, "@") || !strings.Contains(dsn, "/") {
-			return fmt.Errorf("invalid MySQL DSN format - expected format: mysql://user:password@host:port/database")
+			return errors.Wrapf(fmt.Errorf("invalid MySQL DSN format - expected format: mysql://user:password@host:port/database"), "invalid MySQL DSN")
 		}
 		return nil
 	}
 
 	// Basic format check for traditional MySQL DSN
 	if !strings.Contains(dsn, "@tcp(") && !strings.Contains(dsn, "@unix(") {
-		return fmt.Errorf("invalid MySQL DSN format - expected format: user:password@tcp(host:port)/database or mysql://user:password@host:port/database")
+		return errors.Wrapf(fmt.Errorf("invalid MySQL DSN format - expected format: user:password@tcp(host:port)/database or mysql://user:password@host:port/database"), "invalid MySQL DSN")
 	}
 	return nil
 }
@@ -348,7 +350,7 @@ func validateMySQLDSN(dsn string) error {
 func validatePostgresDSN(dsn string) error {
 	// Basic format check for PostgreSQL DSN
 	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
-		return fmt.Errorf("invalid PostgreSQL DSN format - expected format: postgres://user:password@host:port/database")
+		return errors.Wrapf(fmt.Errorf("invalid PostgreSQL DSN format - expected format: postgres://user:password@host:port/database"), "invalid PostgreSQL DSN")
 	}
 	return nil
 }

@@ -15,6 +15,7 @@ import { IconRefresh, IconSearch } from '@tabler/icons-react';
 import LogTableRow from './component/TableRow';
 import LogTableHead from './component/TableHead';
 import TableToolBar from './component/TableToolBar';
+import TracingModal from './component/TracingModal';
 import { API } from 'utils/api';
 import { isAdmin } from 'utils/common';
 import { ITEMS_PER_PAGE } from 'constants';
@@ -45,6 +46,8 @@ export default function Log() {
   const [sortBy, setSortBy] = useState('');
   const [sortOrder, setSortOrder] = useState('desc');
   const [sortLoading, setSortLoading] = useState(false);
+  const [tracingModalOpen, setTracingModalOpen] = useState(false);
+  const [selectedLogId, setSelectedLogId] = useState(null);
   const userIsAdmin = isAdmin();
 
   const loadLogs = async (startIdx) => {
@@ -156,6 +159,16 @@ export default function Log() {
     setInitPage(true);
   };
 
+  const handleRowClick = (logId) => {
+    setSelectedLogId(logId);
+    setTracingModalOpen(true);
+  };
+
+  const handleTracingModalClose = () => {
+    setTracingModalOpen(false);
+    setSelectedLogId(null);
+  };
+
   useEffect(() => {
     setSearchKeyword(originalKeyword);
     setActivePage(0);
@@ -255,7 +268,7 @@ export default function Log() {
               />
               <TableBody>
                 {logs.slice(activePage * ITEMS_PER_PAGE, (activePage + 1) * ITEMS_PER_PAGE).map((row, index) => (
-                  <LogTableRow item={row} key={`${row.id}_${index}`} userIsAdmin={userIsAdmin} />
+                  <LogTableRow item={row} key={`${row.id}_${index}`} userIsAdmin={userIsAdmin} onRowClick={handleRowClick} />
                 ))}
               </TableBody>
             </Table>
@@ -270,6 +283,12 @@ export default function Log() {
           rowsPerPageOptions={[ITEMS_PER_PAGE]}
         />
       </Card>
+
+      <TracingModal
+        open={tracingModalOpen}
+        onClose={handleTracingModalClose}
+        logId={selectedLogId}
+      />
     </>
   );
 }

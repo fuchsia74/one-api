@@ -139,6 +139,14 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), controller.SearchUserLogs)
+
+		// Tracing routes
+		traceRoute := apiRouter.Group("/trace")
+		traceRoute.Use(middleware.UserAuth()) // Users can view traces for their own logs
+		{
+			traceRoute.GET("/log/:log_id", controller.GetTraceByLogId)
+			traceRoute.GET("/:trace_id", controller.GetTraceByTraceId)
+		}
 		groupRoute := apiRouter.Group("/group")
 		groupRoute.Use(middleware.AdminAuth())
 		{

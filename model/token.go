@@ -188,8 +188,9 @@ func (t *Token) Insert() error {
 	err = DB.Create(t).Error
 	if err == nil {
 		clearTokenCache(t.Key)
+		return nil
 	}
-	return err
+	return errors.Wrapf(err, "failed to insert token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
@@ -198,8 +199,9 @@ func (t *Token) Update() error {
 	err = DB.Model(t).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota", "models", "subnet").Updates(t).Error
 	if err == nil {
 		clearTokenCache(t.Key)
+		return nil
 	}
-	return err
+	return errors.Wrapf(err, "failed to update token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
 func (t *Token) SelectUpdate() error {
@@ -207,8 +209,9 @@ func (t *Token) SelectUpdate() error {
 	err := DB.Model(t).Select("accessed_time", "status").Updates(t).Error
 	if err == nil {
 		clearTokenCache(t.Key)
+		return nil
 	}
-	return err
+	return errors.Wrapf(err, "failed to select update token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
 func (t *Token) Delete() error {
@@ -216,8 +219,9 @@ func (t *Token) Delete() error {
 	err = DB.Delete(t).Error
 	if err == nil {
 		clearTokenCache(t.Key)
+		return nil
 	}
-	return err
+	return errors.Wrapf(err, "failed to delete token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
 func (t *Token) GetModels() string {
@@ -269,19 +273,15 @@ func increaseTokenQuota(id int, quota int64) (err error) {
 		},
 	).Error
 	if err == nil {
-		// We need the token key to clear the cache.
-		// Fetch the token first.
-		// This might be inefficient if BatchUpdateEnabled is false and this is called frequently.
-		// Consider if this function needs to clear cache directly or rely on eventual consistency.
-		// For now, let's fetch and clear.
 		token, fetchErr := GetTokenById(id)
 		if fetchErr == nil && token != nil {
 			clearTokenCache(token.Key)
 		} else if fetchErr != nil {
 			logger.Logger.Error("failed to fetch token for cache clearing after quota increase", zap.Int("token_id", id), zap.Error(fetchErr))
 		}
+		return nil
 	}
-	return err
+	return errors.Wrapf(err, "failed to increase token quota: id=%d", id)
 }
 
 func DecreaseTokenQuota(id int, quota int64) (err error) {
@@ -304,15 +304,15 @@ func decreaseTokenQuota(id int, quota int64) (err error) {
 		},
 	).Error
 	if err == nil {
-		// Similar to increaseTokenQuota, fetch the token to get its key for cache clearing.
 		token, fetchErr := GetTokenById(id)
 		if fetchErr == nil && token != nil {
 			clearTokenCache(token.Key)
 		} else if fetchErr != nil {
 			logger.Logger.Error("failed to fetch token for cache clearing after quota decrease", zap.Int("token_id", id), zap.Error(fetchErr))
 		}
+		return nil
 	}
-	return err
+	return errors.Wrapf(err, "failed to decrease token quota: id=%d", id)
 }
 
 func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {

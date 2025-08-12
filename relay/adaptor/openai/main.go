@@ -18,6 +18,8 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/render"
+	"github.com/songquanpeng/one-api/common/tracing"
+	relaymodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -30,6 +32,11 @@ const (
 	done             = openai_compatible.Done
 	dataPrefixLength = openai_compatible.DataPrefixLength
 )
+
+// Optionally: record when upstream streaming is completed (non-standard event)
+func recordUpstreamCompleted(c *gin.Context) {
+	tracing.RecordTraceTimestamp(c, relaymodel.TimestampUpstreamCompleted)
+}
 
 // StreamHandler processes streaming responses from OpenAI API
 // It handles incremental content delivery and accumulates the final response text
@@ -151,6 +158,9 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	if err := resp.Body.Close(); err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), "", nil
 	}
+
+	// Record when upstream streaming is completed
+	recordUpstreamCompleted(c)
 
 	// Return the complete response text (reasoning + content) and usage
 	return nil, reasoningText + responseText, usage
@@ -594,6 +604,9 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), responseText, usage
 	}
 
+	// Record when upstream streaming is completed
+	recordUpstreamCompleted(c)
+
 	return nil, responseText, usage
 }
 
@@ -761,6 +774,9 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 	if err := resp.Body.Close(); err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), responseText, usage
 	}
+
+	// Record when upstream streaming is completed
+	recordUpstreamCompleted(c)
 
 	return nil, responseText, usage
 }

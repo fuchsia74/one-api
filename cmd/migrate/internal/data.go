@@ -39,6 +39,7 @@ var TableMigrationOrder = []TableInfo{
 	{"abilities", &model.Ability{}},
 	{"logs", &model.Log{}},
 	{"user_request_costs", &model.UserRequestCost{}},
+	{"traces", &model.Trace{}},
 }
 
 // TableInfo holds information about a table and its corresponding model

@@ -6,6 +6,7 @@ import { IconRefresh } from '@douyinfe/semi-icons';
 import { ITEMS_PER_PAGE } from '../constants';
 import { renderNumber, renderQuota, stringToColor } from '../helpers/render';
 import Paragraph from '@douyinfe/semi-ui/lib/es/typography/paragraph';
+import TracingModal from './TracingModal';
 import './LogsTable.mobile.css';
 
 const { Header } = Layout;
@@ -196,6 +197,8 @@ const LogsTable = () => {
   const [isStatRefreshing, setIsStatRefreshing] = useState(false);
   const [userOptions, setUserOptions] = useState([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
+  const [tracingModalVisible, setTracingModalVisible] = useState(false);
+  const [selectedLogId, setSelectedLogId] = useState(null);
 
   const handleInputChange = (value, name) => {
     setInputs((inputs) => ({ ...inputs, [name]: value }));
@@ -405,6 +408,16 @@ const LogsTable = () => {
     }
   };
 
+  const handleRowClick = (record) => {
+    setSelectedLogId(record.id);
+    setTracingModalVisible(true);
+  };
+
+  const handleTracingModalClose = () => {
+    setTracingModalVisible(false);
+    setSelectedLogId(null);
+  };
+
   useEffect(() => {
     // console.log('default effect')
     const localPageSize = parseInt(localStorage.getItem('page-size')) || ITEMS_PER_PAGE;
@@ -511,17 +524,26 @@ const LogsTable = () => {
           </Form.Section>
         </>
       </Form>
-      <Table className="logs-table" style={{ marginTop: 5 }} columns={columns} dataSource={pageData} pagination={{
-        currentPage: activePage,
-        pageSize: pageSize,
-        total: logCount,
-        pageSizeOpts: [10, 20, 50, 100],
-        showSizeChanger: true,
-        onPageSizeChange: (size) => {
-          handlePageSizeChange(size).then();
-        },
-        onPageChange: handlePageChange
-      }} />
+      <Table
+        className="logs-table"
+        style={{ marginTop: 5 }}
+        columns={columns}
+        dataSource={pageData}
+        onRow={(record) => ({
+          onClick: () => handleRowClick(record),
+          style: { cursor: 'pointer' }
+        })}
+        pagination={{
+          currentPage: activePage,
+          pageSize: pageSize,
+          total: logCount,
+          pageSizeOpts: [10, 20, 50, 100],
+          showSizeChanger: true,
+          onPageSizeChange: (size) => {
+            handlePageSizeChange(size).then();
+          },
+          onPageChange: handlePageChange
+        }} />
       <Select className="logs-select" defaultValue="0" style={{ width: 120 }} onChange={(value) => {
         setLogType(parseInt(value));
         refresh(parseInt(value)).then();
@@ -532,6 +554,12 @@ const LogsTable = () => {
         <Select.Option value="3">管理</Select.Option>
         <Select.Option value="4">系统</Select.Option>
       </Select>
+
+      <TracingModal
+        visible={tracingModalVisible}
+        onCancel={handleTracingModalClose}
+        logId={selectedLogId}
+      />
     </Layout>
   </>);
 };

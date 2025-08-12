@@ -23,6 +23,7 @@ import {
   renderQuota,
 } from '../helpers';
 import BaseTable from './shared/BaseTable';
+import TracingModal from './TracingModal';
 
 import { ITEMS_PER_PAGE } from '../constants';
 
@@ -121,6 +122,10 @@ const LogsTable = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [searchKeyword, setSearchKeyword] = useState('');
   const [searching, setSearching] = useState(false);
+
+  // Tracing modal state
+  const [tracingModalOpen, setTracingModalOpen] = useState(false);
+  const [selectedLogId, setSelectedLogId] = useState(null);
 
   // Advanced search filters
   const [showStat, setShowStat] = useState(false);
@@ -357,6 +362,16 @@ const LogsTable = () => {
       return <Icon name="sort" style={{ opacity: 0.5 }} />;
     }
     return <Icon name={sortOrder === 'asc' ? 'sort up' : 'sort down'} />;
+  };
+
+  const handleRowClick = (logId) => {
+    setSelectedLogId(logId);
+    setTracingModalOpen(true);
+  };
+
+  const handleTracingModalClose = () => {
+    setTracingModalOpen(false);
+    setSelectedLogId(null);
   };
 
   const headerCells = [
@@ -681,7 +696,12 @@ const LogsTable = () => {
         {logs.map((log, idx) => {
           if (log.deleted) return null;
           return (
-            <Table.Row key={log.id} data-label={`Log ${log.id}`}>
+            <Table.Row
+              key={log.id}
+              data-label={`Log ${log.id}`}
+              style={{ cursor: 'pointer' }}
+              onClick={() => handleRowClick(log.id)}
+            >
               <Table.Cell data-label={t('log.table.time', 'Time')}>
                 {renderTimestamp(log.created_at, log.request_id)}
               </Table.Cell>
@@ -755,6 +775,12 @@ const LogsTable = () => {
           );
         })}
       </BaseTable>
+
+      <TracingModal
+        open={tracingModalOpen}
+        onClose={handleTracingModalClose}
+        logId={selectedLogId}
+      />
     </>
   );
 };

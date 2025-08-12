@@ -219,9 +219,13 @@ func (user *User) Update(updatePassword bool) error {
 
 // ClearTotpSecret clears the TOTP secret for the user
 func (user *User) ClearTotpSecret() error {
-	return DB.Model(user).Select("totp_secret").Updates(map[string]interface{}{
+	err := DB.Model(user).Select("totp_secret").Updates(map[string]interface{}{
 		"totp_secret": "",
 	}).Error
+	if err != nil {
+		return errors.Wrapf(err, "failed to clear TOTP secret for user: id=%d", user.Id)
+	}
+	return nil
 }
 
 func (user *User) Delete() error {
@@ -232,7 +236,10 @@ func (user *User) Delete() error {
 	user.Username = fmt.Sprintf("deleted_%s", random.GetUUID())
 	user.Status = UserStatusDeleted
 	err := DB.Model(user).Updates(user).Error
-	return err
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete user: id=%d", user.Id)
+	}
+	return nil
 }
 
 // ValidateAndFill check password & user status

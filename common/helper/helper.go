@@ -134,6 +134,18 @@ func GetRequestID(ctx context.Context) string {
 	return rawRequestId.(string)
 }
 
+// GetTraceIDFromContext extracts TraceID from standard context using gin-middlewares
+func GetTraceIDFromContext(ctx context.Context) string {
+	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
+		traceID, err := gmw.TraceID(ginCtx)
+		if err != nil {
+			return ""
+		}
+		return traceID.String()
+	}
+	return ""
+}
+
 func GetResponseID(c *gin.Context) string {
 	logID := c.GetString(RequestIdKey)
 	return fmt.Sprintf("chatcmpl-%s", logID)

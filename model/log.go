@@ -28,6 +28,7 @@ type Log struct {
 	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0;index"` // Added index for sorting
 	ChannelId         int    `json:"channel" gorm:"index"`
 	RequestId         string `json:"request_id" gorm:"default:''"`
+	TraceId           string `json:"trace_id" gorm:"type:varchar(64);index;default:''"` // TraceID from gin-middlewares
 	UpdatedAt         int64  `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 	ElapsedTime       int64  `json:"elapsed_time" gorm:"default:0;index"` // Added index for sorting (unit is ms)
 	IsStream          bool   `json:"is_stream" gorm:"default:false"`
@@ -69,6 +70,11 @@ func GetLogOrderClause(sortBy string, sortOrder string) string {
 func recordLogHelper(ctx context.Context, log *Log) {
 	requestId := helper.GetRequestID(ctx)
 	log.RequestId = requestId
+
+	// Also set TraceID from gin-middlewares if available
+	traceId := helper.GetTraceIDFromContext(ctx)
+	log.TraceId = traceId
+
 	err := LOG_DB.Create(log).Error
 	if err != nil {
 		// For billing logs (consume type), this is critical as it means we sent upstream request but failed to log it
@@ -92,7 +98,8 @@ func recordLogHelper(ctx context.Context, log *Log) {
 		zap.Int64("created_at", log.CreatedAt),
 		zap.Int("type", log.Type),
 		zap.String("content", log.Content),
-		zap.String("request_id", log.RequestId))
+		zap.String("request_id", log.RequestId),
+		zap.String("trace_id", log.TraceId))
 }
 
 func RecordLog(ctx context.Context, userId int, logType int, content string) {
@@ -315,6 +322,15 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 func DeleteOldLog(targetTimestamp int64) (int64, error) {
 	result := LOG_DB.Where("created_at < ?", targetTimestamp).Delete(&Log{})
 	return result.RowsAffected, result.Error
+}
+
+// GetLogById retrieves a log entry by its ID
+func GetLogById(id int) (*Log, error) {
+	var log Log
+	if err := LOG_DB.Where("id = ?", id).First(&log).Error; err != nil {
+		return nil, err
+	}
+	return &log, nil
 }
 
 type LogStatistic struct {
