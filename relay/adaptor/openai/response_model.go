@@ -297,7 +297,9 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 	// Handle thinking/reasoning
 	if request.ReasoningEffort != nil || request.Thinking != nil {
 		if responseReq.Reasoning == nil {
-			responseReq.Reasoning = &model.OpenAIResponseReasoning{}
+			responseReq.Reasoning = &model.OpenAIResponseReasoning{
+				Effort: request.ReasoningEffort,
+			}
 		}
 
 		if responseReq.Reasoning.Summary == nil {
@@ -305,8 +307,9 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			responseReq.Reasoning.Summary = &reasoningSummary
 		}
 
-		if request.ReasoningEffort != nil {
-			responseReq.Reasoning.Effort = request.ReasoningEffort
+		if request.ReasoningEffort == nil {
+			reasoningEffort := "high"
+			responseReq.Reasoning.Effort = &reasoningEffort
 		}
 	}
 

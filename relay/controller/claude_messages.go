@@ -18,6 +18,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/model"
@@ -182,6 +183,8 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	quotaId := c.GetInt(ctxkey.Id)
 	requestId := c.GetString(ctxkey.RequestId)
 
+	// Capture trace ID before launching goroutine
+	traceId := helper.GetTraceIDFromContext(c.Request.Context())
 	go func() {
 		// Use configurable billing timeout with model-specific adjustments
 		baseBillingTimeout := time.Duration(config.BillingTimeoutSec) * time.Second
@@ -195,7 +198,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		var quota int64
 
 		go func() {
-			quota = postConsumeClaudeMessagesQuota(ctx, usage, meta, claudeRequest, ratio, preConsumedQuota, modelRatio, groupRatio, channelCompletionRatio)
+			quota = postConsumeClaudeMessagesQuotaWithTraceID(ctx, traceId, usage, meta, claudeRequest, ratio, preConsumedQuota, modelRatio, groupRatio, channelCompletionRatio)
 
 			// also update user request cost
 			if quota != 0 {
@@ -712,5 +715,46 @@ func postConsumeClaudeMessagesQuota(ctx context.Context, usage *relaymodel.Usage
 		meta.IsStream, meta.StartTime, false, completionRatio, usage.ToolsCost)
 
 	logger.Logger.Debug(fmt.Sprintf("Claude Messages quota: pre-consumed=%d, actual=%d, difference=%d", preConsumedQuota, quota, quotaDelta))
+	return quota
+}
+
+// postConsumeClaudeMessagesQuotaWithTraceID calculates and applies final quota consumption for Claude Messages API with explicit trace ID
+func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, traceId string, usage *relaymodel.Usage, meta *metalib.Meta, request *ClaudeMessagesRequest, ratio float64, preConsumedQuota int64, modelRatio float64, groupRatio float64, channelCompletionRatio map[string]float64) int64 {
+	if usage == nil {
+		logger.Logger.Warn("usage is nil for Claude Messages API")
+		return 0
+	}
+
+	// Use three-layer pricing system for completion ratio
+	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
+	completionRatio := pricing.GetCompletionRatioWithThreeLayers(request.Model, channelCompletionRatio, pricingAdaptor)
+	promptTokens := usage.PromptTokens
+	completionTokens := usage.CompletionTokens
+
+	// Calculate base quota
+	baseQuota := int64(math.Ceil((float64(promptTokens) + float64(completionTokens)*completionRatio) * ratio))
+
+	// Add structured output cost if applicable
+	structuredOutputCost := calculateClaudeStructuredOutputCost(request, completionTokens, modelRatio)
+
+	// Total quota includes base cost, tools cost, and structured output cost
+	quota := baseQuota + usage.ToolsCost + structuredOutputCost
+	if ratio != 0 && quota <= 0 {
+		quota = 1
+	}
+
+	totalTokens := promptTokens + completionTokens
+	if totalTokens == 0 {
+		// in this case, must be some error happened
+		// we cannot just return, because we may have to return the pre-consumed quota
+		quota = 0
+	}
+	// Use centralized detailed billing function with explicit trace ID
+	quotaDelta := quota - preConsumedQuota
+	billing.PostConsumeQuotaDetailedWithTraceID(ctx, traceId, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
+		promptTokens, completionTokens, modelRatio, groupRatio, request.Model, meta.TokenName,
+		meta.IsStream, meta.StartTime, false, completionRatio, usage.ToolsCost)
+
+	logger.Logger.Debug(fmt.Sprintf("Claude Messages quota with trace ID: pre-consumed=%d, actual=%d, difference=%d", preConsumedQuota, quota, quotaDelta))
 	return quota
 }

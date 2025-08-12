@@ -191,6 +191,49 @@ func postConsumeQuota(ctx context.Context,
 	return quota
 }
 
+func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
+	usage *relaymodel.Usage,
+	meta *meta.Meta,
+	textRequest *relaymodel.GeneralOpenAIRequest,
+	ratio float64,
+	preConsumedQuota int64,
+	modelRatio float64,
+	groupRatio float64,
+	systemPromptReset bool,
+	channelCompletionRatio map[string]float64) (quota int64) {
+	if usage == nil {
+		logger.Logger.Error("usage is nil, which is unexpected")
+		return
+	}
+
+	// Use three-layer pricing system for completion ratio
+	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
+	completionRatio := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
+	promptTokens := usage.PromptTokens
+	// It appears that DeepSeek's official service automatically merges ReasoningTokens into CompletionTokens,
+	// but the behavior of third-party providers may differ, so for now we do not add them manually.
+	// completionTokens := usage.CompletionTokens + usage.CompletionTokensDetails.ReasoningTokens
+	completionTokens := usage.CompletionTokens
+	quota = int64(math.Ceil((float64(promptTokens)+float64(completionTokens)*completionRatio)*ratio)) + usage.ToolsCost
+	if ratio != 0 && quota <= 0 {
+		quota = 1
+	}
+
+	totalTokens := promptTokens + completionTokens
+	if totalTokens == 0 {
+		// in this case, must be some error happened
+		// we cannot just return, because we may have to return the pre-consumed quota
+		quota = 0
+	}
+	// Use centralized detailed billing function with explicit trace ID
+	quotaDelta := quota - preConsumedQuota
+	billing.PostConsumeQuotaDetailedWithTraceID(ctx, traceId, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
+		promptTokens, completionTokens, modelRatio, groupRatio, textRequest.Model, meta.TokenName,
+		meta.IsStream, meta.StartTime, systemPromptReset, completionRatio, usage.ToolsCost)
+
+	return quota
+}
+
 func isErrorHappened(meta *meta.Meta, resp *http.Response) bool {
 	if resp == nil {
 		if meta.ChannelType == channeltype.AwsClaude {

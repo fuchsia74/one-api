@@ -41,6 +41,9 @@ export interface EnhancedDataTableProps<TData, TValue> {
   toolbarActions?: React.ReactNode
   onRefresh?: () => void
 
+  // Row interaction
+  onRowClick?: (row: TData) => void
+
   // Responsive options
   mobileCardLayout?: boolean
   hideColumnsOnMobile?: string[]
@@ -72,6 +75,7 @@ export function EnhancedDataTable<TData, TValue>({
   allowSearchAdditions = true,
   toolbarActions,
   onRefresh,
+  onRowClick,
   mobileCardLayout = true,
   hideColumnsOnMobile = [],
   compactMode = false,
@@ -339,7 +343,11 @@ export function EnhancedDataTable<TData, TValue>({
                       <TableRow
                         key={row.id}
                         data-state={row.getIsSelected() && 'selected'}
-                        className="hover:bg-muted/50 transition-colors"
+                        className={cn(
+                          "hover:bg-muted/50 transition-colors",
+                          onRowClick && "cursor-pointer"
+                        )}
+                        onClick={() => onRowClick?.(row.original)}
                       >
                         {row.getVisibleCells().map((cell) => {
                           // Skip rendering if this column should be hidden on mobile/tablet

@@ -46,12 +46,14 @@ func RelayProxyHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// log proxy request with zero quota
 	quotaId := c.GetInt(ctxkey.Id)
 	requestId := c.GetString(ctxkey.RequestId)
+	// Capture trace ID before launching goroutine
+	traceId := helper.GetTraceIDFromContext(c.Request.Context())
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		// Log the proxy request with zero quota
-		model.RecordConsumeLog(ctx, &model.Log{
+		model.RecordConsumeLogWithTraceID(ctx, traceId, &model.Log{
 			UserId:           meta.UserId,
 			ChannelId:        meta.ChannelId,
 			PromptTokens:     usage.PromptTokens,
