@@ -217,9 +217,5 @@ func isThemeValid() error {
 		return errors.Errorf("invalid theme: %s", config.Theme)
 	}
 
-	if config.Theme == "modern" && !config.DebugEnabled {
-		return errors.Errorf("modern theme still under development")
-	}
-
 	return nil
 }
