@@ -166,14 +166,21 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 		"role": message.Role,
 	}
 
+	// Determine the appropriate content type based on message role
+	// For Response API: user messages use "input_text", assistant messages use "output_text"
+	textContentType := "input_text"
+	if message.Role == "assistant" {
+		textContentType = "output_text"
+	}
+
 	// Handle different content types
 	switch content := message.Content.(type) {
 	case string:
-		// Simple string content - convert to input_text format
+		// Simple string content - convert to appropriate text format based on role
 		if content != "" {
 			responseMsg["content"] = []map[string]interface{}{
 				{
-					"type": "input_text",
+					"type": textContentType,
 					"text": content,
 				},
 			}
@@ -186,7 +193,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 			case model.ContentTypeText:
 				if part.Text != nil && *part.Text != "" {
 					convertedContent = append(convertedContent, map[string]interface{}{
-						"type": "input_text",
+						"type": textContentType,
 						"text": *part.Text,
 					})
 				}
@@ -207,7 +214,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 			default:
 				// For unknown types, try to preserve as much as possible
 				partMap := map[string]interface{}{
-					"type": "input_text", // Default to input_text for unknown types
+					"type": textContentType, // Use appropriate text type based on role
 				}
 				if part.Text != nil {
 					partMap["text"] = *part.Text
@@ -227,11 +234,11 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 				for k, v := range itemMap {
 					convertedItem[k] = v
 				}
-				// Convert content types to Response API format
+				// Convert content types to Response API format based on message role
 				if itemType, exists := itemMap["type"]; exists {
 					switch itemType {
 					case "text":
-						convertedItem["type"] = "input_text"
+						convertedItem["type"] = textContentType
 					case "image_url":
 						convertedItem["type"] = "input_image"
 					}
@@ -243,11 +250,11 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 			responseMsg["content"] = convertedContent
 		}
 	default:
-		// Fallback: convert to string and treat as input_text
+		// Fallback: convert to string and treat as appropriate text type based on role
 		if contentStr := fmt.Sprintf("%v", content); contentStr != "" && contentStr != "<nil>" {
 			responseMsg["content"] = []map[string]interface{}{
 				{
-					"type": "input_text",
+					"type": textContentType,
 					"text": contentStr,
 				},
 			}

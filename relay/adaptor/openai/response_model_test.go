@@ -1271,6 +1271,84 @@ func TestStreamEventIntegration(t *testing.T) {
 
 // TestConvertChatCompletionToResponseAPIWithToolResults tests that tool result messages
 // are properly converted to function_call_output format for Response API
+func TestContentTypeBasedOnRole(t *testing.T) {
+	// Test that user messages use "input_text" and assistant messages use "output_text"
+	userMessage := model.Message{
+		Role:    "user",
+		Content: "Hello, how are you?",
+	}
+
+	assistantMessage := model.Message{
+		Role:    "assistant",
+		Content: "I'm doing well, thank you!",
+	}
+
+	// Convert user message
+	userResult := convertMessageToResponseAPIFormat(userMessage)
+	userContent := userResult["content"].([]map[string]interface{})
+	if userContent[0]["type"] != "input_text" {
+		t.Errorf("Expected user message to use 'input_text' type, got '%s'", userContent[0]["type"])
+	}
+	if userContent[0]["text"] != "Hello, how are you?" {
+		t.Errorf("Expected user message text to be preserved, got '%s'", userContent[0]["text"])
+	}
+
+	// Convert assistant message
+	assistantResult := convertMessageToResponseAPIFormat(assistantMessage)
+	assistantContent := assistantResult["content"].([]map[string]interface{})
+	if assistantContent[0]["type"] != "output_text" {
+		t.Errorf("Expected assistant message to use 'output_text' type, got '%s'", assistantContent[0]["type"])
+	}
+	if assistantContent[0]["text"] != "I'm doing well, thank you!" {
+		t.Errorf("Expected assistant message text to be preserved, got '%s'", assistantContent[0]["text"])
+	}
+}
+
+func TestConversationWithMultipleRoles(t *testing.T) {
+	// Test a conversation similar to the error log scenario
+	chatRequest := &model.GeneralOpenAIRequest{
+		Model: "gpt-4o-mini",
+		Messages: []model.Message{
+			{Role: "system", Content: "you are an experienced english translator"},
+			{Role: "user", Content: "我认为后端为 invalid 返回 200 是很荒谬的"},
+			{Role: "assistant", Content: "I think it's absurd for the backend to return 200 for an invalid response"},
+			{Role: "user", Content: "用户发送的 openai 请求，应该被转换为 ResponseAPI"},
+			{Role: "assistant", Content: "The OpenAI request sent by the user should be converted into a ResponseAPI"},
+			{Role: "user", Content: "halo"},
+		},
+		MaxTokens:   5000,
+		Temperature: floatPtr(1.0),
+		Stream:      true,
+	}
+
+	// Convert to Response API format
+	responseAPIRequest := ConvertChatCompletionToResponseAPI(chatRequest)
+
+	// Verify the conversion
+	if responseAPIRequest.Model != "gpt-4o-mini" {
+		t.Errorf("Expected model to be 'gpt-4o-mini', got '%s'", responseAPIRequest.Model)
+	}
+
+	// Check that input array has correct content types
+	inputArray := []any(responseAPIRequest.Input)
+	for i, item := range inputArray {
+		if itemMap, ok := item.(map[string]interface{}); ok {
+			role := itemMap["role"].(string)
+			content := itemMap["content"].([]map[string]interface{})
+
+			expectedType := "input_text"
+			if role == "assistant" {
+				expectedType = "output_text"
+			}
+
+			if content[0]["type"] != expectedType {
+				t.Errorf("Message %d with role '%s' should use '%s' type, got '%s'",
+					i, role, expectedType, content[0]["type"])
+			}
+		}
+	}
+}
+
 func TestConvertChatCompletionToResponseAPIWithToolResults(t *testing.T) {
 	chatRequest := &model.GeneralOpenAIRequest{
 		Model: "gpt-4o",
