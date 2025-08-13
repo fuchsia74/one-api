@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
-import { DataTable } from '@/components/ui/data-table'
+import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -12,7 +14,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { renderQuota } from '@/lib/utils'
+import { renderQuota, cn } from '@/lib/utils'
 
 interface UserRow {
   id: number
@@ -28,10 +30,11 @@ interface UserRow {
 
 export function UsersPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<UserRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
@@ -39,12 +42,13 @@ export function UsersPage() {
   const [sortBy, setSortBy] = useState('')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [openCreate, setOpenCreate] = useState(false)
-  const [openTopup, setOpenTopup] = useState<{open: boolean, userId?: number, username?: string}>({open: false})
+  const [openTopup, setOpenTopup] = useState<{ open: boolean, userId?: number, username?: string }>({ open: false })
 
-  const load = async (p = 0) => {
+  const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
-      let url = `/user/?p=${p}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/user/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
       const res = await api.get(url)
       const { success, data, total } = res.data
@@ -52,6 +56,7 @@ export function UsersPage() {
         setData(data)
         setTotal(total || data.length)
         setPageIndex(p)
+        setPageSize(size)
       }
     } finally {
       setLoading(false)
@@ -66,7 +71,8 @@ export function UsersPage() {
 
     setSearchLoading(true)
     try {
-      const res = await api.get(`/user/search?keyword=${encodeURIComponent(query)}`)
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get(`/api/user/search?keyword=${encodeURIComponent(query)}`)
       const { success, data } = res.data
       if (success && Array.isArray(data)) {
         const options: SearchOption[] = data.map((user: UserRow) => ({
@@ -92,15 +98,21 @@ export function UsersPage() {
   }
 
   useEffect(() => {
-    load(0)
+    if (searchKeyword.trim()) {
+      search()
+    } else {
+      load(0, pageSize)
+    }
   }, [sortBy, sortOrder])
 
   const search = async () => {
     setLoading(true)
     try {
-      if (!searchKeyword.trim()) return load(0)
-      let url = `/user/search?keyword=${encodeURIComponent(searchKeyword)}`
+      if (!searchKeyword.trim()) return load(0, pageSize)
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/user/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
       const res = await api.get(url)
       const { success, data } = res.data
       if (success) {
@@ -120,28 +132,24 @@ export function UsersPage() {
     { header: 'Status', cell: ({ row }) => (row.original.status === 1 ? 'Enabled' : 'Disabled') },
     { header: 'Group', accessorKey: 'group' },
     {
-      header: 'Total Quota',
-      accessorKey: 'quota',
-      cell: ({ row }) => (
-        <span className="font-mono text-sm">
-          {renderQuota(row.original.quota)}
-        </span>
-      )
-    },
-    {
       header: 'Used Quota',
       accessorKey: 'used_quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
+        <span className="font-mono text-sm" title={`Used: ${renderQuota(row.original.used_quota || 0)}`}>
           {row.original.used_quota ? renderQuota(row.original.used_quota) : renderQuota(0)}
         </span>
       )
     },
     {
-      header: 'Remaining',
+      header: 'Remaining Quota',
+      accessorKey: 'quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
-          {renderQuota(row.original.quota - (row.original.used_quota || 0))}
+        <span className="font-mono text-sm" title={`Remaining: ${renderQuota(row.original.quota)}`}>
+          {row.original.quota === -1 ? (
+            <span className="text-green-600 font-semibold">Unlimited</span>
+          ) : (
+            renderQuota(row.original.quota)
+          )}
         </span>
       )
     },
@@ -164,19 +172,20 @@ export function UsersPage() {
             {row.original.status === 1 ? 'Disable' : 'Enable'}
           </Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
-          <Button variant="outline" size="sm" onClick={() => setOpenTopup({open:true, userId: row.original.id, username: row.original.username})}>Top Up</Button>
+          <Button variant="outline" size="sm" onClick={() => setOpenTopup({ open: true, userId: row.original.id, username: row.original.username })}>Top Up</Button>
         </div>
       ),
     },
   ]
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete', idx: number) => {
-    let res
+    let res: any
     if (action === 'delete') {
-      res = await api.delete(`/user/${id}`)
+      // Unified API call - complete URL with /api prefix
+      res = await api.delete(`/api/user/${id}`)
     } else {
       const body: any = { id, status: action === 'enable' ? 1 : 2 }
-      res = await api.put('/user/?status_only=true', body)
+      res = await api.put('/api/user/?status_only=true', body)
     }
     const { success } = res.data
     if (success) {
@@ -191,95 +200,109 @@ export function UsersPage() {
     }
   }
 
+  const toolbarActions = (
+    <div className={cn(
+      "flex gap-2",
+      isMobile ? "flex-col w-full" : "items-center"
+    )}>
+      <Button
+        onClick={() => navigate('/users/add')}
+        className={cn(
+          isMobile ? "w-full touch-target" : ""
+        )}
+      >
+        Add User
+      </Button>
+      <select
+        className={cn(
+          "h-9 border rounded-md px-2 text-sm",
+          isMobile ? "w-full" : ""
+        )}
+        value={sortBy}
+        onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}
+      >
+        <option value="">Default</option>
+        <option value="quota">Remaining Quota</option>
+        <option value="used_quota">Used Quota</option>
+        <option value="username">Username</option>
+        <option value="id">ID</option>
+        <option value="created_time">Created Time</option>
+      </select>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+        className={cn(isMobile ? "w-full touch-target" : "")}
+      >
+        {sortOrder.toUpperCase()}
+      </Button>
+    </div>
+  )
+
+  // Handlers for page change and page size change
+  const handlePageChange = (newPageIndex: number, newPageSize: number) => {
+    load(newPageIndex, newPageSize)
+  }
+
+  const handlePageSizeChange = (newPageSize: number) => {
+    setPageSize(newPageSize)
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
+  }
+
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Users"
+      description="Manage users"
+      actions={toolbarActions}
+    >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Users</CardTitle>
-              <CardDescription>Manage users</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => navigate('/users/add')}>Add User</Button>
-              <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
-                <option value="">Default</option>
-                <option value="quota">Remaining Quota</option>
-                <option value="used_quota">Used Quota</option>
-                <option value="username">Username</option>
-                <option value="id">ID</option>
-                <option value="created_time">Created Time</option>
-              </select>
-              <Button variant="outline" size="sm" onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}>{sortOrder.toUpperCase()}</Button>
-              <Button onClick={() => load(pageIndex)} disabled={loading} variant="outline">Refresh</Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 mb-3">
-            <div className="flex-1">
-              <SearchableDropdown
-                value={searchKeyword}
-                placeholder="Search users..."
-                searchPlaceholder="Search by username..."
-                options={searchOptions}
-                onSearchChange={searchUsers}
-                onChange={(value) => setSearchKeyword(value)}
-                onAddItem={(value) => {
-                  const newOption: SearchOption = {
-                    key: value,
-                    value: value,
-                    text: value
-                  }
-                  setSearchOptions([...searchOptions, newOption])
-                }}
-                loading={searchLoading}
-                noResultsMessage="No users found"
-                additionLabel="Use username: "
-                allowAdditions={true}
-                clearable={true}
-              />
-            </div>
-            <Button onClick={search} disabled={loading}>Search</Button>
-          </div>
-          <DataTable
+        <CardContent className={cn(
+          isMobile ? "p-4" : "p-6"
+        )}>
+          <EnhancedDataTable
             columns={columns}
             data={data}
             pageIndex={pageIndex}
             pageSize={pageSize}
             total={total}
-            onPageChange={(pi) => load(pi)}
-            onPageSizeChange={(newPageSize) => {
-              setPageSize(newPageSize)
-              setPageIndex(0)
-            }}
+            onPageChange={handlePageChange}
+            onPageSizeChange={handlePageSizeChange}
             sortBy={sortBy}
             sortOrder={sortOrder}
             onSortChange={(newSortBy, newSortOrder) => {
               setSortBy(newSortBy)
               setSortOrder(newSortOrder)
-              // Reload data with new sort order
-              if (searchKeyword.trim()) {
-                search()
-              } else {
-                load(0)
-              }
+              // Let useEffect handle the reload to avoid double requests
             }}
+            searchValue={searchKeyword}
+            searchOptions={searchOptions}
+            searchLoading={searchLoading}
+            onSearchChange={searchUsers}
+            onSearchValueChange={setSearchKeyword}
+            onSearchSubmit={search}
+            searchPlaceholder="Search users by username..."
+            allowSearchAdditions={true}
+            onRefresh={() => load(pageIndex, pageSize)}
             loading={loading}
+            emptyMessage="No users found. Add your first user to get started."
+            mobileCardLayout={true}
+            hideColumnsOnMobile={['created_time', 'accessed_time']}
+            compactMode={isMobile}
           />
         </CardContent>
       </Card>
 
       {/* Create User Dialog */}
-      <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex)} />
+      <CreateUserDialog open={openCreate} onOpenChange={setOpenCreate} onCreated={() => load(pageIndex, pageSize)} />
       {/* Top Up Dialog */}
-      <TopUpDialog open={openTopup.open} onOpenChange={(v)=>setOpenTopup({open:v})} userId={openTopup.userId} username={openTopup.username} onDone={()=>load(pageIndex)} />
-    </div>
+      <TopUpDialog open={openTopup.open} onOpenChange={(v) => setOpenTopup({ open: v })} userId={openTopup.userId} username={openTopup.username} onDone={() => load(pageIndex, pageSize)} />
+    </ResponsivePageContainer>
   )
 }
 
 // Create User Dialog
-function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, onOpenChange: (v:boolean)=>void, onCreated: ()=>void }) {
+function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, onOpenChange: (v: boolean) => void, onCreated: () => void }) {
   const schema = z.object({
     username: z.string().min(1),
     password: z.string().min(6),
@@ -293,7 +316,8 @@ function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, on
         <DialogHeader><DialogTitle>Create User</DialogTitle></DialogHeader>
         <Form {...form}>
           <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
-            const res = await api.post('/user/', { username: values.username, password: values.password, display_name: values.display_name || values.username })
+            // Unified API call - complete URL with /api prefix
+            const res = await api.post('/api/user/', { username: values.username, password: values.password, display_name: values.display_name || values.username })
             if (res.data?.success) {
               onOpenChange(false)
               form.reset()
@@ -333,7 +357,7 @@ function CreateUserDialog({ open, onOpenChange, onCreated }: { open: boolean, on
 }
 
 // Top Up Dialog
-function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: boolean, onOpenChange: (v:boolean)=>void, userId?: number, username?: string, onDone: ()=>void }) {
+function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: boolean, onOpenChange: (v: boolean) => void, userId?: number, username?: string, onDone: () => void }) {
   const schema = z.object({ quota: z.coerce.number().int(), remark: z.string().optional() })
   type FormT = z.infer<typeof schema>
   const form = useForm<FormT>({ resolver: zodResolver(schema), defaultValues: { quota: 0, remark: '' } })
@@ -344,7 +368,8 @@ function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: b
         <Form {...form}>
           <form className="space-y-3" onSubmit={form.handleSubmit(async (values) => {
             if (!userId) return
-            const res = await api.post('/topup', { user_id: userId, quota: values.quota, remark: values.remark })
+            // Unified API call - complete URL with /api prefix
+            const res = await api.post('/api/topup', { user_id: userId, quota: values.quota, remark: values.remark })
             if (res.data?.success) {
               onOpenChange(false)
               form.reset()
@@ -374,12 +399,4 @@ function TopUpDialog({ open, onOpenChange, userId, username, onDone }: { open: b
       </DialogContent>
     </Dialog>
   )
-}
-
-async function onManageRole(username: string, action: 'promote'|'demote') {
-  await api.post('/user/manage', { username, action })
-}
-
-async function onDisableTotp(id: number) {
-  await api.post(`/user/totp/disable/${id}`)
 }

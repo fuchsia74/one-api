@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -46,12 +47,14 @@ func RelayProxyHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// log proxy request with zero quota
 	quotaId := c.GetInt(ctxkey.Id)
 	requestId := c.GetString(ctxkey.RequestId)
+	// Capture trace ID before launching goroutine
+	traceId := tracing.GetTraceID(c)
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
 		// Log the proxy request with zero quota
-		model.RecordConsumeLog(ctx, &model.Log{
+		model.RecordConsumeLogWithTraceID(ctx, traceId, &model.Log{
 			UserId:           meta.UserId,
 			ChannelId:        meta.ChannelId,
 			PromptTokens:     usage.PromptTokens,

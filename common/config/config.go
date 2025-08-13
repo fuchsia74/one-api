@@ -50,8 +50,11 @@ var DisableCookieSecret = strings.ToLower(os.Getenv("DISABLE_COOKIE_SECURE")) ==
 var OptionMap map[string]string
 var OptionMapRWMutex sync.RWMutex
 
+// DefaultItemsPerPage is the default number of items per page for pagination
 var DefaultItemsPerPage = 10
-var MaxItemsPerPage = env.Int("MAX_ITEMS_PER_PAGE", 10)
+
+// MaxItemsPerPage is the maximum number of items per page for pagination
+var MaxItemsPerPage = env.Int("MAX_ITEMS_PER_PAGE", 100)
 var MaxRecentItems = 100
 
 var PasswordLoginEnabled = true
@@ -143,7 +146,7 @@ var BillingTimeoutSec = env.Int("BILLING_TIMEOUT", 300) // unit is second
 
 var GeminiSafetySetting = env.String("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
 
-var Theme = env.String("THEME", "default")
+var Theme = env.String("THEME", "modern")
 var ValidThemes = map[string]bool{
 	"default": true,
 	"berry":   true,

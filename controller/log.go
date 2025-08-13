@@ -71,7 +71,6 @@ func GetAllLogs(c *gin.Context) {
 		"data":    logs,
 		"total":   totalCount,
 	})
-	return
 }
 
 func GetUserLogs(c *gin.Context) {
@@ -100,7 +99,16 @@ func GetUserLogs(c *gin.Context) {
 		}
 	}
 
-	logs, err := model.GetUserLogs(userId, logType, startTimestamp, endTimestamp, modelName, tokenName, p*config.MaxItemsPerPage, config.MaxItemsPerPage, sortBy, sortOrder)
+	// Get page size from query parameter, default to config value
+	size, err := strconv.Atoi(c.Query("size"))
+	if err != nil || size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+
+	logs, err := model.GetUserLogs(userId, logType, startTimestamp, endTimestamp, modelName, tokenName, p*size, size, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -108,17 +116,44 @@ func GetUserLogs(c *gin.Context) {
 		})
 		return
 	}
+
+	// Get total count for pagination
+	totalCount, err := model.GetUserLogsCount(userId, logType, startTimestamp, endTimestamp, modelName, tokenName)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    logs,
+		"total":   totalCount,
 	})
-	return
 }
 
 func SearchAllLogs(c *gin.Context) {
 	keyword := c.Query("keyword")
-	logs, err := model.SearchAllLogs(keyword)
+	p, _ := strconv.Atoi(c.Query("p"))
+	if p < 0 {
+		p = 0
+	}
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+	logs, total, err := model.SearchAllLogs(keyword, p*size, size, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -126,18 +161,35 @@ func SearchAllLogs(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    logs,
+		"total":   total,
 	})
-	return
 }
 
 func SearchUserLogs(c *gin.Context) {
 	keyword := c.Query("keyword")
 	userId := c.GetInt(ctxkey.Id)
-	logs, err := model.SearchUserLogs(userId, keyword)
+	p, _ := strconv.Atoi(c.Query("p"))
+	if p < 0 {
+		p = 0
+	}
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+	sortBy := c.Query("sort")
+	sortOrder := c.Query("order")
+	if sortOrder == "" {
+		sortOrder = "desc"
+	}
+	logs, total, err := model.SearchUserLogs(userId, keyword, p*size, size, sortBy, sortOrder)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -145,12 +197,13 @@ func SearchUserLogs(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    logs,
+		"total":   total,
 	})
-	return
 }
 
 func GetLogsStat(c *gin.Context) {
@@ -171,7 +224,6 @@ func GetLogsStat(c *gin.Context) {
 			//"token": tokenNum,
 		},
 	})
-	return
 }
 
 func GetLogsSelfStat(c *gin.Context) {
@@ -192,7 +244,6 @@ func GetLogsSelfStat(c *gin.Context) {
 			//"token": tokenNum,
 		},
 	})
-	return
 }
 
 func DeleteHistoryLogs(c *gin.Context) {
@@ -212,10 +263,10 @@ func DeleteHistoryLogs(c *gin.Context) {
 		})
 		return
 	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data":    count,
 	})
-	return
 }

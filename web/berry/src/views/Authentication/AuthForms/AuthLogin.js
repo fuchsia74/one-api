@@ -333,7 +333,7 @@ const LoginForm = ({ ...others }) => {
 
             <Box sx={{ mt: 2 }}>
               <AnimateButton>
-                <Button disableElevation disabled={isSubmitting} fullWidth size="large" type="submit" variant="contained" color="primary">
+                <Button disableElevation disabled={isSubmitting || (totpRequired && (!values.totp_code || values.totp_code.length !== 6))} fullWidth size="large" type="submit" variant="contained" color="primary">
                   {totpRequired ? '验证TOTP' : '登录'}
                 </Button>
               </AnimateButton>

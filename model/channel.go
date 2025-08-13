@@ -42,10 +42,10 @@ type Channel struct {
 	Balance            float64 `json:"balance"` // in USD
 	BalanceUpdatedTime int64   `json:"balance_updated_time" gorm:"bigint"`
 	Models             string  `json:"models"`
-	ModelConfigs       *string `json:"model_configs" gorm:"type:text;default:''"`
+	ModelConfigs       *string `json:"model_configs" gorm:"type:text"`
 	Group              string  `json:"group" gorm:"type:varchar(32);default:'default'"`
 	UsedQuota          int64   `json:"used_quota" gorm:"bigint;default:0"`
-	ModelMapping       *string `json:"model_mapping" gorm:"type:text;default:''"`
+	ModelMapping       *string `json:"model_mapping" gorm:"type:text"`
 	Priority           *int64  `json:"priority" gorm:"bigint;default:0"`
 	Config             string  `json:"config"`
 	SystemPrompt       *string `json:"system_prompt" gorm:"type:text"`
@@ -1055,6 +1055,7 @@ func performPostgreSQLFieldMigration(tx *gorm.DB) error {
 		return errors.Wrap(err, "failed to migrate model_mapping column")
 	}
 
+	channelFieldMigrated.Store(true)
 	logger.Logger.Info("PostgreSQL field migration completed successfully")
 	return nil
 }
@@ -1064,11 +1065,26 @@ func performPostgreSQLFieldMigration(tx *gorm.DB) error {
 // Returns true if migration is needed, false if fields are already TEXT type.
 func checkIfFieldMigrationNeeded() (bool, error) {
 	if common.UsingMySQL {
+		// First check if the channels table exists at all
+		var tableExists int
+		err := DB.Raw(`SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
+			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'channels'`).
+			Scan(&tableExists).Error
+		if err != nil {
+			return false, errors.Wrap(err, "failed to check if channels table exists in MySQL")
+		}
+
+		// If table doesn't exist, no migration needed - AutoMigrate will create it correctly
+		if tableExists == 0 {
+			logger.Logger.Info("Channels table does not exist - no field migration needed")
+			return false, nil
+		}
+
 		// Check MySQL column types for both fields
 		var modelConfigsType, modelMappingType string
 
 		// Check model_configs column type
-		err := DB.Raw(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
+		err = DB.Raw(`SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS
 			WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'channels' AND COLUMN_NAME = 'model_configs'`).
 			Scan(&modelConfigsType).Error
 		if err != nil {
@@ -1087,10 +1103,10 @@ func checkIfFieldMigrationNeeded() (bool, error) {
 			zap.String("model_configs_type", modelConfigsType),
 			zap.String("model_mapping_type", modelMappingType))
 
-		// If we cannot read the column types (empty string), be conservative and attempt migration
+		// If columns don't exist, no migration needed - AutoMigrate will create them correctly
 		if modelConfigsType == "" || modelMappingType == "" {
-			logger.Logger.Warn("Could not determine one or more column types from INFORMATION_SCHEMA; will attempt migration to ensure TEXT size")
-			return true, nil
+			logger.Logger.Info("One or more columns do not exist - no field migration needed")
+			return false, nil
 		}
 
 		// Migration needed unless both columns already some kind of TEXT.* (varchar is insufficient)
@@ -1099,11 +1115,26 @@ func checkIfFieldMigrationNeeded() (bool, error) {
 		return need, nil
 
 	} else if common.UsingPostgreSQL {
+		// First check if the channels table exists at all
+		var tableExists int
+		err := DB.Raw(`SELECT COUNT(*) FROM information_schema.tables
+			WHERE table_name = 'channels'`).
+			Scan(&tableExists).Error
+		if err != nil {
+			return false, errors.Wrap(err, "failed to check if channels table exists in PostgreSQL")
+		}
+
+		// If table doesn't exist, no migration needed - AutoMigrate will create it correctly
+		if tableExists == 0 {
+			logger.Logger.Info("Channels table does not exist - no field migration needed")
+			return false, nil
+		}
+
 		// Check PostgreSQL column types for both fields
 		var modelConfigsType, modelMappingType string
 
 		// Check model_configs column type
-		err := DB.Raw(`SELECT data_type FROM information_schema.columns
+		err = DB.Raw(`SELECT data_type FROM information_schema.columns
 			WHERE table_name = 'channels' AND column_name = 'model_configs'`).
 			Scan(&modelConfigsType).Error
 		if err != nil {
@@ -1116,6 +1147,12 @@ func checkIfFieldMigrationNeeded() (bool, error) {
 			Scan(&modelMappingType).Error
 		if err != nil {
 			return false, errors.Wrap(err, "failed to check model_mapping column type in PostgreSQL")
+		}
+
+		// If columns don't exist, no migration needed - AutoMigrate will create them correctly
+		if modelConfigsType == "" || modelMappingType == "" {
+			logger.Logger.Info("One or more columns do not exist - no field migration needed")
+			return false, nil
 		}
 
 		// Migration needed if either field is still character varying (varchar)
@@ -1170,7 +1207,7 @@ func MigrateAllChannelModelConfigs() error {
 				logger.Logger.Error("Failed to migrate ModelConfigs for channel",
 					zap.Int("channel_id", channel.Id),
 					zap.Error(err))
-				errorMsg := fmt.Sprintf("Failed to migrate ModelConfigs for channel %d: %s", channel.Id, err.Error())
+				errorMsg := getMigrationErrorContext(err, channel.Id, "ModelConfigs format migration")
 				migrationErrors = append(migrationErrors, errorMsg)
 				errorCount++
 				continue
@@ -1185,7 +1222,7 @@ func MigrateAllChannelModelConfigs() error {
 			logger.Logger.Error("Failed to migrate historical pricing for channel",
 				zap.Int("channel_id", channel.Id),
 				zap.Error(err))
-			errorMsg := fmt.Sprintf("Failed to migrate historical pricing for channel %d: %s", channel.Id, err.Error())
+			errorMsg := getMigrationErrorContext(err, channel.Id, "historical pricing migration")
 			migrationErrors = append(migrationErrors, errorMsg)
 			errorCount++
 			continue
@@ -1207,7 +1244,7 @@ func MigrateAllChannelModelConfigs() error {
 				logger.Logger.Error("Migration validation failed for channel",
 					zap.Int("channel_id", channel.Id),
 					zap.Error(err))
-				errorMsg := fmt.Sprintf("Migration validation failed for channel %d: %s", channel.Id, err.Error())
+				errorMsg := getMigrationErrorContext(err, channel.Id, "validation")
 				migrationErrors = append(migrationErrors, errorMsg)
 				errorCount++
 				// Restore original data
@@ -1286,4 +1323,32 @@ func MigrateAllChannelModelConfigs() error {
 	}
 
 	return nil
+}
+
+// getMigrationErrorContext provides additional context for migration errors
+func getMigrationErrorContext(err error, channelID int, operation string) string {
+	if err == nil {
+		return ""
+	}
+
+	context := fmt.Sprintf("Channel %d %s failed", channelID, operation)
+
+	// Add specific guidance for common errors
+	errStr := err.Error()
+	switch {
+	case strings.Contains(errStr, "Data too long"):
+		context += " - Column size insufficient, consider running field migration"
+	case strings.Contains(errStr, "invalid character"):
+		context += " - Invalid JSON format in configuration data"
+	case strings.Contains(errStr, "connection"):
+		context += " - Database connection issue, check connectivity"
+	case strings.Contains(errStr, "syntax error"):
+		context += " - SQL syntax error, check database compatibility"
+	case strings.Contains(errStr, "duplicate"):
+		context += " - Duplicate key constraint violation"
+	default:
+		context += fmt.Sprintf(" - %s", err.Error())
+	}
+
+	return context
 }

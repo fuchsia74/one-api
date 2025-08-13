@@ -13,9 +13,8 @@ export function FormLabel({ className, ...props }: React.LabelHTMLAttributes<HTM
 export function FormControl({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('space-y-2', className)} {...props} />
 }
-export function FormMessage({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
-  const { formState } = useFormContext()
-  return <p className={cn('text-xs text-destructive', className)} {...props}>{formState.errors?.message as any}</p>
+export function FormMessage({ className, children, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {
+  return <p className={cn('text-xs text-destructive', className)} {...props}>{children}</p>
 }
 export function FormField<TFieldValues extends Record<string, any>>(props: {
   name: keyof TFieldValues & string

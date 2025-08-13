@@ -14,6 +14,8 @@ import (
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/common/tracing"
+	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/meta"
 )
 
@@ -63,6 +65,9 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 		zap.String("model", meta.ActualModelName),
 		zap.String("channelName", a.GetChannelName()))
 
+	// Optionally: Record when request is forwarded to upstream (non-standard event)
+	tracing.RecordTraceTimestamp(c, model.TimestampRequestForwarded)
+
 	resp, err := DoRequest(c, req)
 	if err != nil {
 		// Return error without logging - let the calling ErrorWrapper function handle logging
@@ -80,6 +85,10 @@ func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	if resp == nil {
 		return nil, errors.New("resp is nil")
 	}
+
+	// Optionally: Record when first response is received from upstream (non-standard event)
+	tracing.RecordTraceTimestamp(c, model.TimestampFirstUpstreamResponse)
+
 	_ = req.Body.Close()
 	_ = c.Request.Body.Close()
 

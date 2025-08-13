@@ -185,6 +185,116 @@ func findToolCallName(toolCalls []model.Tool, toolCallId string) string {
 	return "unknown_function"
 }
 
+// convertMessageToResponseAPIFormat converts a ChatCompletion message to Response API format
+// This function handles the content type conversion from ChatCompletion format to Response API format
+func convertMessageToResponseAPIFormat(message model.Message) map[string]interface{} {
+	responseMsg := map[string]interface{}{
+		"role": message.Role,
+	}
+
+	// Determine the appropriate content type based on message role
+	// For Response API: user messages use "input_text", assistant messages use "output_text"
+	textContentType := "input_text"
+	if message.Role == "assistant" {
+		textContentType = "output_text"
+	}
+
+	// Handle different content types
+	switch content := message.Content.(type) {
+	case string:
+		// Simple string content - convert to appropriate text format based on role
+		if content != "" {
+			responseMsg["content"] = []map[string]interface{}{
+				{
+					"type": textContentType,
+					"text": content,
+				},
+			}
+		}
+	case []model.MessageContent:
+		// Structured content - convert each part to Response API format
+		var convertedContent []map[string]interface{}
+		for _, part := range content {
+			switch part.Type {
+			case model.ContentTypeText:
+				if part.Text != nil && *part.Text != "" {
+					convertedContent = append(convertedContent, map[string]interface{}{
+						"type": textContentType,
+						"text": *part.Text,
+					})
+				}
+			case model.ContentTypeImageURL:
+				if part.ImageURL != nil && part.ImageURL.Url != "" {
+					convertedContent = append(convertedContent, map[string]interface{}{
+						"type":      "input_image",
+						"image_url": part.ImageURL.Url,
+					})
+				}
+			case model.ContentTypeInputAudio:
+				if part.InputAudio != nil {
+					convertedContent = append(convertedContent, map[string]interface{}{
+						"type":        "input_audio",
+						"input_audio": part.InputAudio,
+					})
+				}
+			default:
+				// For unknown types, try to preserve as much as possible
+				partMap := map[string]interface{}{
+					"type": textContentType, // Use appropriate text type based on role
+				}
+				if part.Text != nil {
+					partMap["text"] = *part.Text
+				}
+				convertedContent = append(convertedContent, partMap)
+			}
+		}
+		if len(convertedContent) > 0 {
+			responseMsg["content"] = convertedContent
+		}
+	case []interface{}:
+		// Handle generic interface array (from JSON unmarshaling)
+		var convertedContent []map[string]interface{}
+		for _, item := range content {
+			if itemMap, ok := item.(map[string]interface{}); ok {
+				convertedItem := make(map[string]interface{})
+				for k, v := range itemMap {
+					convertedItem[k] = v
+				}
+				// Convert content types to Response API format based on message role
+				if itemType, exists := itemMap["type"]; exists {
+					switch itemType {
+					case "text":
+						convertedItem["type"] = textContentType
+					case "image_url":
+						convertedItem["type"] = "input_image"
+					}
+				}
+				convertedContent = append(convertedContent, convertedItem)
+			}
+		}
+		if len(convertedContent) > 0 {
+			responseMsg["content"] = convertedContent
+		}
+	default:
+		// Fallback: convert to string and treat as appropriate text type based on role
+		if contentStr := fmt.Sprintf("%v", content); contentStr != "" && contentStr != "<nil>" {
+			responseMsg["content"] = []map[string]interface{}{
+				{
+					"type": textContentType,
+					"text": contentStr,
+				},
+			}
+		}
+	}
+
+	// Add other message fields if present
+	if message.Name != nil {
+		responseMsg["name"] = *message.Name
+	}
+
+	return responseMsg
+}
+
 // ConvertChatCompletionToResponseAPI converts a ChatCompletion request to Response API format
 func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *ResponseAPIRequest {
 	responseReq := &ResponseAPIRequest{
@@ -210,14 +320,8 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 
 			// If assistant has text content, include it
 			if message.Content != "" {
-				assistantMsg := model.Message{
-					Role:             message.Role,
-					Content:          message.Content,
-					Name:             message.Name,
-					Reasoning:        message.Reasoning,
-					ReasoningContent: message.ReasoningContent,
-				}
-				responseReq.Input = append(responseReq.Input, assistantMsg)
+				convertedMsg := convertMessageToResponseAPIFormat(message)
+				responseReq.Input = append(responseReq.Input, convertedMsg)
 			}
 		} else {
 			// For regular messages, add any pending function call summary first
@@ -236,15 +340,17 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 					Role:    "assistant",
 					Content: summary,
 				}
-				responseReq.Input = append(responseReq.Input, summaryMsg)
+				convertedSummaryMsg := convertMessageToResponseAPIFormat(summaryMsg)
+				responseReq.Input = append(responseReq.Input, convertedSummaryMsg)
 
 				// Clear pending calls and results
 				pendingToolCalls = nil
 				pendingToolResults = nil
 			}
 
-			// Add the regular message
-			responseReq.Input = append(responseReq.Input, message)
+			// Add the regular message - convert to Response API format
+			convertedMsg := convertMessageToResponseAPIFormat(message)
+			responseReq.Input = append(responseReq.Input, convertedMsg)
 		}
 	}
 
@@ -263,7 +369,8 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			Role:    "assistant",
 			Content: summary,
 		}
-		responseReq.Input = append(responseReq.Input, summaryMsg)
+		convertedSummaryMsg := convertMessageToResponseAPIFormat(summaryMsg)
+		responseReq.Input = append(responseReq.Input, convertedSummaryMsg)
 	}
 
 	// Map other fields
@@ -349,7 +456,16 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 	}
 
 	// Handle thinking/reasoning
-	if request.ReasoningEffort != nil || request.Thinking != nil {
+	if isModelSupportedReasoning(request.Model) {
+		if request.ReasoningEffort != nil || request.Thinking != nil {
+			if responseReq.Reasoning == nil {
+				responseReq.Reasoning = &model.OpenAIResponseReasoning{
+					Effort: request.ReasoningEffort,
+				}
+			}
+		}
+
+		// Initialize reasoning if not already set for reasoning-supported models
 		if responseReq.Reasoning == nil {
 			responseReq.Reasoning = &model.OpenAIResponseReasoning{}
 		}
@@ -359,9 +475,12 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			responseReq.Reasoning.Summary = &reasoningSummary
 		}
 
-		if request.ReasoningEffort != nil {
-			responseReq.Reasoning.Effort = request.ReasoningEffort
+		if request.ReasoningEffort == nil {
+			reasoningEffort := "high"
+			responseReq.Reasoning.Effort = &reasoningEffort
 		}
+	} else {
+		request.ReasoningEffort = nil
 	}
 
 	// Handle response format

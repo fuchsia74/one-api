@@ -143,6 +143,7 @@ The tool migrates all One API tables in the correct order to respect foreign key
 6. `abilities` - Channel abilities and permissions
 7. `logs` - Usage and system logs
 8. `user_request_costs` - Request cost tracking
+9. `traces` - Request tracing and performance monitoring
 
 ## PostgreSQL Sequence Management
 

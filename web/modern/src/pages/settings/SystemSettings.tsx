@@ -16,7 +16,8 @@ export function SystemSettings() {
   const load = async () => {
     setLoading(true)
     try {
-      const res = await api.get('/option/')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/option/')
       if (res.data?.success) setOptions(res.data.data || [])
     } finally {
       setLoading(false)
@@ -29,7 +30,8 @@ export function SystemSettings() {
 
   const save = async (key: string, value: string) => {
     try {
-      await api.put('/option/', { key, value })
+      // Unified API call - complete URL with /api prefix
+      await api.put('/api/option/', { key, value })
       // Show success message
       console.log(`Saved ${key}: ${value}`)
     } catch (error) {

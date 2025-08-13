@@ -42,7 +42,8 @@ export function TopUpPage() {
 
   const loadUserData = async () => {
     try {
-      const res = await api.get('/user/self')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/user/self')
       const { success, data } = res.data
       if (success) {
         setUserQuota(data.quota)
@@ -71,7 +72,8 @@ export function TopUpPage() {
   const onSubmit = async (data: TopUpForm) => {
     setIsSubmitting(true)
     try {
-      const res = await api.post('/user/topup', { key: data.redemption_code })
+      // Unified API call - complete URL with /api prefix
+      const res = await api.post('/api/user/topup', { key: data.redemption_code })
       const { success, message, data: responseData } = res.data
 
       if (success) {
@@ -177,11 +179,10 @@ export function TopUpPage() {
                   />
 
                   {form.formState.errors.root && (
-                    <div className={`text-sm ${
-                      form.formState.errors.root.type === 'success'
+                    <div className={`text-sm ${form.formState.errors.root.type === 'success'
                         ? 'text-green-600'
                         : 'text-destructive'
-                    }`}>
+                      }`}>
                       {form.formState.errors.root.message}
                     </div>
                   )}

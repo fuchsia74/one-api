@@ -40,7 +40,8 @@ export function EditRedemptionPage() {
     if (!redemptionId) return
 
     try {
-      const response = await api.get(`/redemption/${redemptionId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/redemption/${redemptionId}`)
       const { success, message, data } = response.data
 
       if (success && data) {
@@ -68,9 +69,10 @@ export function EditRedemptionPage() {
     try {
       let response
       if (isEdit && redemptionId) {
-        response = await api.put('/redemption/', { ...data, id: parseInt(redemptionId) })
+        // Unified API call - complete URL with /api prefix
+        response = await api.put('/api/redemption/', { ...data, id: parseInt(redemptionId) })
       } else {
-        response = await api.post('/redemption/', data)
+        response = await api.post('/api/redemption/', data)
       }
 
       const { success, message } = response.data

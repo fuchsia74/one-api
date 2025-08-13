@@ -58,7 +58,8 @@ export function EditTokenPage() {
     if (!tokenId) return
 
     try {
-      const response = await api.get(`/token/${tokenId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/token/${tokenId}`)
       const { success, message, data } = response.data
 
       if (success && data) {
@@ -90,7 +91,8 @@ export function EditTokenPage() {
 
   const loadAvailableModels = async () => {
     try {
-      const response = await api.get('/user/available_models')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/user/available_models')
       const { success, message, data } = response.data
 
       if (success && data) {
@@ -170,11 +172,12 @@ export function EditTokenPage() {
       const modelsString = payload.models.join(',')
       payload.models = modelsString as any
 
-      let response
+      let response: any
       if (isEdit && tokenId) {
-        response = await api.put('/token/', { ...payload, id: parseInt(tokenId) })
+        // Unified API call - complete URL with /api prefix
+        response = await api.put('/api/token/', { ...payload, id: parseInt(tokenId) })
       } else {
-        response = await api.post('/token/', payload)
+        response = await api.post('/api/token/', payload)
       }
 
       const { success, message } = response.data

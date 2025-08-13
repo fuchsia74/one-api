@@ -27,7 +27,8 @@ export function PasswordResetPage() {
   const onSubmit = async (data: ResetForm) => {
     setIsLoading(true)
     try {
-      const response = await api.get(`/reset_password?email=${encodeURIComponent(data.email)}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/reset_password?email=${encodeURIComponent(data.email)}`)
       const { success, message } = response.data
 
       if (success) {

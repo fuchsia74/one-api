@@ -55,11 +55,7 @@ func authHelper(c *gin.Context, minRole int) {
 		accessToken := c.Request.Header.Get("Authorization")
 		if accessToken == "" {
 			// No authentication method available - reject request
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"success": false,
-				"message": "No permission to perform this operation, not logged in and no access token provided",
-			})
-			c.Abort()
+			respondAuthError(c, http.StatusUnauthorized, "No permission to perform this operation, not logged in and no access token provided")
 			return
 		}
 
@@ -73,36 +69,24 @@ func authHelper(c *gin.Context, minRole int) {
 			status = user.Status
 		} else {
 			// Invalid token - reject request
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "No permission to perform this operation, access token is invalid",
-			})
-			c.Abort()
+			respondAuthError(c, http.StatusUnauthorized, "No permission to perform this operation, access token is invalid")
 			return
 		}
 	}
 
 	// Check if user is disabled or banned
 	if status.(int) == model.UserStatusDisabled || blacklist.IsUserBanned(id.(int)) {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "User has been banned",
-		})
+		respondAuthError(c, http.StatusForbidden, "User has been banned")
 		// Clear session data for banned users
 		session := sessions.Default(c)
 		session.Clear()
 		_ = session.Save()
-		c.Abort()
 		return
 	}
 
 	// Check if user has sufficient role permissions
 	if role.(int) < minRole {
-		c.JSON(http.StatusOK, gin.H{
-			"success": false,
-			"message": "No permission to perform this operation, insufficient permissions",
-		})
-		c.Abort()
+		respondAuthError(c, http.StatusForbidden, "No permission to perform this operation, insufficient permissions")
 		return
 	}
 
@@ -259,4 +243,10 @@ func shouldCheckModel(c *gin.Context) bool {
 		return true
 	}
 	return false
+}
+
+// respondAuthError centralizes error responses for auth failures (DRY, KISS)
+func respondAuthError(c *gin.Context, status int, message string) {
+	c.JSON(status, gin.H{"success": false, "message": message})
+	c.Abort()
 }

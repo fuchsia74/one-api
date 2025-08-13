@@ -25,14 +25,18 @@ function renderType(type) {
   }
 }
 
-export default function LogTableRow({ item, userIsAdmin }) {
+export default function LogTableRow({ item, userIsAdmin, onRowClick }) {
   const fullTimestamp = timestamp2string(item.created_at);
   // Extract MM-DD HH:MM:SS from YYYY-MM-DD HH:MM:SS for compact display
   const compactTimestamp = fullTimestamp.slice(5); // Remove YYYY- part
 
   return (
     <>
-      <TableRow tabIndex={item.id}>
+      <TableRow
+        tabIndex={item.id}
+        sx={{ cursor: 'pointer', '&:hover': { backgroundColor: 'action.hover' } }}
+        onClick={() => onRowClick && onRowClick(item.id)}
+      >
         <TableCell data-label="时间" title={fullTimestamp}>{compactTimestamp}</TableCell>
 
         {userIsAdmin && <TableCell data-label="渠道">{item.channel || ''}</TableCell>}

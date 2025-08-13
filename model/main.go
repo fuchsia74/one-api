@@ -138,50 +138,60 @@ func InitDB() {
 	}
 
 	logger.Logger.Info("database migration started")
+
+	// STEP 1: Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
+	// This must run BEFORE AutoMigrate to ensure schema compatibility
+	if err = MigrateChannelFieldsToText(); err != nil {
+		logger.Logger.Fatal("failed to migrate channel field types", zap.Error(err))
+		return
+	}
+
+	// STEP 2: Run GORM AutoMigrate on all models
+	// This will now work correctly since field types have been pre-migrated
 	if err = migrateDB(); err != nil {
 		logger.Logger.Fatal("failed to migrate database", zap.Error(err))
 		return
 	}
-	logger.Logger.Info("database migrated")
+	logger.Logger.Info("database schema migrated")
 
-	// Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
-	if err = MigrateChannelFieldsToText(); err != nil {
-		logger.Logger.Error("failed to migrate channel field types", zap.Error(err))
-		// Don't fail startup for this migration, just log the error
-	}
-
-	// Migrate existing ModelConfigs data from old format to new format
+	// STEP 3: Migrate existing ModelConfigs data from old format to new format
+	// This handles data format changes after schema is correct
 	if err = MigrateAllChannelModelConfigs(); err != nil {
 		logger.Logger.Error("failed to migrate channel ModelConfigs", zap.Error(err))
 		// Don't fail startup for this migration, just log the error
 	}
+
+	logger.Logger.Info("database migration completed")
 }
 
 func migrateDB() error {
 	var err error
 	if err = DB.AutoMigrate(&Channel{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate Channel")
 	}
 	if err = DB.AutoMigrate(&Token{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate Token")
 	}
 	if err = DB.AutoMigrate(&User{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate User")
 	}
 	if err = DB.AutoMigrate(&Option{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate Option")
 	}
 	if err = DB.AutoMigrate(&Redemption{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate Redemption")
 	}
 	if err = DB.AutoMigrate(&Ability{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate Ability")
 	}
 	if err = DB.AutoMigrate(&Log{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate Log")
 	}
 	if err = DB.AutoMigrate(&UserRequestCost{}); err != nil {
-		return err
+		return errors.Wrapf(err, "failed to migrate UserRequestCost")
+	}
+	if err = DB.AutoMigrate(&Trace{}); err != nil {
+		return errors.Wrapf(err, "failed to migrate Trace")
 	}
 	return nil
 }

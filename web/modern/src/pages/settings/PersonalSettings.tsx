@@ -36,7 +36,8 @@ export function PersonalSettings() {
 
   const generateAccessToken = async () => {
     try {
-      const res = await api.get('/user/token')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/user/token')
       const { success, message, data } = res.data
       if (success) {
         setSystemToken(data)
@@ -54,7 +55,8 @@ export function PersonalSettings() {
 
   const getAffLink = async () => {
     try {
-      const res = await api.get('/user/aff')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/user/aff')
       const { success, message, data } = res.data
       if (success) {
         const link = `${window.location.origin}/register?aff=${data}`
@@ -80,7 +82,8 @@ export function PersonalSettings() {
         delete payload.password
       }
 
-      const response = await api.put('/user/self', payload)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.put('/api/user/self', payload)
       const { success, message } = response.data
       if (success) {
         // Show success message

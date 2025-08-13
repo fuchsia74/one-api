@@ -65,7 +65,7 @@ func getTokenEncoder(model string) *tiktoken.Tiktoken {
 	if ok {
 		tokenEncoder, err := tiktoken.EncodingForModel(model)
 		if err != nil {
-			logger.Logger.Error("failed to get token encoder for model, using encoder for gpt-3.5-turbo",
+			logger.Logger.Warn("failed to get token encoder for model, using encoder for gpt-3.5-turbo",
 				zap.String("model", model),
 				zap.Error(err))
 			tokenEncoder = defaultTokenEncoder

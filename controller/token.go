@@ -44,6 +44,15 @@ func GetAllTokens(c *gin.Context) {
 		p = 0
 	}
 
+	// Get page size from query parameter, default to config value
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+
 	order := c.Query("order")
 	sortBy := c.Query("sort")
 	sortOrder := c.Query("order")
@@ -51,7 +60,7 @@ func GetAllTokens(c *gin.Context) {
 		sortOrder = "desc"
 	}
 
-	tokens, err := model.GetAllUserTokens(userId, p*config.MaxItemsPerPage, config.MaxItemsPerPage, order, sortBy, sortOrder)
+	tokens, err := model.GetAllUserTokens(userId, p*size, size, order, sortBy, sortOrder)
 
 	if err != nil {
 		helper.RespondError(c, err)
@@ -77,13 +86,23 @@ func GetAllTokens(c *gin.Context) {
 func SearchTokens(c *gin.Context) {
 	userId := c.GetInt(ctxkey.Id)
 	keyword := c.Query("keyword")
+	p, _ := strconv.Atoi(c.Query("p"))
+	if p < 0 {
+		p = 0
+	}
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
 	sortBy := c.Query("sort")
 	sortOrder := c.Query("order")
 	if sortOrder == "" {
 		sortOrder = "desc"
 	}
-
-	tokens, err := model.SearchUserTokens(userId, keyword, sortBy, sortOrder)
+	tokens, total, err := model.SearchUserTokens(userId, keyword, p*size, size, sortBy, sortOrder)
 	if err != nil {
 		helper.RespondError(c, err)
 		return
@@ -92,6 +111,7 @@ func SearchTokens(c *gin.Context) {
 		"success": true,
 		"message": "",
 		"data":    tokens,
+		"total":   total,
 	})
 	return
 }

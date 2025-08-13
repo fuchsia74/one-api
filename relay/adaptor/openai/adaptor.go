@@ -81,9 +81,15 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 	case channeltype.GeminiOpenAICompatible:
 		return geminiOpenaiCompatible.GetRequestURL(meta)
 	default:
-		// Handle Claude Messages requests - convert to OpenAI Chat Completions endpoint
+		// Handle Claude Messages requests - check if model should use Response API
 		if meta.RequestURLPath == "/v1/messages" {
-			// Claude Messages requests should use OpenAI's chat completions endpoint
+			// For OpenAI channels, check if the model should use Response API
+			if meta.ChannelType == channeltype.OpenAI &&
+				!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+				responseAPIPath := "/v1/responses"
+				return GetFullRequestURL(meta.BaseURL, responseAPIPath, meta.ChannelType), nil
+			}
+			// Otherwise, use ChatCompletion endpoint
 			chatCompletionsPath := "/v1/chat/completions"
 			return GetFullRequestURL(meta.BaseURL, chatCompletionsPath, meta.ChannelType), nil
 		}
@@ -128,9 +134,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return request, nil
 	}
 
-	// Convert ChatCompletion requests to Response API format only for OpenAI
+	// Convert ChatCompletion and Claude Messages requests to Response API format only for OpenAI
 	// Skip conversion for models that only support ChatCompletion API
-	if relayMode == relaymode.ChatCompletions &&
+	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
 		meta.ChannelType == channeltype.OpenAI &&
 		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
 		// Apply existing transformations first
@@ -153,6 +159,16 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	}
 
 	return request, nil
+}
+
+func isModelSupportedReasoning(modelName string) bool {
+	switch {
+	case strings.HasPrefix(modelName, "o"),
+		strings.HasPrefix(modelName, "gpt-5"):
+		return true
+	default:
+		return false
+	}
 }
 
 // applyRequestTransformations applies the existing request transformations
@@ -184,11 +200,22 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		request.StreamOptions.IncludeUsage = true
 	}
 
-	// o1/o3/o4 do not support system prompt/max_tokens/temperature
-	if strings.HasPrefix(meta.ActualModelName, "o") {
+	// Set both max_tokens and max_completion_tokens for better compatibility
+	// For o-series models, max_tokens must be 0
+	if request.MaxTokens != 0 {
+		// Store the original value before potentially modifying MaxTokens
+		originalMaxTokens := request.MaxTokens
+		request.MaxCompletionTokens = &originalMaxTokens
+		// For o-series models, max_tokens must be set to 0
+		if strings.HasPrefix(meta.ActualModelName, "o") {
+			request.MaxTokens = 0
+		}
+	}
+
+	// o1/o3/o4/gpt-5 do not support system prompt/temperature variations
+	if isModelSupportedReasoning(meta.ActualModelName) {
 		temperature := float64(1)
 		request.Temperature = &temperature // Only the default (1) value is supported
-		request.MaxTokens = 0
 		request.TopP = nil
 		if request.ReasoningEffort == nil {
 			effortHigh := "high"
@@ -204,8 +231,6 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 
 			return
 		}(request.Messages)
-	} else {
-		request.ReasoningEffort = nil
 	}
 
 	// web search do not support system prompt/max_tokens/temperature
@@ -242,12 +267,25 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	// Convert Claude Messages API request to OpenAI Chat Completions format
 	openaiRequest := &model.GeneralOpenAIRequest{
 		Model:       request.Model,
-		MaxTokens:   request.MaxTokens,
 		Temperature: request.Temperature,
 		TopP:        request.TopP,
 		Stream:      request.Stream != nil && *request.Stream,
 		Stop:        request.StopSequences,
 		Thinking:    request.Thinking,
+	}
+
+	// Set both MaxTokens and MaxCompletionTokens for better compatibility
+	// For o-series models, MaxTokens must be 0
+	if request.MaxTokens != 0 {
+		// Store the original value before potentially modifying MaxTokens
+		originalMaxTokens := request.MaxTokens
+		openaiRequest.MaxCompletionTokens = &originalMaxTokens
+		// For o-series models, max_tokens must be set to 0
+		if strings.HasPrefix(request.Model, "o") {
+			openaiRequest.MaxTokens = 0
+		} else {
+			openaiRequest.MaxTokens = request.MaxTokens
+		}
 	}
 
 	// Convert system prompt
@@ -373,8 +411,25 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	c.Set(ctxkey.ClaudeMessagesConversion, true)
 	c.Set(ctxkey.OriginalClaudeRequest, request)
 
-	// For OpenAI adaptor, we can return the OpenAI request directly
-	// since OpenAI format is the native format
+	// For OpenAI adaptor, check if we should convert to Response API format
+	meta := meta.GetByContext(c)
+	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+		// Apply transformations first
+		if err := a.applyRequestTransformations(meta, openaiRequest); err != nil {
+			return nil, err
+		}
+
+		// Convert to Response API format
+		responseAPIRequest := ConvertChatCompletionToResponseAPI(openaiRequest)
+
+		// Store the converted request in context to detect it later in DoResponse
+		c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
+
+		return responseAPIRequest, nil
+	}
+
+	// For non-OpenAI channels or models that only support ChatCompletion API,
+	// return the OpenAI request directly
 	return openaiRequest, nil
 }
 
@@ -466,11 +521,11 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 				case strings.HasPrefix(meta.ActualModelName, "gpt-4o-search"):
 					switch searchContextSize {
 					case "low":
-						usage.ToolsCost += int64(math.Ceil(30 / 1000 * ratio.QuotaPerUsd))
+						usage.ToolsCost += int64(math.Ceil(30.0 / 1000.0 * ratio.QuotaPerUsd))
 					case "medium":
-						usage.ToolsCost += int64(math.Ceil(35 / 1000 * ratio.QuotaPerUsd))
+						usage.ToolsCost += int64(math.Ceil(35.0 / 1000.0 * ratio.QuotaPerUsd))
 					case "high":
-						usage.ToolsCost += int64(math.Ceil(40 / 1000 * ratio.QuotaPerUsd))
+						usage.ToolsCost += int64(math.Ceil(40.0 / 1000.0 * ratio.QuotaPerUsd))
 					default:
 						return nil, ErrorWrapper(
 							errors.Errorf("invalid search context size %q", searchContextSize),
@@ -480,11 +535,11 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 				case strings.HasPrefix(meta.ActualModelName, "gpt-4o-mini-search"):
 					switch searchContextSize {
 					case "low":
-						usage.ToolsCost += int64(math.Ceil(25 / 1000 * ratio.QuotaPerUsd))
+						usage.ToolsCost += int64(math.Ceil(25.0 / 1000.0 * ratio.QuotaPerUsd))
 					case "medium":
-						usage.ToolsCost += int64(math.Ceil(27.5 / 1000 * ratio.QuotaPerUsd))
+						usage.ToolsCost += int64(math.Ceil(27.5 / 1000.0 * ratio.QuotaPerUsd))
 					case "high":
-						usage.ToolsCost += int64(math.Ceil(30 / 1000 * ratio.QuotaPerUsd))
+						usage.ToolsCost += int64(math.Ceil(30.0 / 1000.0 * ratio.QuotaPerUsd))
 					default:
 						return nil, ErrorWrapper(
 							errors.Errorf("invalid search context size %q", searchContextSize),
@@ -593,6 +648,14 @@ func (a *Adaptor) convertToClaudeResponse(c *gin.Context, resp *http.Response) (
 
 // convertNonStreamingToClaudeResponse converts a non-streaming OpenAI response to Claude format
 func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http.Response, body []byte) (*http.Response, *model.ErrorWithStatusCode) {
+	// First try to parse as Response API format
+	var responseAPIResp ResponseAPIResponse
+	if err := json.Unmarshal(body, &responseAPIResp); err == nil && responseAPIResp.Object == "response" {
+		// This is a Response API response, convert it to Claude format
+		return a.ConvertResponseAPIToClaudeResponse(c, resp, &responseAPIResp)
+	}
+
+	// Fall back to ChatCompletion API format
 	var openaiResp TextResponse
 	if err := json.Unmarshal(body, &openaiResp); err != nil {
 		// If it's an error response, pass it through
@@ -670,6 +733,76 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 			claudeResp.StopReason = "tool_use"
 		case "content_filter":
 			claudeResp.StopReason = "stop_sequence"
+		}
+	}
+
+	// Marshal the Claude response
+	claudeBody, err := json.Marshal(claudeResp)
+	if err != nil {
+		return nil, ErrorWrapper(err, "marshal_claude_response_failed", http.StatusInternalServerError)
+	}
+
+	// Create new response with Claude format
+	newResp := &http.Response{
+		StatusCode: resp.StatusCode,
+		Header:     make(http.Header),
+		Body:       io.NopCloser(bytes.NewReader(claudeBody)),
+	}
+
+	// Copy headers but update content type
+	for k, v := range resp.Header {
+		newResp.Header[k] = v
+	}
+	newResp.Header.Set("Content-Type", "application/json")
+	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(claudeBody)))
+
+	return newResp, nil
+}
+
+// ConvertResponseAPIToClaudeResponse converts a Response API response to Claude Messages format
+func (a *Adaptor) ConvertResponseAPIToClaudeResponse(c *gin.Context, resp *http.Response, responseAPIResp *ResponseAPIResponse) (*http.Response, *model.ErrorWithStatusCode) {
+	// Convert to Claude Messages format
+	claudeResp := model.ClaudeResponse{
+		ID:         responseAPIResp.Id,
+		Type:       "message",
+		Role:       "assistant",
+		Model:      responseAPIResp.Model,
+		Content:    []model.ClaudeContent{},
+		StopReason: "end_turn",
+	}
+
+	// Convert usage if present
+	if responseAPIResp.Usage != nil {
+		claudeResp.Usage = model.ClaudeUsage{
+			InputTokens:  responseAPIResp.Usage.InputTokens,
+			OutputTokens: responseAPIResp.Usage.OutputTokens,
+		}
+	}
+
+	// Convert output items to Claude content
+	for _, outputItem := range responseAPIResp.Output {
+		if outputItem.Type == "reasoning" {
+			// Convert reasoning content to Claude thinking format
+			for _, summary := range outputItem.Summary {
+				if summary.Type == "summary_text" && summary.Text != "" {
+					claudeContent := model.ClaudeContent{
+						Type:     "thinking",
+						Thinking: summary.Text,
+					}
+					claudeResp.Content = append(claudeResp.Content, claudeContent)
+				}
+			}
+		} else if outputItem.Type == "message" && outputItem.Role == "assistant" {
+			// Convert message content
+			for _, content := range outputItem.Content {
+				if content.Type == "output_text" && content.Text != "" {
+					claudeContent := model.ClaudeContent{
+						Type: "text",
+						Text: content.Text,
+					}
+					claudeResp.Content = append(claudeResp.Content, claudeContent)
+				}
+			}
 		}
 	}
 

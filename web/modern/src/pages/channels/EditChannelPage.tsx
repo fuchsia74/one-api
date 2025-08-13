@@ -259,6 +259,8 @@ export function EditChannelPage() {
   const [defaultPricing, setDefaultPricing] = useState<string>('')
   const [batchMode, setBatchMode] = useState(false)
   const [customModel, setCustomModel] = useState('')
+  const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
+  const [loadedChannelType, setLoadedChannelType] = useState<number | null>(null) // Track the loaded channel type
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -293,14 +295,54 @@ export function EditChannelPage() {
   const watchConfig = form.watch('config')
   const selectedChannelType = CHANNEL_TYPES.find(t => t.value === watchType)
 
+  // Debug logging for watchType changes
+  useEffect(() => {
+    console.log('[CHANNEL_TYPE_DEBUG] watchType changed:', watchType, typeof watchType)
+    console.log('[CHANNEL_TYPE_DEBUG] selectedChannelType:', selectedChannelType)
+  }, [watchType, selectedChannelType])
+
+  // Additional effect to ensure type field is properly set after form initialization
+  useEffect(() => {
+    if (isEdit && formInitialized && loadedChannelType) {
+      const currentType = form.getValues('type')
+      console.log('[CHANNEL_TYPE_DEBUG] Form initialized effect - current type:', currentType, 'loaded type:', loadedChannelType)
+
+      // If type is still not set correctly, force it to the loaded value
+      if (currentType !== loadedChannelType) {
+        console.log('[CHANNEL_TYPE_DEBUG] Type mismatch detected in effect, forcing setValue:', { expected: loadedChannelType, actual: currentType })
+        form.setValue('type', loadedChannelType, { shouldValidate: true, shouldDirty: false })
+      }
+    }
+  }, [isEdit, formInitialized, loadedChannelType, form])
+
+  // Effect to sync watchType with loadedChannelType
+  useEffect(() => {
+    if (isEdit && loadedChannelType && watchType !== loadedChannelType) {
+      console.log('[CHANNEL_TYPE_DEBUG] watchType sync effect - watchType:', watchType, 'loadedChannelType:', loadedChannelType)
+      // This indicates the form value and watch value are out of sync
+      form.setValue('type', loadedChannelType, { shouldValidate: true, shouldDirty: false })
+    }
+  }, [isEdit, loadedChannelType, watchType, form])
+
   const loadChannel = async () => {
-    if (!channelId) return
+    if (!channelId) {
+      console.log('[CHANNEL_TYPE_DEBUG] No channelId provided, skipping load')
+      return
+    }
+
+    console.log('[CHANNEL_TYPE_DEBUG] Starting to load channel:', channelId)
+    console.log('[CHANNEL_TYPE_DEBUG] Current form values before load:', form.getValues())
 
     try {
-      const response = await api.get(`/channel/${channelId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/channel/${channelId}`)
       const { success, message, data } = response.data
 
+      console.log('[CHANNEL_TYPE_DEBUG] API response:', { success, message, data })
+
       if (success && data) {
+        console.log('[CHANNEL_TYPE_DEBUG] Raw channel data type:', typeof data.type, data.type)
+
         // Parse models field - convert string to array
         let models: string[] = []
         if (data.models && typeof data.models === 'string' && data.models.trim() !== '') {
@@ -343,9 +385,21 @@ export function EditChannelPage() {
           return ''
         }
 
+        // Ensure type is a number and handle edge cases
+        let channelType = data.type
+        if (typeof channelType === 'string') {
+          channelType = parseInt(channelType, 10)
+        }
+        if (!channelType || isNaN(channelType)) {
+          console.warn('[CHANNEL_TYPE_DEBUG] Invalid channel type, defaulting to 1:', data.type)
+          channelType = 1
+        }
+
+        console.log('[CHANNEL_TYPE_DEBUG] Processed channel type:', channelType)
+
         const formData: ChannelForm = {
           name: data.name || '',
-          type: data.type || 1,
+          type: channelType,
           key: data.key || '',
           base_url: data.base_url || '',
           other: data.other || '',
@@ -361,31 +415,61 @@ export function EditChannelPage() {
           inference_profile_arn_map: formatJsonField(data.inference_profile_arn_map),
         }
 
+        console.log('[CHANNEL_TYPE_DEBUG] Prepared form data:', formData)
+        console.log('[CHANNEL_TYPE_DEBUG] Form data type field:', formData.type, typeof formData.type)
+
         // Load channel-specific models and default pricing
-        if (data.type) {
+        if (channelType) {
+          console.log('[CHANNEL_TYPE_DEBUG] Loading channel models and pricing for type:', channelType)
           await Promise.all([
-            loadChannelModels(data.type),
-            loadDefaultPricing(data.type)
+            loadChannelModels(channelType),
+            loadDefaultPricing(channelType)
           ])
         }
 
-        console.log('Loaded channel data:', formData)
+        console.log('[CHANNEL_TYPE_DEBUG] About to reset form with data:', formData)
+
+        // Store the loaded channel type
+        setLoadedChannelType(channelType)
+
         form.reset(formData)
-        // After reset, log values (no extra setValue needed)
-        console.log('Form values after reset:', form.getValues())
+
+        // Wait a tick to ensure form is updated
+        await new Promise(resolve => setTimeout(resolve, 0))
+
+        console.log('[CHANNEL_TYPE_DEBUG] Form values after reset:', form.getValues())
+        console.log('[CHANNEL_TYPE_DEBUG] Form type value after reset:', form.getValues('type'))
+        console.log('[CHANNEL_TYPE_DEBUG] Form watch type after reset:', watchType)
+
+        // Force update the type field if it's not set correctly
+        const currentTypeValue = form.getValues('type')
+        if (currentTypeValue !== channelType) {
+          console.log('[CHANNEL_TYPE_DEBUG] Type mismatch detected, forcing setValue:', { expected: channelType, actual: currentTypeValue })
+          form.setValue('type', channelType, { shouldValidate: true, shouldDirty: false })
+
+          // Wait another tick and check again
+          await new Promise(resolve => setTimeout(resolve, 0))
+          console.log('[CHANNEL_TYPE_DEBUG] Form type value after setValue:', form.getValues('type'))
+        }
+
+        // Mark form as initialized
+        console.log('[CHANNEL_TYPE_DEBUG] Setting formInitialized to true')
+        setFormInitialized(true)
       } else {
         throw new Error(message || 'Failed to load channel')
       }
     } catch (error) {
-      console.error('Error loading channel:', error)
+      console.error('[CHANNEL_TYPE_DEBUG] Error loading channel:', error)
     } finally {
+      console.log('[CHANNEL_TYPE_DEBUG] Setting loading to false')
       setLoading(false)
     }
   }
 
   const loadAllModels = async () => {
     try {
-      const response = await api.get('/models')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/models')
       const { success, data } = response.data
 
       if (success && data) {
@@ -410,7 +494,8 @@ export function EditChannelPage() {
 
   const loadChannelModels = async (type: number) => {
     try {
-      const response = await api.get('/models')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/models')
       const { success, data } = response.data
 
       if (success && data) {
@@ -425,7 +510,8 @@ export function EditChannelPage() {
 
   const loadDefaultPricing = async (channelType: number) => {
     try {
-      const response = await api.get(`/channel/default-pricing?type=${channelType}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/channel/default-pricing?type=${channelType}`)
       const { success, data } = response.data
       if (success && data?.model_configs) {
         try {
@@ -453,7 +539,8 @@ export function EditChannelPage() {
 
   const loadGroups = async () => {
     try {
-      const response = await api.get('/option/')
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get('/api/option/')
       const { success, data } = response.data
 
       if (success && data) {
@@ -473,9 +560,11 @@ export function EditChannelPage() {
   }
 
   useEffect(() => {
+    console.log('[CHANNEL_TYPE_DEBUG] Main useEffect triggered:', { isEdit, channelId })
     if (isEdit) {
       loadChannel()
     } else {
+      console.log('[CHANNEL_TYPE_DEBUG] Not in edit mode, setting loading to false')
       setLoading(false)
     }
     loadAllModels()
@@ -483,6 +572,7 @@ export function EditChannelPage() {
   }, [isEdit, channelId])
 
   useEffect(() => {
+    console.log('[CHANNEL_TYPE_DEBUG] watchType useEffect triggered:', watchType)
     if (watchType) {
       loadChannelModels(watchType)
       loadDefaultPricing(watchType)
@@ -623,9 +713,10 @@ export function EditChannelPage() {
 
       let response
       if (isEdit && channelId) {
-        response = await api.put('/channel/', { ...payload, id: parseInt(channelId) })
+        // Unified API call - complete URL with /api prefix
+        response = await api.put('/api/channel/', { ...payload, id: parseInt(channelId) })
       } else {
-        response = await api.post('/channel/', payload)
+        response = await api.post('/api/channel/', payload)
       }
 
       const { success, message } = response.data
@@ -652,7 +743,8 @@ export function EditChannelPage() {
 
     try {
       setIsSubmitting(true)
-      const response = await api.get(`/channel/test/${channelId}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/channel/test/${channelId}`)
       const { success, message } = response.data
 
       if (success) {
@@ -1100,7 +1192,22 @@ export function EditChannelPage() {
     }
   }
 
-  if (loading) {
+  const currentFormType = form.getValues().type
+  const shouldShowLoading = loading || (isEdit && !formInitialized)
+
+  console.log('[CHANNEL_TYPE_DEBUG] Render check:', {
+    loading,
+    isEdit,
+    currentFormType,
+    formInitialized,
+    loadedChannelType,
+    shouldShowLoading,
+    watchType,
+    formValues: form.getValues()
+  })
+
+  if (shouldShowLoading) {
+    console.log('[CHANNEL_TYPE_DEBUG] Showing loading screen')
     return (
       <div className="container mx-auto px-4 py-8">
         <Card>
@@ -1112,6 +1219,8 @@ export function EditChannelPage() {
       </div>
     )
   }
+
+  console.log('[CHANNEL_TYPE_DEBUG] Rendering main form')
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -1158,17 +1267,46 @@ export function EditChannelPage() {
                   name="type"
                   render={({ field }) => {
                     const currentValue = field.value
+                    // Use loadedChannelType as fallback if field value is not set correctly
+                    const effectiveValue = (isEdit && loadedChannelType && (!currentValue || currentValue === 1)) ? loadedChannelType : currentValue
+                    const stringValue = effectiveValue !== undefined && effectiveValue !== null ? String(effectiveValue) : ''
+
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render - field.value:', currentValue, typeof currentValue)
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render - loadedChannelType:', loadedChannelType)
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render - effectiveValue:', effectiveValue)
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render - stringValue:', stringValue)
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render - isEdit:', isEdit)
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render - watchType:', watchType)
+
+                    // Find the channel type text for display
+                    const selectedChannelTypeForDisplay = CHANNEL_TYPES.find(t => t.value === effectiveValue)
+                    console.log('[CHANNEL_TYPE_DEBUG] Selected channel type for display:', selectedChannelTypeForDisplay)
+
                     return (
                       <FormItem>
                         <FormLabel>Channel Type *</FormLabel>
                         <Select
-                          key={`channel-type-${currentValue ?? 'unset'}`}
-                          onValueChange={field.onChange}
-                          value={currentValue !== undefined && currentValue !== null ? String(currentValue) : undefined}
+                          key={`channel-type-${effectiveValue ?? 'unset'}-${isEdit ? 'edit' : 'create'}-${formInitialized}`}
+                          onValueChange={(v) => {
+                            console.log('[CHANNEL_TYPE_DEBUG] Select onValueChange called with:', v, typeof v)
+                            const numValue = parseInt(v)
+                            console.log('[CHANNEL_TYPE_DEBUG] Select onValueChange parsed to:', numValue)
+                            field.onChange(numValue)
+                            // Also update loadedChannelType if this is a user change
+                            if (isEdit) {
+                              setLoadedChannelType(numValue)
+                            }
+                          }}
+                          value={stringValue}
+                          defaultValue={stringValue}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue placeholder="Select channel type" />
+                              <SelectValue
+                                placeholder="Select channel type"
+                              >
+                                {selectedChannelTypeForDisplay ? selectedChannelTypeForDisplay.text : 'Select channel type'}
+                              </SelectValue>
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="max-h-96 overflow-y-auto">
@@ -1515,7 +1653,7 @@ export function EditChannelPage() {
                       </span>
                       {field.value && field.value.trim() !== '' && (
                         <span className={`font-bold text-xs ${isValidJSON(field.value) && validateModelConfigs(field.value).valid
-                            ? 'text-green-600' : 'text-red-600'
+                          ? 'text-green-600' : 'text-red-600'
                           }`}>
                           {isValidJSON(field.value) && validateModelConfigs(field.value).valid
                             ? '✓ Valid Config' : '✗ Invalid Config'}

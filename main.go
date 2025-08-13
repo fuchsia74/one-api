@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	glog "github.com/Laisky/go-utils/v5/log"
 	"github.com/Laisky/zap"
@@ -53,6 +54,12 @@ func main() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	// check theme
+	logger.Logger.Info(fmt.Sprintf("using theme %s", config.Theme))
+	if err := isThemeValid(); err != nil {
+		logger.Logger.Fatal("invalid theme", zap.Error(err))
+	}
+
 	// Initialize SQL Database
 	model.InitDB()
 	model.InitLogDB()
@@ -77,7 +84,6 @@ func main() {
 
 	// Initialize options
 	model.InitOptionMap()
-	logger.Logger.Info(fmt.Sprintf("using theme %s", config.Theme))
 	if common.RedisEnabled {
 		// for compatibility with old versions
 		config.MemoryCacheEnabled = true
@@ -156,6 +162,7 @@ func main() {
 	// This will cause SSE not to work!!!
 	//server.Use(gzip.Gzip(gzip.DefaultCompression))
 	server.Use(middleware.RequestId())
+	server.Use(middleware.TracingMiddleware())
 	server.Use(middleware.Language())
 
 	// Add Prometheus middleware if enabled
@@ -203,4 +210,12 @@ func main() {
 	if err != nil {
 		logger.Logger.Fatal("failed to start HTTP server", zap.Error(err))
 	}
+}
+
+func isThemeValid() error {
+	if !config.ValidThemes[config.Theme] {
+		return errors.Errorf("invalid theme: %s", config.Theme)
+	}
+
+	return nil
 }

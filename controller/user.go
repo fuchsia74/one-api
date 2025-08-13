@@ -260,6 +260,15 @@ func GetAllUsers(c *gin.Context) {
 		p = 0
 	}
 
+	// Get page size from query parameter, default to config value
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = config.DefaultItemsPerPage
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+
 	order := c.DefaultQuery("order", "")
 	sortBy := c.Query("sort")
 	sortOrder := c.Query("order")
@@ -267,7 +276,7 @@ func GetAllUsers(c *gin.Context) {
 		sortOrder = "desc"
 	}
 
-	users, err := model.GetAllUsers(p*config.MaxItemsPerPage, config.MaxItemsPerPage, order, sortBy, sortOrder)
+	users, err := model.GetAllUsers(p*size, size, order, sortBy, sortOrder)
 
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{

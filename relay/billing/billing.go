@@ -215,3 +215,97 @@ func PostConsumeQuotaDetailed(ctx context.Context, tokenId int, quotaDelta int64
 	// Record billing operation completion
 	metrics.GlobalRecorder.RecordBillingOperation(billingStartTime, "post_consume_detailed", billingSuccess, userId, channelId, modelName, float64(totalQuota))
 }
+
+// PostConsumeQuotaDetailedWithTraceID handles detailed billing with explicit trace ID
+func PostConsumeQuotaDetailedWithTraceID(ctx context.Context, traceId string, tokenId int, quotaDelta int64, totalQuota int64,
+	userId int, channelId int, promptTokens int, completionTokens int,
+	modelRatio float64, groupRatio float64, modelName string, tokenName string,
+	isStream bool, startTime time.Time, systemPromptReset bool,
+	completionRatio float64, toolsCost int64) {
+
+	// Record billing operation start time for monitoring
+	billingStartTime := time.Now()
+	billingSuccess := true
+
+	// Input validation for safety
+	if ctx == nil {
+		logger.Logger.Error("PostConsumeQuotaDetailedWithTraceID: context is nil")
+		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed_with_trace", userId, channelId, modelName)
+		return
+	}
+	if tokenId <= 0 {
+		logger.Logger.Error("PostConsumeQuotaDetailedWithTraceID: invalid tokenId", zap.Int("token_id", tokenId))
+		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed_with_trace", userId, channelId, modelName)
+		return
+	}
+	if userId <= 0 {
+		logger.Logger.Error("PostConsumeQuotaDetailedWithTraceID: invalid userId", zap.Int("user_id", userId))
+		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed_with_trace", userId, channelId, modelName)
+		return
+	}
+	if channelId <= 0 {
+		logger.Logger.Error("PostConsumeQuotaDetailedWithTraceID: invalid channelId", zap.Int("channel_id", channelId))
+		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed_with_trace", userId, channelId, modelName)
+		return
+	}
+	if modelName == "" {
+		logger.Logger.Error("PostConsumeQuotaDetailedWithTraceID: modelName is empty")
+		metrics.GlobalRecorder.RecordBillingError("validation_error", "post_consume_detailed_with_trace", userId, channelId, modelName)
+		return
+	}
+
+	// quotaDelta is remaining quota to be consumed
+	err := model.PostConsumeTokenQuota(tokenId, quotaDelta)
+	if err != nil {
+		logger.Logger.Error("CRITICAL: upstream request was sent but billing failed - unbilled request detected",
+			zap.Error(err),
+			zap.Int("tokenId", tokenId),
+			zap.Int("userId", userId),
+			zap.Int("channelId", channelId),
+			zap.String("model", modelName),
+			zap.Int64("quotaDelta", quotaDelta),
+			zap.Int64("totalQuota", totalQuota))
+		metrics.GlobalRecorder.RecordBillingError("database_error", "post_consume_token_quota_with_trace", userId, channelId, modelName)
+		billingSuccess = false
+	}
+
+	// Prepare log content with detailed breakdown
+	var logContent string
+	if toolsCost > 0 {
+		logContent = fmt.Sprintf("model rate %.2f, group rate %.2f, completion rate %.2f, tools cost %d", modelRatio, groupRatio, completionRatio, toolsCost)
+	} else {
+		logContent = fmt.Sprintf("model rate %.2f, group rate %.2f, completion rate %.2f", modelRatio, groupRatio, completionRatio)
+	}
+
+	// Always log the request for tracking purposes, regardless of quota amount
+	model.RecordConsumeLogWithTraceID(ctx, traceId, &model.Log{
+		UserId:            userId,
+		ChannelId:         channelId,
+		PromptTokens:      promptTokens,
+		CompletionTokens:  completionTokens,
+		ModelName:         modelName,
+		TokenName:         tokenName,
+		Quota:             int(totalQuota),
+		Content:           logContent,
+		IsStream:          isStream,
+		ElapsedTime:       helper.CalcElapsedTime(startTime),
+		SystemPromptReset: systemPromptReset,
+	})
+
+	// Only update quotas when totalQuota > 0
+	if totalQuota > 0 {
+		model.UpdateUserUsedQuotaAndRequestCount(userId, totalQuota)
+		model.UpdateChannelUsedQuota(channelId, totalQuota)
+	} else {
+		logger.Logger.Error("invalid totalQuota consumed - something is wrong",
+			zap.Int64("total_quota", totalQuota),
+			zap.Int("user_id", userId),
+			zap.Int("channel_id", channelId),
+			zap.String("model_name", modelName))
+		metrics.GlobalRecorder.RecordBillingError("calculation_error", "post_consume_detailed_with_trace", userId, channelId, modelName)
+		billingSuccess = false
+	}
+
+	// Record billing operation completion
+	metrics.GlobalRecorder.RecordBillingOperation(billingStartTime, "post_consume_detailed_with_trace", billingSuccess, userId, channelId, modelName, float64(totalQuota))
+}

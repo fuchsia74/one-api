@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { renderQuota } from '@/lib/utils'
@@ -61,22 +63,25 @@ const getStatusBadge = (status: number) => {
 
 export function TokensPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<Token[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
   const [searchLoading, setSearchLoading] = useState(false)
   const [sortBy, setSortBy] = useState('id')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const initializedRef = useRef(false)
   const [showKeys, setShowKeys] = useState<Record<number, boolean>>({})
 
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
-      let url = `/token/?p=${p}&size=${size}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/token/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -97,12 +102,21 @@ export function TokensPage() {
     }
   }
 
+  // Load initial data
   useEffect(() => {
     load(0, pageSize)
-  }, [pageSize])
+    initializedRef.current = true
+  }, [])
 
+  // Handle sort changes (only after initialization)
   useEffect(() => {
-    load(0, pageSize)
+    if (!initializedRef.current) return
+
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(pageIndex, pageSize)
+    }
   }, [sortBy, sortOrder])
 
   const searchTokens = async (query: string) => {
@@ -113,8 +127,10 @@ export function TokensPage() {
 
     setSearchLoading(true)
     try {
-      let url = `/token/search?keyword=${encodeURIComponent(query)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/token/search?keyword=${encodeURIComponent(query)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -150,8 +166,10 @@ export function TokensPage() {
 
     setLoading(true)
     try {
-      let url = `/token/search?keyword=${encodeURIComponent(searchKeyword)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/token/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -170,11 +188,12 @@ export function TokensPage() {
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete') => {
     try {
-      let res
+      let res: any
       if (action === 'delete') {
-        res = await api.delete(`/token/${id}`)
+        // Unified API call - complete URL with /api prefix
+        res = await api.delete(`/api/token/${id}`)
       } else {
-        res = await api.put('/token/', {
+        res = await api.put('/api/token/', {
           id,
           status: action === 'enable' ? TOKEN_STATUS.ENABLED : TOKEN_STATUS.DISABLED
         })
@@ -267,7 +286,7 @@ export function TokensPage() {
       accessorKey: 'remain_quota',
       header: 'Remaining Quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
+        <span className="font-mono text-sm" title={`Remaining: ${formatQuota(row.original.remain_quota, row.original.unlimited_quota)}`}>
           {formatQuota(row.original.remain_quota, row.original.unlimited_quota)}
         </span>
       ),
@@ -276,7 +295,7 @@ export function TokensPage() {
       accessorKey: 'used_quota',
       header: 'Used Quota',
       cell: ({ row }) => (
-        <span className="font-mono text-sm">
+        <span className="font-mono text-sm" title={`Used: ${formatQuota(row.original.used_quota)}`}>
           {formatQuota(row.original.used_quota)}
         </span>
       ),
@@ -307,11 +326,12 @@ export function TokensPage() {
       cell: ({ row }) => {
         const token = row.original
         return (
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 mobile-table-cell">
             <Button
               variant="outline"
               size="sm"
               onClick={() => navigate(`/tokens/edit/${token.id}`)}
+              className="touch-target"
             >
               Edit
             </Button>
@@ -320,6 +340,7 @@ export function TokensPage() {
               size="sm"
               onClick={() => manage(token.id, token.status === TOKEN_STATUS.ENABLED ? 'disable' : 'enable')}
               className={cn(
+                "touch-target",
                 token.status === TOKEN_STATUS.ENABLED
                   ? 'text-orange-600 hover:text-orange-700'
                   : 'text-green-600 hover:text-green-700'
@@ -335,6 +356,7 @@ export function TokensPage() {
                   manage(token.id, 'delete')
                 }
               }}
+              className="touch-target"
             >
               Delete
             </Button>
@@ -345,32 +367,19 @@ export function TokensPage() {
   ]
 
   const handlePageChange = (newPageIndex: number, newPageSize: number) => {
-    if (searchKeyword.trim()) {
-      // For search results, we don't do server-side pagination
-      setPageIndex(newPageIndex)
-    } else {
-      load(newPageIndex, newPageSize)
-    }
+    load(newPageIndex, newPageSize)
   }
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, newPageSize)
-    }
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
   }
 
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
     setSortBy(newSortBy)
     setSortOrder(newSortOrder)
-    // Reload data with new sort order
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, pageSize)
-    }
+    // Let useEffect handle the reload to avoid double requests
   }
 
   const refresh = () => {
@@ -382,23 +391,26 @@ export function TokensPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Tokens"
+      description="Manage your API access tokens"
+      actions={
+        <Button
+          onClick={() => navigate('/tokens/add')}
+          className={cn(
+            "gap-2",
+            isMobile ? "w-full touch-target" : ""
+          )}
+        >
+          <Plus className="h-4 w-4" />
+          {isMobile ? "Add New Token" : "Add Token"}
+        </Button>
+      }
+    >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Tokens</CardTitle>
-              <CardDescription>
-                Manage your API access tokens
-              </CardDescription>
-            </div>
-            <Button onClick={() => navigate('/tokens/add')} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Token
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className={cn(
+          isMobile ? "p-4" : "p-6"
+        )}>
           <EnhancedDataTable
             columns={columns}
             data={data}
@@ -421,10 +433,13 @@ export function TokensPage() {
             onRefresh={refresh}
             loading={loading}
             emptyMessage="No tokens found. Create your first token to get started."
+            mobileCardLayout={true}
+            hideColumnsOnMobile={['created_time', 'accessed_time', 'expired_time']}
+            compactMode={isMobile}
           />
         </CardContent>
       </Card>
-    </div>
+    </ResponsivePageContainer>
   )
 }
 

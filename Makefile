@@ -48,7 +48,7 @@ build-frontend-berry:
 	@./web/berry/dev.sh build
 
 build-frontend-modern:
-	@cd web/modern && npm ci && npm run build
+	@cd web/modern && yarn && yarn build
 
 # Legacy build target (builds default template)
 .PHONY: build-frontend

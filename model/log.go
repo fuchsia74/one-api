@@ -28,6 +28,7 @@ type Log struct {
 	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0;index"` // Added index for sorting
 	ChannelId         int    `json:"channel" gorm:"index"`
 	RequestId         string `json:"request_id" gorm:"default:''"`
+	TraceId           string `json:"trace_id" gorm:"type:varchar(64);index;default:''"` // TraceID from gin-middlewares
 	UpdatedAt         int64  `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 	ElapsedTime       int64  `json:"elapsed_time" gorm:"default:0;index"` // Added index for sorting (unit is ms)
 	IsStream          bool   `json:"is_stream" gorm:"default:false"`
@@ -69,6 +70,16 @@ func GetLogOrderClause(sortBy string, sortOrder string) string {
 func recordLogHelper(ctx context.Context, log *Log) {
 	requestId := helper.GetRequestID(ctx)
 	log.RequestId = requestId
+
+	// Also set TraceID from gin-middlewares if available
+	traceId := helper.GetTraceIDFromContext(ctx)
+	log.TraceId = traceId
+
+	// Debug logging to see what's happening
+	logger.Logger.Debug("setting trace_id in log record",
+		zap.String("trace_id", traceId),
+		zap.String("request_id", requestId))
+
 	err := LOG_DB.Create(log).Error
 	if err != nil {
 		// For billing logs (consume type), this is critical as it means we sent upstream request but failed to log it
@@ -92,7 +103,45 @@ func recordLogHelper(ctx context.Context, log *Log) {
 		zap.Int64("created_at", log.CreatedAt),
 		zap.Int("type", log.Type),
 		zap.String("content", log.Content),
-		zap.String("request_id", log.RequestId))
+		zap.String("request_id", log.RequestId),
+		zap.String("trace_id", log.TraceId))
+}
+
+func recordLogHelperWithTraceID(ctx context.Context, traceId string, log *Log) {
+	requestId := helper.GetRequestID(ctx)
+	log.RequestId = requestId
+	log.TraceId = traceId
+
+	// Debug logging to see what's happening
+	logger.Logger.Debug("setting trace_id in log record (with explicit trace_id)",
+		zap.String("trace_id", traceId),
+		zap.String("request_id", requestId))
+
+	err := LOG_DB.Create(log).Error
+	if err != nil {
+		// For billing logs (consume type), this is critical as it means we sent upstream request but failed to log it
+		if log.Type == LogTypeConsume {
+			logger.Logger.Error("failed to record billing log - audit trail incomplete",
+				zap.Error(err),
+				zap.Int("userId", log.UserId),
+				zap.Int("channelId", log.ChannelId),
+				zap.String("model", log.ModelName),
+				zap.Int("quota", log.Quota),
+				zap.String("requestId", log.RequestId),
+				zap.String("note", "billing completed successfully but log recording failed"))
+		} else {
+			logger.Logger.Error("failed to record log", zap.Error(err))
+		}
+		return
+	}
+	logger.Logger.Info("record log",
+		zap.Int("user_id", log.UserId),
+		zap.String("username", log.Username),
+		zap.Int64("created_at", log.CreatedAt),
+		zap.Int("type", log.Type),
+		zap.String("content", log.Content),
+		zap.String("request_id", log.RequestId),
+		zap.String("trace_id", log.TraceId))
 }
 
 func RecordLog(ctx context.Context, userId int, logType int, content string) {
@@ -129,6 +178,16 @@ func RecordConsumeLog(ctx context.Context, log *Log) {
 	log.CreatedAt = helper.GetTimestamp()
 	log.Type = LogTypeConsume
 	recordLogHelper(ctx, log)
+}
+
+func RecordConsumeLogWithTraceID(ctx context.Context, traceId string, log *Log) {
+	if !config.LogConsumeEnabled {
+		return
+	}
+	log.Username = GetUsernameById(log.UserId)
+	log.CreatedAt = helper.GetTimestamp()
+	log.Type = LogTypeConsume
+	recordLogHelperWithTraceID(ctx, traceId, log)
 }
 
 func RecordTestLog(ctx context.Context, log *Log) {
@@ -232,19 +291,55 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 		defer cancel()
 		err = tx.WithContext(ctx).Order(orderClause).Limit(num).Offset(startIdx).Find(&logs).Error
 	} else {
-		err = tx.Order(orderClause).Limit(num).Offset(startIdx).Omit("id").Find(&logs).Error
+		err = tx.Order(orderClause).Limit(num).Offset(startIdx).Find(&logs).Error
 	}
 	return logs, err
 }
 
-func SearchAllLogs(keyword string) (logs []*Log, err error) {
-	err = LOG_DB.Where("type = ? or content LIKE ?", keyword, keyword+"%").Order("id desc").Limit(config.MaxRecentItems).Find(&logs).Error
-	return logs, err
+func GetUserLogsCount(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string) (count int64, err error) {
+	var tx *gorm.DB
+	if logType == LogTypeUnknown {
+		tx = LOG_DB.Where("user_id = ?", userId)
+	} else {
+		tx = LOG_DB.Where("user_id = ? and type = ?", userId, logType)
+	}
+	if modelName != "" {
+		tx = tx.Where("model_name = ?", modelName)
+	}
+	if tokenName != "" {
+		tx = tx.Where("token_name = ?", tokenName)
+	}
+	if startTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", endTimestamp)
+	}
+
+	err = tx.Model(&Log{}).Count(&count).Error
+	return count, err
 }
 
-func SearchUserLogs(userId int, keyword string) (logs []*Log, err error) {
-	err = LOG_DB.Where("user_id = ? and type = ?", userId, keyword).Order("id desc").Limit(config.MaxRecentItems).Omit("id").Find(&logs).Error
-	return logs, err
+func SearchAllLogs(keyword string, startIdx int, num int, sortBy string, sortOrder string) (logs []*Log, total int64, err error) {
+	db := LOG_DB.Model(&Log{})
+	if keyword != "" {
+		db = db.Where("content LIKE ?", "%"+keyword+"%")
+	}
+	orderClause := GetLogOrderClause(sortBy, sortOrder)
+	db = db.Order(orderClause)
+	err = db.Count(&total).Limit(num).Offset(startIdx).Find(&logs).Error
+	return logs, total, err
+}
+
+func SearchUserLogs(userId int, keyword string, startIdx int, num int, sortBy string, sortOrder string) (logs []*Log, total int64, err error) {
+	db := LOG_DB.Model(&Log{}).Where("user_id = ?", userId)
+	if keyword != "" {
+		db = db.Where("content LIKE ?", "%"+keyword+"%")
+	}
+	orderClause := GetLogOrderClause(sortBy, sortOrder)
+	db = db.Order(orderClause)
+	err = db.Count(&total).Limit(num).Offset(startIdx).Find(&logs).Error
+	return logs, total, err
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int) (quota int64) {
@@ -303,6 +398,15 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 func DeleteOldLog(targetTimestamp int64) (int64, error) {
 	result := LOG_DB.Where("created_at < ?", targetTimestamp).Delete(&Log{})
 	return result.RowsAffected, result.Error
+}
+
+// GetLogById retrieves a log entry by its ID
+func GetLogById(id int) (*Log, error) {
+	var log Log
+	if err := LOG_DB.Where("id = ?", id).First(&log).Error; err != nil {
+		return nil, err
+	}
+	return &log, nil
 }
 
 type LogStatistic struct {

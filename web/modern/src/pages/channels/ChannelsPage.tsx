@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatTimestamp, cn } from '@/lib/utils'
 import { Plus, TestTube, RefreshCw, DollarSign, Trash2, Settings, AlertCircle } from 'lucide-react'
@@ -107,10 +109,11 @@ const formatResponseTime = (time?: number) => {
 
 export function ChannelsPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<Channel[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
-  const [pageSize, setPageSize] = useState(20)
+  const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
   const [searchKeyword, setSearchKeyword] = useState('')
   const [searchOptions, setSearchOptions] = useState<SearchOption[]>([])
@@ -119,11 +122,13 @@ export function ChannelsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [bulkTesting, setBulkTesting] = useState(false)
   const [bulkUpdating, setBulkUpdating] = useState(false)
+  const initializedRef = useRef(false)
 
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
     try {
-      let url = `/channel/?p=${p}&size=${size}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/channel/?p=${p}&size=${size}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
 
       const res = await api.get(url)
@@ -152,8 +157,10 @@ export function ChannelsPage() {
 
     setSearchLoading(true)
     try {
-      let url = `/channel/search?keyword=${encodeURIComponent(query)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/channel/search?keyword=${encodeURIComponent(query)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -189,8 +196,10 @@ export function ChannelsPage() {
 
     setLoading(true)
     try {
-      let url = `/channel/search?keyword=${encodeURIComponent(searchKeyword)}`
+      // Unified API call - complete URL with /api prefix
+      let url = `/api/channel/search?keyword=${encodeURIComponent(searchKeyword)}`
       if (sortBy) url += `&sort=${sortBy}&order=${sortOrder}`
+      url += `&size=${pageSize}`
 
       const res = await api.get(url)
       const { success, data: responseData } = res.data
@@ -207,19 +216,29 @@ export function ChannelsPage() {
     }
   }
 
+  // Load initial data
   useEffect(() => {
     load(0, pageSize)
-  }, [pageSize])
+    initializedRef.current = true
+  }, [])
 
+  // Handle sort changes (only after initialization)
   useEffect(() => {
-    load(0, pageSize)
+    if (!initializedRef.current) return
+
+    if (searchKeyword.trim()) {
+      performSearch()
+    } else {
+      load(pageIndex, pageSize)
+    }
   }, [sortBy, sortOrder])
 
   const manage = async (id: number, action: 'enable' | 'disable' | 'delete' | 'test' | 'balance', index?: number) => {
     try {
       if (action === 'delete') {
         if (!confirm('Are you sure you want to delete this channel?')) return
-        const res = await api.delete(`/channel/${id}`)
+        // Unified API call - complete URL with /api prefix
+        const res = await api.delete(`/api/channel/${id}`)
         if (res.data?.success) {
           if (searchKeyword.trim()) {
             performSearch()
@@ -231,7 +250,8 @@ export function ChannelsPage() {
       }
 
       if (action === 'test') {
-        const res = await api.get(`/channel/test/${id}`)
+        // Unified API call - complete URL with /api prefix
+        const res = await api.get(`/api/channel/test/${id}`)
         const { success, time } = res.data
         if (success && index !== undefined) {
           const newData = [...data]
@@ -242,7 +262,8 @@ export function ChannelsPage() {
       }
 
       if (action === 'balance') {
-        const res = await api.get(`/channel/update_balance/${id}`)
+        // Unified API call - complete URL with /api prefix
+        const res = await api.get(`/api/channel/update_balance/${id}`)
         if (res.data?.success) {
           if (searchKeyword.trim()) {
             performSearch()
@@ -253,9 +274,9 @@ export function ChannelsPage() {
         return
       }
 
-      // Enable/disable
+      // Enable/disable - Unified API call with complete URL
       const payload = { id, status: action === 'enable' ? 1 : 2 }
-      const res = await api.put('/channel/', payload)
+      const res = await api.put('/api/channel/', payload)
       if (res.data?.success) {
         if (searchKeyword.trim()) {
           performSearch()
@@ -271,7 +292,8 @@ export function ChannelsPage() {
   const handleBulkTest = async () => {
     setBulkTesting(true)
     try {
-      await api.get('/channel/test')
+      // Unified API call - complete URL with /api prefix
+      await api.get('/api/channel/test')
       load(pageIndex, pageSize)
     } catch (error) {
       console.error('Bulk test failed:', error)
@@ -283,7 +305,8 @@ export function ChannelsPage() {
   const handleBulkUpdateBalance = async () => {
     setBulkUpdating(true)
     try {
-      await api.get('/channel/update_balance')
+      // Unified API call - complete URL with /api prefix
+      await api.get('/api/channel/update_balance')
       load(pageIndex, pageSize)
     } catch (error) {
       console.error('Bulk balance update failed:', error)
@@ -296,7 +319,8 @@ export function ChannelsPage() {
     if (!confirm('Are you sure you want to delete all disabled channels? This action cannot be undone.')) return
 
     try {
-      await api.delete('/channel/disabled')
+      // Unified API call - complete URL with /api prefix
+      await api.delete('/api/channel/disabled')
       load(pageIndex, pageSize)
     } catch (error) {
       console.error('Failed to delete disabled channels:', error)
@@ -353,7 +377,7 @@ export function ChannelsPage() {
       accessorKey: 'balance',
       header: 'Balance',
       cell: ({ row }) => (
-        <div className="text-sm">
+        <div className="text-sm" title={`Balance: ${formatBalance(row.original.balance)}${row.original.balance_updated_time ? ` (Updated: ${formatTimestamp(row.original.balance_updated_time)})` : ''}`}>
           {formatBalance(row.original.balance)}
           {row.original.balance_updated_time && (
             <div className="text-xs text-muted-foreground">
@@ -367,7 +391,7 @@ export function ChannelsPage() {
       accessorKey: 'response_time',
       header: 'Response',
       cell: ({ row }) => (
-        <div className="text-center">
+        <div className="text-center" title={`Response time: ${row.original.response_time ? `${row.original.response_time}ms` : 'Not tested'}${row.original.test_time ? ` (Tested: ${formatTimestamp(row.original.test_time)})` : ''}`}>
           {formatResponseTime(row.original.response_time)}
           {row.original.test_time && (
             <div className="text-xs text-muted-foreground">
@@ -446,31 +470,19 @@ export function ChannelsPage() {
   ]
 
   const handlePageChange = (newPageIndex: number, newPageSize: number) => {
-    if (searchKeyword.trim()) {
-      setPageIndex(newPageIndex)
-    } else {
-      load(newPageIndex, newPageSize)
-    }
+    load(newPageIndex, newPageSize)
   }
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, newPageSize)
-    }
+    setPageIndex(0)
+    // Don't call load here - let onPageChange handle it to avoid duplicate API calls
   }
 
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {
     setSortBy(newSortBy)
     setSortOrder(newSortOrder)
-    // Reload data with new sort order
-    if (searchKeyword.trim()) {
-      performSearch()
-    } else {
-      load(0, pageSize)
-    }
+    // Let useEffect handle the reload to avoid double requests
   }
 
   const refresh = () => {
@@ -482,62 +494,80 @@ export function ChannelsPage() {
   }
 
   const toolbarActions = (
-    <div className="flex items-center gap-2">
+    <div className={cn(
+      "flex gap-2",
+      isMobile ? "flex-col w-full" : "items-center"
+    )}>
       <Button
         variant="outline"
         onClick={handleBulkTest}
         disabled={bulkTesting || loading}
-        className="gap-2"
+        className={cn(
+          "gap-2",
+          isMobile ? "w-full touch-target" : ""
+        )}
+        size="sm"
       >
         {bulkTesting ? (
           <RefreshCw className="h-4 w-4 animate-spin" />
         ) : (
           <TestTube className="h-4 w-4" />
         )}
-        Test All
+        {isMobile ? "Test All Channels" : "Test All"}
       </Button>
       <Button
         variant="outline"
         onClick={handleBulkUpdateBalance}
         disabled={bulkUpdating || loading}
-        className="gap-2"
+        className={cn(
+          "gap-2",
+          isMobile ? "w-full touch-target" : ""
+        )}
+        size="sm"
       >
         {bulkUpdating ? (
           <RefreshCw className="h-4 w-4 animate-spin" />
         ) : (
           <DollarSign className="h-4 w-4" />
         )}
-        Update Balances
+        {isMobile ? "Update All Balances" : "Update Balances"}
       </Button>
       <Button
         variant="destructive"
         onClick={handleDeleteDisabled}
-        className="gap-2"
+        className={cn(
+          "gap-2",
+          isMobile ? "w-full touch-target" : ""
+        )}
+        size="sm"
       >
         <Trash2 className="h-4 w-4" />
-        Delete Disabled
+        {isMobile ? "Delete All Disabled" : "Delete Disabled"}
       </Button>
     </div>
   )
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Channels"
+      description="Configure and manage API routing channels"
+      actions={
+        <Button
+          onClick={() => navigate('/channels/add')}
+          className={cn(
+            "gap-2",
+            isMobile ? "w-full touch-target" : ""
+          )}
+        >
+          <Plus className="h-4 w-4" />
+          {isMobile ? "Add New Channel" : "Add Channel"}
+        </Button>
+      }
+    >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Channels</CardTitle>
-              <CardDescription>
-                Configure and manage API routing channels
-              </CardDescription>
-            </div>
-            <Button onClick={() => navigate('/channels/add')} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Channel
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
+        <CardContent className={cn(
+          isMobile ? "p-4" : "p-6"
+        )}>
           <EnhancedDataTable
             columns={columns}
             data={data}
@@ -561,9 +591,12 @@ export function ChannelsPage() {
             onRefresh={refresh}
             loading={loading}
             emptyMessage="No channels found. Create your first channel to get started."
+            mobileCardLayout={true}
+            hideColumnsOnMobile={['created_time', 'response_time']}
+            compactMode={isMobile}
           />
         </CardContent>
       </Card>
-    </div>
+    </ResponsivePageContainer>
   )
 }

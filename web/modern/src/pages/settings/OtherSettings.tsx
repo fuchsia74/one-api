@@ -41,7 +41,8 @@ export function OtherSettings() {
 
   const loadOptions = async () => {
     try {
-      const res = await api.get('/option/')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/option/')
       const { success, data } = res.data
       if (success && data) {
         const formData: any = {}
@@ -63,7 +64,8 @@ export function OtherSettings() {
   const updateOption = async (key: string, value: string) => {
     try {
       setLoading(true)
-      await api.put('/option/', { key, value })
+      // Unified API call - complete URL with /api prefix
+      await api.put('/api/option/', { key, value })
       console.log(`Updated ${key}`)
     } catch (error) {
       console.error(`Error updating ${key}:`, error)
@@ -79,7 +81,8 @@ export function OtherSettings() {
 
   const checkUpdate = async () => {
     try {
-      const res = await api.get('/option/update')
+      // Unified API call - complete URL with /api prefix
+      const res = await api.get('/api/option/update')
       const { success, data } = res.data
       if (success && data) {
         setUpdateData(data)

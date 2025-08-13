@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Check, ChevronsUpDown, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -74,7 +75,7 @@ export function SearchableDropdown({
 
   const selectedOption = [...initialOptions, ...apiOptions].find((option) => option.value === value)
 
-  // API search with debouncing
+  // API search with debouncing - now uses unified api wrapper
   const performApiSearch = React.useCallback(async (query: string) => {
     if (!searchEndpoint || !transformResponse || query.length < minQueryLength) {
       setApiOptions([])
@@ -83,8 +84,9 @@ export function SearchableDropdown({
 
     setApiLoading(true)
     try {
-      const response = await fetch(`${searchEndpoint}?keyword=${encodeURIComponent(query)}`)
-      const result = await response.json()
+      // Use unified api wrapper - caller provides complete URL including /api prefix
+      const response = await api.get(`${searchEndpoint}?keyword=${encodeURIComponent(query)}`)
+      const result = response.data
 
       if (result.success && result.data) {
         const transformedOptions = transformResponse(result.data)

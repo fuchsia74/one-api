@@ -7,6 +7,51 @@ applyTo: "**/*"
 This document contains essential, abstract, and up-to-date information about the project, collaboratively maintained by all developers. It is regularly updated to reflect key architectural decisions, subtle implementation details, and recent developments. Outdated content is removed to maintain clarity and relevance.
 
 
+
+## Frontend API Path Unification & Verification (2025-08)
+
+- **API Path Convention:**
+    - All frontend API calls must use explicit, full URLs with the `/api` prefix. The shared Axios client no longer sets a `baseURL`.
+    - Every API call (GET, POST, PUT, DELETE) must include `/api/` in the path. This applies to all pages, components, and utility functions.
+    - Inline comments (`// Unified API call - complete URL with /api prefix`) are used to clarify this convention for maintainers.
+
+- **Verification & Migration:**
+    - A verification script (`grep -r "api\.get|api\.post|api\.put|api\.delete" ... | grep -v "/api/" | grep -v "Unified API call"`) is used to ensure no legacy or missing `/api` prefixes remain.
+    - As of August 2025, all API calls in the modern frontend have been verified and fixed to use the `/api` prefix. The migration is complete and consistent.
+    - Any future code or third-party integration must follow this invariant. If the backend route structure changes, a full review is required.
+
+- **Subtle Implementation Details & Risks:**
+    - Any missed API call without `/api` will fail (404 or unexpected behavior). All new code must be checked for compliance.
+    - Components using `fetch()` or other HTTP clients directly must also use the `/api` prefix.
+    - Tests, mocks, and documentation must be kept in sync with this convention.
+    - If the backend changes the `/api` prefix, both frontend and backend must be updated in lockstep.
+
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the explicit API path requirement, the verification process, and the need to keep this invariant in all future work. Use the verification script after any major refactor or dependency update.
+
+## Frontend Authentication, Validation, and Testing (2025-08)
+
+- **Login & Registration:**
+    - TOTP (Two-Factor Authentication) is strictly validated in the login flow. The UI disables the submit button unless a 6-digit code is entered when required. TOTP state is managed separately from the form state.
+    - Success messages (e.g., after registration or password reset) are passed via navigation state and displayed on the login page (not for direct URL access).
+    - Email validation in registration is regex-based and enforced before sending verification codes. The "Send Code" button is disabled unless a valid email is entered.
+    - Form error handling is decoupled from form context, improving maintainability.
+
+- **Testing Infrastructure:**
+    - The modern frontend uses Vitest as the test runner, with `jsdom` as the default environment. All test scripts and TypeScript configs are updated accordingly.
+    - All test files must use the correct mocking API for Vitest (e.g., `vi.mock`).
+    - The global Vitest setup may affect tests that expect a Node environment or use other runners. All new dependencies must be kept up to date.
+
+- **Subtle Implementation Details & Risks:**
+    - TOTP and email validation are stricter; if backend or other clients expect different behavior, login or registration may fail.
+    - The use of navigation state for success messages means direct URL access will not show these messages.
+    - The refactor of error handling may break custom error handling in other forms if they relied on the previous implementation.
+    - The global Vitest setup may affect tests that expect a Node environment or use other runners.
+
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the stricter validation logic, the decoupled error handling, and the global Vitest test environment. All authentication and registration flows must be tested after changes. Any test runner or environment changes must be validated for compatibility.
+
+
 ## Pricing & Billing Architecture (2025-07)
 
 - **Pricing Unit Standardization:** All model pricing, quota, and billing calculations use "per 1M tokens". This is reflected in backend, UI, and documentation. Always keep user-facing messages and docs in sync with backend logic.
@@ -31,30 +76,39 @@ This document contains essential, abstract, and up-to-date information about the
 
 ---
 
-## Frontend Table & Mobile UX Architecture (2025-08)
 
-- **Table & Pagination Refactor:**
-    - All management tables (Users, Channels, Tokens, Redemptions, Logs) now use a unified, server-side pagination and sorting pattern. Table sorting is handled via dropdown and clickable column headers with icons. All tables fetch data in real-time from the server; no local cache is used for editing or display.
-    - Pagination controls are always visible and styled for both desktop and mobile. Legacy CSS overrides that hid or broke pagination have been removed. Always check for global/legacy CSS overrides when UI elements are missing, especially with third-party UI libraries.
-    - Pagination logic must match the data loading strategy. For server-side pagination, render API results directly—never slice data in the component.
-    - Table action buttons and pagination controls are compact, visually consistent, and touch-friendly. Button and pagination sizing is responsive and modern.
+## Frontend Responsive & Table Architecture (2025-08)
 
-- **Mobile Table Redesign:**
-    - Mobile view uses a card-based layout: each table row is rendered as a card with clear label-value pairs (using `data-label` attributes for accessibility and clarity).
-    - Action buttons are arranged in a 2-column grid for touch usability, with primary actions (like Edit) spanning full width. All buttons are sized for touch targets (min 32px height) and have clear visual feedback.
-    - Pagination on mobile is touch-friendly, with large, visually distinct buttons and proper spacing. Hover/active states use transform and shadow for feedback.
-    - All table components (UsersTable, ChannelsTable, TokensTable, RedemptionsTable) have been updated to include `data-label` attributes for every cell, ensuring clarity and accessibility in mobile layouts.
-    - Mobile CSS is modular, with minimal use of `!important`. Only use `!important` when absolutely necessary to override third-party library conflicts. Prefer maintainable, specific selectors.
+- **Unified Responsive System:**
+    - All management tables (Users, Channels, Tokens, Redemptions, Logs) and main pages now use a unified responsive architecture. This includes:
+        - `useResponsive` hook for device detection (`isMobile`, `isTablet`, etc.).
+        - `ResponsivePageContainer`, `ResponsiveSection`, and `AdaptiveGrid` for consistent, adaptive layouts.
+        - Card-based mobile layouts for tables, with label-value pairs and touch-friendly controls.
+        - All table action buttons and pagination controls are touch-friendly, visually consistent, and use minimum 44px tap targets.
+        - Table columns can be hidden on mobile via `hideColumnsOnMobile` prop; all table cells use `data-label` for accessibility.
+        - Pagination is always visible, styled for both desktop and mobile, and never slices data locally for server-side pagination.
+        - All table and UI changes must be validated on both desktop and mobile after any refactor.
 
-- **General Frontend Practices:**
+- **CSS & Tailwind:**
+    - `mobile.css` and `tailwind.config.js` are extended for modular, maintainable responsive utilities (custom breakpoints, touch targets, responsive spacing, etc.).
+    - Legacy or global CSS overrides that break pagination or table layout have been removed. Always check for such overrides when UI elements are missing.
+    - Never use inline style overrides for layout/visibility; always prefer maintainable CSS fixes.
+    - Remove outdated or redundant CSS as part of any major UI refactor.
+
+- **Testing & Build:**
     - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
-    - All table and UI changes must be reflected in both desktop and mobile views. Always validate both after any refactor.
-    - When handing over, ensure the new assistant is aware of the mobile/table/pagination architecture, the importance of data-labels for mobile, and the need to keep UI/UX in sync with backend and documentation.
+    - Test files must use the correct mocking API for the test runner (e.g., `vi.mock` for Vitest, not `jest.mock`).
+    - After major refactors, always validate build and test integrity. Fixes for test runner compatibility (e.g., Vitest vs Jest) should be documented.
 
 - **Subtle Implementation Details:**
-    - Never use inline style overrides for critical layout/visibility issues; always prefer maintainable CSS fixes.
-    - When updating table or pagination styles, always test on both desktop and mobile. Mobile usability is a first-class concern.
-    - Remove outdated or redundant CSS as part of any major UI refactor. Keep the codebase clean and maintainable.
+    - All model lists for channel/adaptor editing are fetched in real-time from the backend, never from local cache.
+    - Table sorting dropdowns and icons are visually unified and always server-side.
+    - When adding models to a channel, deduplicate and never overwrite existing selections unless explicitly cleared.
+    - Mobile usability and accessibility (touch targets, `data-label`, focus/active states) are first-class concerns.
+    - Any new UI/UX or backend logic must be kept in sync with documentation and user-facing messages.
+
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the unified responsive/table architecture, the importance of data-labels for mobile, the need to keep UI/UX in sync with backend and documentation, and the requirement for proper test/build practices (including test runner compatibility).
 
 
 ## Claude Messages API: Universal Conversion
@@ -104,6 +158,11 @@ This document contains essential, abstract, and up-to-date information about the
 
 - **Handover Best Practices:**
     - When handing over, ensure the new assistant is aware of the pricing unit change, centralized pricing logic, table sorting/pagination patterns, and the importance of keeping documentation and UI in sync with backend logic. Remove outdated content and keep this file concise and abstract.
+
+- **Frontend Authentication & Testing:**
+    - Login and registration flows now enforce stricter TOTP and email validation, with improved error and success message handling. The login page now displays navigation-passed success messages and disables submission unless TOTP is valid. Registration email validation is regex-based and enforced before sending codes.
+    - The modern frontend has migrated to Vitest with `jsdom` as the default environment. All test scripts, configs, and setup files are updated. All test files must use Vitest APIs.
+    - Form error handling is now decoupled from form context, improving maintainability but requiring updates to custom forms.
 
 ## Claude Messages API: Universal Conversion
 

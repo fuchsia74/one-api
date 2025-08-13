@@ -40,16 +40,23 @@ export function RegisterPage() {
     },
   })
 
+  // Watch email field to enable/disable send code button
+  const emailValue = form.watch('email')
+
   const sendVerificationCode = async () => {
     const email = form.getValues('email')
-    if (!email) {
-      form.setError('email', { message: 'Please enter your email first' })
+
+    // Simple email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!email || !emailRegex.test(email)) {
+      form.setError('email', { message: 'Please enter a valid email address' })
       return
     }
 
     try {
       setIsLoading(true)
-      const response = await api.get(`/verification?email=${encodeURIComponent(email)}`)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.get(`/api/verification?email=${encodeURIComponent(email)}`)
       const { success, message } = response.data
 
       if (success) {
@@ -78,7 +85,8 @@ export function RegisterPage() {
         ...(data.invitation_code && { invitation_code: data.invitation_code }),
       }
 
-      const response = await api.post('/user/register', payload)
+      // Unified API call - complete URL with /api prefix
+      const response = await api.post('/api/user/register', payload)
       const { success, message } = response.data
 
       if (success) {
@@ -167,9 +175,9 @@ export function RegisterPage() {
                           type="button"
                           variant="outline"
                           onClick={sendVerificationCode}
-                          disabled={isLoading || !field.value}
+                          disabled={isLoading || !emailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)}
                         >
-                          {isEmailSent ? 'Sent' : 'Send Code'}
+                          {isLoading ? 'Sending...' : isEmailSent ? 'Sent' : 'Send Code'}
                         </Button>
                       </div>
                     </FormControl>

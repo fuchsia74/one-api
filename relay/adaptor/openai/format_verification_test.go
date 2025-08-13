@@ -36,20 +36,24 @@ func TestResponseAPIFormat(t *testing.T) {
 	}
 
 	// Verify that input[0] is a direct message, not wrapped
-	inputMessage, ok := responseAPI.Input[0].(model.Message)
+	inputMessage, ok := responseAPI.Input[0].(map[string]interface{})
 	if !ok {
-		t.Fatalf("Expected input[0] to be model.Message, got %T", responseAPI.Input[0])
+		t.Fatalf("Expected input[0] to be map[string]interface{}, got %T", responseAPI.Input[0])
 	}
 
 	// Verify the message has the correct role
-	if inputMessage.Role != "user" {
-		t.Errorf("Expected role 'user', got '%s'", inputMessage.Role)
+	if inputMessage["role"] != "user" {
+		t.Errorf("Expected role 'user', got '%v'", inputMessage["role"])
 	}
 
 	// Verify the message has the correct content
 	expectedContent := "What is the weather like in Boston?"
-	if inputMessage.StringContent() != expectedContent {
-		t.Errorf("Expected content '%s', got '%s'", expectedContent, inputMessage.StringContent())
+	if content, ok := inputMessage["content"].([]map[string]interface{}); ok && len(content) > 0 {
+		if content[0]["text"] != expectedContent {
+			t.Errorf("Expected content '%s', got '%v'", expectedContent, content[0]["text"])
+		}
+	} else {
+		t.Error("Expected content to be []map[string]interface{}")
 	}
 
 	// Parse the JSON back to verify it's valid
@@ -74,9 +78,17 @@ func TestResponseAPIFormat(t *testing.T) {
 		t.Errorf("After unmarshal: Expected role 'user', got %v", role)
 	}
 
-	// Verify the content in the map
-	if content, exists := inputMap["content"]; !exists || content != expectedContent {
-		t.Errorf("After unmarshal: Expected content '%s', got %v", expectedContent, content)
+	// Verify the content in the map (should be array format after unmarshaling)
+	if content, exists := inputMap["content"]; !exists {
+		t.Error("After unmarshal: Expected content field to exist")
+	} else if contentArray, ok := content.([]interface{}); !ok {
+		t.Errorf("After unmarshal: Expected content to be []interface{}, got %T", content)
+	} else if len(contentArray) != 1 {
+		t.Errorf("After unmarshal: Expected content array length 1, got %d", len(contentArray))
+	} else if contentItem, ok := contentArray[0].(map[string]interface{}); !ok {
+		t.Errorf("After unmarshal: Expected content[0] to be map[string]interface{}, got %T", contentArray[0])
+	} else if contentItem["text"] != expectedContent {
+		t.Errorf("After unmarshal: Expected content text '%s', got %v", expectedContent, contentItem["text"])
 	}
 }
 
@@ -114,12 +126,12 @@ func TestResponseAPIWithSystemMessage(t *testing.T) {
 		t.Errorf("Expected 1 input item after system message removal, got %d", len(responseAPI.Input))
 	}
 
-	inputMessage, ok := responseAPI.Input[0].(model.Message)
+	inputMessage, ok := responseAPI.Input[0].(map[string]interface{})
 	if !ok {
-		t.Fatalf("Expected input[0] to be model.Message, got %T", responseAPI.Input[0])
+		t.Fatalf("Expected input[0] to be map[string]interface{}, got %T", responseAPI.Input[0])
 	}
 
-	if inputMessage.Role != "user" {
-		t.Errorf("Expected remaining message role 'user', got '%s'", inputMessage.Role)
+	if inputMessage["role"] != "user" {
+		t.Errorf("Expected remaining message role 'user', got '%v'", inputMessage["role"])
 	}
 }
