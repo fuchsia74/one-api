@@ -24,6 +24,26 @@ export function GitHubOAuthPage() {
           })
         } else {
           login(data, '')
+
+          // Check for redirect_to parameter in the state
+          const redirectTo = state && state.includes('redirect_to=')
+            ? state.split('redirect_to=')[1]
+            : null;
+
+          if (redirectTo) {
+            try {
+              const decodedPath = decodeURIComponent(redirectTo);
+              if (decodedPath.startsWith("/")) {
+                navigate(decodedPath, {
+                  state: { message: 'GitHub login successful!' }
+                });
+                return;
+              }
+            } catch (error) {
+              console.error("Invalid redirect_to parameter:", error);
+            }
+          }
+
           navigate('/', {
             state: { message: 'GitHub login successful!' }
           })

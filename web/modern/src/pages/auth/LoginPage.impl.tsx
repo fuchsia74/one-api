@@ -138,10 +138,27 @@ export function LoginPage() {
       if (success) {
         login(respData, "");
 
+        // Get redirect_to parameter from URL
+        const redirectTo = searchParams.get("redirect_to");
+
         // Handle default root password warning
         if (data.username === "root" && data.password === "123456") {
           navigate("/users/edit");
           console.warn("Please change the default root password");
+        } else if (redirectTo) {
+          // Decode and navigate to the original page
+          try {
+            const decodedPath = decodeURIComponent(redirectTo);
+            // Ensure the redirect path is safe (starts with /)
+            if (decodedPath.startsWith("/")) {
+              navigate(decodedPath);
+            } else {
+              navigate("/dashboard");
+            }
+          } catch (error) {
+            console.error("Invalid redirect_to parameter:", error);
+            navigate("/dashboard");
+          }
         } else {
           navigate("/dashboard");
         }

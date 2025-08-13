@@ -232,7 +232,7 @@ export function TracingModal({ open, onOpenChange, logId, traceId }: TracingModa
             <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <FileText className="h-4 w-4" />
-                Body Size
+                Request Size
               </div>
               <div className="text-sm">
                 {traceData.body_size ? `${traceData.body_size} bytes` : 'N/A'}
