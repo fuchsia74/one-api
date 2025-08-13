@@ -146,7 +146,7 @@ var BillingTimeoutSec = env.Int("BILLING_TIMEOUT", 300) // unit is second
 
 var GeminiSafetySetting = env.String("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
 
-var Theme = env.String("THEME", "default")
+var Theme = env.String("THEME", "modern")
 var ValidThemes = map[string]bool{
 	"default": true,
 	"berry":   true,

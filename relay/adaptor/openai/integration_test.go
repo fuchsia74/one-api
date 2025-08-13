@@ -111,11 +111,11 @@ func TestAdaptorIntegration(t *testing.T) {
 	}
 
 	// Verify the input message is correctly structured
-	inputMessage, ok := responseAPIReq.Input[0].(model.Message)
+	inputMessage, ok := responseAPIReq.Input[0].(map[string]interface{})
 	if !ok {
-		t.Errorf("Expected input[0] to be model.Message, got %T", responseAPIReq.Input[0])
-	} else if inputMessage.Role != "user" {
-		t.Errorf("Expected input message role 'user', got '%s'", inputMessage.Role)
+		t.Errorf("Expected input[0] to be map[string]interface{}, got %T", responseAPIReq.Input[0])
+	} else if inputMessage["role"] != "user" {
+		t.Errorf("Expected input message role 'user', got '%v'", inputMessage["role"])
 	}
 
 	// Verify tools are preserved
