@@ -316,3 +316,93 @@ func GetCompletionRatioWithThreeLayers(modelName string, channelOverrides map[st
 	// Layer 4: Final fallback - reasonable default
 	return 1.0 // Default completion ratio
 }
+
+// EffectivePricing holds fully-resolved pricing numbers for the current request
+// after applying tiers and cached discounts.
+type EffectivePricing struct {
+	// Per-token prices (per 1 token)
+	InputRatio           float64
+	OutputRatio          float64 // equals InputRatio * CompletionRatio
+	CachedInputRatio     float64 // negative means free
+	CachedOutputRatio    float64 // negative means free
+	AppliedTierThreshold int     // 0 for base tier
+}
+
+// ResolveEffectivePricing determines the effective pricing for a model given the
+// input token count and the adapter's default pricing table. Channel overrides
+// are already handled in higher-level ratio resolution and should be folded into
+// the per-token ratio before calling this if overrides apply globally.
+//
+// Behavior:
+// - If no tiers exist, returns base ratios.
+// - If tiers exist, finds the tier whose InputTokenThreshold <= inputTokens and is the highest such threshold.
+// - Optional tier fields inherit from base if zero. Negative cached ratios mean free.
+func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.Adaptor) EffectivePricing {
+	eff := EffectivePricing{}
+	if adaptor == nil {
+		// Fallback to defaults if adaptor missing
+		baseIn := 2.5 * 0.000001
+		baseComp := 1.0
+		eff.InputRatio = baseIn
+		eff.OutputRatio = baseIn * baseComp
+		eff.CachedInputRatio = 0
+		eff.CachedOutputRatio = 0
+		eff.AppliedTierThreshold = 0
+		return eff
+	}
+
+	pricing := adaptor.GetDefaultModelPricing()
+	base, ok := pricing[modelName]
+	if !ok {
+		// Use adaptor fallbacks
+		baseRatio := adaptor.GetModelRatio(modelName)
+		baseComp := adaptor.GetCompletionRatio(modelName)
+		eff.InputRatio = baseRatio
+		eff.OutputRatio = baseRatio * baseComp
+		eff.CachedInputRatio = base.CachedInputRatio // will be zero, as base not exists
+		eff.CachedOutputRatio = base.CachedOutputRatio
+		eff.AppliedTierThreshold = 0
+		return eff
+	}
+
+	// Start with base
+	in := base.Ratio
+	comp := base.CompletionRatio
+	cachedIn := base.CachedInputRatio
+	cachedOut := base.CachedOutputRatio
+	appliedThreshold := 0
+
+	// Find applicable tier (tiers are sorted ascending by threshold)
+	if len(base.Tiers) > 0 {
+		for _, t := range base.Tiers {
+			if inputTokens >= t.InputTokenThreshold {
+				// Apply overrides from this tier
+				if t.Ratio != 0 {
+					in = t.Ratio
+				}
+				if t.CompletionRatio != 0 {
+					comp = t.CompletionRatio
+				}
+				if t.CachedInputRatio != 0 {
+					cachedIn = t.CachedInputRatio
+				}
+				if t.CachedOutputRatio != 0 {
+					cachedOut = t.CachedOutputRatio
+				}
+				appliedThreshold = t.InputTokenThreshold
+			} else {
+				break
+			}
+		}
+	}
+
+	eff.InputRatio = in
+	if comp == 0 {
+		comp = 1.0
+	}
+	eff.OutputRatio = in * comp
+	eff.CachedInputRatio = cachedIn
+	eff.CachedOutputRatio = cachedOut
+	eff.AppliedTierThreshold = appliedThreshold
+	return eff
+}

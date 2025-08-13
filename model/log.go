@@ -33,6 +33,9 @@ type Log struct {
 	ElapsedTime       int64  `json:"elapsed_time" gorm:"default:0;index"` // Added index for sorting (unit is ms)
 	IsStream          bool   `json:"is_stream" gorm:"default:false"`
 	SystemPromptReset bool   `json:"system_prompt_reset" gorm:"default:false"`
+	// Cached token counts (prompt/output) for cost transparency
+	CachedPromptTokens     int `json:"cached_prompt_tokens" gorm:"default:0;index"`
+	CachedCompletionTokens int `json:"cached_completion_tokens" gorm:"default:0;index"`
 }
 
 const (

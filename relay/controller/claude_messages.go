@@ -710,9 +710,28 @@ func postConsumeClaudeMessagesQuota(ctx context.Context, usage *relaymodel.Usage
 	}
 	// Use centralized detailed billing function to follow DRY principle
 	quotaDelta := quota - preConsumedQuota
-	billing.PostConsumeQuotaDetailed(ctx, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
-		promptTokens, completionTokens, modelRatio, groupRatio, request.Model, meta.TokenName,
-		meta.IsStream, meta.StartTime, false, completionRatio, usage.ToolsCost)
+	// Claude native usage currently does not provide cached token details explicitly; pass zeros
+	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+		Ctx:                    ctx,
+		TokenId:                meta.TokenId,
+		QuotaDelta:             quotaDelta,
+		TotalQuota:             quota,
+		UserId:                 meta.UserId,
+		ChannelId:              meta.ChannelId,
+		PromptTokens:           promptTokens,
+		CompletionTokens:       completionTokens,
+		ModelRatio:             modelRatio,
+		GroupRatio:             groupRatio,
+		ModelName:              request.Model,
+		TokenName:              meta.TokenName,
+		IsStream:               meta.IsStream,
+		StartTime:              meta.StartTime,
+		SystemPromptReset:      false,
+		CompletionRatio:        completionRatio,
+		ToolsCost:              usage.ToolsCost,
+		CachedPromptTokens:     0,
+		CachedCompletionTokens: 0,
+	})
 
 	logger.Logger.Debug(fmt.Sprintf("Claude Messages quota: pre-consumed=%d, actual=%d, difference=%d", preConsumedQuota, quota, quotaDelta))
 	return quota
@@ -753,7 +772,7 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, traceId stri
 	quotaDelta := quota - preConsumedQuota
 	billing.PostConsumeQuotaDetailedWithTraceID(ctx, traceId, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
 		promptTokens, completionTokens, modelRatio, groupRatio, request.Model, meta.TokenName,
-		meta.IsStream, meta.StartTime, false, completionRatio, usage.ToolsCost)
+		meta.IsStream, meta.StartTime, false, completionRatio, usage.ToolsCost, 0, 0)
 
 	logger.Logger.Debug(fmt.Sprintf("Claude Messages quota with trace ID: pre-consumed=%d, actual=%d, difference=%d", preConsumedQuota, quota, quotaDelta))
 	return quota

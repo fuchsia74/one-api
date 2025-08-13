@@ -7,7 +7,7 @@ import (
 
 // ModelRatios contains all supported models and their pricing ratios
 // Model list is derived from the keys of this map, eliminating redundancy
-// Based on OpenAI pricing: https://openai.com/pricing
+// Based on OpenAI pricing: https://platform.openai.com/docs/pricing
 var ModelRatios = map[string]adaptor.ModelConfig{
 	// GPT-3.5 Models
 	"gpt-3.5-turbo":          {Ratio: 0.5 * ratio.MilliTokensUsd, CompletionRatio: 3.0},

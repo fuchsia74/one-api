@@ -18,9 +18,39 @@ type ModelConfig struct {
 	Ratio float64 `json:"ratio"`
 	// CompletionRatio represents the output rate / input rate
 	CompletionRatio float64 `json:"completion_ratio,omitempty"`
+	// CachedInputRatio specifies price per cached input token.
+	// If non-zero, it overrides Ratio for cached input tokens. Negative means free.
+	CachedInputRatio float64 `json:"cached_input_ratio,omitempty"`
+	// CachedOutputRatio specifies price per cached output token.
+	// If non-zero, it overrides (Ratio*CompletionRatio) for cached output tokens. Negative means free.
+	CachedOutputRatio float64 `json:"cached_output_ratio,omitempty"`
+	// Tiers contains tiered pricing data. If present, the first tier is the base
+	// Ratio/CompletionRatio/Cached* fields in this struct. Elements must be sorted
+	// ascending by InputTokenThreshold and represent the 2nd+ tiers.
+	Tiers []ModelRatioTier `json:"tiers,omitempty"`
 	// MaxTokens represents the maximum token limit for this model on this channel
 	// 0 means no limit (infinity)
 	MaxTokens int32 `json:"max_tokens,omitempty"`
+}
+
+// ModelRatioTier describes pricing for a specific input token tier. It overrides
+// the base ModelConfig starting at InputTokenThreshold. Zero values for optional
+// fields mean "inherit from base"; negative cached ratios mean free tokens.
+type ModelRatioTier struct {
+	// Base price for this tier (per input token)
+	Ratio float64 `json:"ratio"`
+
+	// Output‑to‑input multiplier for this tier (optional)
+	CompletionRatio float64 `json:"completion_ratio,omitempty"`
+
+	// Discount for cached input (optional)
+	CachedInputRatio float64 `json:"cached_input_ratio,omitempty"`
+
+	// Discount for cached output (optional)
+	CachedOutputRatio float64 `json:"cached_output_ratio,omitempty"`
+
+	// The minimum input‑token count at which this tier becomes applicable
+	InputTokenThreshold int `json:"input_token_threshold"`
 }
 
 type Adaptor interface {

@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { formatTimestamp, fromDateTimeLocal, toDateTimeLocal, renderQuota, cn } from '@/lib/utils'
 import { useAuthStore } from '@/lib/stores/auth'
 import { RefreshCw, Eye, EyeOff, Copy, FileDown, Calendar, Filter } from 'lucide-react'
@@ -25,6 +26,8 @@ interface LogRow {
   quota: number
   prompt_tokens?: number
   completion_tokens?: number
+  cached_prompt_tokens?: number
+  cached_completion_tokens?: number
   elapsed_time?: number
   request_id?: string
   trace_id?: string
@@ -418,14 +421,40 @@ export function LogsPage() {
         accessorKey: 'prompt_tokens',
         header: 'Prompt',
         cell: ({ row }) => (
-          <span className="font-mono text-sm">{row.original.prompt_tokens || 0}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="font-mono text-sm cursor-help">
+                  {row.original.prompt_tokens || 0}
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="flex flex-col gap-1">
+                  <div>Input tokens: {row.original.prompt_tokens ?? 0}</div>
+                  <div>Cached tokens: {row.original.cached_prompt_tokens ?? 0}</div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ),
       },
       {
         accessorKey: 'completion_tokens',
         header: 'Completion',
         cell: ({ row }) => (
-          <span className="font-mono text-sm">{row.original.completion_tokens || 0}</span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="font-mono text-sm cursor-help">{row.original.completion_tokens || 0}</span>
+              </TooltipTrigger>
+              <TooltipContent>
+                <div className="flex flex-col gap-1">
+                  <div>Output tokens: {row.original.completion_tokens ?? 0}</div>
+                  <div>Cached tokens: {row.original.cached_completion_tokens ?? 0}</div>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ),
       },
       {

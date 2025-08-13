@@ -1,6 +1,7 @@
 package model
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -14,9 +15,13 @@ func TestCreatedAtUpdatedAtFields(t *testing.T) {
 	setupTestDatabase(t)
 
 	t.Run("User timestamps", func(t *testing.T) {
+		now := time.Now().UnixNano()
+		nowStr := strconv.FormatInt(now, 10)
 		user := User{
-			Username: "testuser",
-			Password: "testpassword123",
+			Username:    "testuser_" + time.Now().Format("150405") + "_" + nowStr,
+			Password:    "testpassword123",
+			AccessToken: "testtoken_" + time.Now().Format("150405") + "_" + nowStr,
+			AffCode:     "testaffcode_" + nowStr,
 		}
 
 		// Test creation
@@ -33,7 +38,7 @@ func TestCreatedAtUpdatedAtFields(t *testing.T) {
 		// Test update
 		time.Sleep(10 * time.Millisecond) // Ensure some time passes
 		before = time.Now().UnixMilli()
-		user.Username = "updateduser"
+		user.Username = "updateduser_" + time.Now().Format("150405") + "_" + nowStr
 		err = DB.Save(&user).Error
 		require.NoError(t, err)
 		after = time.Now().UnixMilli()
@@ -147,9 +152,11 @@ func TestCreatedAtUpdatedAtFields(t *testing.T) {
 	})
 
 	t.Run("Ability timestamps", func(t *testing.T) {
+		now := time.Now().UnixNano()
+		nowStr := strconv.FormatInt(now, 10)
 		ability := Ability{
-			Group:     "test-group",
-			Model:     "test-model",
+			Group:     "test-group-" + time.Now().Format("150405") + "-" + nowStr,
+			Model:     "test-model-" + time.Now().Format("150405") + "-" + nowStr,
 			ChannelId: 1,
 			Enabled:   true,
 		}
@@ -172,12 +179,12 @@ func setupTestDatabase(t *testing.T) {
 	}
 
 	// Clean up test data
-	DB.Exec("DELETE FROM users WHERE username LIKE 'test%'")
+	DB.Exec("DELETE FROM users WHERE username LIKE 'test%' OR access_token LIKE 'test%'")
 	DB.Exec("DELETE FROM tokens WHERE name LIKE 'test%'")
 	DB.Exec("DELETE FROM channels WHERE name LIKE 'test%'")
 	DB.Exec("DELETE FROM redemptions WHERE name LIKE 'test%'")
 	DB.Exec("DELETE FROM options WHERE key LIKE 'test%'")
 	DB.Exec("DELETE FROM user_request_costs WHERE request_id LIKE 'test%'")
 	DB.Exec("DELETE FROM logs WHERE content LIKE 'test%'")
-	DB.Exec("DELETE FROM abilities WHERE group_name LIKE 'test%' OR model LIKE 'test%'")
+	DB.Exec("DELETE FROM abilities WHERE `group` LIKE 'test%' OR model LIKE 'test%'")
 }

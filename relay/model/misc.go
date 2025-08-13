@@ -48,4 +48,6 @@ type UsageCompletionTokensDetails struct {
 	RejectedPredictionTokens int `json:"rejected_prediction_tokens"`
 	// TextTokens could be zero for pure text chats
 	TextTokens int `json:"text_tokens"`
+	// CachedTokens indicates the count of completion tokens served from cache
+	CachedTokens int `json:"cached_tokens"`
 }

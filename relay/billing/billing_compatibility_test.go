@@ -93,8 +93,27 @@ func TestInputValidation(t *testing.T) {
 			name: "PostConsumeQuotaDetailed - Negative Tokens",
 			testFunc: func() bool {
 				defer func() { recover() }()
-				PostConsumeQuotaDetailed(ctx, 123, 10, 50, 1, 5, -10, 20, 1.0, 1.0, "test-model", "test-token",
-					false, validTime, false, 1.0, 0)
+				PostConsumeQuotaDetailed(QuotaConsumeDetail{
+					Ctx:                    ctx,
+					TokenId:                123,
+					QuotaDelta:             10,
+					TotalQuota:             50,
+					UserId:                 1,
+					ChannelId:              5,
+					PromptTokens:           -10,
+					CompletionTokens:       20,
+					ModelRatio:             1.0,
+					GroupRatio:             1.0,
+					ModelName:              "test-model",
+					TokenName:              "test-token",
+					IsStream:               false,
+					StartTime:              validTime,
+					SystemPromptReset:      false,
+					CompletionRatio:        1.0,
+					ToolsCost:              0,
+					CachedPromptTokens:     0,
+					CachedCompletionTokens: 0,
+				})
 				return true
 			},
 			shouldFail:  true,

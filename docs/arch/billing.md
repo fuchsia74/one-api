@@ -60,6 +60,7 @@
       - [Get Channel Pricing](#get-channel-pricing)
       - [Update Channel Pricing](#update-channel-pricing)
       - [Get Default Pricing](#get-default-pricing)
+  - [Testing \& Race Condition Policy (2025-08)](#testing--race-condition-policy-2025-08)
     - [Token Management Endpoints](#token-management-endpoints)
   - [Recent Pricing Implementation Improvements](#recent-pricing-implementation-improvements)
     - [Comprehensive Adapter Pricing Implementation](#comprehensive-adapter-pricing-implementation)
@@ -659,6 +660,7 @@ CREATE TABLE channels (
 );
 ```
 
+
 #### Logs Table
 
 ```sql
@@ -669,10 +671,15 @@ CREATE TABLE logs (
     model_name VARCHAR(255),
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
+    cached_prompt_tokens INTEGER,         -- Persisted cached prompt tokens (2025-08)
+    cached_completion_tokens INTEGER,     -- Persisted cached completion tokens (2025-08)
     quota INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
+
+**Note:**
+- The backend log API returns `cached_prompt_tokens` and `cached_completion_tokens` for each log entry. These are surfaced in the API and shown as tooltips in the Prompt/Completion columns of the logs table in the frontend UI for transparency.
 
 ### Relationships
 
@@ -778,18 +785,30 @@ GET /api/channel/default-pricing?type=:channelType
 **Controller**: `controller.GetChannelDefaultPricing()`
 **File**: `controller/channel.go`
 
+
 **Response Format**:
 
 ```json
 {
-  "success": true,
-  "message": "",
-  "data": {
-    "model_ratio": "{\"model1\": 0.001, \"model2\": 0.002}",
-    "completion_ratio": "{\"model1\": 1.0, \"model2\": 3.0}"
-  }
+    "success": true,
+    "message": "",
+    "data": {
+        "model_ratio": "{\"model1\": 0.001, \"model2\": 0.002}",
+        "completion_ratio": "{\"model1\": 1.0, \"model2\": 3.0}",
+        "cached_prompt_tokens": 123,           // (in log API responses)
+        "cached_completion_tokens": 456        // (in log API responses)
+    }
 }
 ```
+
+**Frontend:**
+- The logs table displays these cached token fields as tooltips in the Prompt/Completion columns for each log entry.
+## Testing & Race Condition Policy (2025-08)
+
+- All changes must pass `go test -race ./...` before merge. Any test that fails due to argument mismatch, floating-point precision, or race must be fixed immediately.
+- For floating-point comparisons in tests, always use a tolerance (epsilon) instead of strict equality to avoid failures due to precision errors.
+- If a function signature changes (e.g., new arguments to billing functions), update all test calls accordingly. Use zero or default values for new arguments in legacy/compatibility tests.
+- Some tests (e.g., migration, timestamp, or error recovery tests) are intentionally designed to fail or log errors to verify error handling. These include tests for invalid JSON, duplicate keys, or constraint violations. These edge-case tests should not be removed, but failures in these tests do not indicate a problem with business logic. Only address these if the test intent changes or if they block CI/CD pipelines.
 
 **Key Implementation Details**:
 

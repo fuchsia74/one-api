@@ -163,16 +163,86 @@ func postConsumeQuota(ctx context.Context,
 		return
 	}
 
-	// Use three-layer pricing system for completion ratio
+	// Resolve completion ratio (three-layer) and apply tiered pricing + cached discounts
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
-	completionRatio := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
+	completionRatioResolved := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
 	promptTokens := usage.PromptTokens
-	// It appears that DeepSeek's official service automatically merges ReasoningTokens into CompletionTokens,
-	// but the behavior of third-party providers may differ, so for now we do not add them manually.
-	// completionTokens := usage.CompletionTokens + usage.CompletionTokensDetails.ReasoningTokens
 	completionTokens := usage.CompletionTokens
-	quota = int64(math.Ceil((float64(promptTokens)+float64(completionTokens)*completionRatio)*ratio)) + usage.ToolsCost
-	if ratio != 0 && quota <= 0 {
+
+	// Tier resolution based on input token count (promptTokens)
+	eff := pricing.ResolveEffectivePricing(textRequest.Model, promptTokens, pricingAdaptor)
+
+	// Decide whether to use adapter's tiered base ratios or keep externally resolved ones
+	usedModelRatio := modelRatio
+	usedCompletionRatio := completionRatioResolved
+	if pricingAdaptor != nil {
+		defaultPricing := pricingAdaptor.GetDefaultModelPricing()
+		if _, ok := defaultPricing[textRequest.Model]; ok {
+			// If the adapter has native pricing for this model and modelRatio equals adaptor's base,
+			// we consider that no channel override applied, so we can adopt tiered base ratios.
+			adaptorBase := pricingAdaptor.GetModelRatio(textRequest.Model)
+			if math.Abs(modelRatio-adaptorBase) < 1e-12 {
+				usedModelRatio = eff.InputRatio
+				// Derive completion ratio from eff if available
+				baseComp := eff.OutputRatio
+				if eff.InputRatio != 0 {
+					baseComp = eff.OutputRatio / eff.InputRatio
+				} else {
+					baseComp = 1.0
+				}
+				usedCompletionRatio = baseComp
+			}
+		}
+	}
+
+	// Split cached vs non-cached tokens
+	cachedPrompt := 0
+	if usage.PromptTokensDetails != nil {
+		cachedPrompt = usage.PromptTokensDetails.CachedTokens
+		if cachedPrompt < 0 {
+			cachedPrompt = 0
+		}
+		if cachedPrompt > promptTokens {
+			cachedPrompt = promptTokens
+		}
+	}
+	cachedCompletion := 0
+	if usage.CompletionTokensDetails != nil {
+		cachedCompletion = usage.CompletionTokensDetails.CachedTokens
+		if cachedCompletion < 0 {
+			cachedCompletion = 0
+		}
+		if cachedCompletion > completionTokens {
+			cachedCompletion = completionTokens
+		}
+	}
+
+	nonCachedPrompt := promptTokens - cachedPrompt
+	nonCachedCompletion := completionTokens - cachedCompletion
+
+	// Base per-token prices (include group ratio)
+	normalInputPrice := usedModelRatio * groupRatio
+	normalOutputPrice := usedModelRatio * usedCompletionRatio * groupRatio
+
+	// Cached per-token prices; negative means free; zero means no special discount
+	cachedInputPrice := normalInputPrice
+	if eff.CachedInputRatio < 0 {
+		cachedInputPrice = 0
+	} else if eff.CachedInputRatio > 0 {
+		cachedInputPrice = eff.CachedInputRatio * groupRatio
+	}
+	cachedOutputPrice := normalOutputPrice
+	if eff.CachedOutputRatio < 0 {
+		cachedOutputPrice = 0
+	} else if eff.CachedOutputRatio > 0 {
+		cachedOutputPrice = eff.CachedOutputRatio * groupRatio
+	}
+
+	cost := float64(nonCachedPrompt)*normalInputPrice + float64(cachedPrompt)*cachedInputPrice +
+		float64(nonCachedCompletion)*normalOutputPrice + float64(cachedCompletion)*cachedOutputPrice
+
+	quota = int64(math.Ceil(cost)) + usage.ToolsCost
+	if (usedModelRatio*groupRatio) != 0 && quota <= 0 {
 		quota = 1
 	}
 
@@ -184,9 +254,27 @@ func postConsumeQuota(ctx context.Context,
 	}
 	// Use centralized detailed billing function to follow DRY principle
 	quotaDelta := quota - preConsumedQuota
-	billing.PostConsumeQuotaDetailed(ctx, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
-		promptTokens, completionTokens, modelRatio, groupRatio, textRequest.Model, meta.TokenName,
-		meta.IsStream, meta.StartTime, systemPromptReset, completionRatio, usage.ToolsCost)
+	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+		Ctx:                    ctx,
+		TokenId:                meta.TokenId,
+		QuotaDelta:             quotaDelta,
+		TotalQuota:             quota,
+		UserId:                 meta.UserId,
+		ChannelId:              meta.ChannelId,
+		PromptTokens:           promptTokens,
+		CompletionTokens:       completionTokens,
+		ModelRatio:             usedModelRatio,
+		GroupRatio:             groupRatio,
+		ModelName:              textRequest.Model,
+		TokenName:              meta.TokenName,
+		IsStream:               meta.IsStream,
+		StartTime:              meta.StartTime,
+		SystemPromptReset:      systemPromptReset,
+		CompletionRatio:        usedCompletionRatio,
+		ToolsCost:              usage.ToolsCost,
+		CachedPromptTokens:     cachedPrompt,
+		CachedCompletionTokens: cachedCompletion,
+	})
 
 	return quota
 }
@@ -206,16 +294,78 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 		return
 	}
 
-	// Use three-layer pricing system for completion ratio
+	// Resolve completion ratio (three-layer) and apply tiered pricing + cached discounts
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
-	completionRatio := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
+	completionRatioResolved := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
 	promptTokens := usage.PromptTokens
-	// It appears that DeepSeek's official service automatically merges ReasoningTokens into CompletionTokens,
-	// but the behavior of third-party providers may differ, so for now we do not add them manually.
-	// completionTokens := usage.CompletionTokens + usage.CompletionTokensDetails.ReasoningTokens
 	completionTokens := usage.CompletionTokens
-	quota = int64(math.Ceil((float64(promptTokens)+float64(completionTokens)*completionRatio)*ratio)) + usage.ToolsCost
-	if ratio != 0 && quota <= 0 {
+
+	eff := pricing.ResolveEffectivePricing(textRequest.Model, promptTokens, pricingAdaptor)
+
+	usedModelRatio := modelRatio
+	usedCompletionRatio := completionRatioResolved
+	if pricingAdaptor != nil {
+		defaultPricing := pricingAdaptor.GetDefaultModelPricing()
+		if _, ok := defaultPricing[textRequest.Model]; ok {
+			adaptorBase := pricingAdaptor.GetModelRatio(textRequest.Model)
+			if math.Abs(modelRatio-adaptorBase) < 1e-12 {
+				usedModelRatio = eff.InputRatio
+				baseComp := eff.OutputRatio
+				if eff.InputRatio != 0 {
+					baseComp = eff.OutputRatio / eff.InputRatio
+				} else {
+					baseComp = 1.0
+				}
+				usedCompletionRatio = baseComp
+			}
+		}
+	}
+
+	cachedPrompt := 0
+	if usage.PromptTokensDetails != nil {
+		cachedPrompt = usage.PromptTokensDetails.CachedTokens
+		if cachedPrompt < 0 {
+			cachedPrompt = 0
+		}
+		if cachedPrompt > promptTokens {
+			cachedPrompt = promptTokens
+		}
+	}
+	cachedCompletion := 0
+	if usage.CompletionTokensDetails != nil {
+		cachedCompletion = usage.CompletionTokensDetails.CachedTokens
+		if cachedCompletion < 0 {
+			cachedCompletion = 0
+		}
+		if cachedCompletion > completionTokens {
+			cachedCompletion = completionTokens
+		}
+	}
+
+	nonCachedPrompt := promptTokens - cachedPrompt
+	nonCachedCompletion := completionTokens - cachedCompletion
+
+	normalInputPrice := usedModelRatio * groupRatio
+	normalOutputPrice := usedModelRatio * usedCompletionRatio * groupRatio
+
+	cachedInputPrice := normalInputPrice
+	if eff.CachedInputRatio < 0 {
+		cachedInputPrice = 0
+	} else if eff.CachedInputRatio > 0 {
+		cachedInputPrice = eff.CachedInputRatio * groupRatio
+	}
+	cachedOutputPrice := normalOutputPrice
+	if eff.CachedOutputRatio < 0 {
+		cachedOutputPrice = 0
+	} else if eff.CachedOutputRatio > 0 {
+		cachedOutputPrice = eff.CachedOutputRatio * groupRatio
+	}
+
+	cost := float64(nonCachedPrompt)*normalInputPrice + float64(cachedPrompt)*cachedInputPrice +
+		float64(nonCachedCompletion)*normalOutputPrice + float64(cachedCompletion)*cachedOutputPrice
+
+	quota = int64(math.Ceil(cost)) + usage.ToolsCost
+	if (usedModelRatio*groupRatio) != 0 && quota <= 0 {
 		quota = 1
 	}
 
@@ -228,8 +378,9 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	// Use centralized detailed billing function with explicit trace ID
 	quotaDelta := quota - preConsumedQuota
 	billing.PostConsumeQuotaDetailedWithTraceID(ctx, traceId, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
-		promptTokens, completionTokens, modelRatio, groupRatio, textRequest.Model, meta.TokenName,
-		meta.IsStream, meta.StartTime, systemPromptReset, completionRatio, usage.ToolsCost)
+		promptTokens, completionTokens, usedModelRatio, groupRatio, textRequest.Model, meta.TokenName,
+		meta.IsStream, meta.StartTime, systemPromptReset, usedCompletionRatio, usage.ToolsCost,
+		cachedPrompt, cachedCompletion)
 
 	return quota
 }

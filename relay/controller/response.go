@@ -316,10 +316,49 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 
 	// Use centralized detailed billing function to follow DRY principle
 	quotaDelta := quota - preConsumedQuota
-	billing.PostConsumeQuotaDetailed(ctx, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
-		promptTokens, completionTokens, modelRatio, groupRatio, responseAPIRequest.Model, meta.TokenName,
-		meta.IsStream, meta.StartTime, false, // Response API doesn't have system prompt reset concept
-		completionRatio, usage.ToolsCost)
+	cachedPrompt := 0
+	if usage.PromptTokensDetails != nil {
+		cachedPrompt = usage.PromptTokensDetails.CachedTokens
+		if cachedPrompt < 0 {
+			cachedPrompt = 0
+		}
+		if cachedPrompt > promptTokens {
+			cachedPrompt = promptTokens
+		}
+	}
+
+	cachedCompletion := 0
+	if usage.CompletionTokensDetails != nil {
+		cachedCompletion = usage.CompletionTokensDetails.CachedTokens
+		if cachedCompletion < 0 {
+			cachedCompletion = 0
+		}
+		if cachedCompletion > completionTokens {
+			cachedCompletion = completionTokens
+		}
+	}
+
+	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+		Ctx:                    ctx,
+		TokenId:                meta.TokenId,
+		QuotaDelta:             quotaDelta,
+		TotalQuota:             quota,
+		UserId:                 meta.UserId,
+		ChannelId:              meta.ChannelId,
+		PromptTokens:           promptTokens,
+		CompletionTokens:       completionTokens,
+		ModelRatio:             modelRatio,
+		GroupRatio:             groupRatio,
+		ModelName:              responseAPIRequest.Model,
+		TokenName:              meta.TokenName,
+		IsStream:               meta.IsStream,
+		StartTime:              meta.StartTime,
+		SystemPromptReset:      false,
+		CompletionRatio:        completionRatio,
+		ToolsCost:              usage.ToolsCost,
+		CachedPromptTokens:     cachedPrompt,
+		CachedCompletionTokens: cachedCompletion,
+	})
 
 	return quota
 }

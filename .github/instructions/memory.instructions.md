@@ -7,6 +7,32 @@ applyTo: "**/*"
 This document contains essential, abstract, and up-to-date information about the project, collaboratively maintained by all developers. It is regularly updated to reflect key architectural decisions, subtle implementation details, and recent developments. Outdated content is removed to maintain clarity and relevance.
 
 
+## Backend & Testing Developments (2025-08)
+
+- **Log API & Cached Token Details:**
+    - The backend log API now returns `cached_prompt_tokens` and `cached_completion_tokens` for each log entry. These fields are persisted in the database and surfaced in API responses. The frontend displays these values as tooltips in the Prompt/Completion columns of the logs table for transparency.
+    - AutoMigrate ensures new columns are created automatically. No manual DB migration is needed for cached token fields.
+    - All log and billing changes are covered by updated unit tests. Any new log field or billing logic must be reflected in both backend API and frontend UI.
+
+- **Test & Race Condition Policy:**
+    - All changes must pass `go test -race ./...` before merge. Any test that fails due to argument mismatch, floating-point precision, or race must be fixed immediately.
+    - For floating-point comparisons in tests, always use a tolerance (epsilon) instead of strict equality to avoid failures due to precision errors.
+    - If a function signature changes (e.g., new arguments to billing functions), update all test calls accordingly. Use zero or default values for new arguments in legacy/compatibility tests.
+
+- **Migration/Edge-Case Test Handling:**
+    - Some tests (e.g., migration, timestamp, or error recovery tests) are intentionally designed to fail or log errors to verify error handling. These include tests for invalid JSON, duplicate keys, or constraint violations.
+    - These edge-case tests should not be removed, but failures in these tests do not indicate a problem with business logic. Only address these if the test intent changes or if they block CI/CD pipelines.
+
+- **Handover Best Practices:**
+    - When handing over, ensure the new assistant is aware of the following:
+        - All log/billing API changes must be reflected in both backend and frontend, with tooltips or UI cues for new fields.
+        - All tests must pass with `go test -race ./...` except for intentional edge-case/migration tests.
+        - If a test fails due to a function signature change, update all test invocations across the codebase.
+        - Use tolerance for floating-point assertions in Go tests.
+        - Do not remove or silence migration/edge-case tests unless their intent is obsolete.
+        - Always keep this file concise, abstract, and up-to-date—remove outdated details as new patterns emerge.
+
+
 
 ## Frontend API Path Unification & Verification (2025-08)
 
