@@ -113,6 +113,35 @@ func TestGetAllLogs_SortingValidation(t *testing.T) {
 	}
 }
 
+func TestGetAllLogs_SortFallbackParams(t *testing.T) {
+	model.InitDB()
+	model.InitLogDB()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/api/log/", GetAllLogs)
+
+	params := url.Values{}
+	// Use new frontend style params 'sort' & 'order' only
+	params.Add("sort", "quota")
+	params.Add("order", "asc")
+	params.Add("start_timestamp", strconv.FormatInt(time.Now().Add(-24*time.Hour).Unix(), 10))
+	params.Add("end_timestamp", strconv.FormatInt(time.Now().Unix(), 10))
+	params.Add("p", "0")
+	params.Add("size", "5")
+
+	req := httptest.NewRequest("GET", "/api/log/?"+params.Encode(), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	// Response should be JSON with success field
+	var response map[string]interface{}
+	err := json.Unmarshal(w.Body.Bytes(), &response)
+	require.NoError(t, err)
+	_, ok := response["success"]
+	assert.True(t, ok)
+}
+
 func TestGetUserLogs_SortingValidation(t *testing.T) {
 	model.InitDB()
 	model.InitLogDB()

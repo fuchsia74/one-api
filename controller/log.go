@@ -24,7 +24,13 @@ func GetAllLogs(c *gin.Context) {
 	modelName := c.Query("model_name")
 	channel, _ := strconv.Atoi(c.Query("channel"))
 	sortBy := c.DefaultQuery("sort_by", "")
+	if sortBy == "" { // frontend sends 'sort'
+		sortBy = c.Query("sort")
+	}
 	sortOrder := c.DefaultQuery("sort_order", "desc")
+	if c.Query("order") != "" { // frontend sends 'order'
+		sortOrder = c.Query("order")
+	}
 
 	// Validate date range for sorting requests (max 30 days)
 	if sortBy != "" && startTimestamp > 0 && endTimestamp > 0 {
@@ -38,8 +44,13 @@ func GetAllLogs(c *gin.Context) {
 		}
 	}
 
-	itemsPerPage, err := strconv.Atoi(c.Query("items_per_page"))
-	if err != nil {
+	// Support both legacy 'items_per_page' and preferred 'size' param
+	pageSizeStr := c.Query("size")
+	if pageSizeStr == "" {
+		pageSizeStr = c.Query("items_per_page")
+	}
+	itemsPerPage, err := strconv.Atoi(pageSizeStr)
+	if err != nil || itemsPerPage <= 0 {
 		itemsPerPage = config.DefaultItemsPerPage
 	}
 	if itemsPerPage > config.MaxItemsPerPage {
@@ -85,7 +96,13 @@ func GetUserLogs(c *gin.Context) {
 	tokenName := c.Query("token_name")
 	modelName := c.Query("model_name")
 	sortBy := c.DefaultQuery("sort_by", "")
+	if sortBy == "" { // frontend fallback
+		sortBy = c.Query("sort")
+	}
 	sortOrder := c.DefaultQuery("sort_order", "desc")
+	if c.Query("order") != "" {
+		sortOrder = c.Query("order")
+	}
 
 	// Validate date range for sorting requests (max 30 days)
 	if sortBy != "" && startTimestamp > 0 && endTimestamp > 0 {

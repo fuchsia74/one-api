@@ -41,9 +41,11 @@ const formatQuota = (quota: number, unlimited = false) => {
   return renderQuota(quota)
 }
 
-const formatTimestamp = (timestamp: number) => {
+// Use unified timestamp formatting (local timezone) from utils
+import { formatTimestamp } from '@/lib/utils'
+const formatTimestampLocal = (timestamp: number) => {
   if (timestamp === -1) return 'Never'
-  return new Date(timestamp * 1000).toLocaleString()
+  return formatTimestamp(timestamp)
 }
 
 const getStatusBadge = (status: number) => {
@@ -304,21 +306,21 @@ export function TokensPage() {
       accessorKey: 'created_time',
       header: 'Created',
       cell: ({ row }) => (
-        <span className="text-sm">{formatTimestamp(row.original.created_time)}</span>
+        <span className="text-sm">{formatTimestampLocal(row.original.created_time)}</span>
       ),
     },
     {
       accessorKey: 'accessed_time',
       header: 'Last Access',
       cell: ({ row }) => (
-        <span className="text-sm">{formatTimestamp(row.original.accessed_time)}</span>
+        <span className="text-sm">{formatTimestampLocal(row.original.accessed_time)}</span>
       ),
     },
     {
       accessorKey: 'expired_time',
       header: 'Expires',
       cell: ({ row }) => (
-        <span className="text-sm">{formatTimestamp(row.original.expired_time)}</span>
+        <span className="text-sm">{formatTimestampLocal(row.original.expired_time)}</span>
       ),
     },
     {

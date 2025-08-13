@@ -399,13 +399,14 @@ export function LogsPage() {
       ),
     },
     ...(Number(filters.type) !== LOG_TYPES.TEST ? [
-      ...(isAdmin ? [{
+      // Always show user column; for non-admins fall back to current user if username missing
+      {
         accessorKey: 'username',
         header: 'User',
-        cell: ({ row }: { row: any }) => (
-          <span className="text-sm">{row.original.username || '-'}</span>
+        cell: ({ row }) => (
+          <span className="text-sm">{row.original.username || user?.username || '-'}</span>
         ),
-      } as ColumnDef<LogRow>] : []),
+      } as ColumnDef<LogRow>,
       {
         accessorKey: 'token_name',
         header: 'Token',
@@ -543,10 +544,10 @@ export function LogsPage() {
         </CardHeader>
         <CardContent>
           {/* Filters */}
-          <div className="grid grid-cols-1 md:grid-cols-6 gap-4 mb-6 p-4 border rounded-lg bg-muted/20">
-            <div className="md:col-span-6 flex items-center gap-2 mb-2">
-              <Filter className="h-4 w-4" />
-              <Label className="text-sm font-medium">Filters</Label>
+          <div className="grid grid-cols-1 md:grid-cols-7 gap-3 md:gap-4 mb-6 p-4 border rounded-lg bg-muted/10">
+            <div className="md:col-span-7 flex items-center gap-2 mb-1">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Filters</span>
             </div>
             <div>
               <Label className="text-xs">Type</Label>
@@ -567,8 +568,8 @@ export function LogsPage() {
               <Label className="text-xs">Model</Label>
               <SearchableDropdown
                 value={filters.model_name}
-                placeholder="Search by model name..."
-                searchPlaceholder="Type model name..."
+                placeholder="Model"
+                searchPlaceholder="Model"
                 options={[]}
                 searchEndpoint="/api/models/display" // SearchableDropdown uses fetch() directly, needs /api prefix
                 transformResponse={(data) => {
@@ -593,8 +594,8 @@ export function LogsPage() {
               <Label className="text-xs">Token</Label>
               <SearchableDropdown
                 value={filters.token_name}
-                placeholder="Search by token name..."
-                searchPlaceholder="Type token name..."
+                placeholder="Token"
+                searchPlaceholder="Token"
                 options={[]}
                 searchEndpoint="/api/token/search" // SearchableDropdown uses fetch() directly, needs /api prefix
                 transformResponse={(data) => (Array.isArray(data) ? data.map((t: any) => ({ key: String(t.id), value: t.name, text: t.name })) : [])}
@@ -606,8 +607,8 @@ export function LogsPage() {
               <Label className="text-xs">Username</Label>
               <SearchableDropdown
                 value={filters.username}
-                placeholder="Search by username..."
-                searchPlaceholder="Type username..."
+                placeholder="Username"
+                searchPlaceholder="Username"
                 options={[]}
                 searchEndpoint="/api/user/search" // SearchableDropdown uses fetch() directly, needs /api prefix
                 transformResponse={(data) => (Array.isArray(data) ? data.map((u: any) => ({ key: String(u.id), value: u.username, text: u.username })) : [])}
@@ -628,28 +629,30 @@ export function LogsPage() {
                 </div>
               </>
             )}
-            <div>
-              <Label className="text-xs">Start Time</Label>
-              <Input
-                type="datetime-local"
-                value={filters.start_timestamp}
-                onChange={(e) => setFilters({ ...filters, start_timestamp: e.target.value })}
-                className="h-9"
-              />
+            <div className="md:col-span-2 grid grid-cols-2 gap-3">
+              <div>
+                <Label className="text-xs">Start</Label>
+                <Input
+                  type="datetime-local"
+                  value={filters.start_timestamp}
+                  onChange={(e) => setFilters({ ...filters, start_timestamp: e.target.value })}
+                  className="h-9"
+                />
+              </div>
+              <div>
+                <Label className="text-xs">End</Label>
+                <Input
+                  type="datetime-local"
+                  value={filters.end_timestamp}
+                  onChange={(e) => setFilters({ ...filters, end_timestamp: e.target.value })}
+                  className="h-9"
+                />
+              </div>
             </div>
-            <div>
-              <Label className="text-xs">End Time</Label>
-              <Input
-                type="datetime-local"
-                value={filters.end_timestamp}
-                onChange={(e) => setFilters({ ...filters, end_timestamp: e.target.value })}
-                className="h-9"
-              />
-            </div>
-            <div className="flex items-end">
-              <Button onClick={handleFilterSubmit} disabled={loading} className="w-full gap-2">
+            <div className="flex items-end md:justify-end md:col-span-1">
+              <Button onClick={handleFilterSubmit} disabled={loading} className="w-full md:w-auto gap-2 px-4">
                 <Filter className="h-4 w-4" />
-                Apply Filters
+                Apply
               </Button>
             </div>
           </div>

@@ -7,9 +7,17 @@ export function cn(...inputs: ClassValue[]) {
 
 // Date/time utility functions
 export function formatTimestamp(timestamp: number): string {
-  if (!timestamp) return '-'
-  const date = new Date(timestamp * 1000)
-  return date.toLocaleString()
+  if (timestamp === undefined || timestamp === null) return '-'
+  if (timestamp <= 0) return '-'
+  const date = new Date(timestamp * 1000) // backend stores UTC seconds
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  const yyyy = date.getFullYear()
+  const mm = pad(date.getMonth() + 1)
+  const dd = pad(date.getDate())
+  const HH = pad(date.getHours())
+  const MM = pad(date.getMinutes())
+  const SS = pad(date.getSeconds())
+  return `${yyyy}-${mm}-${dd} ${HH}:${MM}:${SS}` // local browser timezone
 }
 
 export function toDateTimeLocal(timestamp: number | undefined): string {

@@ -171,6 +171,7 @@ type ModelDisplayInfo struct {
 // This endpoint is designed for the Models display page in the frontend
 func GetModelsDisplay(c *gin.Context) {
 	userId := c.GetInt(ctxkey.Id)
+	keyword := strings.ToLower(strings.TrimSpace(c.Query("keyword")))
 
 	// Get user's group to determine available models
 	userGroup, err := model.CacheGetUserGroup(userId)
@@ -200,6 +201,9 @@ func GetModelsDisplay(c *gin.Context) {
 
 	// Group models by individual channel ID
 	for _, ability := range availableAbilities {
+		if keyword != "" && !strings.Contains(strings.ToLower(ability.Model), keyword) { // apply keyword filter
+			continue
+		}
 		channelToModels[ability.ChannelId] = append(channelToModels[ability.ChannelId], ability.Model)
 	}
 
