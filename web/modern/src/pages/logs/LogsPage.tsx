@@ -99,16 +99,20 @@ export function LogsPage() {
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
 
-  // Filters
-  const [filters, setFilters] = useState({
+  // Determine if user is admin/root
+  const isAdmin = useMemo(() => (user?.role ?? 0) === 1, [user])
+  const isRoot = useMemo(() => (user?.role ?? 0) === 2, [user])
+
+  // Filters: for admin/root, username is '', for others, username is self
+  const [filters, setFilters] = useState(() => ({
     type: '0',
     model_name: '',
     token_name: '',
-    username: '',
+    username: (user && (user.role === 1 || user.role === 2)) ? '' : (user?.username || ''),
     channel: '',
     start_timestamp: toDateTimeLocal(Math.floor((Date.now() - 7 * 24 * 3600 * 1000) / 1000)),
     end_timestamp: toDateTimeLocal(Math.floor((Date.now() + 3600 * 1000) / 1000)),
-  })
+  }))
 
   // Statistics
   const [stat, setStat] = useState<LogStatistics>({ quota: 0 })
@@ -129,7 +133,7 @@ export function LogsPage() {
   const [selectedLogId, setSelectedLogId] = useState<number | null>(null)
   const [selectedTraceId, setSelectedTraceId] = useState<string | null>(null)
 
-  const isAdmin = useMemo(() => (user?.role ?? 0) === 1, [user])
+  // (removed duplicate isAdmin declaration)
 
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
