@@ -100,15 +100,17 @@ export function LogsPage() {
   const [total, setTotal] = useState(0)
 
   // Determine if user is admin/root
-  const isAdmin = useMemo(() => (user?.role ?? 0) === 1, [user])
-  const isRoot = useMemo(() => (user?.role ?? 0) === 2, [user])
+  // Use strict equality for admin (10) and root (100)
+  const isAdmin = useMemo(() => (user?.role ?? 0) === 10, [user])
+  const isRoot = useMemo(() => (user?.role ?? 0) === 100, [user])
+  const isAdminOrRoot = isAdmin || isRoot
 
   // Filters: for admin/root, username is '', for others, username is self
   const [filters, setFilters] = useState(() => ({
     type: '0',
     model_name: '',
     token_name: '',
-    username: (user && (user.role === 1 || user.role === 2)) ? '' : (user?.username || ''),
+    username: (user && (user.role === 10 || user.role === 100)) ? '' : (user?.username || ''),
     channel: '',
     start_timestamp: toDateTimeLocal(Math.floor((Date.now() - 7 * 24 * 3600 * 1000) / 1000)),
     end_timestamp: toDateTimeLocal(Math.floor((Date.now() + 3600 * 1000) / 1000)),
@@ -145,8 +147,8 @@ export function LogsPage() {
       if (filters.type !== '0') params.set('type', filters.type)
       if (filters.model_name) params.set('model_name', filters.model_name)
       if (filters.token_name) params.set('token_name', filters.token_name)
-      if (isAdmin && filters.username) params.set('username', filters.username)
-      if (filters.channel && isAdmin) params.set('channel', filters.channel)
+  if (isAdminOrRoot && filters.username) params.set('username', filters.username)
+  if (filters.channel && isAdminOrRoot) params.set('channel', filters.channel)
       if (filters.start_timestamp) params.set('start_timestamp', String(fromDateTimeLocal(filters.start_timestamp)))
       if (filters.end_timestamp) params.set('end_timestamp', String(fromDateTimeLocal(filters.end_timestamp)))
       if (sortBy) {
@@ -155,7 +157,7 @@ export function LogsPage() {
       }
 
       // Unified API call - complete URL with /api prefix
-      const path = isAdmin ? `/api/log/?${params}` : `/api/log/self?${params}`
+  const path = isAdminOrRoot ? `/api/log/?${params}` : `/api/log/self?${params}`
       const res = await api.get(path)
       const { success, data: responseData, total: responseTotal } = res.data
 
@@ -181,13 +183,13 @@ export function LogsPage() {
       if (filters.type !== '0') params.set('type', filters.type)
       if (filters.model_name) params.set('model_name', filters.model_name)
       if (filters.token_name) params.set('token_name', filters.token_name)
-      if (isAdmin && filters.username) params.set('username', filters.username)
-      if (filters.channel && isAdmin) params.set('channel', filters.channel)
+  if (isAdminOrRoot && filters.username) params.set('username', filters.username)
+  if (filters.channel && isAdminOrRoot) params.set('channel', filters.channel)
       if (filters.start_timestamp) params.set('start_timestamp', String(fromDateTimeLocal(filters.start_timestamp)))
       if (filters.end_timestamp) params.set('end_timestamp', String(fromDateTimeLocal(filters.end_timestamp)))
 
       // Unified API call - complete URL with /api prefix
-      const statPath = isAdmin ? '/api/log/stat' : '/api/log/self/stat'
+  const statPath = isAdminOrRoot ? '/api/log/stat' : '/api/log/self/stat'
       const res = await api.get(statPath + '?' + params.toString())
 
       if (res.data?.success) {
@@ -210,7 +212,7 @@ export function LogsPage() {
     setSearchLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
-      const url = isAdmin ? '/api/log/search' : '/api/log/self/search'
+  const url = isAdminOrRoot ? '/api/log/search' : '/api/log/self/search'
       const res = await api.get(url + '?keyword=' + encodeURIComponent(query))
       const { success, data: responseData } = res.data
 
@@ -246,7 +248,7 @@ export function LogsPage() {
     setLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
-      const url = isAdmin ? '/api/log/search' : '/api/log/self/search'
+  const url = isAdminOrRoot ? '/api/log/search' : '/api/log/self/search'
       const res = await api.get(url + '?keyword=' + encodeURIComponent(searchKeyword))
       const { success, data: responseData } = res.data
 
@@ -386,7 +388,7 @@ export function LogsPage() {
         </div>
       ),
     },
-    ...(isAdmin ? [{
+  ...(isAdminOrRoot ? [{
       accessorKey: 'channel',
       header: 'Channel',
       cell: ({ row }: { row: any }) => (
