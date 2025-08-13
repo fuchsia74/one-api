@@ -113,7 +113,7 @@ func TestConvertWithTools(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get current weather",
 					Parameters: map[string]interface{}{
@@ -628,7 +628,7 @@ func TestFunctionCallWorkflow(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_current_weather",
 					Description: "Get the current weather in a given location",
 					Parameters: map[string]interface{}{
@@ -884,7 +884,7 @@ func TestLegacyFunctionCallWorkflow(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_current_weather",
 					Description: "Get the current weather in a given location",
 					Parameters: map[string]interface{}{
@@ -1273,7 +1273,7 @@ func TestConvertChatCompletionToResponseAPIWithToolResults(t *testing.T) {
 					{
 						Id:   "initial_datetime_call",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "get_current_datetime",
 							Arguments: `{}`,
 						},
@@ -1289,7 +1289,7 @@ func TestConvertChatCompletionToResponseAPIWithToolResults(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_current_datetime",
 					Description: "Get current date and time",
 					Parameters: map[string]any{

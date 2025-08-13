@@ -491,7 +491,7 @@ func getToolCalls(candidate *ChatCandidate) []model.Tool {
 	toolCall := model.Tool{
 		Id:   fmt.Sprintf("call_%s", random.GetUUID()),
 		Type: "function",
-		Function: model.Function{
+		Function: &model.Function{
 			Arguments: string(argsBytes),
 			Name:      item.FunctionCall.FunctionName,
 		},
@@ -520,7 +520,7 @@ func getStreamingToolCalls(candidate *ChatCandidate) []model.Tool {
 		toolCall := model.Tool{
 			Id:   fmt.Sprintf("call_%s", random.GetUUID()),
 			Type: "function",
-			Function: model.Function{
+			Function: &model.Function{
 				Arguments: string(argsBytes),
 				Name:      part.FunctionCall.FunctionName,
 			},

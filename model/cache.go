@@ -35,11 +35,17 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 	}
 	var token Token
 	if !common.RedisEnabled {
+		if DB == nil {
+			return nil, errors.New("database not initialized")
+		}
 		err := DB.Where(keyCol+" = ?", key).First(&token).Error
 		return &token, err
 	}
 	tokenObjectString, err := common.RedisGet(fmt.Sprintf("token:%s", key))
 	if err != nil {
+		if DB == nil {
+			return nil, errors.Wrap(err, "database not initialized")
+		}
 		err := DB.Where(keyCol+" = ?", key).First(&token).Error
 		if err != nil {
 			return nil, err

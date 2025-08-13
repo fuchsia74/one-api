@@ -446,7 +446,7 @@ func convertClaudeToolsToOpenAI(claudeTools []relaymodel.ClaudeTool) []relaymode
 	for _, tool := range claudeTools {
 		openaiTool := relaymodel.Tool{
 			Type: "function",
-			Function: relaymodel.Function{
+			Function: &relaymodel.Function{
 				Name:        tool.Name,
 				Description: tool.Description,
 			},

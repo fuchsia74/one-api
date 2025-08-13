@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
+
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -24,7 +26,7 @@ func (r *ResponseAPIInput) UnmarshalJSON(data []byte) error {
 	// If string unmarshaling fails, try as array
 	var arr []any
 	if err := json.Unmarshal(data, &arr); err != nil {
-		return err
+		return errors.Wrap(err, "ResponseAPIInput.UnmarshalJSON: failed to unmarshal as array")
 	}
 	*r = ResponseAPIInput(arr)
 	return nil
@@ -37,11 +39,19 @@ func (r ResponseAPIInput) MarshalJSON() ([]byte, error) {
 	// If there's exactly one element and it's a string, marshal as string
 	if len(r) == 1 {
 		if str, ok := r[0].(string); ok {
-			return json.Marshal(str)
+			b, err := json.Marshal(str)
+			if err != nil {
+				return nil, errors.Wrap(err, "ResponseAPIInput.MarshalJSON: failed to marshal string")
+			}
+			return b, nil
 		}
 	}
 	// Otherwise, marshal as array
-	return json.Marshal([]any(r))
+	b, err := json.Marshal([]any(r))
+	if err != nil {
+		return nil, errors.Wrap(err, "ResponseAPIInput.MarshalJSON: failed to marshal array")
+	}
+	return b, nil
 }
 
 // IsModelsOnlySupportedByChatCompletionAPI determines if a model only supports ChatCompletion API
@@ -523,7 +533,7 @@ func ConvertResponseAPIToChatCompletion(responseAPIResp *ResponseAPIResponse) *T
 				tool := model.Tool{
 					Id:   outputItem.CallId,
 					Type: "function",
-					Function: model.Function{
+					Function: &model.Function{
 						Name:      outputItem.Name,
 						Arguments: outputItem.Arguments,
 					},
@@ -661,7 +671,7 @@ func ConvertResponseAPIStreamToChatCompletionWithIndex(responseAPIChunk *Respons
 				tool := model.Tool{
 					Id:   outputItem.CallId,
 					Type: "function",
-					Function: model.Function{
+					Function: &model.Function{
 						Name:      outputItem.Name,
 						Arguments: outputItem.Arguments,
 					},
@@ -784,7 +794,7 @@ func ParseResponseAPIStreamEvent(data []byte) (*ResponseAPIResponse, *ResponseAP
 	// If that fails, try to parse as a streaming event
 	var streamEvent ResponseAPIStreamEvent
 	if err := json.Unmarshal(data, &streamEvent); err != nil {
-		return nil, nil, err
+		return nil, nil, errors.Wrap(err, "ParseResponseAPIStreamEvent: failed to unmarshal as stream event")
 	}
 
 	return nil, &streamEvent, nil

@@ -142,7 +142,7 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 												openaiMessage.ToolCalls = append(openaiMessage.ToolCalls, model.Tool{
 													Id:   idStr,
 													Type: "function",
-													Function: model.Function{
+													Function: &model.Function{
 														Name:      nameStr,
 														Arguments: argsStr,
 													},
@@ -198,7 +198,7 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 		for _, claudeTool := range request.Tools {
 			tool := model.Tool{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        claudeTool.Name,
 					Description: claudeTool.Description,
 					Parameters:  claudeTool.InputSchema.(map[string]any),

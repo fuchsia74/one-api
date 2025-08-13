@@ -28,7 +28,7 @@ func TestAdaptorIntegration(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get current weather",
 					Parameters: map[string]any{

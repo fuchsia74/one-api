@@ -2,10 +2,10 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/logger"
@@ -22,7 +22,7 @@ func splitSubnets(subnets string) []string {
 func isValidSubnet(subnet string) error {
 	_, _, err := net.ParseCIDR(subnet)
 	if err != nil {
-		return fmt.Errorf("failed to parse subnet: %w", err)
+		return errors.Wrapf(err, "failed to parse subnet: %s", subnet)
 	}
 	return nil
 }
@@ -30,7 +30,7 @@ func isValidSubnet(subnet string) error {
 func isIpInSubnet(ctx context.Context, ip string, subnet string) bool {
 	_, ipNet, err := net.ParseCIDR(subnet)
 	if err != nil {
-		logger.Logger.Error("failed to parse subnet", zap.String("subnet", subnet), zap.Error(err))
+		logger.Logger.Error("failed to parse subnet", zap.String("subnet", subnet), zap.Error(errors.Wrapf(err, "parse subnet: %s", subnet)))
 		return false
 	}
 	return ipNet.Contains(net.ParseIP(ip))
@@ -39,7 +39,7 @@ func isIpInSubnet(ctx context.Context, ip string, subnet string) bool {
 func IsValidSubnets(subnets string) error {
 	for _, subnet := range splitSubnets(subnets) {
 		if err := isValidSubnet(subnet); err != nil {
-			return err
+			return errors.Wrapf(err, "invalid subnet in list: %s", subnet)
 		}
 	}
 	return nil

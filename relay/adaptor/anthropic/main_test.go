@@ -41,7 +41,7 @@ func TestConvertRequest_EmptyAssistantMessageWithToolCalls(t *testing.T) {
 					{
 						Id:   "call_123",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "get_weather",
 							Arguments: `{"location": "San Francisco"}`,
 						},
@@ -57,7 +57,7 @@ func TestConvertRequest_EmptyAssistantMessageWithToolCalls(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get weather information",
 					Parameters: map[string]interface{}{
@@ -159,7 +159,7 @@ func TestConvertRequest_AssistantMessageWithTextAndToolCalls(t *testing.T) {
 					{
 						Id:   "call_123",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "get_weather",
 							Arguments: `{"location": "San Francisco"}`,
 						},
@@ -170,7 +170,7 @@ func TestConvertRequest_AssistantMessageWithTextAndToolCalls(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get weather information",
 					Parameters: map[string]interface{}{
@@ -270,7 +270,7 @@ func TestConvertRequest_ValidJSONGeneration(t *testing.T) {
 					{
 						Id:   "initial_datetime_call",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "get_current_datetime",
 							Arguments: "{}",
 						},
@@ -281,7 +281,7 @@ func TestConvertRequest_ValidJSONGeneration(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_current_datetime",
 					Description: "Get current date and time",
 					Parameters: map[string]interface{}{
@@ -411,7 +411,7 @@ func TestConvertRequest_ThinkingBlocksConversion(t *testing.T) {
 					{
 						Id:   "toolu_01Aihmmh3xCfqxLmzCLdepNi",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "fileOperation",
 							Arguments: `{"operation": "read", "filePath": "vite.config.ts"}`,
 						},
@@ -427,7 +427,7 @@ func TestConvertRequest_ThinkingBlocksConversion(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
 					Parameters: map[string]interface{}{
@@ -554,7 +554,7 @@ func TestConvertRequest_ThinkingBlocksWithComplexContent(t *testing.T) {
 					{
 						Id:   "toolu_01Aihmmh3xCfqxLmzCLdepNi",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "fileOperation",
 							Arguments: `{"operation": "read", "filePath": "vite.config.ts"}`,
 						},
@@ -570,7 +570,7 @@ func TestConvertRequest_ThinkingBlocksWithComplexContent(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
 					Parameters: map[string]interface{}{
@@ -747,7 +747,7 @@ func TestConvertRequest_BugScenario_FullWorkflow(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
 					Parameters: map[string]interface{}{
@@ -810,7 +810,7 @@ func TestConvertRequest_BugScenario_FullWorkflow(t *testing.T) {
 					{
 						Id:   "toolu_01Aihmmh3xCfqxLmzCLdepNi",
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:      "fileOperation",
 							Arguments: `{"operation": "read", "filePath": "vite.config.ts"}`,
 						},
@@ -826,7 +826,7 @@ func TestConvertRequest_BugScenario_FullWorkflow(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
 					Parameters: map[string]interface{}{

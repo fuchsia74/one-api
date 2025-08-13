@@ -64,6 +64,7 @@ func writeData(w stringWriter, data interface{}) error {
 	if strings.HasPrefix(data.(string), "data") {
 		w.writeString("\n\n")
 	}
+	// No error to wrap here, but if error handling is added, wrap with errors.Wrap/Wrapf
 	return nil
 }
 

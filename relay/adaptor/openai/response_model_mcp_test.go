@@ -19,7 +19,7 @@ func TestMCPOutputItemSerialization(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "read_wiki_structure",
 					Description: "Read repository structure",
 					Parameters: map[string]interface{}{
@@ -220,7 +220,7 @@ func TestResponseAPIResponseWithMCPOutput(t *testing.T) {
 				Tools: []model.Tool{
 					{
 						Type: "function",
-						Function: model.Function{
+						Function: &model.Function{
 							Name:        "ask_question",
 							Description: "Ask a question",
 						},
@@ -294,7 +294,7 @@ func TestConvertResponseAPIToChatCompletionWithMCP(t *testing.T) {
 				Type:        "mcp_list_tools",
 				ServerLabel: "deepwiki",
 				Tools: []model.Tool{
-					{Type: "function", Function: model.Function{Name: "ask_question"}},
+					{Type: "function", Function: &model.Function{Name: "ask_question"}},
 				},
 			},
 			{

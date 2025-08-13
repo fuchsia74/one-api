@@ -12,7 +12,7 @@ func TestToolIndexField(t *testing.T) {
 	streamingTool := Tool{
 		Id:   "call_123",
 		Type: "function",
-		Function: Function{
+		Function: &Function{
 			Name:      "get_weather",
 			Arguments: `{"location": "Paris"}`,
 		},
@@ -43,7 +43,7 @@ func TestToolIndexField(t *testing.T) {
 	nonStreamingTool := Tool{
 		Id:   "call_456",
 		Type: "function",
-		Function: Function{
+		Function: &Function{
 			Name:      "send_email",
 			Arguments: `{"to": "test@example.com"}`,
 		},
@@ -77,20 +77,20 @@ func TestStreamingToolCallAccumulation(t *testing.T) {
 			Id:    "call_123",
 			Type:  "function",
 			Index: intPtr(0),
-			Function: Function{
+			Function: &Function{
 				Name:      "get_weather",
 				Arguments: "",
 			},
 		},
 		{
 			Index: intPtr(0),
-			Function: Function{
+			Function: &Function{
 				Arguments: `{"location":`,
 			},
 		},
 		{
 			Index: intPtr(0),
-			Function: Function{
+			Function: &Function{
 				Arguments: ` "Paris"}`,
 			},
 		},
@@ -136,8 +136,8 @@ func TestStreamingToolCallAccumulation(t *testing.T) {
 		t.Errorf("Expected tool call id 'call_123', got '%s'", finalTool.Id)
 	}
 
-	if finalTool.Function.Name != "get_weather" {
-		t.Errorf("Expected function name 'get_weather', got '%s'", finalTool.Function.Name)
+	if finalTool.Function == nil || finalTool.Function.Name != "get_weather" {
+		t.Errorf("Expected function name 'get_weather', got '%v'", finalTool.Function)
 	}
 }
 
@@ -236,17 +236,9 @@ func TestMCPToolSerialization(t *testing.T) {
 		t.Errorf("Expected require_approval to be 'never', got %v", requireApproval)
 	}
 
-	// Verify function field is present but empty (zero value struct is serialized as empty object)
-	if functionField, exists := result["function"]; !exists {
-		t.Error("Function field should be present in JSON")
-	} else {
-		// Function should be an empty object for MCP tools
-		functionMap, ok := functionField.(map[string]any)
-		if !ok {
-			t.Error("Function field should be an object")
-		} else if len(functionMap) > 0 {
-			t.Error("Function field should be empty for MCP tools")
-		}
+	// Verify function field is NOT present for MCP tools (since Function is a pointer and nil)
+	if _, exists := result["function"]; exists {
+		t.Error("Function field should not be present for MCP tools")
 	}
 }
 
@@ -367,7 +359,7 @@ func TestMixedToolArray(t *testing.T) {
 		{
 			Id:   "func_001",
 			Type: "function",
-			Function: Function{
+			Function: &Function{
 				Name:        "get_weather",
 				Description: "Get weather information",
 				Parameters: map[string]any{
@@ -433,8 +425,8 @@ func TestMixedToolArray(t *testing.T) {
 	if mcpTool.ServerLabel != "deepwiki" {
 		t.Errorf("Expected server_label to be 'deepwiki', got '%s'", mcpTool.ServerLabel)
 	}
-	if mcpTool.Function.Name != "" {
-		t.Error("MCP tool should not have function name")
+	if mcpTool.Function != nil {
+		t.Error("MCP tool should not have function definition")
 	}
 }
 
@@ -466,16 +458,9 @@ func TestMCPToolEdgeCases(t *testing.T) {
 		}
 	}
 
-	// Function field should be present but empty for MCP tools
-	if functionField, exists := result["function"]; !exists {
-		t.Error("Function field should be present in JSON")
-	} else {
-		functionMap, ok := functionField.(map[string]any)
-		if !ok {
-			t.Error("Function field should be an object")
-		} else if len(functionMap) > 0 {
-			t.Error("Function field should be empty for minimal MCP tool")
-		}
+	// Function field should NOT be present for MCP tools
+	if _, exists := result["function"]; exists {
+		t.Error("Function field should not be present for MCP tools")
 	}
 
 	// Test empty headers map is omitted

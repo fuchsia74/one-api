@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/Laisky/errors/v2"
+
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 )
@@ -52,12 +54,12 @@ func Init() {
 		var err error
 		*LogDir, err = filepath.Abs(*LogDir)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatal(errors.Wrap(err, "failed to get absolute log dir"))
 		}
 		if _, err := os.Stat(*LogDir); os.IsNotExist(err) {
 			err = os.Mkdir(*LogDir, 0777)
 			if err != nil {
-				log.Fatal(err)
+				log.Fatal(errors.Wrap(err, "failed to create log dir"))
 			}
 		}
 		logger.LogDir = *LogDir

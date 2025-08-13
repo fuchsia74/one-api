@@ -14,10 +14,14 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/model"
 )
 
 func TestGetAllLogs_SortingValidation(t *testing.T) {
+	// initialize databases to avoid nil LOG_DB panics
+	model.InitDB()
+	model.InitLogDB()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
 	router.GET("/api/log/", GetAllLogs)
@@ -110,9 +114,14 @@ func TestGetAllLogs_SortingValidation(t *testing.T) {
 }
 
 func TestGetUserLogs_SortingValidation(t *testing.T) {
+	model.InitDB()
+	model.InitLogDB()
 	gin.SetMode(gin.TestMode)
 	router := gin.New()
-	router.GET("/api/log/self", GetUserLogs)
+	router.GET("/api/log/self", func(c *gin.Context) {
+		c.Set(ctxkey.Id, 1) // inject test user id
+		GetUserLogs(c)
+	})
 
 	tests := []struct {
 		name           string

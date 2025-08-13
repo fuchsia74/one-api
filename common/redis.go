@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 	"github.com/go-redis/redis/v8"
 
@@ -52,7 +53,7 @@ func InitRedisClient() (err error) {
 	if err != nil {
 		logger.Logger.Fatal("Redis ping test failed", zap.Error(err))
 	}
-	return err
+	return nil
 }
 
 func ParseRedisOption() *redis.Options {
@@ -65,20 +66,48 @@ func ParseRedisOption() *redis.Options {
 
 func RedisSet(key string, value string, expiration time.Duration) error {
 	ctx := context.Background()
-	return RDB.Set(ctx, key, value, expiration).Err()
+	if RDB == nil {
+		return errors.New("redis not initialized")
+	}
+	err := RDB.Set(ctx, key, value, expiration).Err()
+	if err != nil {
+		return errors.Wrapf(err, "failed to set redis key: %s", key)
+	}
+	return nil
 }
 
 func RedisGet(key string) (string, error) {
 	ctx := context.Background()
-	return RDB.Get(ctx, key).Result()
+	if RDB == nil {
+		return "", errors.New("redis not initialized")
+	}
+	val, err := RDB.Get(ctx, key).Result()
+	if err != nil {
+		return "", errors.Wrapf(err, "failed to get redis key: %s", key)
+	}
+	return val, nil
 }
 
 func RedisDel(key string) error {
 	ctx := context.Background()
-	return RDB.Del(ctx, key).Err()
+	if RDB == nil {
+		return errors.New("redis not initialized")
+	}
+	err := RDB.Del(ctx, key).Err()
+	if err != nil {
+		return errors.Wrapf(err, "failed to delete redis key: %s", key)
+	}
+	return nil
 }
 
 func RedisDecrease(key string, value int64) error {
 	ctx := context.Background()
-	return RDB.DecrBy(ctx, key, value).Err()
+	if RDB == nil {
+		return errors.New("redis not initialized")
+	}
+	err := RDB.DecrBy(ctx, key, value).Err()
+	if err != nil {
+		return errors.Wrapf(err, "failed to decrease redis key: %s by %d", key, value)
+	}
+	return nil
 }

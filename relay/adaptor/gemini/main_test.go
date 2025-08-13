@@ -377,7 +377,7 @@ func TestConvertRequestWithToolsRegression(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "search_crypto_news",
 					Description: "Search for cryptocurrency news and events",
 					Parameters: map[string]interface{}{
@@ -676,7 +676,7 @@ func TestOriginalErrorScenario(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "search_crypto_news",
 					Description: "Search for cryptocurrency news and events",
 					Parameters: map[string]interface{}{
@@ -988,7 +988,7 @@ func TestOriginalLogErrorFixed(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "search_crypto_news",
 					Description: "Search for cryptocurrency news and events",
 					Parameters: map[string]any{

@@ -110,7 +110,7 @@ func TestConvertChatCompletionToResponseAPIWithMCPAndFunction(t *testing.T) {
 		Tools: []model.Tool{
 			{
 				Type: "function",
-				Function: model.Function{
+				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get weather information",
 					Parameters: map[string]interface{}{

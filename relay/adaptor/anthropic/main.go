@@ -205,20 +205,35 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 	claudeTools := make([]Tool, 0, len(textRequest.Tools))
 
 	for _, tool := range textRequest.Tools {
-		// Convert Parameters from any to map[string]interface{} before indexing
+		// Add nil check for Function pointer
+		if tool.Function == nil {
+			return nil, errors.New("tool function is nil")
+		}
+
 		params, ok := tool.Function.Parameters.(map[string]interface{})
 		if !ok {
-			params = make(map[string]interface{})
+			return nil, errors.New("tool function parameters is not a map")
+		}
+
+		var schema InputSchema
+		// Guarded extraction for 'type'
+		if t, ok := params["type"].(string); ok {
+			schema.Type = t
+		}
+
+		// Assign 'properties' and 'required' directly if present
+		if props, ok := params["properties"]; ok {
+			schema.Properties = props
+		}
+
+		if req, ok := params["required"]; ok {
+			schema.Required = req
 		}
 
 		claudeTools = append(claudeTools, Tool{
 			Name:        tool.Function.Name,
 			Description: tool.Function.Description,
-			InputSchema: InputSchema{
-				Type:       params["type"].(string),
-				Properties: params["properties"],
-				Required:   params["required"],
-			},
+			InputSchema: schema,
 		})
 	}
 
@@ -562,7 +577,7 @@ func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse)
 				tools = append(tools, model.Tool{
 					Id:   claudeResponse.ContentBlock.Id,
 					Type: "function",
-					Function: model.Function{
+					Function: &model.Function{
 						Name:      claudeResponse.ContentBlock.Name,
 						Arguments: "",
 					},
@@ -598,7 +613,7 @@ func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse)
 					// Fallback: create new tool call if no existing tool call found
 					index := 0
 					tools = append(tools, model.Tool{
-						Function: model.Function{
+						Function: &model.Function{
 							Arguments: claudeResponse.Delta.PartialJson,
 						},
 						Index: &index, // Set index for streaming delta accumulation
@@ -713,7 +728,7 @@ func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.Tex
 			tools = append(tools, model.Tool{
 				Id:   v.Id,
 				Type: "function", // compatible with other OpenAI derivative applications
-				Function: model.Function{
+				Function: &model.Function{
 					Name:      v.Name,
 					Arguments: string(args),
 				},
@@ -857,8 +872,9 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 				continue
 			} else { // finish_reason case
 				if len(lastToolCallChoice.Delta.ToolCalls) > 0 {
-					lastArgs := &lastToolCallChoice.Delta.ToolCalls[len(lastToolCallChoice.Delta.ToolCalls)-1].Function
-					if len(lastArgs.Arguments.(string)) == 0 { // compatible with OpenAI sending an empty object `{}` when no arguments.
+					lastArgs := lastToolCallChoice.Delta.ToolCalls[len(lastToolCallChoice.Delta.ToolCalls)-1].Function
+					// Safe type assertion for Arguments
+					if argsStr, ok := lastArgs.Arguments.(string); ok && len(argsStr) == 0 { // compatible with OpenAI sending an empty object `{}` when no arguments.
 						lastArgs.Arguments = "{}"
 						response.Choices[len(response.Choices)-1].Delta.Content = nil
 						response.Choices[len(response.Choices)-1].Delta.ToolCalls = lastToolCallChoice.Delta.ToolCalls

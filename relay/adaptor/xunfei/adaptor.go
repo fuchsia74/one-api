@@ -165,7 +165,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	for _, tool := range request.Tools {
 		openaiTool := model.Tool{
 			Type: "function",
-			Function: model.Function{
+			Function: &model.Function{
 				Name:        tool.Name,
 				Description: tool.Description,
 			},
