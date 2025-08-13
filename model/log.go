@@ -296,6 +296,30 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	return logs, err
 }
 
+func GetUserLogsCount(userId int, logType int, startTimestamp int64, endTimestamp int64, modelName string, tokenName string) (count int64, err error) {
+	var tx *gorm.DB
+	if logType == LogTypeUnknown {
+		tx = LOG_DB.Where("user_id = ?", userId)
+	} else {
+		tx = LOG_DB.Where("user_id = ? and type = ?", userId, logType)
+	}
+	if modelName != "" {
+		tx = tx.Where("model_name = ?", modelName)
+	}
+	if tokenName != "" {
+		tx = tx.Where("token_name = ?", tokenName)
+	}
+	if startTimestamp != 0 {
+		tx = tx.Where("created_at >= ?", startTimestamp)
+	}
+	if endTimestamp != 0 {
+		tx = tx.Where("created_at <= ?", endTimestamp)
+	}
+
+	err = tx.Model(&Log{}).Count(&count).Error
+	return count, err
+}
+
 func SearchAllLogs(keyword string, startIdx int, num int, sortBy string, sortOrder string) (logs []*Log, total int64, err error) {
 	db := LOG_DB.Model(&Log{})
 	if keyword != "" {
