@@ -17,6 +17,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
 
 - [One API](#one-api)
   - [Turtorial](#turtorial)
+  - [Contributors](#contributors)
   - [New Features](#new-features)
     - [(Merged) Support gpt-vision](#merged-support-gpt-vision)
     - [Support update user's remained quota](#support-update-users-remained-quota)
@@ -124,6 +125,12 @@ oneapi:
 ```
 
 The initial default account and password are `root` / `123456`.
+
+## Contributors
+
+<a href="https://github.com/Laisky/one-api/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=Laisky/one-api" />
+</a>
 
 ## New Features
 
