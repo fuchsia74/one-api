@@ -1,6 +1,6 @@
 # * for amd64: docker build -t ppcelery/one-api:arm64-latest .
 # * for arm64: DOCKER_BUILDKIT=1 docker build --platform linux/arm64 --build-arg TARGETARCH=arm64 -t ppcelery/one-api:arm64-latest .
-FROM node:24-bookworm AS builder
+FROM --platform=$TARGETPLATFORM node:24-bookworm AS builder
 
 RUN npm install -g npm react-scripts
 
@@ -10,10 +10,10 @@ COPY ./web .
 
 # Install dependencies for each project
 # do not build parallel to avoid OOM on github actions
-RUN cd /web/default && yarn install
-RUN cd /web/berry && yarn install
-RUN cd /web/air && yarn install
-RUN cd /web/modern && yarn install
+RUN cd /web/default && yarn install --network-timeout 600000
+RUN cd /web/berry && yarn install --network-timeout 600000
+RUN cd /web/air && yarn install --network-timeout 600000
+RUN cd /web/modern && yarn install --network-timeout 600000
 
 RUN mkdir -p /web/build
 
@@ -76,7 +76,7 @@ RUN if [ "${TARGETARCH}" = "arm64" ]; then \
         go build -trimpath -ldflags "-s -w -X github.com/songquanpeng/one-api/common.Version=$(cat VERSION)" -o one-api; \
     fi
 
-# Use a pre-built image that already has ffmpeg for ARM64
+# Use a pre-built image that already has ffmpeg for ARM64/AMD64
 FROM --platform=$TARGETPLATFORM jrottenberg/ffmpeg:6.1.2-ubuntu2404 AS ffmpeg
 
 # Use Ubuntu as the base image which has better ARM64 support
