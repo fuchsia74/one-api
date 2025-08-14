@@ -2,11 +2,8 @@ package aws
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,10 +14,10 @@ import (
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/adaptor"
+	anthropicAdaptor "github.com/songquanpeng/one-api/relay/adaptor/anthropic"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
-	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 var _ adaptor.Adaptor = new(Adaptor)
@@ -97,151 +94,25 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 		return nil, errors.New("request is nil")
 	}
 
-	// AWS Bedrock supports Claude models natively
-	// Get the appropriate sub-adaptor for the model
-	adaptor := GetAdaptor(request.Model)
-	if adaptor == nil {
+	// AWS Bedrock supports Claude Messages natively. Do not convert payload.
+	// Just set context for billing/routing and mark direct pass-through.
+	sub := GetAdaptor(request.Model)
+	if sub == nil {
 		return nil, errors.New("adaptor not found for model: " + request.Model)
 	}
-
-	// Convert Claude request to OpenAI format first, then let the sub-adaptor handle it
-	openaiRequest := &model.GeneralOpenAIRequest{
-		Model:       request.Model,
-		MaxTokens:   request.MaxTokens,
-		Temperature: request.Temperature,
-		TopP:        request.TopP,
-		Stream:      request.Stream != nil && *request.Stream,
-		Stop:        request.StopSequences,
-	}
-
-	// Convert system prompt
-	if request.System != nil {
-		switch system := request.System.(type) {
-		case string:
-			if system != "" {
-				openaiRequest.Messages = append(openaiRequest.Messages, model.Message{
-					Role:    "system",
-					Content: system,
-				})
-			}
-		case []any:
-			// For structured system content, extract text parts
-			var systemParts []string
-			for _, block := range system {
-				if blockMap, ok := block.(map[string]any); ok {
-					if text, exists := blockMap["text"]; exists {
-						if textStr, ok := text.(string); ok {
-							systemParts = append(systemParts, textStr)
-						}
-					}
-				}
-			}
-			if len(systemParts) > 0 {
-				systemText := strings.Join(systemParts, "\n")
-				openaiRequest.Messages = append(openaiRequest.Messages, model.Message{
-					Role:    "system",
-					Content: systemText,
-				})
-			}
-		}
-	}
-
-	// Convert messages
-	for _, msg := range request.Messages {
-		openaiMessage := model.Message{
-			Role: msg.Role,
-		}
-
-		// Convert content based on type
-		switch content := msg.Content.(type) {
-		case string:
-			// Simple string content
-			openaiMessage.Content = content
-		case []any:
-			// Structured content blocks - convert to OpenAI format
-			var contentParts []model.MessageContent
-			for _, block := range content {
-				if blockMap, ok := block.(map[string]any); ok {
-					if blockType, exists := blockMap["type"]; exists {
-						switch blockType {
-						case "text":
-							if text, exists := blockMap["text"]; exists {
-								if textStr, ok := text.(string); ok {
-									contentParts = append(contentParts, model.MessageContent{
-										Type: "text",
-										Text: &textStr,
-									})
-								}
-							}
-						case "image":
-							if source, exists := blockMap["source"]; exists {
-								if sourceMap, ok := source.(map[string]any); ok {
-									imageURL := model.ImageURL{}
-									if mediaType, exists := sourceMap["media_type"]; exists {
-										if data, exists := sourceMap["data"]; exists {
-											if dataStr, ok := data.(string); ok {
-												// Convert to data URL format
-												imageURL.Url = fmt.Sprintf("data:%s;base64,%s", mediaType, dataStr)
-											}
-										}
-									}
-									contentParts = append(contentParts, model.MessageContent{
-										Type:     "image_url",
-										ImageURL: &imageURL,
-									})
-								}
-							}
-						}
-					}
-				}
-			}
-			if len(contentParts) > 0 {
-				openaiMessage.Content = contentParts
-			}
-		default:
-			// Fallback: convert to string
-			if contentBytes, err := json.Marshal(content); err == nil {
-				openaiMessage.Content = string(contentBytes)
-			}
-		}
-
-		openaiRequest.Messages = append(openaiRequest.Messages, openaiMessage)
-	}
-
-	// Convert tools
-	for _, tool := range request.Tools {
-		openaiTool := model.Tool{
-			Type: "function",
-			Function: &model.Function{
-				Name:        tool.Name,
-				Description: tool.Description,
-			},
-		}
-
-		// Convert input schema
-		if tool.InputSchema != nil {
-			if schemaMap, ok := tool.InputSchema.(map[string]any); ok {
-				openaiTool.Function.Parameters = schemaMap
-			}
-		}
-
-		openaiRequest.Tools = append(openaiRequest.Tools, openaiTool)
-	}
-
-	// Convert tool choice
-	if request.ToolChoice != nil {
-		openaiRequest.ToolChoice = request.ToolChoice
-	}
-
-	// Mark this as a Claude Messages conversion for response handling
-	c.Set(ctxkey.ClaudeMessagesConversion, true)
+	a.awsAdapter = sub
+	c.Set(ctxkey.ClaudeMessagesNative, true)
+	c.Set(ctxkey.ClaudeDirectPassthrough, true)
 	c.Set(ctxkey.OriginalClaudeRequest, request)
-
-	// Store the sub-adaptor for later use
-	a.awsAdapter = adaptor
-
-	// Now convert using the sub-adaptor's logic
-	return adaptor.ConvertRequest(c, relaymode.ChatCompletions, openaiRequest)
+	c.Set(ctxkey.RequestModel, request.Model)
+	// Also parse into anthropic.Request for AWS SDK payload building
+	if parsed, perr := anthropicAdaptor.ConvertClaudeRequest(c, *request); perr == nil {
+		c.Set(ctxkey.ConvertedRequest, parsed)
+	} else {
+		return nil, perr
+	}
+	// Return the original request object; controller will forward original body
+	return request, nil
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {

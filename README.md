@@ -54,6 +54,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Support OpenAI Response API](#support-openai-response-api)
     - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
     - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
+    - [Support Cached Input](#support-cached-input)
   - [Bug fix](#bug-fix)
 
 ## Turtorial
@@ -329,6 +330,12 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 ### Support /v1/messages Claude Messages API
 
 ![](https://s3.laisky.com/uploads/2025/07/claude_messages.png)
+
+### Support Cached Input
+
+Now supports cached input, which can significantly reduce the cost.
+
+![](https://s3.laisky.com/uploads/2025/08/cached_input.png)
 
 ## Bug fix
 

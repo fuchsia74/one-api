@@ -87,12 +87,23 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		return openai.ErrorWrapper(err, "convert_request_failed", http.StatusInternalServerError)
 	}
 
-	// Use converted request to preserve model mapping
-	requestBytes, err := json.Marshal(convertedRequest)
-	if err != nil {
-		return openai.ErrorWrapper(err, "marshal_request_failed", http.StatusInternalServerError)
+	// Determine request body:
+	// - If adaptor marks direct pass-through, forward the original Claude Messages payload unchanged
+	// - Otherwise, marshal the converted request
+	var requestBody io.Reader
+	if passthrough, ok := c.Get(ctxkey.ClaudeDirectPassthrough); ok && passthrough.(bool) {
+		rawBody, gerr := common.GetRequestBody(c)
+		if gerr != nil {
+			return openai.ErrorWrapper(gerr, "get_original_body_failed", http.StatusInternalServerError)
+		}
+		requestBody = bytes.NewReader(rawBody)
+	} else {
+		requestBytes, merr := json.Marshal(convertedRequest)
+		if merr != nil {
+			return openai.ErrorWrapper(merr, "marshal_request_failed", http.StatusInternalServerError)
+		}
+		requestBody = bytes.NewReader(requestBytes)
 	}
-	requestBody := bytes.NewReader(requestBytes)
 
 	// for debug
 	requestBodyBytes, _ := io.ReadAll(requestBody)
@@ -105,8 +116,8 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 
-	// Check for HTTP errors
-	if resp.StatusCode != http.StatusOK {
+	// Check for HTTP errors when an HTTP response is returned by the adaptor
+	if resp != nil && resp.StatusCode != http.StatusOK {
 		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
 		return RelayErrorHandler(resp)
 	}

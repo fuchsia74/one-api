@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -19,7 +20,6 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/image"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -551,6 +551,8 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 
 // https://docs.anthropic.com/claude/reference/messages-streaming
 func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse) (*openai.ChatCompletionsStreamResponse, *Response) {
+	logger := gmw.GetLogger(c)
+
 	var response *Response
 	var responseText string
 	var reasoningText string
@@ -642,7 +644,7 @@ func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse)
 		"message_stop",
 		"content_block_stop":
 	default:
-		logger.Logger.Error("unknown stream response type", zap.String("type", claudeResponse.Type))
+		logger.Error("unknown stream response type", zap.String("type", claudeResponse.Type))
 	}
 
 	// Cache signature if present (for thinking blocks)
@@ -684,6 +686,7 @@ func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse)
 }
 
 func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.TextResponse {
+	logger := gmw.GetLogger(c)
 	var responseText string
 	var reasoningText string
 
@@ -694,7 +697,7 @@ func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.Tex
 			if v.Thinking != nil {
 				reasoningText += *v.Thinking
 			} else {
-				logger.Logger.Error("thinking is nil in response")
+				logger.Error("thinking is nil in response")
 			}
 			// Cache signature if present
 			if v.Signature != nil {
@@ -720,7 +723,7 @@ func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.Tex
 		case "text":
 			responseText += v.Text
 		default:
-			logger.Logger.Warn("unknown response type", zap.String("type", v.Type))
+			logger.Warn("unknown response type", zap.String("type", v.Type))
 		}
 
 		if v.Type == "tool_use" {
@@ -762,6 +765,8 @@ func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.Tex
 
 // ClaudeNativeStreamHandler handles streaming responses in Claude native format without conversion to OpenAI format
 func ClaudeNativeStreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+	logger := gmw.GetLogger(c)
+
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
 		if atEOF && len(data) == 0 {
@@ -787,7 +792,7 @@ func ClaudeNativeStreamHandler(c *gin.Context, resp *http.Response) (*model.Erro
 		data = strings.TrimPrefix(data, "data:")
 		data = strings.TrimSpace(data)
 
-		logger.Logger.Debug(fmt.Sprintf("stream <- %q\n", data))
+		logger.Debug(fmt.Sprintf("stream <- %q\n", data))
 
 		// For Claude native streaming, we pass through the events directly
 		c.Writer.Write([]byte("data: " + data + "\n\n"))
@@ -797,7 +802,7 @@ func ClaudeNativeStreamHandler(c *gin.Context, resp *http.Response) (*model.Erro
 		var claudeResponse StreamResponse
 		err := json.Unmarshal([]byte(data), &claudeResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
+			logger.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 
@@ -809,7 +814,7 @@ func ClaudeNativeStreamHandler(c *gin.Context, resp *http.Response) (*model.Erro
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream", zap.Error(err))
+		logger.Error("error reading stream", zap.Error(err))
 	}
 
 	// Send final data: [DONE] to close the stream
@@ -824,6 +829,7 @@ func ClaudeNativeStreamHandler(c *gin.Context, resp *http.Response) (*model.Erro
 }
 
 func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+	logger := gmw.GetLogger(c)
 	createdTime := helper.GetTimestamp()
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -853,12 +859,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		data = strings.TrimPrefix(data, "data:")
 		data = strings.TrimSpace(data)
 
-		logger.Logger.Debug(fmt.Sprintf("stream <- %q\n", data))
+		logger.Debug(fmt.Sprintf("stream <- %q\n", data))
 
 		var claudeResponse StreamResponse
 		err := json.Unmarshal([]byte(data), &claudeResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
+			logger.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 
@@ -904,12 +910,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		}
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error("error rendering stream response", zap.Error(err))
+			logger.Error("error rendering stream response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream", zap.Error(err))
+		logger.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)
@@ -923,6 +929,9 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 // ClaudeNativeHandler handles responses in Claude native format without conversion to OpenAI format
 func ClaudeNativeHandler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+	logger := gmw.GetLogger(c).With(
+		zap.String("model", modelName),
+	)
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -932,7 +941,7 @@ func ClaudeNativeHandler(c *gin.Context, resp *http.Response, promptTokens int, 
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	logger.Logger.Debug(fmt.Sprintf("response <- %s\n", string(responseBody)))
+	logger.Debug(fmt.Sprintf("response <- %s\n", string(responseBody)))
 
 	var claudeResponse Response
 	err = json.Unmarshal(responseBody, &claudeResponse)
@@ -970,6 +979,10 @@ func ClaudeNativeHandler(c *gin.Context, resp *http.Response, promptTokens int, 
 }
 
 func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+	logger := gmw.GetLogger(c).With(
+		zap.String("model", modelName),
+	)
+
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
@@ -979,7 +992,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	logger.Logger.Debug(fmt.Sprintf("response <- %s\n", string(responseBody)))
+	logger.Debug(fmt.Sprintf("response <- %s\n", string(responseBody)))
 
 	var claudeResponse Response
 	err = json.Unmarshal(responseBody, &claudeResponse)

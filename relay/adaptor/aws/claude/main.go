@@ -10,6 +10,8 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
@@ -81,6 +83,10 @@ func AwsClaudeModelTransArn(c *gin.Context, awsCli *bedrockruntime.Client) strin
 // ARN mapping is now handled through channel configuration
 
 func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+	logger := gmw.GetLogger(c).With(
+		zap.String("model", modelName),
+	)
+
 	awsModelID, err := AwsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "AwsModelID")), nil
@@ -121,15 +127,18 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	// Track metrics for the operation
 	startTime := time.Now()
 	awsResp, err := awsCli.InvokeModel(c.Request.Context(), awsReq)
-	latency := time.Since(startTime)
 
 	// Update region health metrics
+	latency := time.Since(startTime)
 	utils.UpdateRegionHealthMetrics(awsCli.Options().Region, err == nil, latency, err)
 
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
 	}
 
+	logger.Debug("received response from AWS Bedrock",
+		zap.ByteString("response_body", awsResp.Body),
+	)
 	claudeResponse := new(anthropic.Response)
 	err = json.Unmarshal(awsResp.Body, claudeResponse)
 	if err != nil {
