@@ -1003,7 +1003,17 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		PromptTokens:     claudeResponse.Usage.InputTokens,
 		CompletionTokens: claudeResponse.Usage.OutputTokens,
 		TotalTokens:      claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens,
+		ServiceTier:      claudeResponse.Usage.ServiceTier,
 	}
+
+	// Map cached input tokens to OpenAI usage details
+	if claudeResponse.Usage.CacheReadInputTokens > 0 || claudeResponse.Usage.CacheCreationInputTokens > 0 || (claudeResponse.Usage.CacheCreation != nil && (claudeResponse.Usage.CacheCreation.Ephemeral5mInputTokens > 0 || claudeResponse.Usage.CacheCreation.Ephemeral1hInputTokens > 0)) {
+		usage.PromptTokensDetails = &model.UsagePromptTokensDetails{
+			CachedTokens: claudeResponse.Usage.CacheReadInputTokens,
+		}
+		// Optionally, you can add more details from CacheCreation if needed
+	}
+
 	fullTextResponse.Usage = usage
 	jsonResponse, err := json.Marshal(fullTextResponse)
 	if err != nil {
