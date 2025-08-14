@@ -66,6 +66,7 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"gpt-4.1-nano-2025-04-14": {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
 
 	// GPT-5 Models
+	"gpt-5-chat-latest":     {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 10 / 1.25},
 	"gpt-5":                 {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 10 / 1.25},
 	"gpt-5-2025-08-07":      {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 10 / 1.25},
 	"gpt-5-mini":            {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 2 / 0.25},

@@ -161,10 +161,11 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	return request, nil
 }
 
+// isModelSupportedReasoning checks if the model supports reasoning features
 func isModelSupportedReasoning(modelName string) bool {
 	switch {
 	case strings.HasPrefix(modelName, "o"),
-		strings.HasPrefix(modelName, "gpt-5"):
+		strings.HasPrefix(modelName, "gpt-5") && !strings.HasPrefix(modelName, "gpt-5-chat"):
 		return true
 	default:
 		return false
