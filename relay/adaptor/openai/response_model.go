@@ -471,7 +471,7 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 		}
 
 		if responseReq.Reasoning.Summary == nil {
-			reasoningSummary := "detailed"
+			reasoningSummary := "auto"
 			responseReq.Reasoning.Summary = &reasoningSummary
 		}
 
