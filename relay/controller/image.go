@@ -369,7 +369,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 		switch meta.ActualModelName {
 		case "gpt-image-1":
-			textQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.TextTokens) * 10 * billingratio.MilliTokensUsd))
+			textQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.TextTokens) * 5 * billingratio.MilliTokensUsd))
 			imageQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.ImageTokens) * 10 * billingratio.MilliTokensUsd))
 			usedQuota += textQuota + imageQuota
 		}

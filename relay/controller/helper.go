@@ -196,6 +196,7 @@ func postConsumeQuota(ctx context.Context,
 	}
 
 	// Split cached vs non-cached tokens
+	// https://platform.openai.com/docs/guides/prompt-caching
 	cachedPrompt := 0
 	if usage.PromptTokensDetails != nil {
 		cachedPrompt = usage.PromptTokensDetails.CachedTokens
