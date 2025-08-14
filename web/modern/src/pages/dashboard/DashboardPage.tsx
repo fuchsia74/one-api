@@ -10,6 +10,22 @@ import { DataTable } from '@/components/ui/data-table'
 import { ResponsivePageContainer } from '@/components/ui/responsive-container'
 import { useResponsive } from '@/hooks/useResponsive'
 import { formatNumber, cn } from '@/lib/utils'
+
+// Quota conversion utility
+const getQuotaPerUnit = () => parseFloat(localStorage.getItem('quota_per_unit') || '500000')
+const getDisplayInCurrency = () => localStorage.getItem('display_in_currency') === 'true'
+
+const renderQuota = (quota: number, precision: number = 2): string => {
+  const displayInCurrency = getDisplayInCurrency()
+  const quotaPerUnit = getQuotaPerUnit()
+
+  if (displayInCurrency) {
+    const amount = (quota / quotaPerUnit).toFixed(precision)
+    return `$${amount}`
+  }
+
+  return formatNumber(quota)
+}
 import {
   ResponsiveContainer,
   LineChart,
@@ -27,16 +43,16 @@ import {
 const GradientDefs = () => (
   <defs>
     <linearGradient id="requestsGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stopColor="#4318FF" stopOpacity={0.8}/>
-      <stop offset="100%" stopColor="#4318FF" stopOpacity={0.1}/>
+      <stop offset="0%" stopColor="#4318FF" stopOpacity={0.8} />
+      <stop offset="100%" stopColor="#4318FF" stopOpacity={0.1} />
     </linearGradient>
     <linearGradient id="quotaGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stopColor="#00B5D8" stopOpacity={0.8}/>
-      <stop offset="100%" stopColor="#00B5D8" stopOpacity={0.1}/>
+      <stop offset="0%" stopColor="#00B5D8" stopOpacity={0.8} />
+      <stop offset="100%" stopColor="#00B5D8" stopOpacity={0.1} />
     </linearGradient>
     <linearGradient id="tokensGradient" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stopColor="#FF5E7D" stopOpacity={0.8}/>
-      <stop offset="100%" stopColor="#FF5E7D" stopOpacity={0.1}/>
+      <stop offset="0%" stopColor="#FF5E7D" stopOpacity={0.8} />
+      <stop offset="100%" stopColor="#FF5E7D" stopOpacity={0.1} />
     </linearGradient>
   </defs>
 )
@@ -108,6 +124,37 @@ export function DashboardPage() {
 
   type Row = { day: string; model_name: string; request_count: number; quota: number; prompt_tokens: number; completion_tokens: number }
   const [rows, setRows] = useState<Row[]>([])
+
+  // Quota/Status panel state
+  const [quotaStats, setQuotaStats] = useState<{ totalQuota: number; usedQuota: number; status: string }>({ totalQuota: 0, usedQuota: 0, status: '-' })
+
+  // Fetch quota/status for selected user or all
+  const fetchQuotaStats = async (userId: string) => {
+    try {
+      let res
+      if (isAdmin) {
+        // Unified API call - complete URL with /api prefix
+        if (userId === 'all') {
+          res = await api.get('/api/user/dashboard')
+        } else {
+          res = await api.get(`/api/user/dashboard?user_id=${userId}`)
+        }
+      } else {
+        res = await api.get('/api/user/dashboard')
+      }
+      if (res.data?.success && res.data.data) {
+        setQuotaStats({
+          totalQuota: res.data.data.total_quota ?? 0,
+          usedQuota: res.data.data.used_quota ?? 0,
+          status: res.data.data.status ?? '-',
+        })
+      } else {
+        setQuotaStats({ totalQuota: 0, usedQuota: 0, status: '-' })
+      }
+    } catch {
+      setQuotaStats({ totalQuota: 0, usedQuota: 0, status: '-' })
+    }
+  }
 
 
 
@@ -196,7 +243,28 @@ export function DashboardPage() {
       const res = await api.get('/api/user/dashboard?' + params.toString())
       const { success, data, message } = res.data
       if (success) {
-        setRows(data || [])
+        // Handle new API response structure
+        const logs = data?.logs || data || []
+        setRows(
+          logs.map((row: any) => ({
+            day: row.Day,
+            model_name: row.ModelName,
+            request_count: row.RequestCount,
+            quota: row.Quota,
+            prompt_tokens: row.PromptTokens,
+            completion_tokens: row.CompletionTokens,
+          }))
+        )
+
+        // Update quota stats if available in the response
+        if (data && typeof data === 'object' && 'total_quota' in data) {
+          setQuotaStats({
+            totalQuota: data.total_quota ?? 0,
+            usedQuota: data.used_quota ?? 0,
+            status: data.status ?? '-',
+          })
+        }
+
         setLastUpdated(new Date().toLocaleTimeString())
         setDateError('')
       } else {
@@ -214,13 +282,19 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (isAdmin) loadUsers()
-    // load initial stats
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin])
-  useEffect(() => {
+    // load initial stats and quota
     loadStats()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isAdmin])
+
+  // Fetch quota/status when dashUser changes (but not on initial load)
+  useEffect(() => {
+    if (isAdmin) {
+      fetchQuotaStats(dashUser)
+    } else {
+      fetchQuotaStats('self')
+    }
+  }, [dashUser, isAdmin])
 
   // Presets
   const applyPreset = (preset: 'today' | '7d' | '30d') => {
@@ -238,11 +312,12 @@ export function DashboardPage() {
   const days = useMemo(() => Array.from(new Set(rows.map(r => r.day))).sort(), [rows])
   const timeSeries = useMemo(() => {
     // Aggregate across models per day
+    const quotaPerUnit = getQuotaPerUnit()
     const map: Record<string, { date: string; requests: number; quota: number; tokens: number }> = {}
     for (const r of rows) {
       if (!map[r.day]) map[r.day] = { date: r.day, requests: 0, quota: 0, tokens: 0 }
       map[r.day].requests += r.request_count || 0
-      map[r.day].quota += r.quota || 0
+      map[r.day].quota += (r.quota || 0) / quotaPerUnit // Convert to USD
       map[r.day].tokens += (r.prompt_tokens || 0) + (r.completion_tokens || 0)
     }
     return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
@@ -251,6 +326,7 @@ export function DashboardPage() {
   // Model stacked bar per day - supports different metrics
   const uniqueModels = useMemo(() => Array.from(new Set(rows.map(r => r.model_name))), [rows])
   const stackedData = useMemo(() => {
+    const quotaPerUnit = getQuotaPerUnit()
     const map: Record<string, Record<string, number>> = {}
     for (const d of days) map[d] = {}
     for (const r of rows) {
@@ -260,7 +336,7 @@ export function DashboardPage() {
           value = r.request_count || 0
           break
         case 'expenses':
-          value = r.quota || 0
+          value = (r.quota || 0) / quotaPerUnit
           break
         case 'tokens':
         default:
@@ -283,11 +359,12 @@ export function DashboardPage() {
 
   // Summaries & insights
   const dailyAgg = useMemo(() => {
+    const quotaPerUnit = getQuotaPerUnit()
     const m: Record<string, { date: string; requests: number; quota: number; tokens: number }> = {}
     for (const r of rows) {
       if (!m[r.day]) m[r.day] = { date: r.day, requests: 0, quota: 0, tokens: 0 }
       m[r.day].requests += r.request_count || 0
-      m[r.day].quota += r.quota || 0
+      m[r.day].quota += (r.quota || 0) / quotaPerUnit // Convert to USD
       m[r.day].tokens += (r.prompt_tokens || 0) + (r.completion_tokens || 0)
     }
     return Object.values(m).sort((a, b) => a.date.localeCompare(b.date))
@@ -313,14 +390,18 @@ export function DashboardPage() {
   }, [rows])
 
   const efficiency = useMemo(() => {
+    const quotaPerUnit = getQuotaPerUnit()
     return byModel
-      .map(m => ({
-        model: m.model,
-        requests: m.requests,
-        avgCost: m.requests ? m.quota / m.requests : 0,
-        avgTokens: m.requests ? m.tokens / m.requests : 0,
-        efficiency: m.quota > 0 ? m.tokens / m.quota : 0, // tokens per quota unit
-      }))
+      .map(m => {
+        const quotaInCurrency = m.quota / quotaPerUnit
+        return {
+          model: m.model,
+          requests: m.requests,
+          avgCost: m.requests ? quotaInCurrency / m.requests : 0,
+          avgTokens: m.requests ? m.tokens / m.requests : 0,
+          efficiency: quotaInCurrency > 0 ? m.tokens / quotaInCurrency : 0, // tokens per dollar
+        }
+      })
       .sort((a, b) => b.requests - a.requests)
   }, [byModel])
 
@@ -342,7 +423,7 @@ export function DashboardPage() {
   // Performance metrics calculations (similar to default dashboard)
   const performanceMetrics = useMemo(() => {
     const avgTokensPerRequest = todayAgg.requests ? todayAgg.tokens / todayAgg.requests : 0
-    const avgCostPerRequest = todayAgg.requests ? todayAgg.quota / todayAgg.requests : 0
+    const avgCostPerRequest = todayAgg.requests ? todayAgg.quota / todayAgg.requests : 0 // quota is already in USD
 
     // Simulate avgResponseTime based on token count (in real implementation, this would come from backend)
     const avgResponseTime = todayAgg.requests > 0 ?
@@ -391,7 +472,7 @@ export function DashboardPage() {
       insights.push({
         type: 'warning',
         title: 'High Cost Model Detected',
-        message: `${mostExpensive.model} has high cost per request (${formatNumber(mostExpensive.avgCost)}). Consider optimizing prompts or switching models.`,
+        message: `${mostExpensive.model} has high cost per request ($${mostExpensive.avgCost.toFixed(4)}). Consider optimizing prompts or switching models.`,
         icon: '⚠️'
       })
     }
@@ -407,14 +488,16 @@ export function DashboardPage() {
     }
 
     // Monthly spending projection
+    const quotaPerUnit = getQuotaPerUnit()
     const avgDailyQuota = dailyAgg.length ? (dailyAgg.reduce((s, d) => s + d.quota, 0) / dailyAgg.length) : 0
-    const monthlyProjection = avgDailyQuota * 30
+    const avgDailySpending = avgDailyQuota / quotaPerUnit
+    const monthlyProjection = avgDailySpending * 30
 
-    if (monthlyProjection > 1000) {
+    if (monthlyProjection > 100) {
       insights.push({
         type: 'info',
         title: 'Monthly Spending Projection',
-        message: `Based on recent usage, monthly quota consumption could reach ${formatNumber(monthlyProjection)}. Consider setting usage limits or optimizing model selection.`,
+        message: `Based on recent usage, monthly spending could reach $${monthlyProjection.toFixed(2)}. Consider setting usage limits or optimizing model selection.`,
         icon: '📊'
       })
     }
@@ -442,12 +525,113 @@ export function DashboardPage() {
     return <div>Please log in to access the dashboard.</div>
   }
 
+  // --- UI ---
   return (
     <ResponsivePageContainer
       title="Dashboard"
       description="Monitor your API usage and account statistics"
     >
-      {/* Account Overview - Simplified */}
+      {/* Filter bar - Date Range Controls */}
+      <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
+          <div className="flex gap-3 flex-1">
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">From</label>
+              <Input
+                type="date"
+                value={fromDate}
+                min={getMinDate()}
+                max={getMaxDate()}
+                onChange={(e) => setFromDate(e.target.value)}
+                className={cn("h-10", dateError ? "border-red-500" : "")}
+                aria-label="From date"
+              />
+            </div>
+            <div className="flex-1">
+              <label className="text-sm font-medium mb-2 block">To</label>
+              <Input
+                type="date"
+                value={toDate}
+                min={getMinDate()}
+                max={getMaxDate()}
+                onChange={(e) => setToDate(e.target.value)}
+                className={cn("h-10", dateError ? "border-red-500" : "")}
+                aria-label="To date"
+              />
+            </div>
+            {isAdmin && (
+              <div className="flex-1">
+                <label className="text-sm font-medium mb-2 block">User</label>
+                <select
+                  className="h-10 w-full border rounded-md px-3 text-sm bg-background"
+                  value={dashUser}
+                  onChange={(e) => setDashUser(e.target.value)}
+                  aria-label="Select user"
+                >
+                  <option value="all">All Users</option>
+                  {userOptions.map(u => (
+                    <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset('today')}
+              className="h-10"
+            >
+              Today
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset('7d')}
+              className="h-10"
+            >
+              7D
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => applyPreset('30d')}
+              className="h-10"
+            >
+              30D
+            </Button>
+            <Button
+              onClick={loadStats}
+              disabled={loading}
+              className="h-10 px-6"
+            >
+              {loading ? 'Loading...' : 'Apply'}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {dateError && (
+        <div
+          id="date-error"
+          className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md dark:bg-red-950/20 dark:border-red-800"
+          role="alert"
+          aria-live="polite"
+        >
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-medium text-red-800 dark:text-red-200">Error</span>
+          </div>
+          <p className="text-sm text-red-700 dark:text-red-300 mt-1">{dateError}</p>
+        </div>
+      )}
+
+      {/* Quota/Status panels below filter bar */}
       <div className="mb-8">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
@@ -455,7 +639,7 @@ export function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Total Quota</p>
-                  <p className="text-2xl font-bold">{user.quota?.toLocaleString() || '0'}</p>
+                  <p className="text-2xl font-bold">{renderQuota(quotaStats.totalQuota)}</p>
                 </div>
                 <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -471,7 +655,7 @@ export function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Used Quota</p>
-                  <p className="text-2xl font-bold">{user.used_quota?.toLocaleString() || '0'}</p>
+                  <p className="text-2xl font-bold">{renderQuota(quotaStats.usedQuota)}</p>
                 </div>
                 <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -487,7 +671,7 @@ export function DashboardPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="text-2xl font-bold">{user.status === 1 ? 'Active' : 'Inactive'}</p>
+                  <p className="text-2xl font-bold">{quotaStats.status}</p>
                 </div>
                 <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -513,105 +697,7 @@ export function DashboardPage() {
             </span>
           )}
         </div>
-        {/* Simplified Date Range Controls */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
-            <div className="flex gap-3 flex-1">
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">From</label>
-                <Input
-                  type="date"
-                  value={fromDate}
-                  min={getMinDate()}
-                  max={getMaxDate()}
-                  onChange={(e) => setFromDate(e.target.value)}
-                  className={cn("h-10", dateError ? "border-red-500" : "")}
-                  aria-label="From date"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="text-sm font-medium mb-2 block">To</label>
-                <Input
-                  type="date"
-                  value={toDate}
-                  min={getMinDate()}
-                  max={getMaxDate()}
-                  onChange={(e) => setToDate(e.target.value)}
-                  className={cn("h-10", dateError ? "border-red-500" : "")}
-                  aria-label="To date"
-                />
-              </div>
-              {isAdmin && (
-                <div className="flex-1">
-                  <label className="text-sm font-medium mb-2 block">User</label>
-                  <select
-                    className="h-10 w-full border rounded-md px-3 text-sm bg-background"
-                    value={dashUser}
-                    onChange={(e) => setDashUser(e.target.value)}
-                    aria-label="Select user"
-                  >
-                    <option value="all">All Users</option>
-                    {userOptions.map(u => (
-                      <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-            </div>
 
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyPreset('today')}
-                className="h-10"
-              >
-                Today
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyPreset('7d')}
-                className="h-10"
-              >
-                7D
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => applyPreset('30d')}
-                className="h-10"
-              >
-                30D
-              </Button>
-              <Button
-                onClick={loadStats}
-                disabled={loading}
-                className="h-10 px-6"
-              >
-                {loading ? 'Loading...' : 'Apply'}
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        {/* Error Message */}
-        {dateError && (
-          <div
-            id="date-error"
-            className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md dark:bg-red-950/20 dark:border-red-800"
-            role="alert"
-            aria-live="polite"
-          >
-            <div className="flex items-center gap-2">
-              <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              <span className="text-sm font-medium text-red-800 dark:text-red-200">Error</span>
-            </div>
-            <p className="text-sm text-red-700 dark:text-red-300 mt-1">{dateError}</p>
-          </div>
-        )}
 
         {/* Key Metrics - Clean Grid */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -632,7 +718,7 @@ export function DashboardPage() {
 
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Quota Used</div>
-            <div className="text-2xl font-bold mt-1">{formatNumber(todayAgg.quota)}</div>
+            <div className="text-2xl font-bold mt-1">{renderQuota(todayAgg.quota)}</div>
             <div className={cn(
               "text-xs mt-2 flex items-center gap-1",
               quotaTrend >= 0 ? 'text-orange-600' : 'text-green-600'
@@ -826,7 +912,7 @@ export function DashboardPage() {
                     case 'requests':
                       return formatNumber(value)
                     case 'expenses':
-                      return `$${value.toFixed(2)}`
+                      return renderQuota(value, 2)
                     case 'tokens':
                     default:
                       return formatNumber(value)
@@ -834,17 +920,58 @@ export function DashboardPage() {
                 }}
               />
               <Tooltip
-                contentStyle={{
-                  backgroundColor: 'var(--background)',
-                  border: '1px solid var(--border)',
-                  borderRadius: '8px',
-                  fontSize: '12px'
-                }}
-                formatter={(value: number, name: string) => {
-                  const formattedValue = statisticsMetric === 'expenses'
-                    ? `$${value.toFixed(6)}`
-                    : formatNumber(value)
-                  return [formattedValue, name]
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    // Filter out entries with zero values and sort by value in descending order
+                    const filteredAndSortedPayload = payload
+                      .filter(entry => entry.value && typeof entry.value === 'number' && entry.value > 0)
+                      .sort((a, b) => (b.value as number) - (a.value as number))
+
+                    // Format value based on selected metric
+                    const formatValue = (value: number) => {
+                      switch (statisticsMetric) {
+                        case 'requests':
+                          return formatNumber(value)
+                        case 'expenses':
+                          return renderQuota(value, 6)
+                        case 'tokens':
+                        default:
+                          return formatNumber(value)
+                      }
+                    }
+
+                    return (
+                      <div style={{
+                        backgroundColor: 'var(--background)',
+                        border: '1px solid var(--border)',
+                        borderRadius: '8px',
+                        padding: '12px 16px',
+                        fontSize: '12px',
+                        color: 'var(--foreground)',
+                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)'
+                      }}>
+                        <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--foreground)' }}>
+                          {label}
+                        </div>
+                        {filteredAndSortedPayload.map((entry, index) => (
+                          <div key={index} style={{ marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
+                            <span style={{
+                              display: 'inline-block',
+                              width: '12px',
+                              height: '12px',
+                              backgroundColor: entry.color,
+                              borderRadius: '50%',
+                              marginRight: '8px'
+                            }}></span>
+                            <span style={{ fontWeight: '600', color: 'var(--foreground)' }}>
+                              {entry.name}: {formatValue(entry.value as number)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  }
+                  return null
                 }}
               />
               <Legend />

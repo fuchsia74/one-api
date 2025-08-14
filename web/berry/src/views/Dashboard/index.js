@@ -66,11 +66,13 @@ const Dashboard = () => {
     const { success, message, data } = res.data;
     if (success) {
       if (data) {
-        let lineData = getLineDataGroup(data);
+        // Handle new API response structure
+        const dashboardData = data.logs || data || [];
+        let lineData = getLineDataGroup(dashboardData);
         setRequestChart(getLineCardOption(lineData, 'RequestCount'));
         setQuotaChart(getLineCardOption(lineData, 'Quota'));
         setTokenChart(getLineCardOption(lineData, 'PromptTokens'));
-        setStatisticalData(getBarDataGroup(data, statisticsMetric));
+        setStatisticalData(getBarDataGroup(dashboardData, statisticsMetric));
       }
       setDateError('');
     } else {

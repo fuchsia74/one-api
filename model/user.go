@@ -506,3 +506,36 @@ func GetUsernameById(id int) (username string) {
 	DB.Model(&User{}).Where("id = ?", id).Select("username").Find(&username)
 	return username
 }
+
+func GetSiteWideQuotaStats() (totalQuota int64, usedQuota int64, status string, err error) {
+	var result struct {
+		TotalQuota  int64 `json:"total_quota"`
+		UsedQuota   int64 `json:"used_quota"`
+		ActiveUsers int64 `json:"active_users"`
+		TotalUsers  int64 `json:"total_users"`
+	}
+
+	// Get aggregated quota statistics for all users
+	err = DB.Model(&User{}).
+		Select("SUM(quota) as total_quota, SUM(used_quota) as used_quota, COUNT(CASE WHEN status = ? THEN 1 END) as active_users, COUNT(*) as total_users", UserStatusEnabled).
+		Where("status != ?", UserStatusDeleted).
+		Scan(&result).Error
+
+	if err != nil {
+		return 0, 0, "", errors.Wrapf(err, "failed to get site-wide quota statistics")
+	}
+
+	totalQuota = result.TotalQuota
+	usedQuota = result.UsedQuota
+
+	// Determine overall status based on active vs total users
+	if result.ActiveUsers == 0 {
+		status = "No Active Users"
+	} else if result.ActiveUsers == result.TotalUsers {
+		status = "All Active"
+	} else {
+		status = fmt.Sprintf("%d/%d Active", result.ActiveUsers, result.TotalUsers)
+	}
+
+	return totalQuota, usedQuota, status, nil
+}

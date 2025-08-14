@@ -306,7 +306,9 @@ const Dashboard = () => {
 
       const response = await axios.get(url);
       if (response.data.success) {
-        const dashboardData = response.data.data || [];
+        const responseData = response.data.data || [];
+        // Handle new API response structure
+        const dashboardData = responseData.logs || responseData || [];
         setData(dashboardData);
         calculateSummary(dashboardData);
         setDateError('');

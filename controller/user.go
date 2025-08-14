@@ -461,6 +461,7 @@ func GetUserDashboard(c *gin.Context) {
 		targetUserId = 0
 	}
 
+	// Get log statistics
 	dashboards, err := model.SearchLogsByDayAndModel(targetUserId, int(startOfDay), int(endOfDay))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -470,10 +471,59 @@ func GetUserDashboard(c *gin.Context) {
 		})
 		return
 	}
+
+	// Get quota and status information
+	var totalQuota, usedQuota int64
+	var status string
+
+	if targetUserId == 0 {
+		// Site-wide statistics for admin/root users
+		totalQuota, usedQuota, status, err = model.GetSiteWideQuotaStats()
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Failed to get site-wide quota stats: " + err.Error(),
+				"data":    nil,
+			})
+			return
+		}
+	} else {
+		// Individual user statistics
+		user, err := model.GetUserById(targetUserId, false)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{
+				"success": false,
+				"message": "Failed to get user data: " + err.Error(),
+				"data":    nil,
+			})
+			return
+		}
+		totalQuota = user.Quota
+		usedQuota = user.UsedQuota
+		switch user.Status {
+		case model.UserStatusEnabled:
+			status = "Active"
+		case model.UserStatusDisabled:
+			status = "Disabled"
+		case model.UserStatusDeleted:
+			status = "Deleted"
+		default:
+			status = "Unknown"
+		}
+	}
+
+	// Create response with both log data and quota/status info
+	response := gin.H{
+		"logs":        dashboards,
+		"total_quota": totalQuota,
+		"used_quota":  usedQuota,
+		"status":      status,
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data":    dashboards,
+		"data":    response,
 	})
 	return
 }
