@@ -666,7 +666,7 @@ Check out all the options for text generation in the API reference.
 
 ](/docs/api-reference/responses)
 
-# Images and vision
+## Images and visio
 
 Learn how to understand or generate images.
 
@@ -688,7 +688,7 @@ Process image inputs
 
 Use our models' vision capabilities to analyze images.
 
-](/docs/guides/images-vision#analyze-images)
+](#analyze-images)
 
 In this guide, you will learn about building applications involving images with the OpenAI API. If you know what you want to build, find your use case below to get started. If you're not sure where to start, continue reading to get an overview.
 
@@ -714,56 +714,6 @@ Our latest image generation model, `gpt-image-1`, is a natively multimodal large
 
 In contrast, we also offer specialized image generation models - DALL·E 2 and 3 - which don't have the same inherent understanding of the world as GPT Image.
 
-Generate images with Responses
-
-```javascript
-import OpenAI from "openai";
-const openai = new OpenAI();
-
-const response = await openai.responses.create({
-  model: "gpt-4.1-mini",
-  input:
-    "Generate an image of gray tabby cat hugging an otter with an orange scarf",
-  tools: [{ type: "image_generation" }],
-});
-
-// Save the image to a file
-const imageData = response.output
-  .filter((output) => output.type === "image_generation_call")
-  .map((output) => output.result);
-
-if (imageData.length > 0) {
-  const imageBase64 = imageData[0];
-  const fs = await import("fs");
-  fs.writeFileSync("cat_and_otter.png", Buffer.from(imageBase64, "base64"));
-}
-```
-
-```python
-from openai import OpenAI
-import base64
-
-client = OpenAI()
-
-response = client.responses.create(
-    model="gpt-4.1-mini",
-    input="Generate an image of gray tabby cat hugging an otter with an orange scarf",
-    tools=[{"type": "image_generation"}],
-)
-
-// Save the image to a file
-image_data = [
-    output.result
-    for output in response.output
-    if output.type == "image_generation_call"
-]
-
-if image_data:
-    image_base64 = image_data[0]
-    with open("cat_and_otter.png", "wb") as f:
-        f.write(base64.b64decode(image_base64))
-```
-
 You can learn more about image generation in our [Image generation](/docs/guides/image-generation) guide.
 
 ### Using world knowledge for image generation
@@ -774,17 +724,13 @@ For example, if you prompt GPT Image to generate an image of a glass cabinet wit
 
 ## Analyze images
 
-**Vision** is the ability for a model to "see" and understand images. If there is text in an image, the model can also understand the text. It can understand most visual elements, including objects, shapes, colors, and textures, even if there are some [limitations](#limitations).
+**Vision** is the ability for a model to "see" and understand images. If there is text in an image, the model can also understand the text. It can understand most visual elements, including objects, shapes, colors, and textures, even if there are some [limitations](/docs/guides/images-vision#limitations).
 
 ### Giving a model images as input
 
-You can provide images as input to generation requests in multiple ways:
+You can provide images as input to generation requests either by providing a fully qualified URL to an image file, or providing an image as a Base64-encoded data URL.
 
-- By providing a fully qualified URL to an image file
-- By providing an image as a Base64-encoded data URL
-- By providing a file ID (created with the [Files API](/docs/api-reference/files))
-
-You can provide multiple images as input in a single request by including multiple images in the `content` array, but keep in mind that [images count as tokens](#calculating-costs) and will be billed accordingly.
+You can provide multiple images as input in a single request by including multiple images in the `content` array, but keep in mind that [images count as tokens](/docs/guides/images-vision#calculating-costs) and will be billed accordingly.
 
 Passing a URL
 
@@ -792,69 +738,76 @@ Analyze the content of an image
 
 ```javascript
 import OpenAI from "openai";
-
 const openai = new OpenAI();
 
-const response = await openai.responses.create({
+const response = await openai.chat.completions.create({
   model: "gpt-4.1-mini",
-  input: [
+  messages: [
     {
       role: "user",
       content: [
-        { type: "input_text", text: "what's in this image?" },
+        { type: "text", text: "What is in this image?" },
         {
-          type: "input_image",
-          image_url:
-            "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+          type: "image_url",
+          image_url: {
+            url: "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+          },
         },
       ],
     },
   ],
 });
 
-console.log(response.output_text);
+console.log(response.choices[0].message.content);
 ```
 
 ```python
 from openai import OpenAI
-
 client = OpenAI()
 
-response = client.responses.create(
+response = client.chat.completions.create(
     model="gpt-4.1-mini",
-    input=[{
+    messages=[{
         "role": "user",
         "content": [
-            {"type": "input_text", "text": "what's in this image?"},
+            {"type": "text", "text": "What's in this image?"},
             {
-                "type": "input_image",
-                "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                "type": "image_url",
+                "image_url": {
+                    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+                },
             },
         ],
     }],
 )
 
-print(response.output_text)
+print(response.choices[0].message.content)
 ```
 
 ```bash
-curl https://api.openai.com/v1/responses \
+curl https://api.openai.com/v1/chat/completions \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $OPENAI_API_KEY" \
   -d '{
     "model": "gpt-4.1-mini",
-    "input": [
+    "messages": [
       {
         "role": "user",
         "content": [
-          {"type": "input_text", "text": "what is in this image?"},
           {
-            "type": "input_image",
-            "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+            "type": "text",
+            "text": "What is in this image?"
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg"
+            }
           }
         ]
       }
-    ]
+    ],
+    "max_tokens": 300
   }'
 ```
 
@@ -871,23 +824,25 @@ const openai = new OpenAI();
 const imagePath = "path_to_your_image.jpg";
 const base64Image = fs.readFileSync(imagePath, "base64");
 
-const response = await openai.responses.create({
+const completion = await openai.chat.completions.create({
   model: "gpt-4.1-mini",
-  input: [
+  messages: [
     {
       role: "user",
       content: [
-        { type: "input_text", text: "what's in this image?" },
+        { type: "text", text: "what's in this image?" },
         {
-          type: "input_image",
-          image_url: `data:image/jpeg;base64,${base64Image}`,
+          type: "image_url",
+          image_url: {
+            url: `data:image/jpeg;base64,${base64Image}`,
+          },
         },
       ],
     },
   ],
 });
 
-console.log(response.output_text);
+console.log(completion.choices[0].message.content);
 ```
 
 ```python
@@ -907,126 +862,77 @@ image_path = "path_to_your_image.jpg"
 # Getting the Base64 string
 base64_image = encode_image(image_path)
 
-response = client.responses.create(
+completion = client.chat.completions.create(
     model="gpt-4.1",
-    input=[
+    messages=[
         {
             "role": "user",
             "content": [
-                { "type": "input_text", "text": "what's in this image?" },
+                { "type": "text", "text": "what's in this image?" },
                 {
-                    "type": "input_image",
-                    "image_url": f"data:image/jpeg;base64,{base64_image}",
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/jpeg;base64,{base64_image}",
+                    },
                 },
             ],
         }
     ],
 )
 
-print(response.output_text)
+print(completion.choices[0].message.content)
 ```
 
-Passing a file ID
-
-Analyze the content of an image
-
-```javascript
-import OpenAI from "openai";
-import fs from "fs";
-
-const openai = new OpenAI();
-
-// Function to create a file with the Files API
-async function createFile(filePath) {
-  const fileContent = fs.createReadStream(filePath);
-  const result = await openai.files.create({
-    file: fileContent,
-    purpose: "vision",
-  });
-  return result.id;
-}
-
-// Getting the file ID
-const fileId = await createFile("path_to_your_image.jpg");
-
-const response = await openai.responses.create({
-  model: "gpt-4.1-mini",
-  input: [
-    {
-      role: "user",
-      content: [
-        { type: "input_text", text: "what's in this image?" },
-        {
-          type: "input_image",
-          file_id: fileId,
-        },
-      ],
-    },
-  ],
-});
-
-console.log(response.output_text);
-```
-
-```python
-from openai import OpenAI
-
-client = OpenAI()
-
-# Function to create a file with the Files API
-def create_file(file_path):
-  with open(file_path, "rb") as file_content:
-    result = client.files.create(
-        file=file_content,
-        purpose="vision",
-    )
-    return result.id
-
-# Getting the file ID
-file_id = create_file("path_to_your_image.jpg")
-
-response = client.responses.create(
-    model="gpt-4.1-mini",
-    input=[{
+```bash
+BASE64_IMAGE=$(base64 < path_to_your_image.jpg) && curl https://api.openai.com/v1/chat/completions   -H "Content-Type: application/json"   -H "Authorization: Bearer $OPENAI_API_KEY"   -d @- <<EOF
+  {
+    "model": "gpt-4.1-mini",
+    "messages": [
+      {
         "role": "user",
         "content": [
-            {"type": "input_text", "text": "what's in this image?"},
-            {
-                "type": "input_image",
-                "file_id": file_id,
-            },
-        ],
-    }],
-)
-
-print(response.output_text)
+          {
+            "type": "text",
+            "text": "What is in this image?"
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "data:image/jpeg;base64,$BASE64_IMAGE"
+            }
+          }
+        ]
+      }
+    ],
+    "max_tokens": 300
+  }
+EOF
 ```
 
 ### Image input requirements
 
 Input images must meet the following requirements to be used in the API.
 
-|Supported file types|PNG (.png)JPEG (.jpeg and .jpg)WEBP (.webp)Non-animated GIF (.gif)|
-|Size limits|Up to 50 MB total payload size per requestUp to 500 individual image inputs per request|
-|Other requirements|No watermarks or logosNo NSFW contentClear enough for a human to understand|
+|Supported file types|PNG (.png) - JPEG (.jpeg and .jpg) - WEBP (.webp) - Non-animated GIF (.gif)|
+|Size limits|Up to 50 MB total payload size per request - Up to 500 individual image inputs per request|
+|Other requirements|No watermarks or logos - No NSFW content - Clear enough for a human to understand|
 
 ### Specify image input detail level
 
 The `detail` parameter tells the model what level of detail to use when processing and understanding the image (`low`, `high`, or `auto` to let the model decide). If you skip the parameter, the model will use `auto`.
 
 ```plain
-{
-    "type": "input_image",
-    "image_url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
+"image_url": {
+    "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/dd/Gfp-wisconsin-madison-the-nature-boardwalk.jpg/2560px-Gfp-wisconsin-madison-the-nature-boardwalk.jpg",
     "detail": "high"
-}
+},
 ```
 
 You can save tokens and speed up responses by using `"detail": "low"`. This lets the model process the image with a budget of 85 tokens. The model receives a low-resolution 512px x 512px version of the image. This is fine if your use case doesn't require the model to see with high-resolution detail (for example, if you're asking about the dominant shape or color in the image).
 
 On the other hand, you can use `"detail": "high"` if you want the model to have a better understanding of the image.
 
-Read more about calculating image processing costs in the [Calculating costs](#calculating-costs) section below.
+Read more about calculating image processing costs in the [Calculating costs](/docs/guides/images-vision#calculating-costs) section below.
 
 ## Limitations
 
@@ -1052,12 +958,34 @@ Image inputs are metered and charged in tokens, just as text inputs are. How ima
 
 Image inputs are metered and charged in tokens based on their dimensions. The token cost of an image is determined as follows:
 
-- Calculate the number of 32px x 32px patches that are needed to fully cover the image
-- If the number of patches exceeds 1536, we scale down the image so that it can be covered by no more than 1536 patches
-- The token cost is the number of patches, capped at a maximum of 1536 tokens
-- For `gpt-4.1-mini` we multiply image tokens by 1.62 to get total tokens, for `gpt-4.1-nano` we multiply image tokens by 2.46 to get total tokens, and for `o4-mini` we multiply image tokens by 1.72 to get total tokens, that are then billed at normal text token rates.
+A. Calculate the number of 32px x 32px patches that are needed to fully cover the image (a patch may extend beyond the image boundaries; out-of-bounds pixels are treated as black.)
 
-Note:
+```text
+raw_patches = ceil(width/32)×ceil(height/32)
+```
+
+B. If the number of patches exceeds 1536, we scale down the image so that it can be covered by no more than 1536 patches
+
+```text
+r = √(32²×1536/(width×height))
+r = r × min( floor(width×r/32) / (width×r/32), floor(height×r/32) / (height×r/32) )
+```
+
+C. The token cost is the number of patches, capped at a maximum of 1536 tokens
+
+```text
+image_tokens = ceil(resized_width/32)×ceil(resized_height/32)
+```
+
+D. Apply a multiplier based on the model to get the total tokens.
+
+| Model        | Multiplier |
+| ------------ | ---------- |
+| gpt-5-mini   | 1.62       |
+| gpt-5-nano   | 2.46       |
+| gpt-4.1-mini | 1.62       |
+| gpt-4.1-nano | 2.46       |
+| o4-mini      | 1.72       |
 
 **Cost calculation examples**
 
@@ -1081,19 +1009,20 @@ Note:
 
 The token cost of an image is determined by two factors: size and detail.
 
-Any image with `"detail": "low"` costs a set, base number of tokens. This amount varies by model (see charte below). To calculate the cost of an image with `"detail": "high"`, we do the following:
+Any image with `"detail": "low"` costs a set, base number of tokens. This amount varies by model (see chart below). To calculate the cost of an image with `"detail": "high"`, we do the following:
 
 - Scale to fit in a 2048px x 2048px square, maintaining original aspect ratio
 - Scale so that the image's shortest side is 768px long
 - Count the number of 512px squares in the image—each square costs a set amount of tokens (see chart below)
 - Add the base tokens to the total
 
-| Model                | Base tokens | Tile tokens |
-| -------------------- | ----------- | ----------- |
-| 4o, 4.1, 4.5         | 85          | 170         |
-| 4o-mini              | 2833        | 5667        |
-| o1, o1-pro, o3       | 75          | 150         |
-| computer-use-preview | 65          | 129         |
+| Model                    | Base tokens | Tile tokens |
+| ------------------------ | ----------- | ----------- |
+| gpt-5, gpt-5-chat-latest | 70          | 140         |
+| 4o, 4.1, 4.5             | 85          | 170         |
+| 4o-mini                  | 2833        | 5667        |
+| o1, o1-pro, o3           | 75          | 150         |
+| computer-use-preview     | 65          | 129         |
 
 **Cost calculation examples (for gpt-4o)**
 
@@ -1110,9 +1039,12 @@ Any image with `"detail": "low"` costs a set, base number of tokens. This amount
 
 ### GPT Image 1
 
-For GPT Image 1, we calculate the cost of an image input the same way as described above, except that we scale down the image so that the shortest side is 512px instead of 768px. There is no detail level configuration for this model, so the price depends on the dimensions of the image.
+For GPT Image 1, we calculate the cost of an image input the same way as described above, except that we scale down the image so that the shortest side is 512px instead of 768px. The price depends on the dimensions of the image and the [input fidelity](/docs/guides/image-generation?image-generation-model=gpt-image-1#input-fidelity).
 
-The base cost is 65 image tokens, and each tile costs 129 image tokens.
+When input fidelity is set to low, the base cost is 65 image tokens, and each tile costs 129 image tokens. When using high input fidelity, we add a set number of tokens based on the image's aspect ratio in addition to the image tokens described above.
+
+- If your image is square, we add 4096 extra input image tokens.
+- If it is closer to portrait or landscape, we add 6144 extra tokens.
 
 To see pricing for image input tokens, refer to our [pricing page](/docs/pricing#latest-models).
 

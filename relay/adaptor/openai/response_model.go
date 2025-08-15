@@ -225,10 +225,15 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 				}
 			case model.ContentTypeImageURL:
 				if part.ImageURL != nil && part.ImageURL.Url != "" {
-					convertedContent = append(convertedContent, map[string]interface{}{
+					item := map[string]interface{}{
 						"type":      "input_image",
 						"image_url": part.ImageURL.Url,
-					})
+					}
+					// Preserve detail if provided
+					if part.ImageURL.Detail != "" {
+						item["detail"] = part.ImageURL.Detail
+					}
+					convertedContent = append(convertedContent, item)
 				}
 			case model.ContentTypeInputAudio:
 				if part.InputAudio != nil {
@@ -267,6 +272,20 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 						convertedItem["type"] = textContentType
 					case "image_url":
 						convertedItem["type"] = "input_image"
+						// Flatten image_url object to string and hoist detail per Response API spec
+						if iu, ok := itemMap["image_url"].(map[string]interface{}); ok {
+							if urlVal, ok2 := iu["url"].(string); ok2 {
+								convertedItem["image_url"] = urlVal
+							} else {
+								// If not a map with url string, try direct cast below
+								convertedItem["image_url"] = iu
+							}
+							if detailVal, ok2 := iu["detail"].(string); ok2 && detailVal != "" {
+								convertedItem["detail"] = detailVal
+							}
+						} else if urlStr, ok := itemMap["image_url"].(string); ok {
+							convertedItem["image_url"] = urlStr
+						}
 					}
 				}
 				convertedContent = append(convertedContent, convertedItem)
