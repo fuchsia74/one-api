@@ -16,6 +16,7 @@ import (
 	_ "golang.org/x/image/webp"
 
 	"github.com/songquanpeng/one-api/common/client"
+	"github.com/songquanpeng/one-api/common/config"
 )
 
 // Regex to match data URL pattern
@@ -41,8 +42,9 @@ func IsImageUrl(url string) (bool, error) {
 		return false, errors.Errorf("failed to fetch image URL: %s, status code: %d", url, resp.StatusCode)
 	}
 
-	if resp.ContentLength > 10*1024*1024 {
-		return false, errors.Errorf("image size should not exceed 10MB: %s, size: %d", url, resp.ContentLength)
+	maxSize := int64(config.MaxInlineImageSizeMB) * 1024 * 1024
+	if resp.ContentLength > maxSize {
+		return false, errors.Errorf("image size should not exceed %dMB: %s, size: %d", config.MaxInlineImageSizeMB, url, resp.ContentLength)
 	}
 
 	contentType := strings.ToLower(resp.Header.Get("Content-Type"))
@@ -103,8 +105,9 @@ func GetImageFromUrl(url string) (mimeType string, data string, err error) {
 	if resp.StatusCode != http.StatusOK {
 		return mimeType, data, errors.Errorf("failed to fetch image URL: %s, status code: %d", url, resp.StatusCode)
 	}
-	if resp.ContentLength > 10*1024*1024 {
-		return mimeType, data, errors.Errorf("image size should not exceed 10MB: %s, size: %d", url, resp.ContentLength)
+	maxSize := int64(config.MaxInlineImageSizeMB) * 1024 * 1024
+	if resp.ContentLength > maxSize {
+		return mimeType, data, errors.Errorf("image size should not exceed %dMB: %s, size: %d", config.MaxInlineImageSizeMB, url, resp.ContentLength)
 	}
 
 	buffer := bytes.NewBuffer(nil)

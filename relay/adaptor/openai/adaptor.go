@@ -11,10 +11,12 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	imgutil "github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor"
@@ -129,8 +131,10 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 	// Handle direct Response API requests
 	if relayMode == relaymode.ResponseAPI {
-		// For direct Response API requests, the request should already be in the correct format
-		// We don't need to convert it, just pass it through
+		// Apply transformations (e.g., image URL -> base64) and pass through
+		if err := a.applyRequestTransformations(meta, request); err != nil {
+			return nil, err
+		}
 		return request, nil
 	}
 
@@ -250,6 +254,35 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		return errors.New("set ENFORCE_INCLUDE_USAGE=true to enable stream mode for gpt-4o-audio")
 	}
 
+	// Transform image URLs in messages to base64 data URLs to ensure upstream receives embedded data
+	for i := range request.Messages {
+		parts := request.Messages[i].ParseContent()
+		if len(parts) == 0 {
+			continue
+		}
+		changed := false
+		for pi := range parts {
+			if parts[pi].Type == model.ContentTypeImageURL && parts[pi].ImageURL != nil {
+				url := parts[pi].ImageURL.Url
+				if url != "" && !strings.HasPrefix(url, "data:image/") {
+					if dataURL, err := toDataURL(url); err == nil && dataURL != "" {
+						parts[pi].ImageURL.Url = dataURL
+						changed = true
+					} else if err != nil {
+						// Wrap but do not fail the whole request; log at info to avoid noisy errors
+						logger.Logger.Warn("failed to inline image URL; sending original URL upstream",
+							zap.String("url", url),
+							zap.Error(err))
+					}
+				}
+			}
+		}
+		if changed {
+			// Replace message content with the normalized parts
+			request.Messages[i].Content = parts
+		}
+	}
+
 	return nil
 }
 
@@ -352,11 +385,19 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 							if source, exists := blockMap["source"]; exists {
 								if sourceMap, ok := source.(map[string]any); ok {
 									imageURL := model.ImageURL{}
+									// Support base64 source
 									if mediaType, exists := sourceMap["media_type"]; exists {
 										if data, exists := sourceMap["data"]; exists {
 											if dataStr, ok := data.(string); ok {
-												// Convert to data URL format
 												imageURL.Url = fmt.Sprintf("data:%s;base64,%s", mediaType, dataStr)
+											}
+										}
+									}
+									// Support URL source -> fetch and inline
+									if srcType, ok := sourceMap["type"].(string); ok && srcType == "url" {
+										if u, ok := sourceMap["url"].(string); ok && u != "" {
+											if dataURL, err := toDataURL(u); err == nil && dataURL != "" {
+												imageURL.Url = dataURL
 											}
 										}
 									}
@@ -432,6 +473,21 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	// For non-OpenAI channels or models that only support ChatCompletion API,
 	// return the OpenAI request directly
 	return openaiRequest, nil
+}
+
+// getImageFromURLFn is injectable for tests
+var getImageFromURLFn = imgutil.GetImageFromUrl
+
+// toDataURL downloads an image and returns a data URL string
+func toDataURL(url string) (string, error) {
+	mime, data, err := getImageFromURLFn(url)
+	if err != nil {
+		return "", errors.Wrap(err, "get image from url")
+	}
+	if mime == "" {
+		mime = "image/jpeg"
+	}
+	return fmt.Sprintf("data:%s;base64,%s", mime, data), nil
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context,

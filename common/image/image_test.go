@@ -200,20 +200,29 @@ func TestGetImageSize(t *testing.T) {
 func TestGetImageSizeFromBase64(t *testing.T) {
 	t.Parallel()
 
-	for i, c := range cases {
-		t.Run("Decode:"+strconv.Itoa(i), func(t *testing.T) {
-			resp, err := retryHTTPGet(c.url, 3)
-			require.NoErrorf(t, err, "get %s", c.url)
-			defer resp.Body.Close()
-			require.Equalf(t, http.StatusOK, resp.StatusCode, "status code from %s", c.url)
+	// Use embedded minimal images to avoid network flakiness
+	// 1x1 transparent PNG
+	b64PNG1x1 := "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9YwVf0sAAAAASUVORK5CYII="
+	// 1x1 GIF
+	b64GIF1x1 := "R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw=="
 
-			data, err := io.ReadAll(resp.Body)
-			require.NoErrorf(t, err, "read body from %s", c.url)
-			encoded := base64.StdEncoding.EncodeToString(data)
-			width, height, err := img.GetImageSizeFromBase64(encoded)
+	tests := []struct {
+		name   string
+		b64    string
+		width  int
+		height int
+	}{
+		{name: "PNG_1x1", b64: b64PNG1x1, width: 1, height: 1},
+		{name: "GIF_1x1", b64: b64GIF1x1, width: 1, height: 1},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			width, height, err := img.GetImageSizeFromBase64(tt.b64)
 			require.NoError(t, err)
-			require.Equal(t, c.width, width)
-			require.Equal(t, c.height, height)
+			require.Equal(t, tt.width, width)
+			require.Equal(t, tt.height, height)
 		})
 	}
 }

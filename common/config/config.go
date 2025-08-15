@@ -15,6 +15,15 @@ import (
 	"github.com/songquanpeng/one-api/common/env"
 )
 
+// MaxInlineImageSizeMB is the maximum allowed image size (in MB) for inlining images as base64
+var MaxInlineImageSizeMB = func() int {
+	v := env.Int("MAX_INLINE_IMAGE_SIZE_MB", 30)
+	if v < 0 {
+		panic("MAX_INLINE_IMAGE_SIZE_MB must not be negative")
+	}
+	return v
+}()
+
 func init() {
 	if SessionSecret == "" {
 		fmt.Println("SESSION_SECRET not set, using random secret")

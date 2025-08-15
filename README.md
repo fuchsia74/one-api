@@ -54,6 +54,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Support OpenAI Response API](#support-openai-response-api)
     - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
     - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
+    - [Support Tracing info in logs](#support-tracing-info-in-logs)
     - [Support Cached Input](#support-cached-input)
   - [Bug fix](#bug-fix)
 
@@ -111,7 +112,9 @@ oneapi:
     CHANNEL_SUSPEND_SECONDS_FOR_429: 60
 
     # (optional) DEFAULT_MAX_TOKEN set the default maximum number of tokens for requests, default is 2048
-    DEFAULT_MAX_TOKEN: 2048
+      DEFAULT_MAX_TOKEN: 2048
+    # (optional) MAX_INLINE_IMAGE_SIZE_MB set the maximum allowed image size (in MB) for inlining images as base64, default is 30
+      MAX_INLINE_IMAGE_SIZE_MB: 30
 
     # (optional) LOG_PUSH_API set the API address for pushing error logs to telegram.
     # More information about log push can be found at: https://github.com/Laisky/laisky-blog-graphql/tree/master/internal/web/telegram
@@ -330,6 +333,10 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 ### Support /v1/messages Claude Messages API
 
 ![](https://s3.laisky.com/uploads/2025/07/claude_messages.png)
+
+### Support Tracing info in logs
+
+![](https://s3.laisky.com/uploads/2025/08/tracing.png)
 
 ### Support Cached Input
 

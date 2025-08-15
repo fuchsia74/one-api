@@ -14,7 +14,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/image"
+	imgutil "github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -200,6 +200,7 @@ func CountTokenMessages(ctx context.Context,
 // }
 
 const (
+	// Defaults for 4o/4.1/4.5 family
 	lowDetailCost         = 85
 	highDetailCostPerTile = 170
 	additionalCost        = 85
@@ -209,31 +210,38 @@ const (
 	gpt4oMiniAdditionalCost = 2833
 )
 
-// https://platform.openai.com/docs/guides/vision/calculating-costs
-// https://github.com/openai/openai-cookbook/blob/05e3f9be4c7a2ae7ecf029a7c32065b024730ebe/examples/How_to_count_tokens_with_tiktoken.ipynb
+// getImageSizeFn is injected for testability
+var getImageSizeFn = imgutil.GetImageSize
+
+// getVisionBaseTile returns base and tile tokens for a model family according to docs
+func getVisionBaseTile(model string) (base int, tile int) {
+	// gpt-4o-mini special case
+	if strings.HasPrefix(model, "gpt-4o-mini") {
+		return gpt4oMiniAdditionalCost, gpt4oMiniHighDetailCost
+	}
+	// gpt-5 family (including gpt-5-chat-latest)
+	if strings.HasPrefix(model, "gpt-5") {
+		return 70, 140
+	}
+	// o-series (o1, o1-pro, o3)
+	if strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3") {
+		return 75, 150
+	}
+	// computer-use-preview
+	if strings.HasPrefix(model, "computer-use-preview") {
+		return 65, 129
+	}
+	// 4o/4.1/4.5 default family
+	if strings.HasPrefix(model, "gpt-4o") || strings.HasPrefix(model, "gpt-4.1") || strings.HasPrefix(model, "gpt-4.5") {
+		return additionalCost, highDetailCostPerTile
+	}
+	// Fallback to 4o/4.1 defaults
+	return additionalCost, highDetailCostPerTile
+}
+
 func countImageTokens(url string, detail string, model string) (_ int, err error) {
 	var fetchSize = true
 	var width, height int
-	// Reference: https://platform.openai.com/docs/guides/vision/low-or-high-fidelity-image-understanding
-	// detail == "auto" is undocumented on how it works, it just said the model will use the auto setting which will look at the image input size and decide if it should use the low or high setting.
-	// According to the official guide, "low" disable the high-res model,
-	// and only receive low-res 512px x 512px version of the image, indicating
-	// that image is treated as low-res when size is smaller than 512px x 512px,
-	// then we can assume that image size larger than 512px x 512px is treated
-	// as high-res. Then we have the following logic:
-	// if detail == "" || detail == "auto" {
-	// 	width, height, err = image.GetImageSize(url)
-	// 	if err != nil {
-	// 		return 0, err
-	// 	}
-	// 	fetchSize = false
-	// 	// not sure if this is correct
-	// 	if width > 512 || height > 512 {
-	// 		detail = "high"
-	// 	} else {
-	// 		detail = "low"
-	// 	}
-	// }
 
 	// However, in my test, it seems to be always the same as "high".
 	// The following image, which is 125x50, is still treated as high-res, taken
@@ -245,23 +253,51 @@ func countImageTokens(url string, detail string, model string) (_ int, err error
 	}
 	switch detail {
 	case "low":
+		// Low detail is a flat base token cost per docs
 		if strings.HasPrefix(model, "gpt-4o-mini") {
 			return gpt4oMiniLowDetailCost, nil
 		}
-		return lowDetailCost, nil
+		base, _ := getVisionBaseTile(model)
+		return base, nil
 	case "high":
 		if fetchSize {
-			width, height, err = image.GetImageSize(url)
+			width, height, err = getImageSizeFn(url)
 			if err != nil {
 				return 0, err
 			}
+		}
+		// Claude-specific: cap long edge at 1568 then approx tokens by area/750
+		// We detect Claude via model prefix to avoid importing meta here
+		if strings.HasPrefix(model, "claude-") || strings.HasPrefix(model, "sonnet") || strings.HasPrefix(model, "haiku") || strings.HasPrefix(model, "opus") {
+			// Cap long edge to 1568 while preserving aspect ratio
+			maxEdge := 1568.0
+			w := float64(width)
+			h := float64(height)
+			if w > h {
+				if w > maxEdge {
+					scale := maxEdge / w
+					w *= scale
+					h *= scale
+				}
+			} else {
+				if h > maxEdge {
+					scale := maxEdge / h
+					w *= scale
+					h *= scale
+				}
+			}
+			tokens := int(math.Round((w * h) / 750.0))
+			if tokens < 0 {
+				tokens = 0
+			}
+			return tokens, nil
 		}
 		if width > 2048 || height > 2048 { // max(width, height) > 2048
 			ratio := float64(2048) / math.Max(float64(width), float64(height))
 			width = int(float64(width) * ratio)
 			height = int(float64(height) * ratio)
 		}
-		if width > 768 && height > 768 { // min(width, height) > 768
+		if width > 768 && height > 768 { // min(width, height) > 768 (scale down to 768 on shortest side)
 			ratio := float64(768) / math.Min(float64(width), float64(height))
 			width = int(float64(width) * ratio)
 			height = int(float64(height) * ratio)
@@ -270,7 +306,8 @@ func countImageTokens(url string, detail string, model string) (_ int, err error
 		if strings.HasPrefix(model, "gpt-4o-mini") {
 			return numSquares*gpt4oMiniHighDetailCost + gpt4oMiniAdditionalCost, nil
 		}
-		result := numSquares*highDetailCostPerTile + additionalCost
+		base, tile := getVisionBaseTile(model)
+		result := numSquares*tile + base
 		return result, nil
 	default:
 		return 0, errors.New("invalid detail option")
