@@ -116,7 +116,7 @@ func SendEmailVerification(c *gin.Context) {
 	}
 	code := common.GenerateVerificationCode(6)
 	common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose)
-	subject := fmt.Sprintf("%s 邮箱验证邮件", config.SystemName)
+	subject := fmt.Sprintf("%s Email Verification", config.SystemName)
 	content := message.EmailTemplate(
 		subject,
 		fmt.Sprintf(`

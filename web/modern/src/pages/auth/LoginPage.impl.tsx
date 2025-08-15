@@ -28,6 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/lib/stores/auth";
 import { api } from "@/lib/api";
+import { buildGitHubOAuthUrl, getOAuthState } from "@/lib/oauth";
 
 const loginSchema = z.object({
   username: z.string().min(1, "Username is required"),
@@ -92,10 +93,19 @@ export function LoginPage() {
     }
   }, [searchParams, location.state]);
 
-  const onGitHubOAuth = () => {
-    if (systemStatus.github_client_id) {
+  const onGitHubOAuth = async () => {
+    if (!systemStatus.github_client_id) return;
+    try {
+      // Request state from backend to prevent CSRF
+      const state = await getOAuthState();
       const redirectUri = `${window.location.origin}/oauth/github`;
-      window.location.href = `https://github.com/login/oauth/authorize?client_id=${systemStatus.github_client_id}&redirect_uri=${redirectUri}&scope=user:email`;
+      const url = buildGitHubOAuthUrl(systemStatus.github_client_id, state, redirectUri);
+      window.location.href = url;
+    } catch (e) {
+      // Fallback: try without state if backend unavailable
+      const redirectUri = `${window.location.origin}/oauth/github`;
+      const url = buildGitHubOAuthUrl(systemStatus.github_client_id, "", redirectUri);
+      window.location.href = url;
     }
   };
 
@@ -213,9 +223,9 @@ export function LoginPage() {
                 name="username"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Username</FormLabel>
+                    <FormLabel htmlFor="login-username">Username</FormLabel>
                     <FormControl>
-                      <Input {...field} disabled={totpRequired} />
+                      <Input id="login-username" {...field} disabled={totpRequired} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -226,9 +236,10 @@ export function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel htmlFor="login-password">Password</FormLabel>
                     <FormControl>
                       <Input
+                        id="login-password"
                         type="password"
                         {...field}
                         disabled={totpRequired}
