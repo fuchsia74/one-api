@@ -455,8 +455,13 @@ const (
 
 ```go
 type ModelConfig struct {
-    Ratio           float64 `json:"ratio"`
-    CompletionRatio float64 `json:"completion_ratio,omitempty"`
+    Ratio             float64 `json:"ratio"`
+    CompletionRatio   float64 `json:"completion_ratio,omitempty"`
+    // Cached reads (cache hit/refresh)
+    CachedInputRatio  float64 `json:"cached_input_ratio,omitempty"`
+    // Cache writes (cache creation)
+    CacheWrite5mRatio float64 `json:"cache_write_5m_ratio,omitempty"`
+    CacheWrite1hRatio float64 `json:"cache_write_1h_ratio,omitempty"`
 }
 ```
 
@@ -597,9 +602,38 @@ Different request types use different calculation methods:
 
 #### Text Requests
 
+Base formula (no caching):
+
 ```
 quota = (prompt_tokens + completion_tokens * completion_ratio) * model_ratio * group_ratio
 ```
+
+Claude prompt caching extends billing with cache-read and cache-write costs. We split prompt tokens into: normal input, cached-read input, and cache-write input (5m and 1h). Completion tokens may also be cached by some providers.
+
+```
+normal_input = prompt_tokens - cached_read - cache_write_5m - cache_write_1h
+
+quota =
+    normal_input        * input_price
++ cached_read         * cached_input_price
++ noncached_completion* output_price
+    # Note: we do not bill cached completion tokens. Providers do not return cached completion metrics and there is no CachedOutputRatio.
++ cache_write_5m      * write5m_price
++ cache_write_1h      * write1h_price
+
+where:
+    input_price           = model_ratio * group_ratio
+    output_price          = model_ratio * completion_ratio * group_ratio
+    cached_input_price    = (CachedInputRatio if >0 else input_price) or 0 if <0
+    # No cached output price; completions are always billed at output_price
+    write5m_price         = (CacheWrite5mRatio if >0 else input_price) or 0 if <0
+    write1h_price         = (CacheWrite1hRatio if >0 else input_price) or 0 if <0
+```
+
+Notes:
+
+- We prevent double-charging by subtracting cache-write tokens from the normal-input bucket; values are clamped to avoid negatives if upstream reports inconsistent totals.
+- For Anthropic Claude, cached-read tokens come from `usage.cache_read_input_tokens`. Cache-write tokens come from `usage.cache_creation.ephemeral_5m_input_tokens` and `usage.cache_creation.ephemeral_1h_input_tokens` (or the legacy `cache_creation_input_tokens`). See `docs/refs/claude_prompt_caching.md`.
 
 #### Audio Requests
 
@@ -660,7 +694,6 @@ CREATE TABLE channels (
 );
 ```
 
-
 #### Logs Table
 
 ```sql
@@ -672,14 +705,15 @@ CREATE TABLE logs (
     prompt_tokens INTEGER,
     completion_tokens INTEGER,
     cached_prompt_tokens INTEGER,         -- Persisted cached prompt tokens (2025-08)
-    cached_completion_tokens INTEGER,     -- Persisted cached completion tokens (2025-08)
     quota INTEGER,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
 
 **Note:**
-- The backend log API returns `cached_prompt_tokens` and `cached_completion_tokens` for each log entry. These are surfaced in the API and shown as tooltips in the Prompt/Completion columns of the logs table in the frontend UI for transparency.
+
+- The backend log API returns `cached_prompt_tokens` for each log entry. The frontend shows cached prompt tokens as a tooltip in the Prompt column.
+- Cache-write token amounts are available at runtime in the usage object (`cache_write_5m_tokens`, `cache_write_1h_tokens`) and are billed accordingly. Persisting them to logs can be added later if needed.
 
 ### Relationships
 
@@ -785,24 +819,24 @@ GET /api/channel/default-pricing?type=:channelType
 **Controller**: `controller.GetChannelDefaultPricing()`
 **File**: `controller/channel.go`
 
-
 **Response Format**:
 
 ```json
 {
-    "success": true,
-    "message": "",
-    "data": {
-        "model_ratio": "{\"model1\": 0.001, \"model2\": 0.002}",
-        "completion_ratio": "{\"model1\": 1.0, \"model2\": 3.0}",
-        "cached_prompt_tokens": 123,           // (in log API responses)
-        "cached_completion_tokens": 456        // (in log API responses)
-    }
+  "success": true,
+  "message": "",
+  "data": {
+    "model_ratio": "{\"model1\": 0.001, \"model2\": 0.002}",
+    "completion_ratio": "{\"model1\": 1.0, \"model2\": 3.0}",
+    "cached_prompt_tokens": 123 // (in log API responses)
+  }
 }
 ```
 
 **Frontend:**
+
 - The logs table displays these cached token fields as tooltips in the Prompt/Completion columns for each log entry.
+
 ## Testing & Race Condition Policy (2025-08)
 
 - All changes must pass `go test -race ./...` before merge. Any test that fails due to argument mismatch, floating-point precision, or race must be fixed immediately.

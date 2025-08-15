@@ -73,10 +73,9 @@ func TestResolveEffectivePricing_BaseNoTiers(t *testing.T) {
 func TestResolveEffectivePricing_TierSelection(t *testing.T) {
 	a := &localMockAdaptor{pricing: map[string]adaptor.ModelConfig{
 		"m": {
-			Ratio:             1.0,
-			CompletionRatio:   2.0,
-			CachedInputRatio:  0.4,
-			CachedOutputRatio: 0.8,
+			Ratio:            1.0,
+			CompletionRatio:  2.0,
+			CachedInputRatio: 0.4,
 			Tiers: []adaptor.ModelRatioTier{
 				{InputTokenThreshold: 1000, Ratio: 0.5, CompletionRatio: 3.0},
 				{InputTokenThreshold: 5000, Ratio: 0.2},
@@ -114,10 +113,9 @@ func abs(f float64) float64 {
 func TestResolveEffectivePricing_CachedNegativeFree(t *testing.T) {
 	a := &localMockAdaptor{pricing: map[string]adaptor.ModelConfig{
 		"m": {
-			Ratio:             1.0,
-			CompletionRatio:   2.0,
-			CachedInputRatio:  -1, // free cached input
-			CachedOutputRatio: -1, // free cached output
+			Ratio:            1.0,
+			CompletionRatio:  2.0,
+			CachedInputRatio: -1, // free cached input
 		},
 	}}
 
@@ -125,7 +123,5 @@ func TestResolveEffectivePricing_CachedNegativeFree(t *testing.T) {
 	if eff.CachedInputRatio >= 0 {
 		t.Fatalf("expected negative cached input (free), got %v", eff.CachedInputRatio)
 	}
-	if eff.CachedOutputRatio >= 0 {
-		t.Fatalf("expected negative cached output (free), got %v", eff.CachedOutputRatio)
-	}
+	// No cached output pricing; nothing to assert here
 }

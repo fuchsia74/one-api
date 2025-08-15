@@ -321,10 +321,12 @@ func GetCompletionRatioWithThreeLayers(modelName string, channelOverrides map[st
 // after applying tiers and cached discounts.
 type EffectivePricing struct {
 	// Per-token prices (per 1 token)
-	InputRatio           float64
-	OutputRatio          float64 // equals InputRatio * CompletionRatio
-	CachedInputRatio     float64 // negative means free
-	CachedOutputRatio    float64 // negative means free
+	InputRatio       float64
+	OutputRatio      float64 // equals InputRatio * CompletionRatio
+	CachedInputRatio float64 // negative means free
+	// Cache-write prices (per 1 token)
+	CacheWrite5mRatio    float64 // zero => use InputRatio; negative => free
+	CacheWrite1hRatio    float64 // zero => use InputRatio; negative => free
 	AppliedTierThreshold int     // 0 for base tier
 }
 
@@ -346,7 +348,8 @@ func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.
 		eff.InputRatio = baseIn
 		eff.OutputRatio = baseIn * baseComp
 		eff.CachedInputRatio = 0
-		eff.CachedOutputRatio = 0
+		eff.CacheWrite5mRatio = 0
+		eff.CacheWrite1hRatio = 0
 		eff.AppliedTierThreshold = 0
 		return eff
 	}
@@ -360,7 +363,8 @@ func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.
 		eff.InputRatio = baseRatio
 		eff.OutputRatio = baseRatio * baseComp
 		eff.CachedInputRatio = base.CachedInputRatio // will be zero, as base not exists
-		eff.CachedOutputRatio = base.CachedOutputRatio
+		eff.CacheWrite5mRatio = base.CacheWrite5mRatio
+		eff.CacheWrite1hRatio = base.CacheWrite1hRatio
 		eff.AppliedTierThreshold = 0
 		return eff
 	}
@@ -369,7 +373,8 @@ func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.
 	in := base.Ratio
 	comp := base.CompletionRatio
 	cachedIn := base.CachedInputRatio
-	cachedOut := base.CachedOutputRatio
+	cw5 := base.CacheWrite5mRatio
+	cw1 := base.CacheWrite1hRatio
 	appliedThreshold := 0
 
 	// Find applicable tier (tiers are sorted ascending by threshold)
@@ -386,8 +391,11 @@ func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.
 				if t.CachedInputRatio != 0 {
 					cachedIn = t.CachedInputRatio
 				}
-				if t.CachedOutputRatio != 0 {
-					cachedOut = t.CachedOutputRatio
+				if t.CacheWrite5mRatio != 0 {
+					cw5 = t.CacheWrite5mRatio
+				}
+				if t.CacheWrite1hRatio != 0 {
+					cw1 = t.CacheWrite1hRatio
 				}
 				appliedThreshold = t.InputTokenThreshold
 			} else {
@@ -402,7 +410,8 @@ func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.
 	}
 	eff.OutputRatio = in * comp
 	eff.CachedInputRatio = cachedIn
-	eff.CachedOutputRatio = cachedOut
+	eff.CacheWrite5mRatio = cw5
+	eff.CacheWrite1hRatio = cw1
 	eff.AppliedTierThreshold = appliedThreshold
 	return eff
 }

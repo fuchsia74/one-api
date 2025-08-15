@@ -1027,6 +1027,15 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		// Optionally, you can add more details from CacheCreation if needed
 	}
 
+	// Map cache-write tokens for precise billing
+	if claudeResponse.Usage.CacheCreation != nil {
+		usage.CacheWrite5mTokens = claudeResponse.Usage.CacheCreation.Ephemeral5mInputTokens
+		usage.CacheWrite1hTokens = claudeResponse.Usage.CacheCreation.Ephemeral1hInputTokens
+	} else if claudeResponse.Usage.CacheCreationInputTokens > 0 {
+		// Backward compatibility: treat all as 5m cache write if duration unspecified
+		usage.CacheWrite5mTokens = claudeResponse.Usage.CacheCreationInputTokens
+	}
+
 	fullTextResponse.Usage = usage
 	jsonResponse, err := json.Marshal(fullTextResponse)
 	if err != nil {

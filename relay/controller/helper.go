@@ -207,19 +207,9 @@ func postConsumeQuota(ctx context.Context,
 			cachedPrompt = promptTokens
 		}
 	}
-	cachedCompletion := 0
-	if usage.CompletionTokensDetails != nil {
-		cachedCompletion = usage.CompletionTokensDetails.CachedTokens
-		if cachedCompletion < 0 {
-			cachedCompletion = 0
-		}
-		if cachedCompletion > completionTokens {
-			cachedCompletion = completionTokens
-		}
-	}
-
 	nonCachedPrompt := promptTokens - cachedPrompt
-	nonCachedCompletion := completionTokens - cachedCompletion
+	// No cached completion billing; all completion tokens are non-cached
+	nonCachedCompletion := completionTokens
 
 	// Base per-token prices (include group ratio)
 	normalInputPrice := usedModelRatio * groupRatio
@@ -232,15 +222,54 @@ func postConsumeQuota(ctx context.Context,
 	} else if eff.CachedInputRatio > 0 {
 		cachedInputPrice = eff.CachedInputRatio * groupRatio
 	}
-	cachedOutputPrice := normalOutputPrice
-	if eff.CachedOutputRatio < 0 {
-		cachedOutputPrice = 0
-	} else if eff.CachedOutputRatio > 0 {
-		cachedOutputPrice = eff.CachedOutputRatio * groupRatio
+	// No separate cached completion price
+
+	// Cache-write tokens (Claude prompt caching)
+	write5m := usage.CacheWrite5mTokens
+	write1h := usage.CacheWrite1hTokens
+	if write5m < 0 {
+		write5m = 0
+	}
+	if write1h < 0 {
+		write1h = 0
+	}
+	// Prevent double-charging: remove write tokens from normal input bucket
+	if write5m+write1h > nonCachedPrompt {
+		// Clamp to avoid negative counts due to inconsistent upstream reporting
+		writeExcess := write5m + write1h - nonCachedPrompt
+		if write1h >= writeExcess {
+			write1h -= writeExcess
+		} else {
+			writeExcess -= write1h
+			write1h = 0
+			if write5m >= writeExcess {
+				write5m -= writeExcess
+			} else {
+				write5m = 0
+			}
+		}
+		nonCachedPrompt = 0
+	} else {
+		nonCachedPrompt -= (write5m + write1h)
+	}
+
+	// Determine write prices (fall back to normal input price if not configured)
+	write5mPrice := normalInputPrice
+	if eff.CacheWrite5mRatio < 0 {
+		write5mPrice = 0
+	} else if eff.CacheWrite5mRatio > 0 {
+		write5mPrice = eff.CacheWrite5mRatio * groupRatio
+	}
+	write1hPrice := normalInputPrice
+	if eff.CacheWrite1hRatio < 0 {
+		write1hPrice = 0
+	} else if eff.CacheWrite1hRatio > 0 {
+		write1hPrice = eff.CacheWrite1hRatio * groupRatio
 	}
 
 	cost := float64(nonCachedPrompt)*normalInputPrice + float64(cachedPrompt)*cachedInputPrice +
-		float64(nonCachedCompletion)*normalOutputPrice + float64(cachedCompletion)*cachedOutputPrice
+		float64(nonCachedCompletion)*normalOutputPrice +
+		float64(write5m)*write5mPrice + float64(write1h)*write1hPrice
 
 	quota = int64(math.Ceil(cost)) + usage.ToolsCost
 	if (usedModelRatio*groupRatio) != 0 && quota <= 0 {
@@ -274,7 +303,7 @@ func postConsumeQuota(ctx context.Context,
 		CompletionRatio:        usedCompletionRatio,
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     cachedPrompt,
-		CachedCompletionTokens: cachedCompletion,
+		CachedCompletionTokens: 0,
 	})
 
 	return quota
@@ -332,19 +361,9 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 			cachedPrompt = promptTokens
 		}
 	}
-	cachedCompletion := 0
-	if usage.CompletionTokensDetails != nil {
-		cachedCompletion = usage.CompletionTokensDetails.CachedTokens
-		if cachedCompletion < 0 {
-			cachedCompletion = 0
-		}
-		if cachedCompletion > completionTokens {
-			cachedCompletion = completionTokens
-		}
-	}
-
 	nonCachedPrompt := promptTokens - cachedPrompt
-	nonCachedCompletion := completionTokens - cachedCompletion
+	// No cached completion billing; all completion tokens are non-cached
+	nonCachedCompletion := completionTokens
 
 	normalInputPrice := usedModelRatio * groupRatio
 	normalOutputPrice := usedModelRatio * usedCompletionRatio * groupRatio
@@ -355,15 +374,50 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	} else if eff.CachedInputRatio > 0 {
 		cachedInputPrice = eff.CachedInputRatio * groupRatio
 	}
-	cachedOutputPrice := normalOutputPrice
-	if eff.CachedOutputRatio < 0 {
-		cachedOutputPrice = 0
-	} else if eff.CachedOutputRatio > 0 {
-		cachedOutputPrice = eff.CachedOutputRatio * groupRatio
+	// No separate cached completion price
+	// Cache-write tokens (Claude prompt caching)
+	write5m := usage.CacheWrite5mTokens
+	write1h := usage.CacheWrite1hTokens
+	if write5m < 0 {
+		write5m = 0
+	}
+	if write1h < 0 {
+		write1h = 0
+	}
+	if write5m+write1h > nonCachedPrompt {
+		writeExcess := write5m + write1h - nonCachedPrompt
+		if write1h >= writeExcess {
+			write1h -= writeExcess
+		} else {
+			writeExcess -= write1h
+			write1h = 0
+			if write5m >= writeExcess {
+				write5m -= writeExcess
+			} else {
+				write5m = 0
+			}
+		}
+		nonCachedPrompt = 0
+	} else {
+		nonCachedPrompt -= (write5m + write1h)
+	}
+
+	write5mPrice := normalInputPrice
+	if eff.CacheWrite5mRatio < 0 {
+		write5mPrice = 0
+	} else if eff.CacheWrite5mRatio > 0 {
+		write5mPrice = eff.CacheWrite5mRatio * groupRatio
+	}
+	write1hPrice := normalInputPrice
+	if eff.CacheWrite1hRatio < 0 {
+		write1hPrice = 0
+	} else if eff.CacheWrite1hRatio > 0 {
+		write1hPrice = eff.CacheWrite1hRatio * groupRatio
 	}
 
 	cost := float64(nonCachedPrompt)*normalInputPrice + float64(cachedPrompt)*cachedInputPrice +
-		float64(nonCachedCompletion)*normalOutputPrice + float64(cachedCompletion)*cachedOutputPrice
+		float64(nonCachedCompletion)*normalOutputPrice +
+		float64(write5m)*write5mPrice + float64(write1h)*write1hPrice
 
 	quota = int64(math.Ceil(cost)) + usage.ToolsCost
 	if (usedModelRatio*groupRatio) != 0 && quota <= 0 {
@@ -381,7 +435,7 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	billing.PostConsumeQuotaDetailedWithTraceID(ctx, traceId, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
 		promptTokens, completionTokens, usedModelRatio, groupRatio, textRequest.Model, meta.TokenName,
 		meta.IsStream, meta.StartTime, systemPromptReset, usedCompletionRatio, usage.ToolsCost,
-		cachedPrompt, cachedCompletion)
+		cachedPrompt, 0) // Set cachedCompletion to 0
 
 	return quota
 }

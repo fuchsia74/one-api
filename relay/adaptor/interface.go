@@ -21,9 +21,12 @@ type ModelConfig struct {
 	// CachedInputRatio specifies price per cached input token.
 	// If non-zero, it overrides Ratio for cached input tokens. Negative means free.
 	CachedInputRatio float64 `json:"cached_input_ratio,omitempty"`
-	// CachedOutputRatio specifies price per cached output token.
-	// If non-zero, it overrides (Ratio*CompletionRatio) for cached output tokens. Negative means free.
-	CachedOutputRatio float64 `json:"cached_output_ratio,omitempty"`
+	// CacheWrite5mRatio specifies price per input token written to a 5-minute cache window.
+	// If zero, falls back to normal input Ratio. Negative means free (not expected in production).
+	CacheWrite5mRatio float64 `json:"cache_write_5m_ratio,omitempty"`
+	// CacheWrite1hRatio specifies price per input token written to a 1-hour cache window.
+	// If zero, falls back to normal input Ratio. Negative means free (not expected in production).
+	CacheWrite1hRatio float64 `json:"cache_write_1h_ratio,omitempty"`
 	// Tiers contains tiered pricing data. If present, the first tier is the base
 	// Ratio/CompletionRatio/Cached* fields in this struct. Elements must be sorted
 	// ascending by InputTokenThreshold and represent the 2nd+ tiers.
@@ -46,8 +49,9 @@ type ModelRatioTier struct {
 	// Discount for cached input (optional)
 	CachedInputRatio float64 `json:"cached_input_ratio,omitempty"`
 
-	// Discount for cached output (optional)
-	CachedOutputRatio float64 `json:"cached_output_ratio,omitempty"`
+	// Cache-write prices for this tier (optional)
+	CacheWrite5mRatio float64 `json:"cache_write_5m_ratio,omitempty"`
+	CacheWrite1hRatio float64 `json:"cache_write_1h_ratio,omitempty"`
 
 	// The minimum input‑token count at which this tier becomes applicable
 	InputTokenThreshold int `json:"input_token_threshold"`

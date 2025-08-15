@@ -17,6 +17,12 @@ type Usage struct {
 	// -------------------------------------
 	// ToolsCost is the cost of using tools, in quota.
 	ToolsCost int64 `json:"tools_cost,omitempty"`
+
+	// Cache write token details (Anthropic Claude prompt caching)
+	// These fields capture how many input tokens were charged as cache creation writes.
+	// They are optional and only set when providers return such details.
+	CacheWrite5mTokens int `json:"cache_write_5m_tokens,omitempty"`
+	CacheWrite1hTokens int `json:"cache_write_1h_tokens,omitempty"`
 }
 
 type Error struct {

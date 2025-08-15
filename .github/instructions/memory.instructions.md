@@ -7,30 +7,28 @@ applyTo: "**/*"
 This document contains essential, abstract, and up-to-date information about the project, collaboratively maintained by all developers. It is regularly updated to reflect key architectural decisions, subtle implementation details, and recent developments. Outdated content is removed to maintain clarity and relevance.
 
 
-## Backend & Testing Developments (2025-08)
 
-- **Log API & Cached Token Details:**
-    - The backend log API now returns `cached_prompt_tokens` and `cached_completion_tokens` for each log entry. These fields are persisted in the database and surfaced in API responses. The frontend displays these values as tooltips in the Prompt/Completion columns of the logs table for transparency.
-    - AutoMigrate ensures new columns are created automatically. No manual DB migration is needed for cached token fields.
-    - All log and billing changes are covered by updated unit tests. Any new log field or billing logic must be reflected in both backend API and frontend UI.
+## Claude Prompt Caching & Billing (2025-08)
 
-- **Test & Race Condition Policy:**
-    - All changes must pass `go test -race ./...` before merge. Any test that fails due to argument mismatch, floating-point precision, or race must be fixed immediately.
-    - For floating-point comparisons in tests, always use a tolerance (epsilon) instead of strict equality to avoid failures due to precision errors.
-    - If a function signature changes (e.g., new arguments to billing functions), update all test calls accordingly. Use zero or default values for new arguments in legacy/compatibility tests.
+- **Claude Prompt Caching Billing Model:**
+    - Claude prompt caching uses a three-bucket billing model:
+        - **Normal input tokens**: Prompt tokens not covered by cache-read or cache-write.
+        - **Cache-read tokens**: Prompt tokens served from cache (billed at `CachedInputRatio`).
+        - **Cache-write tokens**: Prompt tokens written to cache (billed at `CacheWrite5mRatio` or `CacheWrite1hRatio`).
+    - **Cache-write tokens** are subtracted from the normal input bucket to prevent double-charging. If the sum of cache-write tokens exceeds normal input, values are clamped to zero.
+    - **Cached completion (output) tokens are never billed**. All code, API, and UI references to cached completion billing and `CachedOutputRatio` have been removed. The field remains in logs for compatibility but is always zero for Claude.
+    - **Pricing configuration** for Claude and VertexAI Claude models now includes `CachedInputRatio`, `CacheWrite5mRatio`, and `CacheWrite1hRatio` for all models. All new Claude models must include these fields.
+    - **API/DB/Log schema**: Only `cached_prompt_tokens` is surfaced and shown in the UI. `cached_completion_tokens` is deprecated and always zero for Claude.
+    - **Documentation and tests**: All formulas, docs, and tests are updated to match this logic. See `docs/arch/billing.md` for the canonical formula and mapping.
 
-- **Migration/Edge-Case Test Handling:**
-    - Some tests (e.g., migration, timestamp, or error recovery tests) are intentionally designed to fail or log errors to verify error handling. These include tests for invalid JSON, duplicate keys, or constraint violations.
-    - These edge-case tests should not be removed, but failures in these tests do not indicate a problem with business logic. Only address these if the test intent changes or if they block CI/CD pipelines.
+- **Subtle Implementation Details:**
+    - Cache-write tokens are mapped from Anthropic API fields: `Ephemeral5mInputTokens`, `Ephemeral1hInputTokens`, or legacy `CacheCreationInputTokens` (all treated as 5m if duration unspecified).
+    - The billing formula clamps negative values and prevents double-charging by subtracting cache-write tokens from normal input.
+    - All code, tests, and documentation must remain in sync. Any new billing field or logic must be reflected in backend, API, UI, and docs.
+    - All changes must pass `go test -race ./...` before merge. Use floating-point tolerance in tests.
 
-- **Handover Best Practices:**
-    - When handing over, ensure the new assistant is aware of the following:
-        - All log/billing API changes must be reflected in both backend and frontend, with tooltips or UI cues for new fields.
-        - All tests must pass with `go test -race ./...` except for intentional edge-case/migration tests.
-        - If a test fails due to a function signature change, update all test invocations across the codebase.
-        - Use tolerance for floating-point assertions in Go tests.
-        - Do not remove or silence migration/edge-case tests unless their intent is obsolete.
-        - Always keep this file concise, abstract, and up-to-date—remove outdated details as new patterns emerge.
+- **Handover Guidance:**
+    - When handing over, ensure the new assistant is aware of the three-bucket Claude prompt caching billing model, the removal of cached completion billing, and the requirement to keep all pricing, API, and documentation in sync. All new Claude models must include cache-read and cache-write pricing fields. Remove outdated content and keep this file concise and abstract.
 
 
 

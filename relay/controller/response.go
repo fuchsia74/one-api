@@ -327,17 +327,6 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 		}
 	}
 
-	cachedCompletion := 0
-	if usage.CompletionTokensDetails != nil {
-		cachedCompletion = usage.CompletionTokensDetails.CachedTokens
-		if cachedCompletion < 0 {
-			cachedCompletion = 0
-		}
-		if cachedCompletion > completionTokens {
-			cachedCompletion = completionTokens
-		}
-	}
-
 	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
 		Ctx:                    ctx,
 		TokenId:                meta.TokenId,
@@ -357,7 +346,7 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 		CompletionRatio:        completionRatio,
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     cachedPrompt,
-		CachedCompletionTokens: cachedCompletion,
+		CachedCompletionTokens: 0,
 	})
 
 	return quota

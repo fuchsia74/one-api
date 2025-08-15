@@ -19,16 +19,16 @@ import (
 // Based on VertexAI Claude pricing: https://cloud.google.com/vertex-ai/generative-ai/pricing
 var ModelRatios = map[string]adaptor.ModelConfig{
 	// Claude Models on VertexAI
-	"claude-3-haiku@20240307":       {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $0.25/$1.25 per 1M tokens
-	"claude-3-opus@20240229":        {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $15/$75 per 1M tokens
-	"claude-opus-4@20250514":        {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $15/$75 per 1M tokens
-	"claude-opus-4-1@20250805":      {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // $15/$75 per 1M tokens
-	"claude-3-sonnet@20240229":      {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
-	"claude-3-5-sonnet@20240620":    {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
-	"claude-3-5-sonnet-v2@20241022": {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
-	"claude-3-5-haiku@20241022":     {Ratio: 1.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $1/$5 per 1M tokens
-	"claude-3-7-sonnet@20250219":    {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
-	"claude-sonnet-4@20250514":      {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},  // $3/$15 per 1M tokens
+	"claude-3-haiku@20240307":       {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.025 * ratio.MilliTokensUsd, CacheWrite5mRatio: 0.3125 * ratio.MilliTokensUsd, CacheWrite1hRatio: 0.5 * ratio.MilliTokensUsd}, // $0.25/$1.25 per 1M tokens
+	"claude-3-opus@20240229":        {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 1.5 * ratio.MilliTokensUsd, CacheWrite5mRatio: 18.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 30 * ratio.MilliTokensUsd},     // $15/$75 per 1M tokens
+	"claude-opus-4@20250514":        {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 1.5 * ratio.MilliTokensUsd, CacheWrite5mRatio: 18.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 30 * ratio.MilliTokensUsd},     // $15/$75 per 1M tokens
+	"claude-opus-4-1@20250805":      {Ratio: 15.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 1.5 * ratio.MilliTokensUsd, CacheWrite5mRatio: 18.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 30 * ratio.MilliTokensUsd},     // $15/$75 per 1M tokens
+	"claude-3-sonnet@20240229":      {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.3 * ratio.MilliTokensUsd, CacheWrite5mRatio: 3.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 6 * ratio.MilliTokensUsd},        // $3/$15 per 1M tokens
+	"claude-3-5-sonnet@20240620":    {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.3 * ratio.MilliTokensUsd, CacheWrite5mRatio: 3.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 6 * ratio.MilliTokensUsd},        // $3/$15 per 1M tokens
+	"claude-3-5-sonnet-v2@20241022": {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.3 * ratio.MilliTokensUsd, CacheWrite5mRatio: 3.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 6 * ratio.MilliTokensUsd},        // $3/$15 per 1M tokens
+	"claude-3-5-haiku@20241022":     {Ratio: 1.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.1 * ratio.MilliTokensUsd, CacheWrite5mRatio: 1.25 * ratio.MilliTokensUsd, CacheWrite1hRatio: 1.6 * ratio.MilliTokensUsd},      // $1/$5 per 1M tokens
+	"claude-3-7-sonnet@20250219":    {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.3 * ratio.MilliTokensUsd, CacheWrite5mRatio: 3.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 6 * ratio.MilliTokensUsd},        // $3/$15 per 1M tokens
+	"claude-sonnet-4@20250514":      {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0, CachedInputRatio: 0.3 * ratio.MilliTokensUsd, CacheWrite5mRatio: 3.75 * ratio.MilliTokensUsd, CacheWrite1hRatio: 6 * ratio.MilliTokensUsd},        // $3/$15 per 1M tokens
 }
 
 // ModelList derived from ModelRatios for backward compatibility
