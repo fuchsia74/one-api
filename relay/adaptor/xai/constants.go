@@ -19,6 +19,11 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"grok-2-1212":        {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
 	// Image generation model
 	"grok-2-image-1212": {Ratio: (0.07 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1}, // $0.07 per image
+	// Legacy aliases for backward compatibility
+	"grok-beta":        {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-2":           {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-2-latest":    {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-vision-beta": {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
 }
 
 // ModelList derived from ModelRatios for backward compatibility
