@@ -10,14 +10,15 @@ import (
 // Based on X.AI pricing: https://console.x.ai/
 var ModelRatios = map[string]adaptor.ModelConfig{
 	// Grok Models - Based on https://console.x.ai/
-	"grok-2":               {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-2-latest":        {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-2-1212":          {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-vision-beta":     {Ratio: 7.5 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-2-vision-1212":   {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-2-vision":        {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-2-vision-latest": {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
-	"grok-beta":            {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-4-0709":        {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-3":             {Ratio: 3.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-3-mini":        {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-3-fast":        {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-3-mini-fast":   {Ratio: 0.6 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-2-vision-1212": {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	"grok-2-1212":        {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 1},
+	// Image generation model
+	"grok-2-image-1212": {Ratio: (0.07 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1}, // $0.07 per image
 }
 
 // ModelList derived from ModelRatios for backward compatibility
