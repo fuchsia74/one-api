@@ -280,6 +280,7 @@ func TestFallbackPricing(t *testing.T) {
 		{"Gemini", apitype.Gemini},
 		{"Xunfei", apitype.Xunfei},
 		{"VertexAI", apitype.VertexAI},
+		{"xAI", apitype.Grok},
 	}
 
 	unknownModel := "unknown-test-model-12345"
