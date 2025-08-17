@@ -23,6 +23,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/replicate"
 	"github.com/songquanpeng/one-api/relay/adaptor/tencent"
 	"github.com/songquanpeng/one-api/relay/adaptor/vertexai"
+	"github.com/songquanpeng/one-api/relay/adaptor/xai"
 	"github.com/songquanpeng/one-api/relay/adaptor/xunfei"
 	"github.com/songquanpeng/one-api/relay/adaptor/zhipu"
 	"github.com/songquanpeng/one-api/relay/apitype"
@@ -77,6 +78,8 @@ func GetAdaptor(apiType int) adaptor.Adaptor {
 		return &mistral.Adaptor{}
 	case apitype.Moonshot:
 		return &moonshot.Adaptor{}
+	case apitype.Grok:
+		return &xai.Adaptor{}
 	}
 
 	return nil

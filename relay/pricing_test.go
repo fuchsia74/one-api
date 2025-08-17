@@ -3,7 +3,6 @@ package relay
 import (
 	"testing"
 
-	"github.com/songquanpeng/one-api/relay/adaptor/xai"
 	"github.com/songquanpeng/one-api/relay/apitype"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 )
@@ -105,8 +104,10 @@ func TestSpecificAdapterPricing(t *testing.T) {
 
 	// H0llyW00dzZ: I'm writing this test myself now because this codebase is too complex.
 	t.Run("xAI_Pricing", func(t *testing.T) {
-		// Direct instantiation of the xAI adapter
-		adaptor := &xai.Adaptor{}
+		adaptor := GetAdaptor(apitype.Grok)
+		if adaptor == nil {
+			t.Fatal("xAI_Pricing not found")
+		}
 
 		// xAI uses USD pricing with ratio.MilliTokensUsd = 0.5
 		testModels := map[string]struct {
