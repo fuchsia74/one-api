@@ -3,7 +3,9 @@ package relay
 import (
 	"testing"
 
+	"github.com/songquanpeng/one-api/relay/adaptor/xai"
 	"github.com/songquanpeng/one-api/relay/apitype"
+	"github.com/songquanpeng/one-api/relay/billing/ratio"
 )
 
 // TestAdapterPricingImplementations tests that all major adapters have proper pricing implementations
@@ -99,6 +101,69 @@ func TestSpecificAdapterPricing(t *testing.T) {
 				t.Errorf("Ali %s: expected completion ratio %.2f, got %.2f", model, expected.expectedCompletionRatio, completionRatio)
 			}
 		}
+	})
+
+	// H0llyW00dzZ: I'm writing this test myself now because this codebase is too complex.
+	t.Run("xAI_Pricing", func(t *testing.T) {
+		// Direct instantiation of the XAI adapter
+		adaptor := &xai.Adaptor{}
+
+		// XAI uses USD pricing with ratio.MilliTokensUsd = 0.5
+		testModels := map[string]struct {
+			expectedRatio           float64
+			expectedCompletionRatio float64
+			description             string
+		}{
+			// Test standard language models
+			"grok-4-0709":      {3.0 * ratio.MilliTokensUsd, 5.0, "$3.00 input, $15.00 output"},
+			"grok-3":           {3.0 * ratio.MilliTokensUsd, 5.0, "$3.00 input, $15.00 output"},
+			"grok-3-mini":      {0.3 * ratio.MilliTokensUsd, 1.67, "$0.30 input, $0.50 output"},
+			"grok-3-fast":      {5.0 * ratio.MilliTokensUsd, 5.0, "$5.00 input, $25.00 output"},
+			"grok-3-mini-fast": {0.6 * ratio.MilliTokensUsd, 6.67, "$0.60 input, $4.00 output"},
+			"grok-2-1212":      {2.0 * ratio.MilliTokensUsd, 5.0, "$2.00 input, $10.00 output"},
+
+			// Test legacy aliases
+			"grok-beta": {2.0 * ratio.MilliTokensUsd, 5.0, "Legacy alias for grok-2-1212"},
+		}
+
+		for model, expected := range testModels {
+			ratio := adaptor.GetModelRatio(model)
+			completionRatio := adaptor.GetCompletionRatio(model)
+
+			if ratio != expected.expectedRatio {
+				t.Errorf("XAI %s: expected ratio %.6f, got %.6f (%s)",
+					model, expected.expectedRatio, ratio, expected.description)
+			}
+			if completionRatio != expected.expectedCompletionRatio {
+				t.Errorf("XAI %s: expected completion ratio %.2f, got %.2f (%s)",
+					model, expected.expectedCompletionRatio, completionRatio, expected.description)
+			}
+
+			t.Logf("XAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
+				model, ratio, expected.expectedRatio, completionRatio, expected.expectedCompletionRatio,
+				expected.description)
+		}
+
+		// Special test for image model which uses ImageUsdPerPic (1000)
+		imageModel := "grok-2-image-1212"
+		expectedImageRatio := (0.07 / 0.002) * ratio.ImageUsdPerPic // $0.07 per image
+		expectedImageCompletionRatio := 1.0
+
+		imageModelRatio := adaptor.GetModelRatio(imageModel)
+		imageModelCompletionRatio := adaptor.GetCompletionRatio(imageModel)
+
+		if imageModelRatio != expectedImageRatio {
+			t.Errorf("XAI %s: expected ratio %.6f, got %.6f (Image model: $0.07 per image)",
+				imageModel, expectedImageRatio, imageModelRatio)
+		}
+		if imageModelCompletionRatio != expectedImageCompletionRatio {
+			t.Errorf("XAI %s: expected completion ratio %.2f, got %.2f",
+				imageModel, expectedImageCompletionRatio, imageModelCompletionRatio)
+		}
+
+		t.Logf("XAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
+			imageModel, imageModelRatio, expectedImageRatio, imageModelCompletionRatio, expectedImageCompletionRatio,
+			"$0.07 per image using ImageUsdPerPic")
 	})
 
 	t.Run("Gemini_Pricing", func(t *testing.T) {
