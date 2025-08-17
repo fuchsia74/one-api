@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
@@ -41,7 +42,7 @@ func ChatHandler(c *gin.Context, resp *http.Response) (
 	for {
 		err = func() error {
 			// get task
-			taskReq, err := http.NewRequestWithContext(c.Request.Context(),
+			taskReq, err := http.NewRequestWithContext(gmw.Ctx(c),
 				http.MethodGet, respData.URLs.Get, nil)
 			if err != nil {
 				return errors.Wrap(err, "new request")
@@ -116,7 +117,7 @@ const (
 
 func chatStreamHandler(c *gin.Context, streamUrl string) (responseText string, err error) {
 	// request stream endpoint
-	streamReq, err := http.NewRequestWithContext(c.Request.Context(), http.MethodGet, streamUrl, nil)
+	streamReq, err := http.NewRequestWithContext(gmw.Ctx(c), http.MethodGet, streamUrl, nil)
 	if err != nil {
 		return "", errors.Wrap(err, "new request to stream")
 	}

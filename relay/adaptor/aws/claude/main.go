@@ -93,7 +93,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	}
 
 	// Use the enhanced cross-region profile conversion with fallback testing
-	awsModelID = utils.ConvertModelID2CrossRegionProfileWithFallback(c.Request.Context(), awsModelID, awsCli.Options().Region, awsCli)
+	awsModelID = utils.ConvertModelID2CrossRegionProfileWithFallback(gmw.Ctx(c), awsModelID, awsCli.Options().Region, awsCli)
 	awsReq := &bedrockruntime.InvokeModelInput{
 		ModelId:     aws.String(awsModelID),
 		Accept:      aws.String("application/json"),
@@ -126,7 +126,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 
 	// Track metrics for the operation
 	startTime := time.Now()
-	awsResp, err := awsCli.InvokeModel(c.Request.Context(), awsReq)
+	awsResp, err := awsCli.InvokeModel(gmw.Ctx(c), awsReq)
 
 	// Update region health metrics
 	latency := time.Since(startTime)
@@ -166,7 +166,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	}
 
 	// Use the enhanced cross-region profile conversion with fallback testing
-	awsModelID = utils.ConvertModelID2CrossRegionProfileWithFallback(c.Request.Context(), awsModelID, awsCli.Options().Region, awsCli)
+	awsModelID = utils.ConvertModelID2CrossRegionProfileWithFallback(gmw.Ctx(c), awsModelID, awsCli.Options().Region, awsCli)
 	awsReq := &bedrockruntime.InvokeModelWithResponseStreamInput{
 		ModelId:     aws.String(awsModelID),
 		Accept:      aws.String("application/json"),
@@ -200,7 +200,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	// Track metrics for the operation
 	startTime := time.Now()
-	awsResp, err := awsCli.InvokeModelWithResponseStream(c.Request.Context(), awsReq)
+	awsResp, err := awsCli.InvokeModelWithResponseStream(gmw.Ctx(c), awsReq)
 	latency := time.Since(startTime)
 
 	// Update region health metrics

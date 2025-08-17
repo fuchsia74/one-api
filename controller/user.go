@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	gcrypto "github.com/Laisky/go-utils/v5/crypto"
 	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
@@ -29,7 +30,6 @@ type LoginRequest struct {
 	Password string `json:"password"`
 	TotpCode string `json:"totp_code,omitempty"`
 }
-
 type TotpSetupRequest struct {
 	TotpCode string `json:"totp_code"`
 }
@@ -40,13 +40,6 @@ type TotpSetupResponse struct {
 }
 
 func Login(c *gin.Context) {
-	if !config.PasswordLoginEnabled {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "The administrator has turned off password login",
-			"success": false,
-		})
-		return
-	}
 	var loginRequest LoginRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&loginRequest)
 	if err != nil {
@@ -182,7 +175,7 @@ func Logout(c *gin.Context) {
 }
 
 func Register(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	if !config.RegisterEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "The administrator has turned off new user registration",
@@ -261,6 +254,7 @@ func GetAllUsers(c *gin.Context) {
 	}
 
 	// Get page size from query parameter, default to config value
+
 	size, _ := strconv.Atoi(c.Query("size"))
 	if size <= 0 {
 		size = config.DefaultItemsPerPage
@@ -325,6 +319,7 @@ func SearchUsers(c *gin.Context) {
 		"message": "",
 		"data":    users,
 	})
+
 	return
 }
 
@@ -374,6 +369,7 @@ func GetUserDashboard(c *gin.Context) {
 
 	if fromDateStr != "" && toDateStr != "" {
 		// Parse custom date range
+
 		fromDate, err := time.Parse("2006-01-02", fromDateStr)
 		if err != nil {
 			c.JSON(http.StatusOK, gin.H{
@@ -677,7 +673,7 @@ func GetSelf(c *gin.Context) {
 }
 
 func UpdateUser(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	var updatedUser model.User
 	err := json.NewDecoder(c.Request.Body).Decode(&updatedUser)
 	if err != nil || updatedUser.Id == 0 {
@@ -851,7 +847,7 @@ func DeleteSelf(c *gin.Context) {
 }
 
 func CreateUser(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	var user model.User
 	err := json.NewDecoder(c.Request.Body).Decode(&user)
 	if err != nil || user.Username == "" || user.Password == "" {
@@ -1064,7 +1060,7 @@ type topUpRequest struct {
 }
 
 func TopUp(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	req := topUpRequest{}
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
@@ -1098,7 +1094,7 @@ type adminTopUpRequest struct {
 }
 
 func AdminTopUp(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	req := adminTopUpRequest{}
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
@@ -1381,7 +1377,7 @@ func GetTotpStatus(c *gin.Context) {
 
 // AdminDisableUserTotp allows admins to disable TOTP for any user
 func AdminDisableUserTotp(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	targetUserId := c.Param("id")
 	if targetUserId == "" {
 		c.JSON(http.StatusOK, gin.H{

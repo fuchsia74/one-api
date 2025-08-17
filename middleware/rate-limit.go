@@ -15,7 +15,6 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 )
 
 var timeFormat = "2006-01-02T15:04:05.000Z"
@@ -179,13 +178,14 @@ func CheckTotpRateLimit(c *gin.Context, userId int) bool {
 
 // checkRedisRateLimit checks rate limit using Redis
 func checkRedisRateLimit(c *gin.Context, key string, maxRequestNum int, duration int64) bool {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	rdb := common.RDB
+	lg := gmw.GetLogger(c)
 
 	listLength, err := rdb.LLen(ctx, key).Result()
 	if err != nil {
 		// If Redis fails, allow the request but log the error
-		logger.Logger.Warn("Redis rate limit check failed, allowing request", zap.String("key", key), zap.Error(err))
+		lg.Warn("Redis rate limit check failed, allowing request", zap.String("key", key), zap.Error(err))
 		return true
 	}
 
@@ -196,13 +196,13 @@ func checkRedisRateLimit(c *gin.Context, key string, maxRequestNum int, duration
 	} else {
 		oldTimeStr, err := rdb.LIndex(ctx, key, -1).Result()
 		if err != nil {
-			logger.Logger.Warn("Redis rate limit get old time failed, allowing request", zap.String("key", key), zap.Error(err))
+			lg.Warn("Redis rate limit get old time failed, allowing request", zap.String("key", key), zap.Error(err))
 			return true
 		}
 
 		oldTime, err := time.Parse(timeFormat, oldTimeStr)
 		if err != nil {
-			logger.Logger.Warn("Redis rate limit parse old time failed, allowing request", zap.String("key", key), zap.String("time_str", oldTimeStr), zap.Error(err))
+			lg.Warn("Redis rate limit parse old time failed, allowing request", zap.String("key", key), zap.String("time_str", oldTimeStr), zap.Error(err))
 			return true
 		}
 

@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -57,13 +58,13 @@ func countAudioTokens(c *gin.Context) (float64, error) {
 
 	ctxMeta := meta.GetByContext(c)
 
-	return helper.GetAudioTokens(c.Request.Context(),
+	return helper.GetAudioTokens(gmw.Ctx(c),
 		reqFp,
 		ratio.GetAudioPromptTokensPerSecond(ctxMeta.ActualModelName))
 }
 
 func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatusCode {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	meta := meta.GetByContext(c)
 	audioModel := "whisper-1"
 
@@ -165,7 +166,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 						logger.Logger.Error("error rollback pre-consumed quota", zap.Error(err))
 					}
 				}()
-			}(c.Request.Context())
+			}(gmw.Ctx(c))
 		}
 	}()
 
@@ -293,7 +294,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	quotaDelta := quota - preConsumedQuota
 	defer func(ctx context.Context) {
 		go billing.PostConsumeQuota(ctx, tokenId, quotaDelta, quota, userId, channelId, modelRatio, groupRatio, audioModel, tokenName)
-	}(c.Request.Context())
+	}(gmw.Ctx(c))
 
 	for k, v := range resp.Header {
 		c.Writer.Header().Set(k, v[0])

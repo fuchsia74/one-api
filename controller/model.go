@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -185,7 +186,7 @@ func GetModelsDisplay(c *gin.Context) {
 	}
 
 	// Get available models with their channel information for this user group
-	availableAbilities, err := model.CacheGetGroupModelsV2(c.Request.Context(), userGroup)
+	availableAbilities, err := model.CacheGetGroupModelsV2(gmw.Ctx(c), userGroup)
 	if err != nil {
 		c.JSON(http.StatusOK, ModelsDisplayResponse{
 			Success: false,
@@ -321,7 +322,7 @@ func ListModels(c *gin.Context) {
 	}
 
 	// Get available models with their channel names
-	availableAbilities, err := model.CacheGetGroupModelsV2(c.Request.Context(), userGroup)
+	availableAbilities, err := model.CacheGetGroupModelsV2(gmw.Ctx(c), userGroup)
 	if err != nil {
 		middleware.AbortWithError(c, http.StatusBadRequest, err)
 		return
@@ -406,7 +407,7 @@ func RetrieveModel(c *gin.Context) {
 }
 
 func GetUserAvailableModels(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	id := c.GetInt(ctxkey.Id)
 	userGroup, err := model.CacheGetUserGroup(id)
 	if err != nil {

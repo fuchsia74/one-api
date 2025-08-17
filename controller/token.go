@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/copier"
 
@@ -239,7 +240,7 @@ type consumeTokenRequest struct {
 // ConsumeToken consume token from another source,
 // let one-api to gather billing from different sources.
 func ConsumeToken(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	userID := c.GetInt(ctxkey.Id)
 	tokenID := c.GetInt(ctxkey.TokenId)
 

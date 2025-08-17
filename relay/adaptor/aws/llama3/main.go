@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common/random"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
@@ -94,7 +95,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
 	}
 
-	awsResp, err := awsCli.InvokeModel(c.Request.Context(), awsReq)
+	awsResp, err := awsCli.InvokeModel(gmw.Ctx(c), awsReq)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
 	}
@@ -164,7 +165,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
 	}
 
-	awsResp, err := awsCli.InvokeModelWithResponseStream(c.Request.Context(), awsReq)
+	awsResp, err := awsCli.InvokeModelWithResponseStream(gmw.Ctx(c), awsReq)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "InvokeModelWithResponseStream")), nil
 	}

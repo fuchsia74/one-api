@@ -10,6 +10,8 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
+
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -117,11 +119,12 @@ func getPreConsumedQuota(textRequest *relaymodel.GeneralOpenAIRequest, promptTok
 }
 
 func preConsumeQuota(c *gin.Context, textRequest *relaymodel.GeneralOpenAIRequest, promptTokens int, ratio float64, meta *meta.Meta) (int64, *relaymodel.ErrorWithStatusCode) {
+	lg := gmw.GetLogger(c)
 	preConsumedQuota := getPreConsumedQuota(textRequest, promptTokens, ratio)
 
 	tokenQuota := c.GetInt64(ctxkey.TokenQuota)
 	tokenQuotaUnlimited := c.GetBool(ctxkey.TokenQuotaUnlimited)
-	userQuota, err := model.CacheGetUserQuota(c.Request.Context(), meta.UserId)
+	userQuota, err := model.CacheGetUserQuota(gmw.Ctx(c), meta.UserId)
 	if err != nil {
 		return preConsumedQuota, openai.ErrorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
 	}
@@ -137,7 +140,7 @@ func preConsumeQuota(c *gin.Context, textRequest *relaymodel.GeneralOpenAIReques
 		// in this case, we do not pre-consume quota
 		// because the user and token have enough quota
 		preConsumedQuota = 0
-		logger.Logger.Info("user has enough quota, trusted and no need to pre-consume", zap.Int("user_id", meta.UserId), zap.Int64("user_quota", userQuota))
+		lg.Info("user has enough quota, trusted and no need to pre-consume", zap.Int("user_id", meta.UserId), zap.Int64("user_quota", userQuota))
 	}
 	if preConsumedQuota > 0 {
 		err := model.PreConsumeTokenQuota(meta.TokenId, preConsumedQuota)

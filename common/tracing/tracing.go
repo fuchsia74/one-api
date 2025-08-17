@@ -15,7 +15,7 @@ import (
 func GetTraceID(c *gin.Context) string {
 	traceID, err := gmw.TraceID(c)
 	if err != nil {
-		logger.Logger.Warn("failed to get trace ID from gin-middlewares", zap.Error(err))
+		gmw.GetLogger(c).Warn("failed to get trace ID from gin-middlewares", zap.Error(err))
 		// Fallback to empty string - this should not happen in normal operation
 		return ""
 	}
@@ -35,8 +35,9 @@ func GetTraceIDFromContext(ctx context.Context) string {
 // RecordTraceStart creates a new trace record when a request starts
 func RecordTraceStart(c *gin.Context) {
 	traceID := GetTraceID(c)
+	lg := gmw.GetLogger(c).With(zap.String("trace_id", traceID))
 	if traceID == "" {
-		logger.Logger.Warn("empty trace ID, skipping trace record creation")
+		lg.Warn("empty trace ID, skipping trace record creation")
 		return
 	}
 
@@ -47,31 +48,34 @@ func RecordTraceStart(c *gin.Context) {
 		bodySize = 0
 	}
 
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
+	// propagate tagged logger downstream
+	ctx = gmw.SetLogger(ctx, lg)
 	_, err := model.CreateTrace(ctx, traceID, url, method, bodySize)
 	if err != nil {
-		logger.Logger.Error("failed to create trace record",
-			zap.Error(err),
-			zap.String("trace_id", traceID))
+		lg.Error("failed to create trace record",
+			zap.Error(err))
 	}
 }
 
 // RecordTraceTimestamp updates a specific timestamp in the trace record
 func RecordTraceTimestamp(c *gin.Context, timestampKey string) {
 	traceID := GetTraceID(c)
+	lg := gmw.GetLogger(c).With(
+		zap.String("trace_id", traceID),
+		zap.String("timestamp_key", timestampKey),
+	)
 	if traceID == "" {
-		logger.Logger.Warn("empty trace ID, skipping timestamp update",
-			zap.String("timestamp_key", timestampKey))
+		lg.Warn("empty trace ID, skipping timestamp update")
 		return
 	}
 
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
+	// propagate tagged logger downstream
+	ctx = gmw.SetLogger(ctx, lg)
 	err := model.UpdateTraceTimestamp(ctx, traceID, timestampKey)
 	if err != nil {
-		logger.Logger.Error("failed to update trace timestamp",
-			zap.Error(err),
-			zap.String("trace_id", traceID),
-			zap.String("timestamp_key", timestampKey))
+		lg.Error("failed to update trace timestamp", zap.Error(err))
 	}
 }
 
@@ -96,27 +100,30 @@ func RecordTraceTimestampFromContext(ctx context.Context, timestampKey string) {
 // RecordTraceStatus updates the HTTP status code for a trace
 func RecordTraceStatus(c *gin.Context, status int) {
 	traceID := GetTraceID(c)
+	lg := gmw.GetLogger(c).With(
+		zap.String("trace_id", traceID),
+		zap.Int("status", status),
+	)
 	if traceID == "" {
-		logger.Logger.Warn("empty trace ID, skipping status update",
-			zap.Int("status", status))
+		lg.Warn("empty trace ID, skipping status update")
 		return
 	}
 
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
+	// propagate tagged logger downstream
+	ctx = gmw.SetLogger(ctx, lg)
 	err := model.UpdateTraceStatus(ctx, traceID, status)
 	if err != nil {
-		logger.Logger.Error("failed to update trace status",
-			zap.Error(err),
-			zap.String("trace_id", traceID),
-			zap.Int("status", status))
+		lg.Error("failed to update trace status", zap.Error(err))
 	}
 }
 
 // RecordTraceEnd marks the completion of a request and records final timestamp
 func RecordTraceEnd(c *gin.Context) {
 	traceID := GetTraceID(c)
+	lg := gmw.GetLogger(c).With(zap.String("trace_id", traceID))
 	if traceID == "" {
-		logger.Logger.Warn("empty trace ID, skipping trace end recording")
+		lg.Warn("empty trace ID, skipping trace end recording")
 		return
 	}
 
@@ -128,6 +135,10 @@ func RecordTraceEnd(c *gin.Context) {
 	if status == 0 {
 		status = 200 // Default to 200 if no status was set
 	}
+	// attach logger to context for downstream status update
+	ctx := gmw.Ctx(c)
+	ctx = gmw.SetLogger(ctx, lg)
+	_ = ctx // keep for symmetry; RecordTraceStatus will fetch its own context
 	RecordTraceStatus(c, status)
 }
 

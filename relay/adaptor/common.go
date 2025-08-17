@@ -13,7 +13,6 @@ import (
 
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -57,13 +56,18 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 		return nil, errors.Wrap(err, "setup request header failed")
 	}
 
-	// Log upstream request for billing tracking
-	logger.Logger.Info("sending request to upstream channel",
+	// Prepare tagged logger and propagate to context
+	lg := gmw.GetLogger(c).With(
 		zap.String("url", fullRequestURL),
 		zap.Int("channelId", meta.ChannelId),
 		zap.Int("userId", meta.UserId),
 		zap.String("model", meta.ActualModelName),
-		zap.String("channelName", a.GetChannelName()))
+		zap.String("channelName", a.GetChannelName()),
+	)
+	ctx := gmw.Ctx(c)
+	ctx = gmw.SetLogger(ctx, lg)
+	// Log upstream request for billing tracking
+	lg.Info("sending request to upstream channel")
 
 	// Optionally: Record when request is forwarded to upstream (non-standard event)
 	tracing.RecordTraceTimestamp(c, model.TimestampRequestForwarded)
@@ -74,10 +78,19 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 		// This prevents duplicate logging when ErrorWrapper also logs the error
 		return nil, errors.Wrapf(err, "upstream request failed for channel %s (id: %d)", a.GetChannelName(), meta.ChannelId)
 	}
+	// Add debug log for non-200 statuses to help diagnose model mapping issues
+	if resp != nil && resp.StatusCode >= 400 {
+		lg.Debug("upstream returned error status",
+			zap.Int("status", resp.StatusCode),
+			zap.String("model", meta.ActualModelName),
+			zap.String("url", fullRequestURL),
+		)
+	}
 	return resp, nil
 }
 
 func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
+	// keep logger from context if available
 	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err

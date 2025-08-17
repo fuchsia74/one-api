@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -53,7 +54,7 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 }
 
 func Relay(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	relayMode := relaymode.GetByPath(c.Request.URL.Path)
 	channelId := c.GetInt(ctxkey.ChannelId)
 	userId := c.GetInt(ctxkey.Id)

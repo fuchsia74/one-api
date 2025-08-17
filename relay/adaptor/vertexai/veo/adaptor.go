@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -26,8 +27,8 @@ import (
 // Based on VertexAI Veo pricing: https://cloud.google.com/vertex-ai/generative-ai/pricing
 var ModelRatios = map[string]adaptor.ModelConfig{
 	// Veo Video Generation Models
-	"veo-2.0-generate-001":     {Ratio: (0.1 / 0.1) * ratio.VideoUsdPerVideo, CompletionRatio: 1},  // $0.1 per video
-	"veo-3.0-generate-preview": {Ratio: (0.15 / 0.1) * ratio.VideoUsdPerVideo, CompletionRatio: 1}, // $0.15 per video
+	"veo-2.0-generate-001":     {Ratio: 1.0 * ratio.VideoUsdPerVideo, CompletionRatio: 1}, // $0.1 per video (scaled by unit)
+	"veo-3.0-generate-preview": {Ratio: 1.5 * ratio.VideoUsdPerVideo, CompletionRatio: 1}, // $0.15 per video (scaled by unit)
 }
 
 // ModelList derived from ModelRatios for backward compatibility
@@ -166,7 +167,7 @@ func pollVideoTask(
 		var pollAttemptErr *model.ErrorWithStatusCode
 
 		func() { // Anonymous function to scope defer
-			req, err := http.NewRequestWithContext(c.Request.Context(),
+			req, err := http.NewRequestWithContext(gmw.Ctx(c),
 				http.MethodPost, pollUrl, bytes.NewBuffer(pollBodyBytes))
 			if err != nil {
 				pollAttemptErr = openai.ErrorWrapper(errors.Wrap(err, "create_poll_request_failed"), "create_poll_request_failed", http.StatusInternalServerError)
@@ -210,8 +211,8 @@ func pollVideoTask(
 		select {
 		case <-time.After(pollInterval):
 			// Continue to next iteration
-		case <-c.Request.Context().Done():
-			return openai.ErrorWrapper(c.Request.Context().Err(), "request_context_done_while_waiting_for_poll", http.StatusRequestTimeout)
+		case <-gmw.Ctx(c).Done():
+			return openai.ErrorWrapper(gmw.Ctx(c).Err(), "request_context_done_while_waiting_for_poll", http.StatusRequestTimeout)
 		}
 	}
 }

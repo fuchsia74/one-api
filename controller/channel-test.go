@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -237,7 +238,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 }
 
 func TestChannel(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	id, err := strconv.Atoi(c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -344,7 +345,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 }
 
 func TestChannels(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	scope := c.Query("scope")
 	if scope == "" {
 		scope = "all"

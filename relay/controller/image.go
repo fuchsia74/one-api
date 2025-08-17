@@ -14,10 +14,11 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
+
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -187,7 +188,8 @@ func getImageCostRatio(imageRequest *relaymodel.ImageRequest) (float64, error) {
 }
 
 func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatusCode {
-	ctx := c.Request.Context()
+	lg := gmw.GetLogger(c)
+	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
 	imageRequest, err := getImageRequest(c, meta.Mode)
 	if err != nil {
@@ -319,11 +321,11 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 		err := model.PostConsumeTokenQuota(meta.TokenId, usedQuota)
 		if err != nil {
-			logger.Logger.Error("error consuming token remain quota", zap.Error(err))
+			lg.Error("error consuming token remain quota", zap.Error(err))
 		}
 		err = model.CacheUpdateUserQuota(ctx, meta.UserId)
 		if err != nil {
-			logger.Logger.Error("error update user quota cache", zap.Error(err))
+			lg.Error("error update user quota cache", zap.Error(err))
 		}
 		if usedQuota >= 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
@@ -351,10 +353,10 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 				usedQuota,
 			)
 			if err = docu.Insert(); err != nil {
-				logger.Logger.Error("insert user request cost failed", zap.Error(err))
+				lg.Error("insert user request cost failed", zap.Error(err))
 			}
 		}
-	}(c.Request.Context())
+	}(gmw.Ctx(c))
 
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)

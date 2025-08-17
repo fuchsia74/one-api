@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
@@ -83,7 +84,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 }
 
 func OidcAuth(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	session := sessions.Default(c)
 	state := c.Query("state")
 	if state == "" || session.Get("oauth_state") == nil || state != session.Get("oauth_state").(string) {

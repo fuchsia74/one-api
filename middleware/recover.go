@@ -5,11 +5,11 @@ import (
 	"net/http"
 	"runtime/debug"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/logger"
 )
 
 func RelayPanicRecover() gin.HandlerFunc {
@@ -17,7 +17,7 @@ func RelayPanicRecover() gin.HandlerFunc {
 		defer func() {
 			if err := recover(); err != nil {
 				body, _ := common.GetRequestBody(c)
-				logger.Logger.Error("panic detected",
+				gmw.GetLogger(c).Error("panic detected",
 					zap.Any("panic", err),
 					zap.String("stacktrace", string(debug.Stack())),
 					zap.String("method", c.Request.Method),

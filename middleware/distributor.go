@@ -6,12 +6,12 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	gutils "github.com/Laisky/go-utils/v5"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
@@ -23,6 +23,7 @@ type ModelRequest struct {
 
 func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
+		lg := gmw.GetLogger(c)
 		userId := c.GetInt(ctxkey.Id)
 		userGroup, _ := model.CacheGetUserGroup(userId)
 		c.Set(ctxkey.Group, userGroup)
@@ -47,12 +48,12 @@ func Distribute() func(c *gin.Context) {
 			channel, err = model.CacheGetRandomSatisfiedChannel(userGroup, requestModel, false)
 			if err != nil {
 				// If no highest priority channels available, try lower priority channels as fallback
-				logger.Logger.Info(fmt.Sprintf("No highest priority channels available for model %s in group %s, trying lower priority channels", requestModel, userGroup))
+				lg.Info(fmt.Sprintf("No highest priority channels available for model %s in group %s, trying lower priority channels", requestModel, userGroup))
 				channel, err = model.CacheGetRandomSatisfiedChannel(userGroup, requestModel, true)
 				if err != nil {
 					message := fmt.Sprintf("No available channels for Model %s under Group %s", requestModel, userGroup)
 					if channel != nil {
-						logger.Logger.Error("Channel does not exist", zap.Int("channel_id", channel.Id))
+						lg.Error("Channel does not exist", zap.Int("channel_id", channel.Id))
 						message = "Database consistency has been broken, please contact the administrator"
 					}
 					AbortWithError(c, http.StatusServiceUnavailable, errors.New(message))
@@ -60,13 +61,14 @@ func Distribute() func(c *gin.Context) {
 				}
 			}
 		}
-		logger.Logger.Debug(fmt.Sprintf("user id %d, user group: %s, request model: %s, using channel #%d", userId, userGroup, requestModel, channel.Id))
+		lg.Debug(fmt.Sprintf("user id %d, user group: %s, request model: %s, using channel #%d", userId, userGroup, requestModel, channel.Id))
 		SetupContextForSelectedChannel(c, channel, requestModel)
 		c.Next()
 	}
 }
 
 func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, modelName string) {
+	lg := gmw.GetLogger(c)
 	// one channel could relates to multiple groups,
 	// and each groud has individual ratio,
 	// set minimal group ratio as channel_ratio
@@ -77,7 +79,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 			minimalRatio = v
 		}
 	}
-	logger.Logger.Info(fmt.Sprintf("set channel %s ratio to %f", channel.Name, minimalRatio))
+	lg.Info(fmt.Sprintf("set channel %s ratio to %f", channel.Name, minimalRatio))
 	c.Set(ctxkey.ChannelRatio, minimalRatio)
 	c.Set(ctxkey.ChannelModel, channel)
 

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -54,7 +55,7 @@ func getWeChatIdByCode(code string) (string, error) {
 }
 
 func WeChatAuth(c *gin.Context) {
-	ctx := c.Request.Context()
+	ctx := gmw.Ctx(c)
 	if !config.WeChatAuthEnabled {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "The administrator has not enabled login and registration via WeChat",

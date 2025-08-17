@@ -666,7 +666,7 @@ Check out all the options for text generation in the API reference.
 
 ](/docs/api-reference/responses)
 
-## Images and visio
+## Images and vision
 
 Learn how to understand or generate images.
 

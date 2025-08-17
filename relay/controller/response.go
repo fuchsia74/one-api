@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -29,7 +30,8 @@ import (
 
 // RelayResponseAPIHelper handles Response API requests with direct pass-through
 func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
-	ctx := c.Request.Context()
+	lg := gmw.GetLogger(c)
+	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
 
 	// get & validate Response API request
@@ -40,13 +42,19 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
 
 	if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
-		logger.Logger.Debug("get response api request", zap.ByteString("body", reqBody.([]byte)))
+		lg.Debug("get response api request", zap.ByteString("body", reqBody.([]byte)))
 	}
 
 	// Check if channel supports Response API
 	if meta.ChannelType != 1 { // Only OpenAI channels support Response API for now
 		return openai.ErrorWrapper(errors.New("Response API is only supported for OpenAI channels"), "unsupported_channel", http.StatusBadRequest)
 	}
+
+	// Map model name for pass-through: record origin and apply mapped model
+	meta.OriginModelName = responseAPIRequest.Model
+	responseAPIRequest.Model = metalib.GetMappedModelName(meta.OriginModelName, meta.ModelMapping)
+	meta.ActualModelName = responseAPIRequest.Model
+	metalib.Set2Context(c, meta)
 
 	// get channel model ratio
 	channelModelRatio, channelCompletionRatio := getChannelRatios(c, meta.ChannelId)
@@ -59,7 +67,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	ratio := modelRatio * groupRatio
 
 	// pre-consume quota based on estimated input tokens
-	promptTokens := getResponseAPIPromptTokens(c.Request.Context(), responseAPIRequest)
+	promptTokens := getResponseAPIPromptTokens(gmw.Ctx(c), responseAPIRequest)
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeResponseAPIQuota(c, responseAPIRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
@@ -73,7 +81,8 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 	adaptor.Init(meta)
 
-	// get request body - for Response API, we pass through directly without conversion
+	// get request body - for Response API, we pass through directly without conversion,
+	// but ensure mapped model is used in the outgoing JSON
 	requestBody, err := getResponseAPIRequestBody(c, meta, responseAPIRequest, adaptor)
 	if err != nil {
 		return openai.ErrorWrapper(err, "convert_request_failed", http.StatusInternalServerError)
@@ -81,6 +90,16 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 	// for debug
 	requestBodyBytes, _ := io.ReadAll(requestBody)
+	// Attempt to log outgoing model for diagnostics without printing the entire payload
+	var outgoing struct {
+		Model string `json:"model"`
+	}
+	_ = json.Unmarshal(requestBodyBytes, &outgoing)
+	lg.Debug("prepared Response API upstream request",
+		zap.String("origin_model", meta.OriginModelName),
+		zap.String("mapped_model", meta.ActualModelName),
+		zap.String("outgoing_model", outgoing.Model),
+	)
 	requestBody = bytes.NewBuffer(requestBodyBytes)
 
 	// do request
@@ -131,7 +150,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 					quota,
 				)
 				if err = docu.Insert(); err != nil {
-					logger.Logger.Error("insert user request cost failed", zap.Error(err))
+					lg.Error("insert user request cost failed", zap.Error(err))
 				}
 			}
 			done <- true
@@ -145,7 +164,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 				estimatedQuota := float64(usage.PromptTokens+usage.CompletionTokens) * ratio
 				elapsedTime := time.Since(meta.StartTime)
 
-				logger.Logger.Error("CRITICAL BILLING TIMEOUT",
+				lg.Error("CRITICAL BILLING TIMEOUT",
 					zap.String("model", responseAPIRequest.Model),
 					zap.String("requestId", requestId),
 					zap.Int("userId", meta.UserId),
@@ -265,7 +284,7 @@ func preConsumeResponseAPIQuota(c *gin.Context, responseAPIRequest *openai.Respo
 
 	tokenQuota := c.GetInt64(ctxkey.TokenQuota)
 	tokenQuotaUnlimited := c.GetBool(ctxkey.TokenQuotaUnlimited)
-	userQuota, err := model.CacheGetUserQuota(c.Request.Context(), meta.UserId)
+	userQuota, err := model.CacheGetUserQuota(gmw.Ctx(c), meta.UserId)
 	if err != nil {
 		return baseQuota, openai.ErrorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
 	}
@@ -298,6 +317,7 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 	channelCompletionRatio map[string]float64) (quota int64) {
 
 	if usage == nil {
+		// No gin context here; cannot use request-scoped logger
 		logger.Logger.Error("usage is nil, which is unexpected")
 		return
 	}

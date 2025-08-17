@@ -992,7 +992,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	logger.Debug(fmt.Sprintf("response <- %s\n", string(responseBody)))
+	logger.Debug("got upstream response", zap.ByteString("body", responseBody))
 
 	var claudeResponse Response
 	err = json.Unmarshal(responseBody, &claudeResponse)

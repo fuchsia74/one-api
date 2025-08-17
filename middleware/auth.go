@@ -25,12 +25,12 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/blacklist"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/network"
 	"github.com/songquanpeng/one-api/model"
 )
@@ -50,7 +50,7 @@ func authHelper(c *gin.Context, minRole int) {
 
 	// First, try to authenticate using session data (cookies)
 	if username == nil {
-		logger.Logger.Info("no user session found, try to use access token")
+		gmw.GetLogger(c).Info("no user session found, try to use access token")
 		// If no session exists, try to authenticate using the Authorization header
 		accessToken := c.Request.Header.Get("Authorization")
 		if accessToken == "" {
@@ -137,7 +137,7 @@ func RootAuth() func(c *gin.Context) {
 // Use this for API endpoints that will be accessed programmatically with API tokens.
 func TokenAuth() func(c *gin.Context) {
 	return func(c *gin.Context) {
-		ctx := c.Request.Context()
+		ctx := gmw.Ctx(c)
 		// Parse the token key from the request (could include channel specification)
 		// Parse the token key from the request (could include channel specification)
 		parts := GetTokenKeyParts(c)

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -31,7 +32,8 @@ import (
 )
 
 func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
-	ctx := c.Request.Context()
+	lg := gmw.GetLogger(c)
+	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
 
 	// BUG: should not override meta.BaseURL and meta.ChannelId outside of metalib.GetByContext
@@ -47,7 +49,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.IsStream = textRequest.Stream
 
 	if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
-		logger.Logger.Debug("get text request", zap.ByteString("body", reqBody.([]byte)))
+		lg.Debug("get text request", zap.ByteString("body", reqBody.([]byte)))
 	}
 
 	// map model name
@@ -76,11 +78,11 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 	ratio := modelRatio * groupRatio
 	// pre-consume quota
-	promptTokens := getPromptTokens(c.Request.Context(), textRequest, meta.Mode)
+	promptTokens := getPromptTokens(gmw.Ctx(c), textRequest, meta.Mode)
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeQuota(c, textRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		logger.Logger.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
 		return bizErr
 	}
 
@@ -190,7 +192,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 					quota,
 				)
 				if err = docu.Insert(); err != nil {
-					logger.Logger.Error("insert user request cost failed", zap.Error(err))
+					lg.Error("insert user request cost failed", zap.Error(err))
 				}
 			}
 			done <- true
@@ -204,7 +206,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 				estimatedQuota := float64(usage.PromptTokens+usage.CompletionTokens) * ratio
 				elapsedTime := time.Since(meta.StartTime)
 
-				logger.Logger.Error("CRITICAL BILLING TIMEOUT",
+				lg.Error("CRITICAL BILLING TIMEOUT",
 					zap.String("model", textRequest.Model),
 					zap.String("requestId", requestId),
 					zap.Int("userId", meta.UserId),
