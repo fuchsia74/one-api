@@ -25,6 +25,7 @@ func TestAdapterPricingImplementations(t *testing.T) {
 		{"Gemini", apitype.Gemini, "gemini-pro", false},
 		{"Xunfei", apitype.Xunfei, "Spark-Lite", false},
 		{"VertexAI", apitype.VertexAI, "gemini-pro", false},
+		{"xAI", apitype.Grok, "grok-beta", false}, // Use legacy name just for testing
 		// Adapters that still use DefaultPricingMethods (expected to have empty pricing)
 		{"Ollama", apitype.Ollama, "llama2", true},
 		{"Cohere", apitype.Cohere, "command", false},
