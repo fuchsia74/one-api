@@ -3,6 +3,7 @@ package relay
 import (
 	"testing"
 
+	"github.com/songquanpeng/one-api/relay/adaptor/xai"
 	"github.com/songquanpeng/one-api/relay/apitype"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 )
@@ -116,15 +117,15 @@ func TestSpecificAdapterPricing(t *testing.T) {
 			description             string
 		}{
 			// Test standard language models
-			"grok-4-0709":      {3.0 * ratio.MilliTokensUsd, 5.0, "$3.00 input, $15.00 output"},
-			"grok-3":           {3.0 * ratio.MilliTokensUsd, 5.0, "$3.00 input, $15.00 output"},
-			"grok-3-mini":      {0.3 * ratio.MilliTokensUsd, 1.67, "$0.30 input, $0.50 output"},
-			"grok-3-fast":      {5.0 * ratio.MilliTokensUsd, 5.0, "$5.00 input, $25.00 output"},
-			"grok-3-mini-fast": {0.6 * ratio.MilliTokensUsd, 6.67, "$0.60 input, $4.00 output"},
-			"grok-2-1212":      {2.0 * ratio.MilliTokensUsd, 5.0, "$2.00 input, $10.00 output"},
+			"grok-4-0709":      {xai.Grok4InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$3.00 input, $15.00 output"},
+			"grok-3":           {xai.Grok3InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$3.00 input, $15.00 output"},
+			"grok-3-mini":      {xai.Grok3MiniInputPrice * ratio.MilliTokensUsd, xai.Grok3MiniCompletionRatio, "$0.30 input, $0.50 output"},
+			"grok-3-fast":      {xai.Grok3FastInputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$5.00 input, $25.00 output"},
+			"grok-3-mini-fast": {xai.Grok3MiniFastPrice * ratio.MilliTokensUsd, xai.Grok3MiniFastCompletionRatio, "$0.60 input, $4.00 output"},
+			"grok-2-1212":      {xai.Grok2InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$2.00 input, $10.00 output"},
 
 			// Test legacy aliases
-			"grok-beta": {2.0 * ratio.MilliTokensUsd, 5.0, "Legacy alias for grok-2-1212"},
+			"grok-beta": {xai.Grok2InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "Legacy alias for grok-2-1212"},
 		}
 
 		for model, expected := range testModels {
@@ -147,8 +148,8 @@ func TestSpecificAdapterPricing(t *testing.T) {
 
 		// Special test for image model which uses ImageUsdPerPic (1000)
 		imageModel := "grok-2-image-1212"
-		expectedImageRatio := (0.07 / 0.002) * ratio.ImageUsdPerPic // $0.07 per image
-		expectedImageCompletionRatio := 1.0
+		expectedImageRatio := xai.ImagePrice * ratio.ImageUsdPerPic // $0.07 per image
+		expectedImageCompletionRatio := xai.ImageCompletionRatio
 
 		imageModelRatio := adaptor.GetModelRatio(imageModel)
 		imageModelCompletionRatio := adaptor.GetCompletionRatio(imageModel)
