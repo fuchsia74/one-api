@@ -233,6 +233,7 @@ func TestPricingConsistency(t *testing.T) {
 		{"Gemini", apitype.Gemini},
 		{"Xunfei", apitype.Xunfei},
 		{"VertexAI", apitype.VertexAI},
+		{"xAI", apitype.Grok},
 	}
 
 	for _, adapter := range adapters {
