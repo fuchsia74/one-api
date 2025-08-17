@@ -105,10 +105,10 @@ func TestSpecificAdapterPricing(t *testing.T) {
 
 	// H0llyW00dzZ: I'm writing this test myself now because this codebase is too complex.
 	t.Run("xAI_Pricing", func(t *testing.T) {
-		// Direct instantiation of the XAI adapter
+		// Direct instantiation of the xAI adapter
 		adaptor := &xai.Adaptor{}
 
-		// XAI uses USD pricing with ratio.MilliTokensUsd = 0.5
+		// xAI uses USD pricing with ratio.MilliTokensUsd = 0.5
 		testModels := map[string]struct {
 			expectedRatio           float64
 			expectedCompletionRatio float64
@@ -131,15 +131,15 @@ func TestSpecificAdapterPricing(t *testing.T) {
 			completionRatio := adaptor.GetCompletionRatio(model)
 
 			if ratio != expected.expectedRatio {
-				t.Errorf("XAI %s: expected ratio %.6f, got %.6f (%s)",
+				t.Errorf("xAI %s: expected ratio %.6f, got %.6f (%s)",
 					model, expected.expectedRatio, ratio, expected.description)
 			}
 			if completionRatio != expected.expectedCompletionRatio {
-				t.Errorf("XAI %s: expected completion ratio %.2f, got %.2f (%s)",
+				t.Errorf("xAI %s: expected completion ratio %.2f, got %.2f (%s)",
 					model, expected.expectedCompletionRatio, completionRatio, expected.description)
 			}
 
-			t.Logf("XAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
+			t.Logf("xAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
 				model, ratio, expected.expectedRatio, completionRatio, expected.expectedCompletionRatio,
 				expected.description)
 		}
@@ -153,15 +153,15 @@ func TestSpecificAdapterPricing(t *testing.T) {
 		imageModelCompletionRatio := adaptor.GetCompletionRatio(imageModel)
 
 		if imageModelRatio != expectedImageRatio {
-			t.Errorf("XAI %s: expected ratio %.6f, got %.6f (Image model: $0.07 per image)",
+			t.Errorf("xAI %s: expected ratio %.6f, got %.6f (Image model: $0.07 per image)",
 				imageModel, expectedImageRatio, imageModelRatio)
 		}
 		if imageModelCompletionRatio != expectedImageCompletionRatio {
-			t.Errorf("XAI %s: expected completion ratio %.2f, got %.2f",
+			t.Errorf("xAI %s: expected completion ratio %.2f, got %.2f",
 				imageModel, expectedImageCompletionRatio, imageModelCompletionRatio)
 		}
 
-		t.Logf("XAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
+		t.Logf("xAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
 			imageModel, imageModelRatio, expectedImageRatio, imageModelCompletionRatio, expectedImageCompletionRatio,
 			"$0.07 per image using ImageUsdPerPic")
 	})
