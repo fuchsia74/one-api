@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Button } from '@/components/ui/button'
@@ -266,7 +266,9 @@ export function EditChannelPage() {
     resolver: zodResolver(channelSchema),
     defaultValues: {
       name: '',
-      type: 1,
+  // For create, do not preselect a type so dependent fields stay locked until user chooses
+  // Keep a sane default for edit; values will be reset after loading
+  type: isEdit ? 1 : (undefined as unknown as number),
       key: '',
       base_url: '',
       other: '',
@@ -294,6 +296,7 @@ export function EditChannelPage() {
   const watchType = form.watch('type')
   const watchConfig = form.watch('config')
   const selectedChannelType = CHANNEL_TYPES.find(t => t.value === watchType)
+  const hasSelectedType = !!watchType && CHANNEL_TYPES.some(t => t.value === Number(watchType))
 
   // Debug logging for watchType changes
   useEffect(() => {
@@ -576,17 +579,7 @@ export function EditChannelPage() {
     if (watchType) {
       loadChannelModels(watchType)
       loadDefaultPricing(watchType)
-
-      // Auto-populate models if none are selected
-      const currentModels = form.getValues('models')
-      if (currentModels.length === 0) {
-        // Load and set channel-specific models
-        loadChannelModels(watchType).then(() => {
-          if (channelModels.length > 0) {
-            form.setValue('models', channelModels)
-          }
-        })
-      }
+      // Do NOT auto-populate models on type change; only explicit user actions should modify models
     }
   }, [watchType])
 
@@ -945,13 +938,16 @@ export function EditChannelPage() {
         return (
           <div className="space-y-4 p-4 border rounded-lg bg-blue-50/50">
             <h4 className="font-medium text-blue-900">Coze Configuration</h4>
-            <FormField
-              control={form.control}
+            <Controller
               name="config.auth_type"
+              control={form.control}
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Authentication Type</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select
+                    value={field.value ?? ''}
+                    onValueChange={(v) => field.onChange(v)}
+                  >
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Select authentication type" />
@@ -1075,13 +1071,13 @@ export function EditChannelPage() {
 
       case 18: // iFlytek Spark
         return (
-          <FormField
-            control={form.control}
+          <Controller
             name="other"
+            control={form.control}
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Spark Version</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select value={field.value ?? ''} onValueChange={(v) => field.onChange(v)}>
                   <FormControl>
                     <SelectTrigger>
                       <SelectValue placeholder="Select Spark version" />
@@ -1262,51 +1258,29 @@ export function EditChannelPage() {
                   )}
                 />
 
-                <FormField
-                  control={form.control}
+                <Controller
                   name="type"
+                  control={form.control}
                   render={({ field }) => {
-                    const currentValue = field.value
-                    // Use loadedChannelType as fallback if field value is not set correctly
-                    const effectiveValue = (isEdit && loadedChannelType && (!currentValue || currentValue === 1)) ? loadedChannelType : currentValue
-                    const stringValue = effectiveValue !== undefined && effectiveValue !== null ? String(effectiveValue) : ''
-
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render - field.value:', currentValue, typeof currentValue)
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render - loadedChannelType:', loadedChannelType)
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render - effectiveValue:', effectiveValue)
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render - stringValue:', stringValue)
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render - isEdit:', isEdit)
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render - watchType:', watchType)
-
-                    // Find the channel type text for display
-                    const selectedChannelTypeForDisplay = CHANNEL_TYPES.find(t => t.value === effectiveValue)
-                    console.log('[CHANNEL_TYPE_DEBUG] Selected channel type for display:', selectedChannelTypeForDisplay)
-
+                    const stringValue = field.value ? String(field.value) : ''
+                    console.log('[CHANNEL_TYPE_DEBUG] Select render (Controller) - value:', field.value, 'string:', stringValue, 'isEdit:', isEdit)
                     return (
                       <FormItem>
                         <FormLabel>Channel Type *</FormLabel>
                         <Select
-                          key={`channel-type-${effectiveValue ?? 'unset'}-${isEdit ? 'edit' : 'create'}-${formInitialized}`}
+                          value={stringValue}
                           onValueChange={(v) => {
                             console.log('[CHANNEL_TYPE_DEBUG] Select onValueChange called with:', v, typeof v)
                             const numValue = parseInt(v)
-                            console.log('[CHANNEL_TYPE_DEBUG] Select onValueChange parsed to:', numValue)
                             field.onChange(numValue)
-                            // Also update loadedChannelType if this is a user change
                             if (isEdit) {
                               setLoadedChannelType(numValue)
                             }
                           }}
-                          value={stringValue}
-                          defaultValue={stringValue}
                         >
                           <FormControl>
                             <SelectTrigger>
-                              <SelectValue
-                                placeholder="Select channel type"
-                              >
-                                {selectedChannelTypeForDisplay ? selectedChannelTypeForDisplay.text : 'Select channel type'}
-                              </SelectValue>
+                              <SelectValue placeholder="Select channel type" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent className="max-h-96 overflow-y-auto">
@@ -1364,104 +1338,110 @@ export function EditChannelPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="models"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Supported Models *</FormLabel>
-                    <div className="flex gap-2 mb-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={fillRelatedModels}
-                        disabled={channelModels.length === 0}
-                        size="sm"
-                      >
-                        Fill Related Models ({channelModels.length})
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={fillAllModels}
-                        size="sm"
-                      >
-                        Fill All Models ({allModels.length})
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={clearModels}
-                        size="sm"
-                      >
-                        Clear All
-                      </Button>
-                    </div>
-                    <div className="mb-2">
-                      <Input
-                        placeholder="Search models..."
-                        value={modelSearchTerm}
-                        onChange={(e) => setModelSearchTerm(e.target.value)}
-                      />
-                    </div>
-                    <div className="max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
-                      {filteredModels.map((model) => (
-                        <div key={model.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={model.id}
-                            checked={selectedModels.includes(model.id)}
-                            onCheckedChange={() => toggleModel(model.id)}
-                          />
-                          <Label
-                            htmlFor={model.id}
-                            className="flex-1 cursor-pointer text-sm"
-                            onClick={() => navigator.clipboard.writeText(model.id)}
-                            title="Click to copy model name"
-                          >
-                            {model.name}
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-2">
-                      <div className="flex gap-2 mb-2">
-                        <Input
-                          placeholder="Add custom model..."
-                          value={customModel}
-                          onChange={(e) => setCustomModel(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault()
-                              addCustomModel()
-                            }
-                          }}
-                        />
+              {(!isEdit && !hasSelectedType) ? (
+                <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
+                  Select a channel type to configure Supported Models.
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="models"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Supported Models *</FormLabel>
+                      <div className="flex gap-2 mb-3">
                         <Button
                           type="button"
-                          onClick={addCustomModel}
-                          disabled={!customModel.trim()}
+                          variant="outline"
+                          onClick={fillRelatedModels}
+                          disabled={channelModels.length === 0}
                           size="sm"
                         >
-                          Add
+                          Fill Related Models ({channelModels.length})
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={fillAllModels}
+                          size="sm"
+                        >
+                          Fill All Models ({allModels.length})
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={clearModels}
+                          size="sm"
+                        >
+                          Clear All
                         </Button>
                       </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      {selectedModels.map((model) => (
-                        <Badge
-                          key={model}
-                          variant="secondary"
-                          className="cursor-pointer"
-                          onClick={() => removeModel(model)}
-                        >
-                          {model} ×
-                        </Badge>
-                      ))}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <div className="mb-2">
+                        <Input
+                          placeholder="Search models..."
+                          value={modelSearchTerm}
+                          onChange={(e) => setModelSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      <div className="max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
+                        {filteredModels.map((model) => (
+                          <div key={model.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={model.id}
+                              checked={selectedModels.includes(model.id)}
+                              onCheckedChange={() => toggleModel(model.id)}
+                            />
+                            <Label
+                              htmlFor={model.id}
+                              className="flex-1 cursor-pointer text-sm"
+                              onClick={() => navigator.clipboard.writeText(model.id)}
+                              title="Click to copy model name"
+                            >
+                              {model.name}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-2">
+                        <div className="flex gap-2 mb-2">
+                          <Input
+                            placeholder="Add custom model..."
+                            value={customModel}
+                            onChange={(e) => setCustomModel(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                addCustomModel()
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            onClick={addCustomModel}
+                            disabled={!customModel.trim()}
+                            size="sm"
+                          >
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {selectedModels.map((model) => (
+                          <Badge
+                            key={model}
+                            variant="secondary"
+                            className="cursor-pointer"
+                            onClick={() => removeModel(model)}
+                          >
+                            {model} ×
+                          </Badge>
+                        ))}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               <FormField
                 control={form.control}
@@ -1604,66 +1584,72 @@ export function EditChannelPage() {
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="model_configs"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center gap-2">
-                      <FormLabel>Model Configs (JSON)</FormLabel>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={formatModelConfigs}
-                        disabled={!field.value || field.value.trim() === ''}
-                      >
-                        Format JSON
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={loadDefaultModelConfigs}
-                        disabled={!defaultPricing}
-                      >
-                        Load Defaults
-                      </Button>
-                    </div>
-                    {defaultPricing && (
-                      <div className="bg-muted/50 p-4 rounded-lg mb-2">
-                        <h4 className="text-sm font-medium mb-2">
-                          Default Pricing for {selectedChannelType?.text}
-                        </h4>
-                        <pre className="text-xs bg-background p-2 rounded border overflow-auto max-h-40">
-                          {defaultPricing}
-                        </pre>
+              {(!isEdit && !hasSelectedType) ? (
+                <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
+                  Select a channel type to configure Model Configs.
+                </div>
+              ) : (
+                <FormField
+                  control={form.control}
+                  name="model_configs"
+                  render={({ field }) => (
+                    <FormItem>
+                      <div className="flex items-center gap-2">
+                        <FormLabel>Model Configs (JSON)</FormLabel>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={formatModelConfigs}
+                          disabled={!field.value || field.value.trim() === ''}
+                        >
+                          Format JSON
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={loadDefaultModelConfigs}
+                          disabled={!defaultPricing}
+                        >
+                          Load Defaults
+                        </Button>
                       </div>
-                    )}
-                    <FormControl>
-                      <Textarea
-                        placeholder={`Model configurations in JSON format:\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
-                        className="font-mono text-sm min-h-[120px]"
-                        {...field}
-                      />
-                    </FormControl>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">
-                        Configure pricing and limits per model (optional)
-                      </span>
-                      {field.value && field.value.trim() !== '' && (
-                        <span className={`font-bold text-xs ${isValidJSON(field.value) && validateModelConfigs(field.value).valid
-                          ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                          {isValidJSON(field.value) && validateModelConfigs(field.value).valid
-                            ? '✓ Valid Config' : '✗ Invalid Config'}
-                        </span>
+                      {defaultPricing && (
+                        <div className="bg-muted/50 p-4 rounded-lg mb-2">
+                          <h4 className="text-sm font-medium mb-2">
+                            Default Pricing for {selectedChannelType?.text}
+                          </h4>
+                          <pre className="text-xs bg-background p-2 rounded border overflow-auto max-h-40">
+                            {defaultPricing}
+                          </pre>
+                        </div>
                       )}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                      <FormControl>
+                        <Textarea
+                          placeholder={`Model configurations in JSON format:\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
+                          className="font-mono text-sm min-h-[120px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-muted-foreground">
+                          Configure pricing and limits per model (optional)
+                        </span>
+                        {field.value && field.value.trim() !== '' && (
+                          <span className={`font-bold text-xs ${isValidJSON(field.value) && validateModelConfigs(field.value).valid
+                            ? 'text-green-600' : 'text-red-600'
+                            }`}>
+                            {isValidJSON(field.value) && validateModelConfigs(field.value).valid
+                              ? '✓ Valid Config' : '✗ Invalid Config'}
+                          </span>
+                        )}
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {/* Channel-specific configuration sections */}
               {renderChannelSpecificFields()}

@@ -3,7 +3,9 @@ package relay
 import (
 	"testing"
 
+	"github.com/songquanpeng/one-api/relay/adaptor/xai"
 	"github.com/songquanpeng/one-api/relay/apitype"
+	"github.com/songquanpeng/one-api/relay/billing/ratio"
 )
 
 // TestAdapterPricingImplementations tests that all major adapters have proper pricing implementations
@@ -23,6 +25,7 @@ func TestAdapterPricingImplementations(t *testing.T) {
 		{"Gemini", apitype.Gemini, "gemini-pro", false},
 		{"Xunfei", apitype.Xunfei, "Spark-Lite", false},
 		{"VertexAI", apitype.VertexAI, "gemini-pro", false},
+		{"xAI", apitype.XAI, "grok-beta", false}, // Prefer primary constant; model alias still tested
 		// Adapters that still use DefaultPricingMethods (expected to have empty pricing)
 		{"Ollama", apitype.Ollama, "llama2", true},
 		{"Cohere", apitype.Cohere, "command", false},
@@ -101,6 +104,71 @@ func TestSpecificAdapterPricing(t *testing.T) {
 		}
 	})
 
+	// H0llyW00dzZ: I'm writing this test myself now because this codebase is too complex.
+	t.Run("xAI_Pricing", func(t *testing.T) {
+		adaptor := GetAdaptor(apitype.XAI)
+		if adaptor == nil {
+			t.Fatal("xAI_Pricing not found")
+		}
+
+		// xAI uses USD pricing with ratio.MilliTokensUsd = 0.5
+		testModels := map[string]struct {
+			expectedRatio           float64
+			expectedCompletionRatio float64
+			description             string
+		}{
+			// Test standard language models
+			"grok-4-0709":      {xai.Grok4InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$3.00 input, $15.00 output"},
+			"grok-3":           {xai.Grok3InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$3.00 input, $15.00 output"},
+			"grok-3-mini":      {xai.Grok3MiniInputPrice * ratio.MilliTokensUsd, xai.Grok3MiniCompletionRatio, "$0.30 input, $0.50 output"},
+			"grok-3-fast":      {xai.Grok3FastInputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$5.00 input, $25.00 output"},
+			"grok-3-mini-fast": {xai.Grok3MiniFastPrice * ratio.MilliTokensUsd, xai.Grok3MiniFastCompletionRatio, "$0.60 input, $4.00 output"},
+			"grok-2-1212":      {xai.Grok2InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$2.00 input, $10.00 output"},
+
+			// Test legacy aliases
+			"grok-beta": {xai.Grok2InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "Legacy alias for grok-2-1212"},
+		}
+
+		for model, expected := range testModels {
+			ratio := adaptor.GetModelRatio(model)
+			completionRatio := adaptor.GetCompletionRatio(model)
+
+			if ratio != expected.expectedRatio {
+				t.Errorf("xAI %s: expected ratio %.6f, got %.6f (%s)",
+					model, expected.expectedRatio, ratio, expected.description)
+			}
+			if completionRatio != expected.expectedCompletionRatio {
+				t.Errorf("xAI %s: expected completion ratio %.2f, got %.2f (%s)",
+					model, expected.expectedCompletionRatio, completionRatio, expected.description)
+			}
+
+			t.Logf("xAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
+				model, ratio, expected.expectedRatio, completionRatio, expected.expectedCompletionRatio,
+				expected.description)
+		}
+
+		// Special test for image model which uses ImageUsdPerPic (1000)
+		imageModel := "grok-2-image-1212"
+		expectedImageRatio := xai.ImagePrice * ratio.ImageUsdPerPic // $0.07 per image
+		expectedImageCompletionRatio := xai.ImageCompletionRatio
+
+		imageModelRatio := adaptor.GetModelRatio(imageModel)
+		imageModelCompletionRatio := adaptor.GetCompletionRatio(imageModel)
+
+		if imageModelRatio != expectedImageRatio {
+			t.Errorf("xAI %s: expected ratio %.6f, got %.6f (Image model: $0.07 per image)",
+				imageModel, expectedImageRatio, imageModelRatio)
+		}
+		if imageModelCompletionRatio != expectedImageCompletionRatio {
+			t.Errorf("xAI %s: expected completion ratio %.2f, got %.2f",
+				imageModel, expectedImageCompletionRatio, imageModelCompletionRatio)
+		}
+
+		t.Logf("xAI %s: ratio=%.6f (expected %.6f), completion_ratio=%.2f (expected %.2f) - %s",
+			imageModel, imageModelRatio, expectedImageRatio, imageModelCompletionRatio, expectedImageCompletionRatio,
+			"$0.07 per image using ImageUsdPerPic")
+	})
+
 	t.Run("Gemini_Pricing", func(t *testing.T) {
 		adaptor := GetAdaptor(apitype.Gemini)
 		if adaptor == nil {
@@ -167,6 +235,7 @@ func TestPricingConsistency(t *testing.T) {
 		{"Gemini", apitype.Gemini},
 		{"Xunfei", apitype.Xunfei},
 		{"VertexAI", apitype.VertexAI},
+		{"xAI", apitype.XAI},
 	}
 
 	for _, adapter := range adapters {
@@ -213,6 +282,7 @@ func TestFallbackPricing(t *testing.T) {
 		{"Gemini", apitype.Gemini},
 		{"Xunfei", apitype.Xunfei},
 		{"VertexAI", apitype.VertexAI},
+		{"xAI", apitype.XAI},
 	}
 
 	unknownModel := "unknown-test-model-12345"

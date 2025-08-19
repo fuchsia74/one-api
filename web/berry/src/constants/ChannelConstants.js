@@ -1,3 +1,6 @@
+/**
+ * Channel options defined at relay/channeltype/define.go
+ */
 export const CHANNEL_OPTIONS = {
   1: {
     key: 1,

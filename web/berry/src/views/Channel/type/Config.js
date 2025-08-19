@@ -1,3 +1,6 @@
+/**
+ * Channel options defined at relay/channeltype/define.go
+ */
 const defaultConfig = {
   input: {
     name: '',
