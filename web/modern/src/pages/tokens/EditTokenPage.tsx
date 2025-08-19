@@ -64,19 +64,28 @@ export function EditTokenPage() {
 
       if (success && data) {
         // Convert timestamp to datetime-local format
-        if (data.expired_time !== -1) {
-          const date = new Date(data.expired_time * 1000)
+        const rawExpired = Number(data.expired_time)
+        if (rawExpired && rawExpired > 0) {
+          const date = new Date(rawExpired * 1000)
           data.expired_time = date.toISOString().slice(0, 16)
         } else {
+          // Treat 0, -1, null, undefined as never
           data.expired_time = ''
         }
 
         // Convert models string to array
-        if (data.models === '') {
-          data.models = []
+        const modelsRaw = data.models
+        if (Array.isArray(modelsRaw)) {
+          data.models = modelsRaw
+        } else if (typeof modelsRaw === 'string') {
+          data.models = modelsRaw === '' ? [] : modelsRaw.split(',').filter(Boolean)
         } else {
-          data.models = data.models.split(',')
+          data.models = []
         }
+
+        // Normalize potentially nullish fields
+        if (data.name == null) data.name = ''
+        if (data.subnet == null) data.subnet = ''
 
         form.reset(data)
       } else {
