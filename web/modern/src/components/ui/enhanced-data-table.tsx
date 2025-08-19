@@ -306,10 +306,10 @@ export function EnhancedDataTable<TData, TValue>({
             )}
           </div>
         ) : (
-          /* Desktop Table Layout */
-          <div className="rounded-md border overflow-hidden">
-            <div className="overflow-x-auto">
-              <Table className={cn(loading && 'pointer-events-none opacity-60')}>
+          /* Desktop/Tablet Table Layout with horizontal scroll support */
+          <div className="rounded-md border overflow-x-auto">
+            <div className="overflow-x-auto w-full">
+              <Table className={cn('min-w-max', loading && 'pointer-events-none opacity-60')}>
                 <TableHeader>
                   {table.getHeaderGroups().map((headerGroup) => (
                     <TableRow key={headerGroup.id}>

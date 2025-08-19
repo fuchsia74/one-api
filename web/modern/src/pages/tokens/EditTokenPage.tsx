@@ -11,6 +11,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
+import { logEditPageLayout } from '@/dev/layout-debug'
 
 const tokenSchema = z.object({
   name: z.string().min(1, 'Token name is required'),
@@ -222,6 +223,10 @@ export function EditTokenPage() {
   }
 
   return (
+    // Trigger layout diagnostics after render
+    // eslint-disable-next-line react/jsx-no-useless-fragment
+    <>
+      {(() => { logEditPageLayout('EditTokenPage'); return null })()}
     <div className="container mx-auto px-4 py-8">
       <Card>
         <CardHeader>
@@ -254,9 +259,9 @@ export function EditTokenPage() {
                   value={modelSearchTerm}
                   onChange={(e) => setModelSearchTerm(e.target.value)}
                 />
-                <div className="max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
+                <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
                   {filteredModels.map((model) => (
-                    <div key={model.value} className="flex items-center space-x-2">
+                    <div key={model.value} className="relative flex items-center space-x-2">
                       <Checkbox
                         id={model.value}
                         checked={selectedModels.includes(model.value)}
@@ -415,7 +420,8 @@ export function EditTokenPage() {
           </Form>
         </CardContent>
       </Card>
-    </div>
+  </div>
+  </>
   )
 }
 

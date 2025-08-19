@@ -63,12 +63,21 @@
 }
 
 @layer base {
+	html, body, #root {
+		/* Ensure the app uses dynamic viewport height on mobile to prevent extra blank space */
+		min-height: 100dvh;
+		/* Fallback for older browsers */
+		min-height: 100vh;
+		height: auto;
+		margin: 0;
+	}
 	* {
 		@apply border-border;
 	}
 
 	body {
 		@apply bg-background text-foreground;
+		/* Do not force overflow-x hidden globally; allow tables and toolbars to scroll when needed */
 	}
 }
 
@@ -123,4 +132,11 @@
 	.json-invalid {
 		@apply border-red-300 bg-red-50;
 	}
+
+		/* Prevent absolutely-positioned descendants (e.g., injected inputs) from stretching document height */
+		.bounded-abs *[style*="position: absolute"],
+		.bounded-abs input[type="checkbox"][style*="position: absolute"] {
+			position: absolute !important;
+			inset: auto auto auto auto; /* do not push layout */
+		}
 }

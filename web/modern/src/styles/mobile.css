@@ -193,7 +193,10 @@
     right: 0 !important;
     bottom: 0 !important;
     width: 100vw !important;
-    height: 100vh !important;
+  /* Use dynamic viewport height to avoid iOS/Android address bar issues creating extra scroll space */
+  height: 100dvh !important;
+  /* Fallback for older browsers */
+  min-height: 100vh !important;
     max-height: none !important;
     border-radius: 0 !important;
     z-index: 50;

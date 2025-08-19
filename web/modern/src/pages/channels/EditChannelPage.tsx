@@ -16,6 +16,7 @@ import { SearchableDropdown, type SearchOption } from '@/components/ui/searchabl
 import { Separator } from '@/components/ui/separator'
 import { AlertCircle, Info } from 'lucide-react'
 import { api } from '@/lib/api'
+import { logEditPageLayout } from '@/dev/layout-debug'
 
 // Enhanced channel schema with comprehensive validation
 const channelSchema = z.object({
@@ -1202,6 +1203,14 @@ export function EditChannelPage() {
     formValues: form.getValues()
   })
 
+  // Layout diagnostics: when the form is actually rendered (no loading), log layout info
+  useEffect(() => {
+    if (!shouldShowLoading) {
+      logEditPageLayout('EditChannelPage')
+    }
+    // Re-run when channel type changes as sections expand/collapse
+  }, [shouldShowLoading, watchType])
+
   if (shouldShowLoading) {
     console.log('[CHANNEL_TYPE_DEBUG] Showing loading screen')
     return (
@@ -1383,9 +1392,9 @@ export function EditChannelPage() {
                           onChange={(e) => setModelSearchTerm(e.target.value)}
                         />
                       </div>
-                      <div className="max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
+            <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
                         {filteredModels.map((model) => (
-                          <div key={model.id} className="flex items-center space-x-2">
+              <div key={model.id} className="relative flex items-center space-x-2">
                             <Checkbox
                               id={model.id}
                               checked={selectedModels.includes(model.id)}
