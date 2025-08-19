@@ -5,7 +5,6 @@ import (
 
 	"github.com/songquanpeng/one-api/relay/adaptor/xai"
 	"github.com/songquanpeng/one-api/relay/apitype"
-	"github.com/songquanpeng/one-api/relay/billing/ratio"
 )
 
 // TestAdapterPricingImplementations tests that all major adapters have proper pricing implementations
@@ -111,22 +110,20 @@ func TestSpecificAdapterPricing(t *testing.T) {
 			t.Fatal("xAI_Pricing not found")
 		}
 
-		// xAI uses USD pricing with ratio.MilliTokensUsd = 0.5
+		// Use values directly from xai.ModelRatios for test expectations
 		testModels := map[string]struct {
 			expectedRatio           float64
 			expectedCompletionRatio float64
 			description             string
 		}{
-			// Test standard language models
-			"grok-4-0709":      {xai.Grok4InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$3.00 input, $15.00 output"},
-			"grok-3":           {xai.Grok3InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$3.00 input, $15.00 output"},
-			"grok-3-mini":      {xai.Grok3MiniInputPrice * ratio.MilliTokensUsd, xai.Grok3MiniCompletionRatio, "$0.30 input, $0.50 output"},
-			"grok-3-fast":      {xai.Grok3FastInputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$5.00 input, $25.00 output"},
-			"grok-3-mini-fast": {xai.Grok3MiniFastPrice * ratio.MilliTokensUsd, xai.Grok3MiniFastCompletionRatio, "$0.60 input, $4.00 output"},
-			"grok-2-1212":      {xai.Grok2InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "$2.00 input, $10.00 output"},
-
+			"grok-4-0709":      {xai.ModelRatios["grok-4-0709"].Ratio, xai.ModelRatios["grok-4-0709"].CompletionRatio, "$3.00 input, $15.00 output"},
+			"grok-3":           {xai.ModelRatios["grok-3"].Ratio, xai.ModelRatios["grok-3"].CompletionRatio, "$3.00 input, $15.00 output"},
+			"grok-3-mini":      {xai.ModelRatios["grok-3-mini"].Ratio, xai.ModelRatios["grok-3-mini"].CompletionRatio, "$0.30 input, $0.50 output"},
+			"grok-3-fast":      {xai.ModelRatios["grok-3-fast"].Ratio, xai.ModelRatios["grok-3-fast"].CompletionRatio, "$5.00 input, $25.00 output"},
+			"grok-3-mini-fast": {xai.ModelRatios["grok-3-mini-fast"].Ratio, xai.ModelRatios["grok-3-mini-fast"].CompletionRatio, "$0.60 input, $4.00 output"},
+			"grok-2-1212":      {xai.ModelRatios["grok-2-1212"].Ratio, xai.ModelRatios["grok-2-1212"].CompletionRatio, "$2.00 input, $10.00 output"},
 			// Test legacy aliases
-			"grok-beta": {xai.Grok2InputPrice * ratio.MilliTokensUsd, xai.StandardCompletionRatio, "Legacy alias for grok-2-1212"},
+			"grok-beta": {xai.ModelRatios["grok-beta"].Ratio, xai.ModelRatios["grok-beta"].CompletionRatio, "Legacy alias for grok-2-1212"},
 		}
 
 		for model, expected := range testModels {
@@ -149,8 +146,8 @@ func TestSpecificAdapterPricing(t *testing.T) {
 
 		// Special test for image model which uses ImageUsdPerPic (1000)
 		imageModel := "grok-2-image-1212"
-		expectedImageRatio := xai.ImagePrice * ratio.ImageUsdPerPic // $0.07 per image
-		expectedImageCompletionRatio := xai.ImageCompletionRatio
+		expectedImageRatio := xai.ModelRatios[imageModel].Ratio // $0.07 per image
+		expectedImageCompletionRatio := xai.ModelRatios[imageModel].CompletionRatio
 
 		imageModelRatio := adaptor.GetModelRatio(imageModel)
 		imageModelCompletionRatio := adaptor.GetCompletionRatio(imageModel)
