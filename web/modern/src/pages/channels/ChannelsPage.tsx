@@ -30,7 +30,9 @@ interface Channel {
   test_time?: number
 }
 
-// Channel type mapping
+/**
+ * Channel options defined at relay/channeltype/define.go
+ */
 const CHANNEL_TYPES: Record<number, { name: string; color: string }> = {
   1: { name: 'OpenAI', color: 'green' },
   50: { name: 'OpenAI Compatible', color: 'olive' },

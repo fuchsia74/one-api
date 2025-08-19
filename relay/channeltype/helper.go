@@ -49,6 +49,8 @@ func ToAPIType(channelType int) int {
 		apiType = apitype.Mistral
 	case Moonshot:
 		apiType = apitype.Moonshot
+	case XAI:
+		apiType = apitype.XAI
 	}
 
 	return apiType

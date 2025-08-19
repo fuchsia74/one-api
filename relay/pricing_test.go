@@ -25,7 +25,7 @@ func TestAdapterPricingImplementations(t *testing.T) {
 		{"Gemini", apitype.Gemini, "gemini-pro", false},
 		{"Xunfei", apitype.Xunfei, "Spark-Lite", false},
 		{"VertexAI", apitype.VertexAI, "gemini-pro", false},
-		{"xAI", apitype.Grok, "grok-beta", false}, // Use legacy name just for testing
+		{"xAI", apitype.XAI, "grok-beta", false}, // Prefer primary constant; model alias still tested
 		// Adapters that still use DefaultPricingMethods (expected to have empty pricing)
 		{"Ollama", apitype.Ollama, "llama2", true},
 		{"Cohere", apitype.Cohere, "command", false},
@@ -106,7 +106,7 @@ func TestSpecificAdapterPricing(t *testing.T) {
 
 	// H0llyW00dzZ: I'm writing this test myself now because this codebase is too complex.
 	t.Run("xAI_Pricing", func(t *testing.T) {
-		adaptor := GetAdaptor(apitype.Grok)
+		adaptor := GetAdaptor(apitype.XAI)
 		if adaptor == nil {
 			t.Fatal("xAI_Pricing not found")
 		}
@@ -235,7 +235,7 @@ func TestPricingConsistency(t *testing.T) {
 		{"Gemini", apitype.Gemini},
 		{"Xunfei", apitype.Xunfei},
 		{"VertexAI", apitype.VertexAI},
-		{"xAI", apitype.Grok},
+		{"xAI", apitype.XAI},
 	}
 
 	for _, adapter := range adapters {
@@ -282,7 +282,7 @@ func TestFallbackPricing(t *testing.T) {
 		{"Gemini", apitype.Gemini},
 		{"Xunfei", apitype.Xunfei},
 		{"VertexAI", apitype.VertexAI},
-		{"xAI", apitype.Grok},
+		{"xAI", apitype.XAI},
 	}
 
 	unknownModel := "unknown-test-model-12345"

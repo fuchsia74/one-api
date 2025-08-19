@@ -78,7 +78,7 @@ func GetAdaptor(apiType int) adaptor.Adaptor {
 		return &mistral.Adaptor{}
 	case apitype.Moonshot:
 		return &moonshot.Adaptor{}
-	case apitype.Grok:
+	case apitype.XAI:
 		return &xai.Adaptor{}
 	}
 
