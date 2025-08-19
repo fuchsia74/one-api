@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
@@ -181,6 +182,15 @@ func AddToken(c *gin.Context) {
 		return
 	}
 
+	// Disallow empty name on create
+	if strings.TrimSpace(token.Name) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Token name is required",
+		})
+		return
+	}
+
 	err = validateToken(c, token)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -336,6 +346,15 @@ func UpdateToken(c *gin.Context) {
 	err := c.ShouldBindJSON(tokenPatch)
 	if err != nil {
 		helper.RespondError(c, err)
+		return
+	}
+
+	// Disallow empty name when not status_only
+	if statusOnly == "" && strings.TrimSpace(tokenPatch.Name) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Token name cannot be empty",
+		})
 		return
 	}
 

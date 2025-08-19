@@ -276,9 +276,9 @@ export function ChannelsPage() {
         return
       }
 
-      // Enable/disable - Unified API call with complete URL
-      const payload = { id, status: action === 'enable' ? 1 : 2 }
-      const res = await api.put('/api/channel/', payload)
+  // Enable/disable - send status_only to avoid overwriting other fields
+  const payload = { id, status: action === 'enable' ? 1 : 2 }
+  const res = await api.put('/api/channel/?status_only=1', payload)
       if (res.data?.success) {
         if (searchKeyword.trim()) {
           performSearch()

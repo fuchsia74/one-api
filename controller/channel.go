@@ -128,6 +128,15 @@ func AddChannel(c *gin.Context) {
 		return
 	}
 
+	// Disallow empty channel name
+	if strings.TrimSpace(channel.Name) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Channel name is required",
+		})
+		return
+	}
+
 	// Validate inference profile ARN map if provided
 	if channel.InferenceProfileArnMap != nil && *channel.InferenceProfileArnMap != "" {
 		err = model.ValidateInferenceProfileArnMapJSON(*channel.InferenceProfileArnMap)
@@ -202,6 +211,7 @@ func DeleteDisabledChannel(c *gin.Context) {
 }
 
 func UpdateChannel(c *gin.Context) {
+	statusOnly := c.Query("status_only")
 	channel := model.Channel{}
 	err := c.ShouldBindJSON(&channel)
 	if err != nil {
@@ -222,6 +232,26 @@ func UpdateChannel(c *gin.Context) {
 			})
 			return
 		}
+	}
+
+	if statusOnly != "" {
+		// Only update status safely
+		if channel.Id == 0 {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "Channel id is required"})
+			return
+		}
+		model.UpdateChannelStatusById(channel.Id, channel.Status)
+		c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+		return
+	}
+
+	// Disallow empty name on full update
+	if strings.TrimSpace(channel.Name) == "" {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Channel name cannot be empty",
+		})
+		return
 	}
 
 	err = channel.Update()

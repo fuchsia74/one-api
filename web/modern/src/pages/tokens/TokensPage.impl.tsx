@@ -195,7 +195,8 @@ export function TokensPage() {
         // Unified API call - complete URL with /api prefix
         res = await api.delete(`/api/token/${id}`)
       } else {
-        res = await api.put('/api/token/', {
+  // Use status_only to avoid overwriting other fields like name/models when toggling status
+  res = await api.put('/api/token/?status_only=1', {
           id,
           status: action === 'enable' ? TOKEN_STATUS.ENABLED : TOKEN_STATUS.DISABLED
         })

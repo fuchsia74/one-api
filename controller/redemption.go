@@ -3,6 +3,7 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -126,6 +127,10 @@ func AddRedemption(c *gin.Context) {
 		})
 		return
 	}
+	if strings.TrimSpace(redemption.Name) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Redemption name is required"})
+		return
+	}
 	if len(redemption.Name) == 0 || len(redemption.Name) > 20 {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -216,6 +221,10 @@ func UpdateRedemption(c *gin.Context) {
 		cleanRedemption.Status = redemption.Status
 	} else {
 		// If you add more fields, please also update redemption.Update()
+		if strings.TrimSpace(redemption.Name) == "" {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "Redemption name cannot be empty"})
+			return
+		}
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/Laisky/errors/v2"
@@ -693,6 +694,15 @@ func UpdateUser(c *gin.Context) {
 		})
 		return
 	}
+	// Disallow empty username/display name
+	if strings.TrimSpace(updatedUser.Username) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Username cannot be empty"})
+		return
+	}
+	if strings.TrimSpace(updatedUser.DisplayName) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Display name cannot be empty"})
+		return
+	}
 	originUser, err := model.GetUserById(updatedUser.Id, false)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
@@ -755,6 +765,16 @@ func UpdateSelf(c *gin.Context) {
 			"success": false,
 			"message": "Input is illegal " + err.Error(),
 		})
+		return
+	}
+
+	// Disallow empty username/display name
+	if strings.TrimSpace(user.Username) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Username cannot be empty"})
+		return
+	}
+	if strings.TrimSpace(user.DisplayName) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Display name cannot be empty"})
 		return
 	}
 
@@ -862,6 +882,15 @@ func CreateUser(c *gin.Context) {
 			"success": false,
 			"message": i18n.Translate(c, "invalid_input"),
 		})
+		return
+	}
+	// Disallow empty username/display name
+	if strings.TrimSpace(user.Username) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Username cannot be empty"})
+		return
+	}
+	if user.DisplayName != "" && strings.TrimSpace(user.DisplayName) == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "Display name cannot be empty if provided"})
 		return
 	}
 	if user.DisplayName == "" {

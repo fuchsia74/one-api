@@ -15,7 +15,7 @@ import { logEditPageLayout } from '@/dev/layout-debug'
 
 const tokenSchema = z.object({
   name: z.string().min(1, 'Token name is required'),
-  remain_quota: z.number().min(0, 'Quota must be non-negative'),
+  remain_quota: z.coerce.number().min(0, 'Quota must be non-negative'),
   expired_time: z.string().optional(),
   unlimited_quota: z.boolean().default(false),
   models: z.array(z.string()).default([]),
@@ -23,6 +23,12 @@ const tokenSchema = z.object({
 })
 
 type TokenForm = z.infer<typeof tokenSchema>
+
+// Matches a subset of backend Token for status handling
+type BackendToken = {
+  id: number
+  status: number
+}
 
 interface Model {
   key: string
@@ -61,7 +67,7 @@ export function EditTokenPage() {
     try {
       // Unified API call - complete URL with /api prefix
       const response = await api.get(`/api/token/${tokenId}`)
-      const { success, message, data } = response.data
+  const { success, message, data } = response.data
 
       if (success && data) {
         // Convert timestamp to datetime-local format
@@ -88,7 +94,9 @@ export function EditTokenPage() {
         if (data.name == null) data.name = ''
         if (data.subnet == null) data.subnet = ''
 
-        form.reset(data)
+  form.reset(data)
+  // Persist original id/status for submission logic
+  ;(form as any)._original = { id: data.id as number, status: data.status as number } as BackendToken
       } else {
         throw new Error(message || 'Failed to load token')
       }
@@ -183,7 +191,21 @@ export function EditTokenPage() {
       payload.models = modelsString as any
 
       let response: any
-      if (isEdit && tokenId) {
+      // Include current status and auto-adjust so Unlimited or new expiry takes effect
+      const original: BackendToken | undefined = (form as any)._original
+      if (original) {
+        let nextStatus = original.status
+        const nowSec = Math.floor(Date.now() / 1000)
+        const exp = Number((payload as any).expired_time)
+        const isUnlimited = !!(payload as any).unlimited_quota
+        const hasQuota = Number((payload as any).remain_quota) > 0
+        // Exhausted -> Enabled if unlimited or quota > 0
+        if (nextStatus === 4 && (isUnlimited || hasQuota)) nextStatus = 1
+        // Expired -> Enabled if never expire or a future expiry
+        if (nextStatus === 3 && (exp === -1 || exp > nowSec)) nextStatus = 1
+        ;(payload as any).status = nextStatus
+      }
+    if (isEdit && tokenId) {
         // Unified API call - complete URL with /api prefix
         response = await api.put('/api/token/', { ...payload, id: parseInt(tokenId) })
       } else {
@@ -356,44 +378,37 @@ export function EditTokenPage() {
                 </Button>
               </div>
 
+              <div className="flex flex-row items-start space-x-3 space-y-0">
+                <FormControl>
+                  <Checkbox
+                    id="unlimited_quota"
+                    checked={!!watchUnlimitedQuota}
+                    onCheckedChange={(checked) => form.setValue('unlimited_quota', !!checked, { shouldDirty: true })}
+                  />
+                </FormControl>
+                <div className="space-y-1 leading-none">
+                  <FormLabel htmlFor="unlimited_quota">Unlimited Quota</FormLabel>
+                </div>
+              </div>
+
               <FormField
                 control={form.control}
-                name="unlimited_quota"
+                name="remain_quota"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormItem>
+                    <FormLabel>Remaining Quota (tokens)</FormLabel>
                     <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={field.onChange}
+                      <Input
+                        type="number"
+                        min="0"
+                        disabled={watchUnlimitedQuota}
+                        {...field}
                       />
                     </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel>Unlimited Quota</FormLabel>
-                    </div>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
-
-              {!watchUnlimitedQuota && (
-                <FormField
-                  control={form.control}
-                  name="remain_quota"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Remaining Quota (tokens)</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
 
               {form.formState.errors.root && (
                 <div className="text-sm text-destructive">
