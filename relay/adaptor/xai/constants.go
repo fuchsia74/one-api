@@ -2,7 +2,7 @@ package xai
 
 import (
 	"github.com/songquanpeng/one-api/relay/adaptor"
-	"github.com/songquanpeng/one-api/relay/billing/ratio"
+	ratio "github.com/songquanpeng/one-api/relay/billing/ratio"
 )
 
 // ModelRatios contains all supported models and their pricing ratios
@@ -19,7 +19,8 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"grok-2-1212":        {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0},       // $2.00 input, $10.00 output
 
 	// Image generation model
-	"grok-2-image-1212": {Ratio: (0.07 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.07 per image
+	// Use usd_per_image * ImageUsdPerPic for clarity; numerically identical to legacy formula
+	"grok-2-image-1212": {Ratio: 0.07 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.07 per image
 
 	// Legacy aliases for backward compatibility
 	"grok-beta":        {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 5.0}, // Updated to match grok-2-1212

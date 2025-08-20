@@ -8,15 +8,17 @@ import (
 )
 
 const (
-	QuotaPerUsd      = 500000 // $1 = 500,000 quota
-	MilliTokensUsd   = 0.5    // 0.000001 * 500000 = 0.5 quota per milli-token
-	ImageUsdPerPic   = 1000   // 0.002 * 500000 = 1000 quota per image
-	MilliTokensRmb   = 3.5    // 0.000007 * 500000 = 3.5 quota per milli-token
-	ImageRmbPerPic   = 7000   // 0.014 * 500000 = 7000 quota per image
-	MilliTokensYuan  = 3.5    // 0.000007 * 500000 = 3.5 quota per milli-token
-	ImageYuanPerPic  = 7000   // 0.014 * 500000 = 7000 quota per image
-	VideoUsdPerVideo = 50000  // 0.1 * 500000 = 50000 quota per video (typical $0.1 per video)
-	TokensPerSec     = 10     // Video tokens per second for video generation models
+	QuotaPerUsd    = 500000 // $1 = 500,000 quota
+	MilliTokensUsd = 0.5    // 0.000001 * 500000 = 0.5 quota per milli-token
+	// ImageUsdPerPic equals QuotaPerUsd to eliminate legacy magic numbers.
+	// Use: Ratio = usd_per_image * ImageUsdPerPic (backward-identical to (usd/0.002)*1000)
+	ImageUsdPerPic   = QuotaPerUsd
+	MilliTokensRmb   = 3.5   // 0.000007 * 500000 = 3.5 quota per milli-token
+	ImageRmbPerPic   = 7000  // 0.014 * 500000 = 7000 quota per image
+	MilliTokensYuan  = 3.5   // 0.000007 * 500000 = 3.5 quota per milli-token
+	ImageYuanPerPic  = 7000  // 0.014 * 500000 = 7000 quota per image
+	VideoUsdPerVideo = 50000 // 0.1 * 500000 = 50000 quota per video (typical $0.1 per video)
+	TokensPerSec     = 10    // Video tokens per second for video generation models
 )
 
 // Note: ModelPrice has been moved to relay/adaptor/interface.go

@@ -25,13 +25,13 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	// -------------------------------------
 	// Image Generation Models
 	// -------------------------------------
-	"imagen-3.0-generate-001":      {Ratio: (0.04 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.04 per image
-	"imagen-3.0-generate-002":      {Ratio: (0.04 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.04 per image
-	"imagen-3.0-fast-generate-001": {Ratio: (0.02 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.02 per image
+	"imagen-3.0-generate-001":      {Ratio: 0.04 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.04 per image
+	"imagen-3.0-generate-002":      {Ratio: 0.04 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.04 per image
+	"imagen-3.0-fast-generate-001": {Ratio: 0.02 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.02 per image
 	// -------------------------------------
 	// Image Editing Models
 	// -------------------------------------
-	"imagen-3.0-capability-001": {Ratio: (0.05 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.05 per image
+	"imagen-3.0-capability-001": {Ratio: 0.05 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.05 per image
 }
 
 // ModelList derived from ModelRatios for backward compatibility

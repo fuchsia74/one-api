@@ -346,7 +346,7 @@ func (a *Adaptor) GetModelRatio(modelName string) float64 {
 		return price.Ratio
 	}
 	// Default Replicate pricing (image generation) - use proper image pricing unit
-	return (0.05 / 0.002) * ratio.ImageUsdPerPic // Default $0.05 per image
+	return 0.05 * ratio.ImageUsdPerPic // Default $0.05 per image
 }
 
 func (a *Adaptor) GetCompletionRatio(modelName string) float64 {

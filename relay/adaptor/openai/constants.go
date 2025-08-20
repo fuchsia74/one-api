@@ -151,9 +151,9 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"gpt-4o-mini-tts":        {Ratio: 0.6 * ratio.MilliTokensUsd, CompletionRatio: 20.0}, // $0.60 input, $12.00 output per 1M tokens
 
 	// Image Generation Models (Standard)
-	// FIXME: We need to redesign a new image‑billing system.
-	"dall-e-2":    {Ratio: (0.016 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0},
-	"dall-e-3":    {Ratio: (0.04 / 0.002) * ratio.ImageUsdPerPic, CompletionRatio: 1.0},
+	// Use usd_per_image * ImageUsdPerPic for clarity; numerically identical to legacy formula.
+	"dall-e-2":    {Ratio: 0.016 * ratio.ImageUsdPerPic, CompletionRatio: 1.0},
+	"dall-e-3":    {Ratio: 0.04 * ratio.ImageUsdPerPic, CompletionRatio: 1.0},
 	"gpt-image-1": {Ratio: 5.0 * ratio.MilliTokensUsd, CompletionRatio: 40.0 / 5.0, CachedInputRatio: 1.25 * ratio.MilliTokensUsd},
 }
 

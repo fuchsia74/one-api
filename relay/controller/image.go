@@ -27,6 +27,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	metalib "github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/pricing"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
@@ -284,7 +285,9 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 	}
 
-	modelRatio := billingratio.GetModelRatioWithChannel(imageModel, meta.ChannelType, channelModelRatio)
+	// Resolve model ratio using unified three-layer pricing (channel overrides → adapter defaults → global fallback)
+	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
+	modelRatio := pricing.GetModelRatioWithThreeLayers(imageModel, channelModelRatio, pricingAdaptor)
 	// groupRatio := billingratio.GetGroupRatio(meta.Group)
 	groupRatio := c.GetFloat64(ctxkey.ChannelRatio)
 
@@ -294,10 +297,11 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	var usedQuota int64
 	switch meta.ChannelType {
 	case channeltype.Replicate:
-		// replicate always return 1 image
-		usedQuota = int64(ratio*imageCostRatio) * 1000
+		// Replicate always returns 1 image; charge for a single image
+		usedQuota = int64(math.Ceil(ratio * imageCostRatio))
 	default:
-		usedQuota = int64(ratio*imageCostRatio) * int64(imageRequest.N) * 1000
+		// Charge per requested image count (n)
+		usedQuota = int64(math.Ceil(ratio*imageCostRatio)) * int64(imageRequest.N)
 	}
 
 	if userQuota < usedQuota {
