@@ -199,7 +199,6 @@ func PostConsumeQuotaDetailedWithTraceID(ctx context.Context, traceId string, to
 	completionRatio float64, toolsCost int64,
 	cachedPromptTokens int, cachedCompletionTokens int) {
 
-
 	// Input validation for safety
 	if ctx == nil {
 		logger.Logger.Error("PostConsumeQuotaDetailedWithTraceID: context is nil")

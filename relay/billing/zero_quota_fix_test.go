@@ -30,7 +30,7 @@ func TestZeroQuotaFix(t *testing.T) {
 
 		// Before the fix: this would skip logging entirely when totalQuota == 0
 		// After the fix: this will attempt to log (and may panic on DB operations, which is fine)
-	PostConsumeQuotaWithLog(ctx, 123, 10, 0, &modelpkg.Log{ // model.Log
+		PostConsumeQuotaWithLog(ctx, 123, 10, 0, &modelpkg.Log{ // model.Log
 			UserId:    1,
 			ChannelId: 5,
 			ModelName: "test-model",
@@ -85,7 +85,7 @@ func TestZeroQuotaFix(t *testing.T) {
 			}
 		}()
 
-	PostConsumeQuotaWithLog(ctx, 123, 10, 50, &modelpkg.Log{
+		PostConsumeQuotaWithLog(ctx, 123, 10, 50, &modelpkg.Log{
 			UserId:    1,
 			ChannelId: 5,
 			ModelName: "test-model",

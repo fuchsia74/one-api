@@ -157,24 +157,6 @@ func recordLogHelperWithTraceID(ctx context.Context, traceId string, log *Log) {
 		zap.String("trace_id", log.TraceId))
 }
 
-// RecordConsumeLogWithTraceAndRequestID records a consume log using explicit requestId and traceId,
-// avoiding reliance on values stored in ctx (which may be a background context).
-func RecordConsumeLogWithTraceAndRequestID(ctx context.Context, traceId string, requestId string, log *Log) {
-	if !config.LogConsumeEnabled {
-		return
-	}
-	log.Username = GetUsernameById(log.UserId)
-	log.CreatedAt = helper.GetTimestamp()
-	log.Type = LogTypeConsume
-	if log.RequestId == "" {
-		log.RequestId = requestId
-	}
-	if log.TraceId == "" {
-		log.TraceId = traceId
-	}
-	recordLogHelper(ctx, log)
-}
-
 func RecordLog(ctx context.Context, userId int, logType int, content string) {
 	if logType == LogTypeConsume && !config.LogConsumeEnabled {
 		return

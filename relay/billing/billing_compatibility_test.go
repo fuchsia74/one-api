@@ -2,9 +2,9 @@ package billing
 
 import (
 	"context"
+	modelpkg "github.com/songquanpeng/one-api/model"
 	"testing"
 	"time"
-	modelpkg "github.com/songquanpeng/one-api/model"
 )
 
 // TestBackwardCompatibility ensures that the billing refactor doesn't break existing functionality

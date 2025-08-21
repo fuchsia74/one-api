@@ -302,7 +302,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		entry := &model.Log{
 			UserId:           userId,
 			ChannelId:        channelId,
-			PromptTokens:     int(quota),   // audio API logs total as prompt tokens
+			PromptTokens:     int(quota), // audio API logs total as prompt tokens
 			CompletionTokens: 0,
 			ModelName:        audioModel,
 			TokenName:        tokenName,

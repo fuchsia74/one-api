@@ -20,6 +20,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -382,6 +383,9 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	}
 
 	var promptTokens, completionTokens int
+	// Capture IDs from gin context before switching to a background context in defer
+	requestId := c.GetString(ctxkey.RequestId)
+	traceId := tracing.GetTraceID(c)
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
@@ -418,7 +422,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			} else {
 				logContent = fmt.Sprintf("model rate %.2f, group rate %.2f, num %d", modelRatio, groupRatio, imageRequest.N)
 			}
-			// Set IDs directly on log and delegate to RecordConsumeLog
+			// Record log with RequestId/TraceId set directly on the log
 			model.RecordConsumeLog(ctx, &model.Log{
 				UserId:           meta.UserId,
 				ChannelId:        meta.ChannelId,
@@ -429,8 +433,8 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 				Quota:            int(usedQuota),
 				Content:          logContent,
 				ElapsedTime:      helper.CalcElapsedTime(meta.StartTime),
-				RequestId:        c.GetString(ctxkey.RequestId),
-				TraceId:          helper.GetTraceIDFromContext(ctx),
+				RequestId:        requestId,
+				TraceId:          traceId,
 			})
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, usedQuota)
 			channelId := c.GetInt(ctxkey.ChannelId)
