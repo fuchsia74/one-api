@@ -304,6 +304,8 @@ func ConsumeToken(c *gin.Context) {
 		Quota:     int(tokenPatch.AddUsedQuota),
 		Content: fmt.Sprintf("External (%s) consumed %s",
 			tokenPatch.AddReason, common.LogQuota(int64(tokenPatch.AddUsedQuota))),
+		RequestId: helper.GetRequestID(ctx),
+		TraceId:   helper.GetTraceIDFromContext(ctx),
 	})
 
 	// Update token data

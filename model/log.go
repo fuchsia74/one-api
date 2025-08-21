@@ -78,12 +78,14 @@ func GetLogOrderClause(sortBy string, sortOrder string) string {
 // from `context.Context` and change the design to pass those values explicitly
 // as parameters, rather than trying to read them from a generic `context.Context`.
 func recordLogHelper(ctx context.Context, log *Log) {
-	requestId := helper.GetRequestID(ctx)
-	log.RequestId = requestId
-
-	// Also set TraceID from gin-middlewares if available
-	traceId := helper.GetTraceIDFromContext(ctx)
-	log.TraceId = traceId
+	// Respect pre-set IDs; only fill from context if missing
+	if log.RequestId == "" {
+		log.RequestId = helper.GetRequestID(ctx)
+	}
+	if log.TraceId == "" {
+		// Also set TraceID from gin-middlewares if available
+		log.TraceId = helper.GetTraceIDFromContext(ctx)
+	}
 
 	err := LOG_DB.Create(log).Error
 	if err != nil {
@@ -155,6 +157,24 @@ func recordLogHelperWithTraceID(ctx context.Context, traceId string, log *Log) {
 		zap.String("trace_id", log.TraceId))
 }
 
+// RecordConsumeLogWithTraceAndRequestID records a consume log using explicit requestId and traceId,
+// avoiding reliance on values stored in ctx (which may be a background context).
+func RecordConsumeLogWithTraceAndRequestID(ctx context.Context, traceId string, requestId string, log *Log) {
+	if !config.LogConsumeEnabled {
+		return
+	}
+	log.Username = GetUsernameById(log.UserId)
+	log.CreatedAt = helper.GetTimestamp()
+	log.Type = LogTypeConsume
+	if log.RequestId == "" {
+		log.RequestId = requestId
+	}
+	if log.TraceId == "" {
+		log.TraceId = traceId
+	}
+	recordLogHelper(ctx, log)
+}
+
 func RecordLog(ctx context.Context, userId int, logType int, content string) {
 	if logType == LogTypeConsume && !config.LogConsumeEnabled {
 		return
@@ -169,6 +189,20 @@ func RecordLog(ctx context.Context, userId int, logType int, content string) {
 	recordLogHelper(ctx, log)
 }
 
+// RecordLogWithIDs records a generic log with explicit requestId/traceId.
+func RecordLogWithIDs(_ context.Context, userId int, logType int, content string, requestId string, traceId string) {
+	log := &Log{
+		UserId:    userId,
+		Username:  GetUsernameById(userId),
+		CreatedAt: helper.GetTimestamp(),
+		Type:      logType,
+		Content:   content,
+		RequestId: requestId,
+		TraceId:   traceId,
+	}
+	_ = LOG_DB.Create(log).Error
+}
+
 func RecordTopupLog(ctx context.Context, userId int, content string, quota int) {
 	log := &Log{
 		UserId:    userId,
@@ -179,6 +213,21 @@ func RecordTopupLog(ctx context.Context, userId int, content string, quota int) 
 		Quota:     quota,
 	}
 	recordLogHelper(ctx, log)
+}
+
+// RecordTopupLogWithIDs records a topup log with explicit requestId/traceId.
+func RecordTopupLogWithIDs(_ context.Context, userId int, content string, quota int, requestId string, traceId string) {
+	log := &Log{
+		UserId:    userId,
+		Username:  GetUsernameById(userId),
+		CreatedAt: helper.GetTimestamp(),
+		Type:      LogTypeTopup,
+		Content:   content,
+		Quota:     quota,
+		RequestId: requestId,
+		TraceId:   traceId,
+	}
+	_ = LOG_DB.Create(log).Error
 }
 
 func RecordConsumeLog(ctx context.Context, log *Log) {
@@ -205,6 +254,15 @@ func RecordTestLog(ctx context.Context, log *Log) {
 	log.CreatedAt = helper.GetTimestamp()
 	log.Type = LogTypeTest
 	recordLogHelper(ctx, log)
+}
+
+// RecordTestLogWithIDs records a test log with explicit requestId/traceId.
+func RecordTestLogWithIDs(_ context.Context, log *Log, requestId string, traceId string) {
+	log.CreatedAt = helper.GetTimestamp()
+	log.Type = LogTypeTest
+	log.RequestId = requestId
+	log.TraceId = traceId
+	_ = LOG_DB.Create(log).Error
 }
 
 func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, sortBy string, sortOrder string) (logs []*Log, err error) {

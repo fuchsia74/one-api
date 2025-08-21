@@ -297,7 +297,20 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
-		go billing.PostConsumeQuota(ctx, tokenId, quotaDelta, quota, userId, channelId, modelRatio, groupRatio, audioModel, tokenName)
+		// Build a full log entry with IDs from gin.Context
+		logContent := fmt.Sprintf("model rate %.2f, group rate %.2f", modelRatio, groupRatio)
+		entry := &model.Log{
+			UserId:           userId,
+			ChannelId:        channelId,
+			PromptTokens:     int(quota),   // audio API logs total as prompt tokens
+			CompletionTokens: 0,
+			ModelName:        audioModel,
+			TokenName:        tokenName,
+			Content:          logContent,
+			RequestId:        c.GetString(ctxkey.RequestId),
+			TraceId:          helper.GetTraceIDFromContext(ctx),
+		}
+		go billing.PostConsumeQuotaWithLog(ctx, tokenId, quotaDelta, quota, entry)
 	}()
 
 	for k, v := range resp.Header {

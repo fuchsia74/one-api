@@ -6,13 +6,16 @@ import (
 	"time"
 )
 
+// bring in model.Log type for constructing log entries
+import modelpkg "github.com/songquanpeng/one-api/model"
+
 // TestZeroQuotaFix verifies that the billing functions handle zero quota correctly
 // This addresses the critical bug where requests with 0 quota were not being logged
 func TestZeroQuotaFix(t *testing.T) {
 	ctx := context.Background()
 	validTime := time.Now()
 
-	t.Run("PostConsumeQuota with zero quota should not panic on logging", func(t *testing.T) {
+	t.Run("PostConsumeQuotaWithLog with zero quota should not panic on logging", func(t *testing.T) {
 		// This test verifies that the function doesn't return early when totalQuota is 0
 		// The function should attempt to log (which may fail due to database issues in test env)
 		// but should not panic due to the conditional check being removed
@@ -27,7 +30,12 @@ func TestZeroQuotaFix(t *testing.T) {
 
 		// Before the fix: this would skip logging entirely when totalQuota == 0
 		// After the fix: this will attempt to log (and may panic on DB operations, which is fine)
-		PostConsumeQuota(ctx, 123, 10, 0, 1, 5, 1.0, 1.0, "test-model", "test-token")
+	PostConsumeQuotaWithLog(ctx, 123, 10, 0, &modelpkg.Log{ // model.Log
+			UserId:    1,
+			ChannelId: 5,
+			ModelName: "test-model",
+			TokenName: "test-token",
+		})
 
 		// If we reach here, the function completed without database operations
 		// This is also acceptable behavior
@@ -69,7 +77,7 @@ func TestZeroQuotaFix(t *testing.T) {
 		t.Log("Function completed without database panic")
 	})
 
-	t.Run("PostConsumeQuota with positive quota should work normally", func(t *testing.T) {
+	t.Run("PostConsumeQuotaWithLog with positive quota should work normally", func(t *testing.T) {
 		defer func() {
 			if r := recover(); r != nil {
 				// Database operations will fail in test environment, but that's expected
@@ -77,7 +85,12 @@ func TestZeroQuotaFix(t *testing.T) {
 			}
 		}()
 
-		PostConsumeQuota(ctx, 123, 10, 50, 1, 5, 1.0, 1.0, "test-model", "test-token")
+	PostConsumeQuotaWithLog(ctx, 123, 10, 50, &modelpkg.Log{
+			UserId:    1,
+			ChannelId: 5,
+			ModelName: "test-model",
+			TokenName: "test-token",
+		})
 		t.Log("Function completed")
 	})
 

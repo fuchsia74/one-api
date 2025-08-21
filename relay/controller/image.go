@@ -418,6 +418,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			} else {
 				logContent = fmt.Sprintf("model rate %.2f, group rate %.2f, num %d", modelRatio, groupRatio, imageRequest.N)
 			}
+			// Set IDs directly on log and delegate to RecordConsumeLog
 			model.RecordConsumeLog(ctx, &model.Log{
 				UserId:           meta.UserId,
 				ChannelId:        meta.ChannelId,
@@ -428,6 +429,8 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 				Quota:            int(usedQuota),
 				Content:          logContent,
 				ElapsedTime:      helper.CalcElapsedTime(meta.StartTime),
+				RequestId:        c.GetString(ctxkey.RequestId),
+				TraceId:          helper.GetTraceIDFromContext(ctx),
 			})
 			model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, usedQuota)
 			channelId := c.GetInt(ctxkey.ChannelId)
