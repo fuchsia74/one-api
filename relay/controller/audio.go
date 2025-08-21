@@ -11,6 +11,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
@@ -158,7 +159,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		if preConsumedQuota > 0 {
 			// we need to roll back the pre-consumed quota
-			defer func(ctx context.Context) {
+			defer func() {
 				go func() {
 					// negative means add quota back for token & user
 					err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
@@ -166,7 +167,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 						logger.Logger.Error("error rollback pre-consumed quota", zap.Error(err))
 					}
 				}()
-			}(gmw.Ctx(c))
+			}()
 		}
 	}()
 
@@ -292,9 +293,12 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 	succeed = true
 	quotaDelta := quota - preConsumedQuota
-	defer func(ctx context.Context) {
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+
 		go billing.PostConsumeQuota(ctx, tokenId, quotaDelta, quota, userId, channelId, modelRatio, groupRatio, audioModel, tokenName)
-	}(gmw.Ctx(c))
+	}()
 
 	for k, v := range resp.Header {
 		c.Writer.Header().Set(k, v[0])

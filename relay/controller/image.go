@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
@@ -307,7 +308,8 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	}
 
 	// Resolve model ratio using unified three-layer pricing (channel overrides → adapter defaults → global fallback)
-	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
+	// IMPORTANT: Use APIType here (adaptor family), not ChannelType. ChannelType IDs do not map to adaptor switch.
+	pricingAdaptor := relay.GetAdaptor(meta.APIType)
 	modelRatio := pricing.GetModelRatioWithThreeLayers(imageModel, channelModelRatio, pricingAdaptor)
 	// groupRatio := billingratio.GetGroupRatio(meta.Group)
 	groupRatio := c.GetFloat64(ctxkey.ChannelRatio)
@@ -317,39 +319,89 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		imageCostRatio = override
 	}
 
+	// Determine if this model is billed per image (ImagePriceUsd) or per token (Ratio)
+	var imagePriceUsd float64
+	if pricingAdaptor != nil {
+		if pm, ok := pricingAdaptor.GetDefaultModelPricing()[imageModel]; ok {
+			imagePriceUsd = pm.ImagePriceUsd
+		}
+	}
+	// Fallback to global pricing table if adapter has no entry
+	if imagePriceUsd == 0 {
+		if pm, ok := pricing.GetGlobalModelPricing()[imageModel]; ok {
+			imagePriceUsd = pm.ImagePriceUsd
+		}
+	}
+
 	ratio := modelRatio * groupRatio
 	userQuota, err := model.CacheGetUserQuota(ctx, meta.UserId)
 
 	var usedQuota int64
+	var preConsumedQuota int64
 	switch meta.ChannelType {
 	case channeltype.Replicate:
 		// Replicate always returns 1 image; charge for a single image
-		usedQuota = int64(math.Ceil(ratio * imageCostRatio))
+		if imagePriceUsd > 0 {
+			// Per-image billing path
+			perImageQuota := math.Ceil(imagePriceUsd * billingratio.ImageUsdPerPic * imageCostRatio * groupRatio)
+			usedQuota = int64(perImageQuota)
+		} else {
+			usedQuota = int64(math.Ceil(ratio * imageCostRatio))
+		}
 	default:
 		// Charge per requested image count (n)
-		usedQuota = int64(math.Ceil(ratio*imageCostRatio)) * int64(imageRequest.N)
+		if imagePriceUsd > 0 {
+			perImageQuota := math.Ceil(imagePriceUsd * billingratio.ImageUsdPerPic * imageCostRatio * groupRatio)
+			usedQuota = int64(perImageQuota) * int64(imageRequest.N)
+		} else {
+			usedQuota = int64(math.Ceil(ratio*imageCostRatio)) * int64(imageRequest.N)
+		}
 	}
 
 	if userQuota < usedQuota {
 		return openai.ErrorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusForbidden)
 	}
 
+	// If using per-image billing, pre-consume the estimated quota now
+	if imagePriceUsd > 0 && usedQuota > 0 {
+		preConsumedQuota = usedQuota
+		if err := model.PreConsumeTokenQuota(meta.TokenId, preConsumedQuota); err != nil {
+			return openai.ErrorWrapper(err, "pre_consume_failed", http.StatusInternalServerError)
+		}
+	}
+
 	// do request
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
 		// ErrorWrapper will log the error, so we don't need to log it here
+		// Refund any pre-consumed quota if request failed
+		if preConsumedQuota > 0 {
+			_ = model.PostConsumeTokenQuota(meta.TokenId, -preConsumedQuota)
+		}
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 
 	var promptTokens, completionTokens int
-	defer func(ctx context.Context) {
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		defer cancel()
+
 		if resp != nil &&
 			resp.StatusCode != http.StatusCreated && // replicate returns 201
 			resp.StatusCode != http.StatusOK {
+			// Refund pre-consumed quota when upstream not successful
+			if preConsumedQuota > 0 {
+				_ = model.PostConsumeTokenQuota(meta.TokenId, -preConsumedQuota)
+			}
 			return
 		}
 
-		err := model.PostConsumeTokenQuota(meta.TokenId, usedQuota)
+		// Apply delta if we pre-consumed; otherwise apply full usage
+		quotaDelta := usedQuota
+		if preConsumedQuota > 0 {
+			quotaDelta = usedQuota - preConsumedQuota
+		}
+		err := model.PostConsumeTokenQuota(meta.TokenId, quotaDelta)
 		if err != nil {
 			lg.Error("error consuming token remain quota", zap.Error(err))
 		}
@@ -359,8 +411,13 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 		if usedQuota >= 0 {
 			tokenName := c.GetString(ctxkey.TokenName)
-			logContent := fmt.Sprintf("model rate %.2f, group rate %.2f, num %d",
-				modelRatio, groupRatio, imageRequest.N)
+			// Improve log clarity for per-image billed models
+			var logContent string
+			if imagePriceUsd > 0 {
+				logContent = fmt.Sprintf("image usd %.3f, tier %.2f, group rate %.2f, num %d", imagePriceUsd, imageCostRatio, groupRatio, imageRequest.N)
+			} else {
+				logContent = fmt.Sprintf("model rate %.2f, group rate %.2f, num %d", modelRatio, groupRatio, imageRequest.N)
+			}
 			model.RecordConsumeLog(ctx, &model.Log{
 				UserId:           meta.UserId,
 				ChannelId:        meta.ChannelId,
@@ -386,7 +443,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 				lg.Error("insert user request cost failed", zap.Error(err))
 			}
 		}
-	}(gmw.Ctx(c))
+	}()
 
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
@@ -399,13 +456,117 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		promptTokens = usage.PromptTokens
 		completionTokens = usage.CompletionTokens
 
-		switch meta.ActualModelName {
-		case "gpt-image-1":
-			textQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.TextTokens) * 5 * billingratio.MilliTokensUsd))
-			imageQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.ImageTokens) * 10 * billingratio.MilliTokensUsd))
-			usedQuota += textQuota + imageQuota
+		// Universal reconciliation: if we have reliable usage and a known token pricing rule for this model,
+		// recompute the quota from tokens and override the pre-consumed per-image estimate.
+		if imagePriceUsd > 0 {
+			if final := computeImageUsageQuota(imageModel, usage, groupRatio); final > 0 {
+				usedQuota = int64(math.Ceil(final))
+			}
+		} else {
+			// Legacy token-based path for models without per-image pricing configured
+			switch meta.ActualModelName {
+			case "gpt-image-1":
+				if usage.PromptTokensDetails != nil {
+					textQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.TextTokens) * 5 * billingratio.MilliTokensUsd))
+					imageQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.ImageTokens) * 10 * billingratio.MilliTokensUsd))
+					usedQuota += textQuota + imageQuota
+				}
+			}
 		}
 	}
 
 	return nil
+}
+
+// computeGptImage1TokenQuota calculates quota for gpt-image-1 across five buckets:
+// 1) input text, 2) cached input text, 3) input image, 4) cached input image, 5) output image tokens.
+// Prices are in USD per 1M tokens: 5.0, 1.25, 10.0, 2.5, 40.0 respectively.
+// Returns the quota (not USD). Applies groupRatio as a final multiplier.
+func computeGptImage1TokenQuota(usage *relaymodel.Usage, groupRatio float64) float64 {
+	if usage == nil {
+		return 0
+	}
+	var textIn, imageIn, cachedIn int
+	if usage.PromptTokensDetails != nil {
+		textIn = usage.PromptTokensDetails.TextTokens
+		imageIn = usage.PromptTokensDetails.ImageTokens
+		cachedIn = usage.PromptTokensDetails.CachedTokens
+	}
+	if textIn < 0 {
+		textIn = 0
+	}
+	if imageIn < 0 {
+		imageIn = 0
+	}
+	if cachedIn < 0 {
+		cachedIn = 0
+	}
+	totalIn := textIn + imageIn
+	if cachedIn > totalIn {
+		cachedIn = totalIn
+	}
+	cachedText := 0
+	cachedImage := 0
+	if cachedIn > 0 && totalIn > 0 {
+		cachedText = int(math.Round(float64(cachedIn) * (float64(textIn) / float64(totalIn))))
+		if cachedText < 0 {
+			cachedText = 0
+		}
+		if cachedText > cachedIn {
+			cachedText = cachedIn
+		}
+		cachedImage = cachedIn - cachedText
+	}
+	normalText := textIn - cachedText
+	if normalText < 0 {
+		normalText = 0
+	}
+	normalImage := imageIn - cachedImage
+	if normalImage < 0 {
+		normalImage = 0
+	}
+	outTokens := usage.CompletionTokens
+	if outTokens < 0 {
+		outTokens = 0
+	}
+
+	// USD per 1M tokens
+	const (
+		inTextUSD        = 5.0
+		inTextCachedUSD  = 1.25
+		inImageUSD       = 10.0
+		inImageCachedUSD = 2.5
+		outImageUSD      = 40.0
+	)
+
+	quota := 0.0
+	quota += float64(normalText) * inTextUSD * billingratio.MilliTokensUsd
+	quota += float64(cachedText) * inTextCachedUSD * billingratio.MilliTokensUsd
+	quota += float64(normalImage) * inImageUSD * billingratio.MilliTokensUsd
+	quota += float64(cachedImage) * inImageCachedUSD * billingratio.MilliTokensUsd
+	quota += float64(outTokens) * outImageUSD * billingratio.MilliTokensUsd
+
+	if groupRatio > 0 {
+		quota *= groupRatio
+	}
+	return quota
+}
+
+// computeImageUsageQuota routes to the correct usage-based cost function per model.
+// Returns 0 when usage is missing or the model has no token pricing rule.
+func computeImageUsageQuota(modelName string, usage *relaymodel.Usage, groupRatio float64) float64 {
+	if usage == nil {
+		return 0
+	}
+	// Basic reliability check: some providers may omit usage entirely
+	if usage.PromptTokens == 0 && usage.CompletionTokens == 0 && (usage.PromptTokensDetails == nil) {
+		return 0
+	}
+	switch modelName {
+	case "gpt-image-1":
+		return computeGptImage1TokenQuota(usage, groupRatio)
+	default:
+		// Add more models here as they publish token pricing for image buckets
+		return 0
+	}
 }

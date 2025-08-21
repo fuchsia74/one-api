@@ -70,6 +70,13 @@ func GetLogOrderClause(sortBy string, sortOrder string) string {
 	}
 }
 
+// BUG: Session‑related variables like RequestId and TraceId are kept in `gin.Context`.
+// However, logging can happen after the request’s Gin context has been closed,
+// so `recordLogHelper` receives a standard `context.Context` rather than
+// the original `gin.Context`. Consequently, many context values are lost.
+// We need a systematic audit of every function that attempts to fetch values
+// from `context.Context` and change the design to pass those values explicitly
+// as parameters, rather than trying to read them from a generic `context.Context`.
 func recordLogHelper(ctx context.Context, log *Log) {
 	requestId := helper.GetRequestID(ctx)
 	log.RequestId = requestId
@@ -77,11 +84,6 @@ func recordLogHelper(ctx context.Context, log *Log) {
 	// Also set TraceID from gin-middlewares if available
 	traceId := helper.GetTraceIDFromContext(ctx)
 	log.TraceId = traceId
-
-	// Debug logging to see what's happening
-	logger.Logger.Debug("setting trace_id in log record",
-		zap.String("trace_id", traceId),
-		zap.String("request_id", requestId))
 
 	err := LOG_DB.Create(log).Error
 	if err != nil {
@@ -98,8 +100,10 @@ func recordLogHelper(ctx context.Context, log *Log) {
 		} else {
 			logger.Logger.Error("failed to record log", zap.Error(err))
 		}
+
 		return
 	}
+
 	logger.Logger.Info("record log",
 		zap.Int("user_id", log.UserId),
 		zap.String("username", log.Username),
@@ -107,7 +111,11 @@ func recordLogHelper(ctx context.Context, log *Log) {
 		zap.Int("type", log.Type),
 		zap.String("content", log.Content),
 		zap.String("request_id", log.RequestId),
-		zap.String("trace_id", log.TraceId))
+		zap.String("trace_id", log.TraceId),
+		zap.Int("quota", log.Quota),
+		zap.Int("prompt_tokens", log.PromptTokens),
+		zap.Int("completion_tokens", log.CompletionTokens),
+	)
 }
 
 func recordLogHelperWithTraceID(ctx context.Context, traceId string, log *Log) {

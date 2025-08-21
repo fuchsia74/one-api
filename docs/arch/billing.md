@@ -45,6 +45,7 @@
       - [Text Requests](#text-requests)
       - [Audio Requests](#audio-requests)
       - [Image Requests](#image-requests)
+    - [Universal Two-Step Image Billing (2025-08)](#universal-two-step-image-billing-2025-08)
   - [Database Schema](#database-schema)
     - [Core Tables](#core-tables)
       - [Users Table](#users-table)
@@ -645,118 +646,62 @@ quota = audio_duration_seconds * audio_tokens_per_second * model_ratio * group_r
 
 #### Image Requests
 
-This section documents how upstream image-generation requests are billed today, the exact data flow, and issues to fix.
+### Universal Two-Step Image Billing (2025-08)
 
-Current formula in controller (source: `relay/controller/image.go`):
+The billing system now implements a universal, robust two-step billing process for all image-centric models (e.g., DALL·E 2/3, gpt-image-1):
 
-- Model ratio resolution: `modelRatio := billingratio.GetModelRatioWithChannel(imageModel, meta.ChannelType, channelModelRatio)`
-- Size/quality multiplier: `imageCostRatio := getImageCostRatio(imageRequest)`
-- Pre-check and final charge baseline:
-  - Replicate: `usedQuota = int64(modelRatio*imageCostRatio) * 1000`
-  - Others: `usedQuota = int64(modelRatio*imageCostRatio) * int64(imageRequest.N) * 1000`
-- Post-response add-on (OpenAI `gpt-image-1` only):
-  - `textQuota = ceil(textTokens * 5 * MilliTokensUsd)`
-  - `imageQuota = ceil(imageTokens * 10 * MilliTokensUsd)`
-  - `usedQuota += textQuota + imageQuota`
+**1. Pre-consume:**
 
-Where do the numbers come from:
+- Before sending the request, the system pre-consumes quota based on a fixed per-image price (`ImagePriceUsd`), multiplied by the appropriate size/quality tier and group ratio.
+- This ensures quota is reserved up front, even if usage data is missing later.
+- Example: For gpt-image-1, the base price for 1024x1024/low is $0.011; higher qualities and sizes use tier multipliers (see `ratio.ImageTierTables`).
 
-- Image model pricing tables live in each adapter:
-  - OpenAI: `relay/adaptor/openai/constants.go`
-  - VertexAI Imagen: `relay/adaptor/vertexai/imagen/adaptor.go`
-  - Replicate: `relay/adaptor/replicate/constants.go`
-  - xAI (image): `relay/adaptor/xai/constants.go`
-- Each image model’s `ModelConfig.Ratio` is set as `(usd_per_image / 0.002) * ratio.ImageUsdPerPic`.
-  - `ratio.ImageUsdPerPic = 1000`, and `ratio.QuotaPerUsd = 500000`.
-  - So `(usd / 0.002) * 1000 = usd * 500000` = quota per image. Example: `$0.04` → `0.04 * 500000 = 20000 quota`.
+**2. Post-consume (Reconciliation):**
 
-Important nuance (bug today):
+- After the request, if the provider returns detailed usage metrics (token buckets), the system recomputes the quota using the most accurate, token-based formula for that model.
+- For gpt-image-1, the formula is:
 
-- The controller multiplies the adapter-provided ratio by `* 1000` again when computing `usedQuota`.
-- Since adapter `Ratio` for images is already in “quota per image”, the extra `* 1000` produces a 1000× overcharge. For `$0.04` per image: expected `20000 quota`, actual code bills `20000 * 1000 = 20,000,000 quota` per image.
-- Replicate path uses the same extra `* 1000` (still overcharges by 1000×, though it forces `n=1`).
+  - Input text tokens: $5 per 1M tokens
+  - Cached input text tokens: $1.25 per 1M tokens
+  - Input image tokens: $10 per 1M tokens
+  - Cached input image tokens: $2.5 per 1M tokens
+  - Output image tokens: $40 per 1M tokens
+  - Cached tokens are apportioned between text/image proportionally.
+  - The group ratio is applied as a final multiplier.
 
-Request/response data flow (non-Azure unless noted):
+- If usage data is missing or unreliable, the system falls back to the pre-consumed per-image price.
 
-1. Request parsing and defaults: `getImageRequest()` sets defaults for `n`, `size`, `quality` based on model.
-2. Model mapping: origin→actual model name; Azure builds specific images endpoint.
-3. Validation: `validateImageRequest()` enforces size, prompt length, and `n` bounds using `ratio.ImageSizeRatios`, `ImagePromptLengthLimitations`, `ImageGenerationAmounts`.
-4. Cost multiplier: `getImageCostRatio()` applies size/quality tiers (e.g., DALL·E 3 “hd”, `gpt-image-1` low/medium/high/auto) with hard-coded multipliers.
-5. Pricing lookup: channel overrides via `channel.GetModelRatioFromConfigs()`; then legacy `billingratio.GetModelRatioWithChannel(...)` (not the new three-layer resolver).
-6. Pre-check: compute `usedQuota` as above; ensure user quota suffices; no pre-consume is recorded, only a check.
-7. Upstream call: adapter `DoRequest()`; per-channel image request conversion may occur (Ali, Zhipu, VertexAI, Baidu, Replicate).
-8. Response handling: `ImageHandler()` copies upstream body and returns `ImageResponse.Usage` if present. For OpenAI `gpt-image-1`, token-based add-on cost is appended to `usedQuota`.
-9. Post-consume and logging: `PostConsumeTokenQuota(tokenId, usedQuota)`, user/channel quotas, request cost record, and logs.
+**3. Fallback and Extensibility:**
 
-Known inconsistencies vs text billing:
+- This two-step process is universal for all image models with per-image pricing. As more models publish token-bucket rates, they can be added to the usage reconciliation logic.
+- The system is designed to always use usage-derived costs when available, ensuring fairness and accuracy.
 
-- Images still use legacy `billingratio.GetModelRatioWithChannel` instead of `pricing.GetModelRatioWithThreeLayers` (which adds adapter defaults and global fallback).
-- Over-scaling: extra `* 1000` applied to an adapter `Ratio` that is already in “quota per image” units.
-- Provider asymmetry: only `gpt-image-1` adds token-based surcharges; other image models do not.
+**4. Channel/Admin Overrides:**
 
-Temporary mental model (as implemented today):
+- Channel-specific overrides for image tiers and per-image pricing are supported and merged with adapter and global defaults.
 
-```
-// Current code path (overcharges by 1000×)
-quota = n * image_cost_ratio * adapter_ratio_in_quota_per_image * 1000
-// gpt-image-1 extra:
-quota += ceil(text_tokens * 5 * MilliTokensUsd) + ceil(image_tokens * 10 * MilliTokensUsd)
-```
+**5. Logging and Quota Management:**
 
-Recommended corrected formula:
+- All quota operations (pre-consume, post-consume, refund) are logged with clear context, and quota is always refunded if the request fails.
 
-```
-// Adapter Ratio for images should equal usd_per_image * QuotaPerUsd (already in quota units)
-quota = n * image_cost_ratio * adapter_ratio_in_quota_per_image
-// Optional: provider-declared prompt/image token add-ons if part of public pricing
-quota += token_addons_quota
-```
+**6. Example (gpt-image-1):**
 
-Planned corrections and improvements are outlined below.
+- Pre-consume: For a 1024x1024/high image, pre-consume $0.167 × group ratio × quota-per-USD.
+- Post-consume: If usage is returned, recompute using the five-bucket formula above and override the pre-charge.
 
----
+**7. Implementation References:**
 
-Improvement plan (image pricing and billing):
+- Controller logic: `relay/controller/image.go` (see `RelayImageHelper`, `computeImageUsageQuota`, `computeGptImage1TokenQuota`)
+- Pricing constants: `relay/adaptor/openai/constants.go`, `relay/billing/ratio/image.go`
+- Tier tables: `ratio.ImageTierTables`
 
-1. Unit and scaling cleanup (bug fix)
+**8. Tests:**
 
-- Remove the trailing `* 1000` in `RelayImageHelper` when calculating `usedQuota` for all providers.
-- Keep adapter `Ratio` for images defined as `usd_per_image * QuotaPerUsd` (single source of truth).
-- Outcome: exact parity between configured USD price and billed quota.
+- All changes are covered by unit tests and must pass `go test -race ./...` before merge.
 
-2. Unify pricing resolution layers
+**Summary:**
 
-- Switch image model pricing to the same three-layer resolver used by text:
-  - Channel overrides (admin-configurable)
-  - Adapter defaults (per-provider `GetDefaultModelPricing()`)
-  - Global fallback (merged pricing map)
-- Replace legacy `billingratio.GetModelRatioWithChannel` with `pricing.GetModelRatioWithThreeLayers` in `RelayImageHelper`.
-
-3. Tiered resolution pricing (by size/quality)
-
-- Replace scattered hard-coded multipliers with structured, per-model tier tables:
-  - Base: 1024×1024 at quality=standard (or provider base)
-  - Tiers keyed by canonical sizes (e.g., 512×512, 1024×1024, 1024×1536, 1792×1024) and qualities (low/medium/high/hd/auto)
-  - Strategy: either area-proportional or provider-specified fixed multipliers
-- Store tier tables alongside adapter pricing as `ImageTiers` (new field) or reuse `ModelConfig.Tiers` with a resolution/quality dimension. Keep JSON-serializable.
-
-4. Provider-consistent token add-ons
-
-- Document provider rules for token add-ons explicitly. If only OpenAI’s `gpt-image-1` has token-based add-ons, keep it behind a provider flag; otherwise, normalize across providers.
-- Add unit tests to ensure add-ons match declared pricing and never double-bill against per-image base.
-
-5. Admin-managed rate tables
-
-- Extend channel config to accept image-tier overrides in addition to base model ratios, using a clear JSON schema:
-  - Example: `{ "model": "dall-e-3", "base_usd_per_image": 0.040, "tiers": { "1024x1024": {"high": 2.0}, "1024x1792": {"auto": 2.0} } }`
-- Provide merge rules: channel overrides > adapter defaults > global fallback. Omitted fields inherit.
-- Add validation and a “pricing preview” UI showing computed quota per requested size/quality before save.
-
-6. Documentation and tests
-
-- Update this document and `docs/arch/api_convert.md` to reflect the unified approach.
-- Add unit tests for: resolution tier lookup, admin overrides merge, replicate n=1 behavior, OpenAI `gpt-image-1` add-ons, and the removal of the extra `* 1000` scale.
-- Ensure `go test -race ./...` passes; include floating-point tolerance for pricing math.
+- The system now guarantees that image requests are always billed fairly: usage-derived token costs take priority, with a safe fallback to per-image pricing. This is universal for all image models and extensible to new models as they publish token-bucket rates.
 
 ## Database Schema
 
