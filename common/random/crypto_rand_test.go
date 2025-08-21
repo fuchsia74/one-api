@@ -18,13 +18,13 @@ func TestUniqueness(t *testing.T) {
 		{
 			name:         "GetUUID should always generate unique values",
 			generator:    random.GetUUID,
-			iterations:   10000,
+			iterations:   100000,
 			expectedUniq: true,
 		},
 		{
 			name:         "GenerateKey should always generate unique values",
 			generator:    random.GenerateKey,
-			iterations:   10000,
+			iterations:   100000,
 			expectedUniq: true,
 		},
 		{
@@ -32,7 +32,7 @@ func TestUniqueness(t *testing.T) {
 			generator: func() string {
 				return random.GetRandomString(10)
 			},
-			iterations:   10000,
+			iterations:   100000,
 			expectedUniq: true,
 		},
 		{
@@ -40,7 +40,7 @@ func TestUniqueness(t *testing.T) {
 			generator: func() string {
 				return random.GetRandomString(20)
 			},
-			iterations:   10000,
+			iterations:   100000,
 			expectedUniq: true,
 		},
 		{
@@ -48,7 +48,7 @@ func TestUniqueness(t *testing.T) {
 			generator: func() string {
 				return random.GetRandomNumberString(10)
 			},
-			iterations:    10000,
+			iterations:    100000,
 			expectedUniq:  false,
 			allowDupsRate: 0.001, // Allow 0.1% duplicates due to limited numeric space
 		},
@@ -57,7 +57,7 @@ func TestUniqueness(t *testing.T) {
 			generator: func() string {
 				return random.GetRandomNumberString(15)
 			},
-			iterations:   10000,
+			iterations:   100000,
 			expectedUniq: true,
 		},
 	}
