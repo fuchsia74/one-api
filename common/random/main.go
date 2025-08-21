@@ -1,13 +1,18 @@
 package random
 
 import (
-	"math/rand"
+	"crypto/rand"
+	"math/big"
 	"strings"
-	"time"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/google/uuid"
 )
 
+// GetUUID generates a UUID and returns it as a string without hyphens.
+// It uses [github.com/google/uuid] for UUID generation.
+//
+// [github.com/google/uuid]: https://pkg.go.dev/github.com/google/uuid
 func GetUUID() string {
 	code := uuid.New().String()
 	code = strings.Replace(code, "-", "", -1)
@@ -17,16 +22,13 @@ func GetUUID() string {
 const keyChars = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
 const keyNumbers = "0123456789"
 
-func init() {
-	rand.Seed(time.Now().UnixNano())
-}
-
+// GenerateKey creates a 48-character key consisting of 16 random characters
+// followed by a modified UUID. This provides a unique, secure identifier
+// suitable for authentication tokens or similar purposes.
 func GenerateKey() string {
-	rand.Seed(time.Now().UnixNano())
 	key := make([]byte, 48)
-	for i := 0; i < 16; i++ {
-		key[i] = keyChars[rand.Intn(len(keyChars))]
-	}
+	prefix := randomStringFromCharset(16, keyChars)
+	copy(key[:16], prefix)
 	uuid_ := GetUUID()
 	for i := 0; i < 32; i++ {
 		c := uuid_[i]
@@ -38,25 +40,46 @@ func GenerateKey() string {
 	return string(key)
 }
 
+// randomStringFromCharset generates a random string of the specified length using the provided charset.
+func randomStringFromCharset(length int, charset string) string {
+	key := make([]byte, length)
+	for i := range length {
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(charset))))
+		if err != nil {
+			panic(errors.Wrapf(err, "generating random string from charset %q and length %d", charset, length))
+		}
+
+		key[i] = charset[n.Int64()]
+	}
+	return string(key)
+}
+
+// GetRandomString generates a random string of the specified length
+// using a mix of numbers and letters (both uppercase and lowercase).
+// It uses [crypto/rand] for secure random number generation.
 func GetRandomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	key := make([]byte, length)
-	for i := 0; i < length; i++ {
-		key[i] = keyChars[rand.Intn(len(keyChars))]
-	}
-	return string(key)
+	return randomStringFromCharset(length, keyChars)
 }
 
+// GetRandomNumberString generates a random string of the specified length
+// using only numeric characters (0-9). It uses [crypto/rand] for secure
+// random number generation.
 func GetRandomNumberString(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	key := make([]byte, length)
-	for i := 0; i < length; i++ {
-		key[i] = keyNumbers[rand.Intn(len(keyNumbers))]
-	}
-	return string(key)
+	return randomStringFromCharset(length, keyNumbers)
 }
 
-// RandRange returns a random number between min and max (max is not included)
+// RandRange returns a random number between min and max (max is not included).
+// If min == max, returns min. If min > max, panics.
 func RandRange(min, max int) int {
-	return min + rand.Intn(max-min)
+	if min == max {
+		return min
+	}
+	if min > max {
+		panic(errors.Errorf("RandRange: min (%d) > max (%d)", min, max))
+	}
+	n, err := rand.Int(rand.Reader, big.NewInt(int64(max-min)))
+	if err != nil {
+		panic(errors.Wrapf(err, "generating random number between %d and %d", min, max))
+	}
+	return min + int(n.Int64())
 }
