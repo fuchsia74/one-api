@@ -60,7 +60,8 @@ func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
 		case "dall-e-2":
 			imageRequest.Quality = "standard"
 		case "dall-e-3":
-			imageRequest.Quality = "auto"
+			// OpenAI only supports 'standard' and 'hd' for DALL·E 3; 'auto' is invalid
+			imageRequest.Quality = "standard"
 		case "gpt-image-1":
 			imageRequest.Quality = "high"
 		}
@@ -116,6 +117,18 @@ func validateImageRequest(imageRequest *relaymodel.ImageRequest, _ *metalib.Meta
 	// Number of generated images validation
 	if !isWithinRange(imageRequest.Model, imageRequest.N) {
 		return openai.ErrorWrapper(errors.New("invalid value of n"), "n_not_within_range", http.StatusBadRequest)
+	}
+
+	// Model-specific quality validation
+	if imageRequest.Model == "dall-e-3" && imageRequest.Quality != "" {
+		q := strings.ToLower(imageRequest.Quality)
+		if q != "standard" && q != "hd" {
+			return openai.ErrorWrapper(
+				errors.Errorf("Invalid value: '%s'. Supported values are: 'standard' and 'hd'.", imageRequest.Quality),
+				"invalid_value",
+				http.StatusBadRequest,
+			)
+		}
 	}
 	return nil
 }
