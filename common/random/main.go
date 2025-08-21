@@ -9,7 +9,9 @@ import (
 )
 
 // GetUUID generates a UUID and returns it as a string without hyphens.
-// It uses github.com/google/uuid for UUID generation.
+// It uses [github.com/google/uuid] for UUID generation.
+//
+// [github.com/google/uuid]: https://pkg.go.dev/github.com/google/uuid
 func GetUUID() string {
 	code := uuid.New().String()
 	code = strings.Replace(code, "-", "", -1)
@@ -45,7 +47,7 @@ func GenerateKey() string {
 
 // GetRandomString generates a random string of the specified length
 // using a mix of numbers and letters (both uppercase and lowercase).
-// It uses crypto/rand for secure random number generation.
+// It uses [crypto/rand] for secure random number generation.
 func GetRandomString(length int) string {
 	key := make([]byte, length)
 	for i := range length {
@@ -60,7 +62,7 @@ func GetRandomString(length int) string {
 }
 
 // GetRandomNumberString generates a random string of the specified length
-// using only numeric characters (0-9). It uses crypto/rand for secure
+// using only numeric characters (0-9). It uses [crypto/rand] for secure
 // random number generation.
 func GetRandomNumberString(length int) string {
 	key := make([]byte, length)
