@@ -134,3 +134,55 @@ func TestRandRangeDistribution(t *testing.T) {
 		}
 	}
 }
+
+func TestEdgeCases(t *testing.T) {
+	t.Run("GetRandomString zero length", func(t *testing.T) {
+		s := random.GetRandomString(0)
+		if s != "" {
+			t.Errorf("Expected empty string, got %q", s)
+		}
+	})
+
+	t.Run("GetRandomNumberString zero length", func(t *testing.T) {
+		s := random.GetRandomNumberString(0)
+		if s != "" {
+			t.Errorf("Expected empty string, got %q", s)
+		}
+	})
+
+	t.Run("GetRandomString negative length (should panic)", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected panic for negative length")
+			}
+		}()
+		_ = random.GetRandomString(-1)
+	})
+
+	t.Run("GetRandomNumberString negative length (should panic)", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected panic for negative length")
+			}
+		}()
+		_ = random.GetRandomNumberString(-5)
+	})
+
+	t.Run("RandRange min == max (should always return min)", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			v := random.RandRange(5, 5)
+			if v != 5 {
+				t.Errorf("Expected 5, got %d", v)
+			}
+		}
+	})
+
+	t.Run("RandRange min > max (should panic)", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r == nil {
+				t.Errorf("Expected panic for min > max")
+			}
+		}()
+		_ = random.RandRange(10, 5)
+	})
+}
