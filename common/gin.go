@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -31,6 +33,11 @@ func UnmarshalBodyReusable(c *gin.Context, v any) error {
 	requestBody, err := GetRequestBody(c)
 	if err != nil {
 		return errors.Wrap(err, "get request body failed")
+	}
+
+	logger := gmw.GetLogger(c)
+	if _, ok := c.Get(ctxkey.RequestModel); !ok {
+		logger.Debug("receive user request", zap.ByteString("request", requestBody))
 	}
 
 	// check v should be a pointer

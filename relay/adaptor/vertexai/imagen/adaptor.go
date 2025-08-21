@@ -12,7 +12,6 @@ import (
 
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
-	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -25,13 +24,13 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	// -------------------------------------
 	// Image Generation Models
 	// -------------------------------------
-	"imagen-3.0-generate-001":      {Ratio: 0.04 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.04 per image
-	"imagen-3.0-generate-002":      {Ratio: 0.04 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.04 per image
-	"imagen-3.0-fast-generate-001": {Ratio: 0.02 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.02 per image
+	"imagen-3.0-generate-001":      {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // $0.04 per image
+	"imagen-3.0-generate-002":      {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // $0.04 per image
+	"imagen-3.0-fast-generate-001": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // $0.02 per image
 	// -------------------------------------
 	// Image Editing Models
 	// -------------------------------------
-	"imagen-3.0-capability-001": {Ratio: 0.05 * ratio.ImageUsdPerPic, CompletionRatio: 1.0}, // $0.05 per image
+	"imagen-3.0-capability-001": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.05}, // $0.05 per image
 }
 
 // ModelList derived from ModelRatios for backward compatibility

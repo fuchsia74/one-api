@@ -457,6 +457,8 @@ const (
 type ModelConfig struct {
     Ratio             float64 `json:"ratio"`
     CompletionRatio   float64 `json:"completion_ratio,omitempty"`
+    // For image models: explicit USD price per generated image.
+    ImagePriceUsd     float64 `json:"image_price_usd,omitempty"`
     // Cached reads (cache hit/refresh)
     CachedInputRatio  float64 `json:"cached_input_ratio,omitempty"`
     // Cache writes (cache creation)

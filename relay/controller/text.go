@@ -48,10 +48,6 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 	meta.IsStream = textRequest.Stream
 
-	if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
-		lg.Debug("get text request", zap.ByteString("body", reqBody.([]byte)))
-	}
-
 	// map model name
 	meta.OriginModelName = textRequest.Model
 	textRequest.Model = meta.ActualModelName

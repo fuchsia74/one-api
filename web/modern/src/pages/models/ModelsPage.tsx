@@ -10,6 +10,7 @@ interface ModelData {
   input_price: number
   output_price: number
   max_tokens: number
+  image_price?: number
 }
 
 interface ChannelInfo {
@@ -122,7 +123,8 @@ export function ModelsPage() {
       model: modelName,
       inputPrice: channelInfo.models[modelName].input_price,
       outputPrice: channelInfo.models[modelName].output_price,
-      maxTokens: channelInfo.models[modelName].max_tokens
+      maxTokens: channelInfo.models[modelName].max_tokens,
+      imagePrice: channelInfo.models[modelName].image_price,
     }))
 
     return (
@@ -140,6 +142,7 @@ export function ModelsPage() {
                   <th className="text-left py-2 px-3 font-medium">Model</th>
                   <th className="text-left py-2 px-3 font-medium">Input Price (per 1M tokens)</th>
                   <th className="text-left py-2 px-3 font-medium">Output Price (per 1M tokens)</th>
+                  <th className="text-left py-2 px-3 font-medium">Image Price (per image)</th>
                   <th className="text-left py-2 px-3 font-medium">Max Tokens</th>
                 </tr>
               </thead>
@@ -149,6 +152,7 @@ export function ModelsPage() {
                     <td className="py-2 px-3 font-mono text-sm">{model.model}</td>
                     <td className="py-2 px-3">{formatPrice(model.inputPrice)}</td>
                     <td className="py-2 px-3">{formatPrice(model.outputPrice)}</td>
+                    <td className="py-2 px-3">{model.imagePrice && model.imagePrice > 0 ? formatPrice(model.imagePrice) : '-'}</td>
                     <td className="py-2 px-3">{formatMaxTokens(model.maxTokens)}</td>
                   </tr>
                 ))}

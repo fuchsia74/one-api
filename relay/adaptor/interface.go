@@ -18,6 +18,9 @@ type ModelConfig struct {
 	Ratio float64 `json:"ratio"`
 	// CompletionRatio represents the output rate / input rate
 	CompletionRatio float64 `json:"completion_ratio,omitempty"`
+	// ImagePriceUsd is the USD cost per generated image for image models.
+	// Text models should leave this as zero.
+	ImagePriceUsd float64 `json:"image_price_usd,omitempty"`
 	// CachedInputRatio specifies price per cached input token.
 	// If non-zero, it overrides Ratio for cached input tokens. Negative means free.
 	CachedInputRatio float64 `json:"cached_input_ratio,omitempty"`

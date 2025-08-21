@@ -19,7 +19,6 @@ import (
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
-	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -345,8 +344,8 @@ func (a *Adaptor) GetModelRatio(modelName string) float64 {
 	if price, exists := pricing[modelName]; exists {
 		return price.Ratio
 	}
-	// Default Replicate pricing (image generation) - use proper image pricing unit
-	return 0.05 * ratio.ImageUsdPerPic // Default $0.05 per image
+	// Default Replicate pricing (image generation) - no per-token price by default
+	return 0
 }
 
 func (a *Adaptor) GetCompletionRatio(modelName string) float64 {

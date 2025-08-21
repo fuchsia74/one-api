@@ -163,9 +163,10 @@ type ChannelModelsDisplayInfo struct {
 
 // ModelDisplayInfo represents display information for a single model
 type ModelDisplayInfo struct {
-	InputPrice  float64 `json:"input_price"`  // Price per 1M input tokens in USD
-	OutputPrice float64 `json:"output_price"` // Price per 1M output tokens in USD
-	MaxTokens   int32   `json:"max_tokens"`   // Maximum tokens limit, 0 means unlimited
+	InputPrice  float64 `json:"input_price"`           // Price per 1M input tokens in USD
+	OutputPrice float64 `json:"output_price"`          // Price per 1M output tokens in USD
+	MaxTokens   int32   `json:"max_tokens"`            // Maximum tokens limit, 0 means unlimited
+	ImagePrice  float64 `json:"image_price,omitempty"` // USD per image (image models only)
 }
 
 // GetModelsDisplay returns models available to the current user grouped by channel/adaptor with pricing information
@@ -257,21 +258,34 @@ func GetModelsDisplay(c *gin.Context) {
 			}
 
 			if modelConfig, exists := pricing[actualModelName]; exists {
+				// If ImagePriceUsd is set and Ratio is zero, it's image-only pricing.
+				if modelConfig.ImagePriceUsd > 0 && modelConfig.Ratio == 0 {
+					modelsInfo[modelName] = ModelDisplayInfo{
+						InputPrice:  0, // Hide per-token price for image-only models
+						OutputPrice: 0,
+						MaxTokens:   modelConfig.MaxTokens,
+						ImagePrice:  modelConfig.ImagePriceUsd,
+					}
+					continue
+				}
+
 				// Convert pricing based on the format used by the adapter
-				// Some adapters use quota-based pricing (ratio.MilliTokensUsd = 0.5)
-				// Others use USD-based pricing (MilliTokensUsd = 0.000001)
-				// We detect the format by checking the magnitude of the ratio
 				if modelConfig.Ratio < 0.001 {
 					// USD-based pricing (like AWS): ratio is already in USD per token
-					// Just convert to USD per 1M tokens
 					inputPrice = modelConfig.Ratio * 1000000
 				} else {
 					// Quota-based pricing (like OpenAI): ratio is in quota per token
-					// Convert from quota to USD: ratio.QuotaPerUsd = 500000
 					inputPrice = (modelConfig.Ratio * 1000000) / 500000
 				}
 				outputPrice = inputPrice * modelConfig.CompletionRatio
 				maxTokens = modelConfig.MaxTokens
+				modelsInfo[modelName] = ModelDisplayInfo{
+					InputPrice:  inputPrice,
+					OutputPrice: outputPrice,
+					MaxTokens:   maxTokens,
+					ImagePrice:  modelConfig.ImagePriceUsd,
+				}
+				continue
 			} else {
 				// Fallback to adapter methods if not in pricing map
 				inputRatio := adaptor.GetModelRatio(actualModelName)

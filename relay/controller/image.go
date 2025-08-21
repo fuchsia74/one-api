@@ -124,68 +124,76 @@ func getImageCostRatio(imageRequest *relaymodel.ImageRequest) (float64, error) {
 	if imageRequest == nil {
 		return 0, errors.New("imageRequest is nil")
 	}
+	// Prefer structured tier tables when available; fallback to legacy logic
+	if tiersByQuality, ok := billingratio.ImageTierTables[imageRequest.Model]; ok {
+		quality := imageRequest.Quality
+		if quality == "" {
+			quality = "default"
+		}
+		// Try specific quality, then default
+		if tiersBySize, ok := tiersByQuality[quality]; ok {
+			if v, ok := tiersBySize[imageRequest.Size]; ok {
+				if v > 0 {
+					return v, nil
+				}
+			}
+		}
+		if tiersBySize, ok := tiersByQuality["default"]; ok {
+			if v, ok := tiersBySize[imageRequest.Size]; ok {
+				if v > 0 {
+					return v, nil
+				}
+			}
+		}
+		// When model has tier table but size not found, treat as invalid only for models with strict sizes (gpt-image-1)
+		if imageRequest.Model == "gpt-image-1" {
+			return 0, errors.New("invalid size for gpt-image-1, should be 1024x1024/1024x1536/1536x1024")
+		}
+		// Else, fall through to legacy map's permissive default
+	}
 
+	// Legacy fallback
 	imageCostRatio := getImageSizeRatio(imageRequest.Model, imageRequest.Size)
-	switch imageRequest.Quality {
-	case "hd":
-		switch imageRequest.Model {
-		case "dall-e-3":
-			switch imageRequest.Size {
-			case "1024x1024":
-				imageCostRatio *= 2
-			default:
-				imageCostRatio *= 1.5
-			}
+	if imageRequest.Quality == "hd" && imageRequest.Model == "dall-e-3" {
+		if imageRequest.Size == "1024x1024" {
+			imageCostRatio *= 2
+		} else {
+			imageCostRatio *= 1.5
 		}
-	case "low":
-		switch imageRequest.Model {
-		case "gpt-image-1":
-			switch imageRequest.Size {
-			case "1024x1024":
-				imageCostRatio = 1
-			case "1024x1536",
-				"1536x1024":
-				imageCostRatio = 16 / 11
-			default:
-				return 0, errors.New("invalid size for gpt-image-1, should be 1024x1024/1024x1536/1536x1024")
-			}
-		}
-	case "medium":
-		switch imageRequest.Model {
-		case "gpt-image-1":
-			switch imageRequest.Size {
-			case "1024x1024":
-				imageCostRatio = 42 / 11
-			case "1024x1536",
-				"1536x1024":
-				imageCostRatio = 63 / 11
-			default:
-				return 0, errors.New("invalid size for gpt-image-1, should be 1024x1024/1024x1536/1536x1024")
-			}
-		}
-	case "high", "auto", "":
-		switch imageRequest.Model {
-		case "gpt-image-1":
-			switch imageRequest.Size {
-			case "1024x1024":
-				imageCostRatio = 167 / 11
-			case "1024x1536",
-				"1536x1024",
-				"":
-				imageCostRatio = 250 / 11
-			default:
-				return 0, errors.New("invalid size for gpt-image-1, should be 1024x1024/1024x1536/1536x1024")
-			}
-		}
-	default:
-		return 0, errors.New("invalid quality, should be hd/low/medium/high/auto")
 	}
 
 	if imageCostRatio <= 0 {
 		imageCostRatio = 1
 	}
-
 	return imageCostRatio, nil
+}
+
+// getChannelImageTierOverride reads model tier overrides from channel model-configs map.
+// Convention keys (in channel ModelConfigs Ratio map):
+//
+//	$image-tier:<model>|size=<WxH>|quality=<q>  (highest priority)
+//	$image-tier:<model>|size=<WxH>
+//	$image-tier:<model>|quality=<q>
+func getChannelImageTierOverride(channelModelRatio map[string]float64, model, size, quality string) (float64, bool) {
+	if channelModelRatio == nil {
+		return 0, false
+	}
+	// Combined override
+	key := "$image-tier:" + model + "|size=" + size + "|quality=" + quality
+	if v, ok := channelModelRatio[key]; ok && v > 0 {
+		return v, true
+	}
+	// Size-only override
+	key = "$image-tier:" + model + "|size=" + size
+	if v, ok := channelModelRatio[key]; ok && v > 0 {
+		return v, true
+	}
+	// Quality-only override
+	key = "$image-tier:" + model + "|quality=" + quality
+	if v, ok := channelModelRatio[key]; ok && v > 0 {
+		return v, true
+	}
+	return 0, false
 }
 
 func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatusCode {
@@ -290,6 +298,11 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	modelRatio := pricing.GetModelRatioWithThreeLayers(imageModel, channelModelRatio, pricingAdaptor)
 	// groupRatio := billingratio.GetGroupRatio(meta.Group)
 	groupRatio := c.GetFloat64(ctxkey.ChannelRatio)
+
+	// Channel override for size/quality tier multiplier (optional)
+	if override, ok := getChannelImageTierOverride(channelModelRatio, imageModel, imageRequest.Size, imageRequest.Quality); ok {
+		imageCostRatio = override
+	}
 
 	ratio := modelRatio * groupRatio
 	userQuota, err := model.CacheGetUserQuota(ctx, meta.UserId)
