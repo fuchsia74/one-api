@@ -39,6 +39,28 @@ type commonAudioRequest struct {
 	File *multipart.FileHeader `form:"file" binding:"required"`
 }
 
+// extractAudioModelFromMultipart reads the cached request body and binds the `model` form field.
+// On any error or missing field, it returns an empty string and leaves the original body reusable.
+func extractAudioModelFromMultipart(c *gin.Context) string {
+	body, err := common.GetRequestBody(c)
+	if err != nil || len(body) == 0 {
+		return ""
+	}
+	// Restore body for binding
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	var req struct {
+		Model string `form:"model"`
+	}
+	if err := c.ShouldBind(&req); err != nil {
+		// Reset body and ignore error
+		c.Request.Body = io.NopCloser(bytes.NewReader(body))
+		return ""
+	}
+	// Reset body for downstream usage
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	return req.Model
+}
+
 func countAudioTokens(c *gin.Context) (float64, error) {
 	body, err := common.GetRequestBody(c)
 	if err != nil {
@@ -88,6 +110,11 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		// Check if text is too long 4096
 		if len(ttsRequest.Input) > 4096 {
 			return openai.ErrorWrapper(errors.New("input is too long (over 4096 characters)"), "text_too_long", http.StatusBadRequest)
+		}
+	} else if relayMode == relaymode.AudioTranscription || relayMode == relaymode.AudioTranslation {
+		// Extract `model` from multipart form for transcription/translation
+		if m := extractAudioModelFromMultipart(c); m != "" {
+			audioModel = m
 		}
 	}
 
