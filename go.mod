@@ -7,7 +7,7 @@ toolchain go1.24.0
 require (
 	cloud.google.com/go/iam v1.5.2
 	github.com/Laisky/errors/v2 v2.0.1
-	github.com/Laisky/gin-middlewares/v6 v6.1.0
+	github.com/Laisky/gin-middlewares/v6 v6.1.1-0.20250822145037-bfdcd7d1b070
 	github.com/Laisky/go-utils/v5 v5.1.2-0.20250801145933-70d7400d39dc
 	github.com/Laisky/zap v1.27.1-0.20241010063010-3154c45f2a1f
 	github.com/aws/aws-sdk-go-v2 v1.36.5

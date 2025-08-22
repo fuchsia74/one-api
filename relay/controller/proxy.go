@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -50,7 +51,7 @@ func RelayProxyHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// Capture trace ID before launching goroutine
 	traceId := tracing.GetTraceID(c)
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		ctx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), 30*time.Second)
 		defer cancel()
 
 		// Log the proxy request with zero quota

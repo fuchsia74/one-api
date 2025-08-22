@@ -387,7 +387,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	requestId := c.GetString(ctxkey.RequestId)
 	traceId := tracing.GetTraceID(c)
 	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		ctx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), time.Minute)
 		defer cancel()
 
 		if resp != nil &&

@@ -151,6 +151,7 @@ export default {
 	},
 	plugins: [
 		require('tailwindcss-animate'),
+		require('@tailwindcss/typography'),
 		// Custom plugin for responsive utilities
 		function ({ addUtilities, theme }) {
 			const newUtilities = {

@@ -132,7 +132,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		baseBillingTimeout := time.Duration(config.BillingTimeoutSec) * time.Second
 		billingTimeout := baseBillingTimeout
 
-		ctx, cancel := context.WithTimeout(context.Background(), billingTimeout)
+		ctx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), billingTimeout)
 		defer cancel()
 
 		// Monitor for timeout and log critical errors

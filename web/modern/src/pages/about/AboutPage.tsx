@@ -120,7 +120,7 @@ export function AboutPage() {
         </CardHeader>
         <CardContent>
           <div
-            className="prose prose-sm max-w-none dark:prose-invert"
+            className="prose prose-lg prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary hover:prose-a:underline prose-pre:bg-muted/60 prose-code:before:content-[''] prose-code:after:content-[''] max-w-none dark:prose-invert"
             dangerouslySetInnerHTML={{ __html: about }}
           />
         </CardContent>

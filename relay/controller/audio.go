@@ -329,7 +329,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	}
 
 	defer func() {
-		bgctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		bgctx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), time.Minute)
 		defer cancel()
 
 		// Build a full log entry with IDs from gin.Context
