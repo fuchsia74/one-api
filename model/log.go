@@ -77,15 +77,8 @@ func GetLogOrderClause(sortBy string, sortOrder string) string {
 // We need a systematic audit of every function that attempts to fetch values
 // from `context.Context` and change the design to pass those values explicitly
 // as parameters, rather than trying to read them from a generic `context.Context`.
-func recordLogHelper(ctx context.Context, log *Log) {
-	// Respect pre-set IDs; only fill from context if missing
-	if log.RequestId == "" {
-		log.RequestId = helper.GetRequestID(ctx)
-	}
-	if log.TraceId == "" {
-		// Also set TraceID from gin-middlewares if available
-		log.TraceId = helper.GetTraceIDFromContext(ctx)
-	}
+func recordLogHelper(_ context.Context, log *Log) {
+	// IDs must be pre-populated by the caller from gin.Context
 
 	err := LOG_DB.Create(log).Error
 	if err != nil {
@@ -120,42 +113,7 @@ func recordLogHelper(ctx context.Context, log *Log) {
 	)
 }
 
-func recordLogHelperWithTraceID(ctx context.Context, traceId string, log *Log) {
-	requestId := helper.GetRequestID(ctx)
-	log.RequestId = requestId
-	log.TraceId = traceId
-
-	// Debug logging to see what's happening
-	logger.Logger.Debug("setting trace_id in log record (with explicit trace_id)",
-		zap.String("trace_id", traceId),
-		zap.String("request_id", requestId))
-
-	err := LOG_DB.Create(log).Error
-	if err != nil {
-		// For billing logs (consume type), this is critical as it means we sent upstream request but failed to log it
-		if log.Type == LogTypeConsume {
-			logger.Logger.Error("failed to record billing log - audit trail incomplete",
-				zap.Error(err),
-				zap.Int("userId", log.UserId),
-				zap.Int("channelId", log.ChannelId),
-				zap.String("model", log.ModelName),
-				zap.Int("quota", log.Quota),
-				zap.String("requestId", log.RequestId),
-				zap.String("note", "billing completed successfully but log recording failed"))
-		} else {
-			logger.Logger.Error("failed to record log", zap.Error(err))
-		}
-		return
-	}
-	logger.Logger.Info("record log",
-		zap.Int("user_id", log.UserId),
-		zap.String("username", log.Username),
-		zap.Int64("created_at", log.CreatedAt),
-		zap.Int("type", log.Type),
-		zap.String("content", log.Content),
-		zap.String("request_id", log.RequestId),
-		zap.String("trace_id", log.TraceId))
-}
+// recordLogHelperWithTraceID removed: callers must set IDs directly on log
 
 func RecordLog(ctx context.Context, userId int, logType int, content string) {
 	if logType == LogTypeConsume && !config.LogConsumeEnabled {
@@ -222,15 +180,7 @@ func RecordConsumeLog(ctx context.Context, log *Log) {
 	recordLogHelper(ctx, log)
 }
 
-func RecordConsumeLogWithTraceID(ctx context.Context, traceId string, log *Log) {
-	if !config.LogConsumeEnabled {
-		return
-	}
-	log.Username = GetUsernameById(log.UserId)
-	log.CreatedAt = helper.GetTimestamp()
-	log.Type = LogTypeConsume
-	recordLogHelperWithTraceID(ctx, traceId, log)
-}
+// RecordConsumeLogWithTraceID removed: pass IDs directly and call RecordConsumeLog
 
 func RecordTestLog(ctx context.Context, log *Log) {
 	log.CreatedAt = helper.GetTimestamp()

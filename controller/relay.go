@@ -62,6 +62,18 @@ func Relay(c *gin.Context) {
 	// Start timing for Prometheus metrics
 	startTime := time.Now()
 
+	// Request start log for traceability
+	logger.Logger.Debug("incoming relay request",
+		zap.String("method", c.Request.Method),
+		zap.String("path", c.Request.URL.Path),
+		zap.Int("relay_mode", relayMode),
+		zap.Int("channel_id", channelId),
+		zap.Int("user_id", userId),
+		zap.String("content_type", c.GetHeader("Content-Type")),
+		zap.Int64("content_length", c.Request.ContentLength),
+		zap.String("request_id", c.GetString(helper.RequestIdKey)),
+	)
+
 	// Get metadata for monitoring
 	relayMeta := meta.GetByContext(c)
 

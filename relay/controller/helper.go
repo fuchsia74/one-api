@@ -287,6 +287,8 @@ func postConsumeQuota(ctx context.Context,
 	}
 	// Use centralized detailed billing function to follow DRY principle
 	quotaDelta := quota - preConsumedQuota
+	// We don't have gin.Context here, so RequestId/TraceId must be captured by caller and stored in meta if needed.
+	// For now, leave them empty.
 	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
 		Ctx:                    ctx,
 		TokenId:                meta.TokenId,
@@ -307,11 +309,14 @@ func postConsumeQuota(ctx context.Context,
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     cachedPrompt,
 		CachedCompletionTokens: 0,
+		RequestId:              "",
+		TraceId:                "",
 	})
 
 	return quota
 }
 
+// postConsumeQuotaWithTraceID is deprecated; callers should pass IDs via QuotaConsumeDetail
 func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	usage *relaymodel.Usage,
 	meta *meta.Meta,
@@ -435,10 +440,29 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	}
 	// Use centralized detailed billing function with explicit trace ID
 	quotaDelta := quota - preConsumedQuota
-	billing.PostConsumeQuotaDetailedWithTraceID(ctx, traceId, meta.TokenId, quotaDelta, quota, meta.UserId, meta.ChannelId,
-		promptTokens, completionTokens, usedModelRatio, groupRatio, textRequest.Model, meta.TokenName,
-		meta.IsStream, meta.StartTime, systemPromptReset, usedCompletionRatio, usage.ToolsCost,
-		cachedPrompt, 0) // Set cachedCompletion to 0
+	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+		Ctx:                    ctx,
+		TokenId:                meta.TokenId,
+		QuotaDelta:             quotaDelta,
+		TotalQuota:             quota,
+		UserId:                 meta.UserId,
+		ChannelId:              meta.ChannelId,
+		PromptTokens:           promptTokens,
+		CompletionTokens:       completionTokens,
+		ModelRatio:             usedModelRatio,
+		GroupRatio:             groupRatio,
+		ModelName:              textRequest.Model,
+		TokenName:              meta.TokenName,
+		IsStream:               meta.IsStream,
+		StartTime:              meta.StartTime,
+		SystemPromptReset:      systemPromptReset,
+		CompletionRatio:        usedCompletionRatio,
+		ToolsCost:              usage.ToolsCost,
+		CachedPromptTokens:     cachedPrompt,
+		CachedCompletionTokens: 0,
+		RequestId:              "",
+		TraceId:                traceId,
+	})
 
 	return quota
 }

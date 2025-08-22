@@ -103,7 +103,6 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// Use three-layer pricing system
 	pricingAdaptor := relay.GetAdaptor(channelType)
 	modelRatio := pricing.GetModelRatioWithThreeLayers(audioModel, channelModelRatio, pricingAdaptor)
-	// groupRatio := billingratio.GetGroupRatio(group)
 	groupRatio := c.GetFloat64(ctxkey.ChannelRatio)
 	ratio := modelRatio * groupRatio
 	var quota int64
@@ -196,12 +195,14 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		}
 	}
 
-	requestBody := &bytes.Buffer{}
-	_, err = io.Copy(requestBody, c.Request.Body)
+	// Reconstruct the original request body from cache to ensure full payload is forwarded
+	rawBody, err := common.GetRequestBody(c)
 	if err != nil {
-		return openai.ErrorWrapper(err, "new_request_body_failed", http.StatusInternalServerError)
+		return openai.ErrorWrapper(err, "get_request_body_failed", http.StatusInternalServerError)
 	}
-	c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody.Bytes()))
+	requestBody := bytes.NewBuffer(rawBody)
+	// Reset gin Request.Body for any subsequent operations that may need it
+	c.Request.Body = io.NopCloser(bytes.NewReader(rawBody))
 	// responseFormat := c.DefaultPostForm("response_format", "json")
 
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
@@ -293,8 +294,15 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 
 	succeed = true
 	quotaDelta := quota - preConsumedQuota
+
+	// Capture trace ID from gin context now; the background context will not carry gin
+	var traceID string
+	if tid, err := gmw.TraceID(c); err == nil {
+		traceID = tid.String()
+	}
+
 	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+		bgctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 		defer cancel()
 
 		// Build a full log entry with IDs from gin.Context
@@ -308,9 +316,9 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			TokenName:        tokenName,
 			Content:          logContent,
 			RequestId:        c.GetString(ctxkey.RequestId),
-			TraceId:          helper.GetTraceIDFromContext(ctx),
+			TraceId:          traceID,
 		}
-		go billing.PostConsumeQuotaWithLog(ctx, tokenId, quotaDelta, quota, entry)
+		go billing.PostConsumeQuotaWithLog(bgctx, tokenId, quotaDelta, quota, entry)
 	}()
 
 	for k, v := range resp.Header {

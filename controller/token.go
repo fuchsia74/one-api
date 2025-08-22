@@ -296,7 +296,11 @@ func ConsumeToken(c *gin.Context) {
 		return
 	}
 
-	// Record consumption log
+	// Record consumption log (pass IDs explicitly)
+	traceID := ""
+	if tid, err := gmw.TraceID(c); err == nil {
+		traceID = tid.String()
+	}
 	model.RecordConsumeLog(ctx, &model.Log{
 		UserId:    userID,
 		ModelName: tokenPatch.AddReason,
@@ -304,8 +308,8 @@ func ConsumeToken(c *gin.Context) {
 		Quota:     int(tokenPatch.AddUsedQuota),
 		Content: fmt.Sprintf("External (%s) consumed %s",
 			tokenPatch.AddReason, common.LogQuota(int64(tokenPatch.AddUsedQuota))),
-		RequestId: helper.GetRequestID(ctx),
-		TraceId:   helper.GetTraceIDFromContext(ctx),
+		RequestId: c.GetString(helper.RequestIdKey),
+		TraceId:   traceID,
 	})
 
 	// Update token data
