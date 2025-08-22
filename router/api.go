@@ -16,7 +16,8 @@ func SetApiRouter(router *gin.Engine) {
 	{
 		apiRouter.GET("/status", controller.GetStatus)
 		apiRouter.GET("/models", middleware.UserAuth(), controller.DashboardListModels)
-		apiRouter.GET("/models/display", middleware.UserAuth(), controller.GetModelsDisplay)
+		// Public endpoint: anonymous users see all supported models; logged-in users see only allowed models
+		apiRouter.GET("/models/display", controller.GetModelsDisplay)
 		apiRouter.GET("/notice", controller.GetNotice)
 		apiRouter.GET("/about", controller.GetAbout)
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)

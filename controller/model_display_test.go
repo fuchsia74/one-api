@@ -44,3 +44,31 @@ func TestGetModelsDisplay_Keyword(t *testing.T) {
 	// We only assert the presence of the success field and valid JSON structure.
 	assert.NotNil(t, resp.Success)
 }
+
+// TestGetModelsDisplay_Anonymous ensures anonymous users can access the endpoint
+// and receive a well-formed success response (may be empty data on a fresh DB).
+func TestGetModelsDisplay_Anonymous(t *testing.T) {
+	model.InitDB()
+	model.InitLogDB()
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/api/models/display", func(c *gin.Context) {
+		// Do not set ctxkey.Id to simulate anonymous user
+		GetModelsDisplay(c)
+	})
+
+	req := httptest.NewRequest("GET", "/api/models/display", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp struct {
+		Success bool                   `json:"success"`
+		Message string                 `json:"message"`
+		Data    map[string]interface{} `json:"data"`
+	}
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.True(t, resp.Success)
+}

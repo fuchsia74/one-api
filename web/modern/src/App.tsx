@@ -82,6 +82,11 @@ function App() {
               <Route path="/oauth/github" element={<GitHubOAuthPage />} />
               <Route path="/oauth/lark" element={<LarkOAuthPage />} />
 
+              {/* Public route(s) with layout */}
+              <Route path="/" element={<Layout />}>
+                <Route path="models" element={<ModelsPage />} />
+              </Route>
+
               {/* Protected routes */}
               <Route element={<ProtectedRoute />}>
                 <Route path="/" element={<Layout />}>
@@ -103,7 +108,6 @@ function App() {
                   <Route path="redemptions/edit/:id" element={<EditRedemptionPage />} />
                   <Route path="about" element={<AboutPage />} />
                   <Route path="settings" element={<SettingsPage />} />
-                  <Route path="models" element={<ModelsPage />} />
                   <Route path="topup" element={<TopUpPage />} />
                   <Route path="chat" element={<ChatPage />} />
                 </Route>

@@ -1,13 +1,17 @@
 package controller
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sort"
 	"strings"
+	"time"
 
 	gmw "github.com/Laisky/gin-middlewares/v6"
+	gutils "github.com/Laisky/go-utils/v5"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/middleware"
@@ -55,6 +59,13 @@ type OpenAIModels struct {
 var allModels []OpenAIModels
 var modelsMap map[string]OpenAIModels
 var channelId2Models map[int][]string
+
+// Anonymous models display cache (1-minute TTL) to avoid repeated heavy loads.
+// Keyed by normalized keyword filter.
+var (
+	anonymousModelsDisplayCache = gutils.NewExpCache[map[string]ChannelModelsDisplayInfo](context.Background(), time.Minute)
+	anonymousModelsDisplayGroup singleflight.Group
+)
 
 func init() {
 	var permission []OpenAIModelPermission
@@ -172,157 +183,157 @@ type ModelDisplayInfo struct {
 // GetModelsDisplay returns models available to the current user grouped by channel/adaptor with pricing information
 // This endpoint is designed for the Models display page in the frontend
 func GetModelsDisplay(c *gin.Context) {
+	// If logged-in, filter by user's allowed models; otherwise, show all supported models grouped by channel type
 	userId := c.GetInt(ctxkey.Id)
 	keyword := strings.ToLower(strings.TrimSpace(c.Query("keyword")))
 
-	// Get user's group to determine available models
-	userGroup, err := model.CacheGetUserGroup(userId)
-	if err != nil {
-		c.JSON(http.StatusOK, ModelsDisplayResponse{
-			Success: false,
-			Message: "Failed to get user group: " + err.Error(),
-			Data:    nil,
-		})
-		return
-	}
-
-	// Get available models with their channel information for this user group
-	availableAbilities, err := model.CacheGetGroupModelsV2(gmw.Ctx(c), userGroup)
-	if err != nil {
-		c.JSON(http.StatusOK, ModelsDisplayResponse{
-			Success: false,
-			Message: "Failed to get available models: " + err.Error(),
-			Data:    nil,
-		})
-		return
-	}
-
-	// Group models by individual channels to support Custom Channels and distinguish between multiple channels of the same type
-	result := make(map[string]ChannelModelsDisplayInfo)
-	channelToModels := make(map[int][]string)
-
-	// Group models by individual channel ID
-	for _, ability := range availableAbilities {
-		if keyword != "" && !strings.Contains(strings.ToLower(ability.Model), keyword) { // apply keyword filter
-			continue
-		}
-		channelToModels[ability.ChannelId] = append(channelToModels[ability.ChannelId], ability.Model)
-	}
-
-	// For each channel, get the channel information and pricing
-	for channelId, models := range channelToModels {
-		// Get channel information from database
-		channel, err := model.GetChannelById(channelId, true)
-		if err != nil {
-			continue
-		}
-
-		// Get adaptor for this channel type
+	// Helper to build pricing info map for a channel with given model names
+	buildChannelModels := func(channel *model.Channel, modelNames []string) map[string]ModelDisplayInfo {
+		result := make(map[string]ModelDisplayInfo)
+		// Get adaptor for this channel type (fallback to OpenAI for unsupported/custom)
 		adaptor := relay.GetAdaptor(channeltype.ToAPIType(channel.Type))
 		if adaptor == nil {
-			// For Custom Channels and other unsupported types, use OpenAI adaptor as fallback
 			adaptor = relay.GetAdaptor(apitype.OpenAI)
 			if adaptor == nil {
-				continue
+				return result
 			}
 		}
+		m := &meta.Meta{ChannelType: channel.Type}
+		adaptor.Init(m)
 
-		meta := &meta.Meta{
-			ChannelType: channel.Type,
-		}
-		adaptor.Init(meta)
-
-		// Get channel type name and pricing
-		channelTypeName := channeltype.IdToName(channel.Type)
 		pricing := adaptor.GetDefaultModelPricing()
-
-		// Get model mapping for this channel to resolve mapped model pricing
 		modelMapping := channel.GetModelMapping()
 
-		// Create display key in format {channel_type}:{channel_name}
-		displayKey := fmt.Sprintf("%s:%s", channelTypeName, channel.Name)
+		for _, modelName := range modelNames {
+			if keyword != "" && !strings.Contains(strings.ToLower(modelName), keyword) {
+				continue
+			}
+			// resolve mapped model for pricing
+			actual := modelName
+			if modelMapping != nil {
+				if mapped, ok := modelMapping[modelName]; ok && mapped != "" {
+					actual = mapped
+				}
+			}
 
-		// Create models display info for available models only
-		modelsInfo := make(map[string]ModelDisplayInfo)
-		for _, modelName := range models {
 			var inputPrice, outputPrice float64
 			var maxTokens int32
 
-			// Resolve the actual model name for pricing lookup
-			// If the model is mapped, use the target model for pricing
-			actualModelName := modelName
-			if modelMapping != nil {
-				if mappedModel, exists := modelMapping[modelName]; exists && mappedModel != "" {
-					actualModelName = mappedModel
-				}
-			}
-
-			if modelConfig, exists := pricing[actualModelName]; exists {
-				// If ImagePriceUsd is set and Ratio is zero, it's image-only pricing.
-				if modelConfig.ImagePriceUsd > 0 && modelConfig.Ratio == 0 {
-					modelsInfo[modelName] = ModelDisplayInfo{
-						InputPrice:  0, // Hide per-token price for image-only models
-						OutputPrice: 0,
-						MaxTokens:   modelConfig.MaxTokens,
-						ImagePrice:  modelConfig.ImagePriceUsd,
+			if cfg, ok := pricing[actual]; ok {
+				if cfg.ImagePriceUsd > 0 && cfg.Ratio == 0 {
+					result[modelName] = ModelDisplayInfo{
+						MaxTokens:  cfg.MaxTokens,
+						ImagePrice: cfg.ImagePriceUsd,
 					}
 					continue
 				}
-
-				// Convert pricing based on the format used by the adapter
-				if modelConfig.Ratio < 0.001 {
-					// USD-based pricing (like AWS): ratio is already in USD per token
-					inputPrice = modelConfig.Ratio * 1000000
+				if cfg.Ratio < 0.001 {
+					inputPrice = cfg.Ratio * 1000000
 				} else {
-					// Quota-based pricing (like OpenAI): ratio is in quota per token
-					inputPrice = (modelConfig.Ratio * 1000000) / 500000
+					inputPrice = (cfg.Ratio * 1000000) / 500000
 				}
-				outputPrice = inputPrice * modelConfig.CompletionRatio
-				maxTokens = modelConfig.MaxTokens
-				modelsInfo[modelName] = ModelDisplayInfo{
-					InputPrice:  inputPrice,
-					OutputPrice: outputPrice,
-					MaxTokens:   maxTokens,
-					ImagePrice:  modelConfig.ImagePriceUsd,
-				}
-				continue
+				outputPrice = inputPrice * cfg.CompletionRatio
+				maxTokens = cfg.MaxTokens
 			} else {
-				// Fallback to adapter methods if not in pricing map
-				inputRatio := adaptor.GetModelRatio(actualModelName)
-				completionRatio := adaptor.GetCompletionRatio(actualModelName)
-				// Apply the same detection logic for fallback pricing
-				if inputRatio < 0.001 {
-					// USD-based pricing
-					inputPrice = inputRatio * 1000000
+				inRatio := adaptor.GetModelRatio(actual)
+				compRatio := adaptor.GetCompletionRatio(actual)
+				if inRatio < 0.001 {
+					inputPrice = inRatio * 1000000
 				} else {
-					// Quota-based pricing
-					inputPrice = (inputRatio * 1000000) / 500000
+					inputPrice = (inRatio * 1000000) / 500000
 				}
-				outputPrice = inputPrice * completionRatio
-				maxTokens = 0 // Default to unlimited
+				outputPrice = inputPrice * compRatio
+				maxTokens = 0
 			}
 
-			modelsInfo[modelName] = ModelDisplayInfo{
+			result[modelName] = ModelDisplayInfo{
 				InputPrice:  inputPrice,
 				OutputPrice: outputPrice,
 				MaxTokens:   maxTokens,
+				ImagePrice:  pricing[actual].ImagePriceUsd,
 			}
 		}
-
-		if len(modelsInfo) > 0 {
-			result[displayKey] = ChannelModelsDisplayInfo{
-				ChannelName: displayKey,
-				ChannelType: channel.Type,
-				Models:      modelsInfo,
-			}
-		}
+		return result
 	}
 
-	c.JSON(http.StatusOK, ModelsDisplayResponse{
-		Success: true,
-		Message: "",
-		Data:    result,
-	})
+	// If userId is zero, treat as anonymous: list all channels and their supported models from DB and adaptor
+	if userId == 0 {
+		// Anonymous path with cache + singleflight to mitigate DB load and thundering herd
+		cacheKey := "kw:" + keyword
+		if data, ok := anonymousModelsDisplayCache.Load(cacheKey); ok {
+			c.JSON(http.StatusOK, ModelsDisplayResponse{Success: true, Message: "", Data: data})
+			return
+		}
+
+		v, err, _ := anonymousModelsDisplayGroup.Do(cacheKey, func() (interface{}, error) {
+			channels, err := model.GetAllEnabledChannels()
+			if err != nil {
+				return nil, err
+			}
+			result := make(map[string]ChannelModelsDisplayInfo)
+			for _, ch := range channels {
+				adaptor := relay.GetAdaptor(channeltype.ToAPIType(ch.Type))
+				if adaptor == nil {
+					adaptor = relay.GetAdaptor(apitype.OpenAI)
+					if adaptor == nil {
+						continue
+					}
+				}
+				modelList := adaptor.GetModelList()
+				if len(modelList) == 0 {
+					continue
+				}
+				modelInfos := buildChannelModels(ch, modelList)
+				if len(modelInfos) == 0 {
+					continue
+				}
+				key := fmt.Sprintf("%s:%s", channeltype.IdToName(ch.Type), ch.Name)
+				result[key] = ChannelModelsDisplayInfo{ChannelName: key, ChannelType: ch.Type, Models: modelInfos}
+			}
+			anonymousModelsDisplayCache.Store(cacheKey, result)
+			return result, nil
+		})
+		if err != nil {
+			c.JSON(http.StatusOK, ModelsDisplayResponse{Success: false, Message: "Failed to load channels: " + err.Error()})
+			return
+		}
+		data := v.(map[string]ChannelModelsDisplayInfo)
+		c.JSON(http.StatusOK, ModelsDisplayResponse{Success: true, Message: "", Data: data})
+		return
+	}
+
+	// Logged-in path: show only models allowed for the user group
+	userGroup, err := model.CacheGetUserGroup(userId)
+	if err != nil {
+		c.JSON(http.StatusOK, ModelsDisplayResponse{Success: false, Message: "Failed to get user group: " + err.Error()})
+		return
+	}
+	abilities, err := model.CacheGetGroupModelsV2(gmw.Ctx(c), userGroup)
+	if err != nil {
+		c.JSON(http.StatusOK, ModelsDisplayResponse{Success: false, Message: "Failed to get available models: " + err.Error()})
+		return
+	}
+
+	result := make(map[string]ChannelModelsDisplayInfo)
+	// Group abilities by channel ID
+	ch2models := make(map[int][]string)
+	for _, ab := range abilities {
+		ch2models[ab.ChannelId] = append(ch2models[ab.ChannelId], ab.Model)
+	}
+	for chID, models := range ch2models {
+		ch, err := model.GetChannelById(chID, true)
+		if err != nil {
+			continue
+		}
+		infos := buildChannelModels(ch, models)
+		if len(infos) == 0 {
+			continue
+		}
+		key := fmt.Sprintf("%s:%s", channeltype.IdToName(ch.Type), ch.Name)
+		result[key] = ChannelModelsDisplayInfo{ChannelName: key, ChannelType: ch.Type, Models: infos}
+	}
+
+	c.JSON(http.StatusOK, ModelsDisplayResponse{Success: true, Message: "", Data: result})
 }
 
 // ListModels lists all models available to the user.

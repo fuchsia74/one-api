@@ -138,6 +138,15 @@ func GetChannelCount() (count int64, err error) {
 	return count, err
 }
 
+// GetAllEnabledChannels returns all channels with status = ChannelStatusEnabled
+func GetAllEnabledChannels() ([]*Channel, error) {
+	var channels []*Channel
+	if err := DB.Where("status = ?", ChannelStatusEnabled).Find(&channels).Error; err != nil {
+		return nil, errors.Wrap(err, "query enabled channels")
+	}
+	return channels, nil
+}
+
 func SearchChannels(keyword string, sortBy string, sortOrder string) (channels []*Channel, err error) {
 	// Default sorting
 	orderClause := "id desc"

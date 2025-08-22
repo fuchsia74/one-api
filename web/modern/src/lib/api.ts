@@ -42,17 +42,20 @@ const handleAuthFailure = () => {
 // Response interceptor
 api.interceptors.response.use(
   (response) => {
-    // TEMPORARY: Handle legacy 200 OK with success: false for auth errors
-    // TODO: Remove this once all backend endpoints return proper HTTP status codes
+    // Handle legacy 200 OK with success: false for auth errors
     if (response.data && response.data.success === false) {
+      const url = response.config?.url || ''
       const message = response.data.message || ''
       const isAuthError = message.includes('access token is invalid') ||
                          message.includes('not logged in') ||
                          message.includes('No permission to perform this operation')
 
-      if (isAuthError) {
+      // Do not redirect for known public endpoints
+      const isPublicEndpoint = url.startsWith('/api/models/display')
+
+      if (isAuthError && !isPublicEndpoint) {
         handleAuthFailure()
-        return response // Return to prevent further processing
+        return response
       }
     }
     return response
