@@ -10,16 +10,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 
-// Helper function to render quota with USD conversion
+// Helper function to render quota with USD conversion (USD only)
 const renderQuotaWithPrompt = (quota: number): string => {
-  const quotaPerUnit = parseFloat(localStorage.getItem('quota_per_unit') || '500000')
-  const displayInCurrency = localStorage.getItem('display_in_currency') === 'true'
-
-  if (displayInCurrency) {
-    const usdValue = (quota / quotaPerUnit).toFixed(6)
-    return `${quota.toLocaleString()} tokens ($${usdValue})`
-  }
-  return `${quota.toLocaleString()} tokens`
+  const quotaPerUnitRaw = localStorage.getItem('quota_per_unit')
+  const quotaPerUnit = parseFloat(quotaPerUnitRaw || '500000')
+  const usd = Number.isFinite(quota) && quotaPerUnit > 0 ? quota / quotaPerUnit : NaN
+  const usdValue = Number.isFinite(usd) ? usd.toFixed(2) : '0.00'
+  console.log('[QUOTA_DEBUG][User] renderQuotaWithPrompt', { quota, quotaPerUnitRaw, quotaPerUnit, usd, usdValue })
+  return `$${usdValue}`
 }
 
 const userSchema = z.object({
@@ -60,6 +58,11 @@ export function EditUserPage() {
       group: 'default',
     },
   })
+
+  const watchQuota = form.watch('quota')
+  useEffect(() => {
+    console.log('[QUOTA_DEBUG][User] watchQuota changed:', watchQuota, typeof watchQuota)
+  }, [watchQuota])
 
   const loadUser = async () => {
     if (!userId) return
@@ -241,14 +244,17 @@ export function EditUserPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Quota {field.value ? `(${renderQuotaWithPrompt(field.value)})` : '(tokens)'}
+                        Quota {typeof field.value === 'number' ? renderQuotaWithPrompt(field.value) : ''}
                       </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
                           min="0"
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(e) => {
+                            console.log('[QUOTA_DEBUG][User] Input onChange', { value: e.target.value })
+                            field.onChange(e)
+                          }}
                         />
                       </FormControl>
                       <FormMessage />

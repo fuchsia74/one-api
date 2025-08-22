@@ -10,6 +10,16 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
 
+// Helper function to render quota with USD conversion (USD only)
+const renderQuotaWithPrompt = (quota: number): string => {
+  const quotaPerUnitRaw = localStorage.getItem('quota_per_unit')
+  const quotaPerUnit = parseFloat(quotaPerUnitRaw || '500000')
+  const usd = Number.isFinite(quota) && quotaPerUnit > 0 ? quota / quotaPerUnit : NaN
+  const usdValue = Number.isFinite(usd) ? usd.toFixed(2) : '0.00'
+  console.log('[QUOTA_DEBUG][Redemption] renderQuotaWithPrompt', { quota, quotaPerUnitRaw, quotaPerUnit, usd, usdValue })
+  return `$${usdValue}`
+}
+
 const redemptionSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   quota: z.number().min(1, 'Quota must be positive'),
@@ -35,6 +45,8 @@ export function EditRedemptionPage() {
       count: 1,
     },
   })
+
+  const watchQuota = form.watch('quota')
 
   const loadRedemption = async () => {
     if (!redemptionId) return
@@ -139,13 +151,18 @@ export function EditRedemptionPage() {
                   name="quota"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Quota (tokens)</FormLabel>
+                      <FormLabel>
+                        Quota {typeof field.value === 'number' ? renderQuotaWithPrompt(field.value) : ''}
+                      </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
                           min="1"
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(e) => {
+                            console.log('[QUOTA_DEBUG][Redemption] Input onChange', { value: e.target.value })
+                            field.onChange(e)
+                          }}
                         />
                       </FormControl>
                       <FormMessage />

@@ -13,6 +13,16 @@ import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { logEditPageLayout } from '@/dev/layout-debug'
 
+// Helper function to render quota with USD conversion (USD only)
+const renderQuotaWithPrompt = (quota: number): string => {
+  const quotaPerUnitRaw = localStorage.getItem('quota_per_unit')
+  const quotaPerUnit = parseFloat(quotaPerUnitRaw || '500000')
+  const usd = Number.isFinite(quota) && quotaPerUnit > 0 ? quota / quotaPerUnit : NaN
+  const usdValue = Number.isFinite(usd) ? usd.toFixed(2) : '0.00'
+  console.log('[QUOTA_DEBUG] renderQuotaWithPrompt', { quota, quotaPerUnitRaw, quotaPerUnit, usd, usdValue })
+  return `$${usdValue}`
+}
+
 const tokenSchema = z.object({
   name: z.string().min(1, 'Token name is required'),
   remain_quota: z.coerce.number().min(0, 'Quota must be non-negative'),
@@ -60,6 +70,10 @@ export function EditTokenPage() {
   })
 
   const watchUnlimitedQuota = form.watch('unlimited_quota')
+  const watchRemainQuota = form.watch('remain_quota')
+  useEffect(() => {
+    console.log('[QUOTA_DEBUG] watchRemainQuota changed:', watchRemainQuota, typeof watchRemainQuota)
+  }, [watchRemainQuota])
 
   const loadToken = async () => {
     if (!tokenId) return
@@ -67,7 +81,7 @@ export function EditTokenPage() {
     try {
       // Unified API call - complete URL with /api prefix
       const response = await api.get(`/api/token/${tokenId}`)
-  const { success, message, data } = response.data
+      const { success, message, data } = response.data
 
       if (success && data) {
         // Convert timestamp to datetime-local format
@@ -94,9 +108,9 @@ export function EditTokenPage() {
         if (data.name == null) data.name = ''
         if (data.subnet == null) data.subnet = ''
 
-  form.reset(data)
-  // Persist original id/status for submission logic
-  ;(form as any)._original = { id: data.id as number, status: data.status as number } as BackendToken
+        form.reset(data)
+          // Persist original id/status for submission logic
+          ; (form as any)._original = { id: data.id as number, status: data.status as number } as BackendToken
       } else {
         throw new Error(message || 'Failed to load token')
       }
@@ -203,9 +217,9 @@ export function EditTokenPage() {
         if (nextStatus === 4 && (isUnlimited || hasQuota)) nextStatus = 1
         // Expired -> Enabled if never expire or a future expiry
         if (nextStatus === 3 && (exp === -1 || exp > nowSec)) nextStatus = 1
-        ;(payload as any).status = nextStatus
+          ; (payload as any).status = nextStatus
       }
-    if (isEdit && tokenId) {
+      if (isEdit && tokenId) {
         // Unified API call - complete URL with /api prefix
         response = await api.put('/api/token/', { ...payload, id: parseInt(tokenId) })
       } else {
@@ -249,194 +263,209 @@ export function EditTokenPage() {
     // eslint-disable-next-line react/jsx-no-useless-fragment
     <>
       {(() => { logEditPageLayout('EditTokenPage'); return null })()}
-    <div className="container mx-auto px-4 py-8">
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEdit ? 'Edit Token' : 'Create Token'}</CardTitle>
-          <CardDescription>
-            {isEdit ? 'Update token settings' : 'Create a new API token'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Token Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter token name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="space-y-4">
-                <Label>Allowed Models</Label>
-                <Input
-                  placeholder="Search models..."
-                  value={modelSearchTerm}
-                  onChange={(e) => setModelSearchTerm(e.target.value)}
+      <div className="container mx-auto px-4 py-8">
+        <Card>
+          <CardHeader>
+            <CardTitle>{isEdit ? 'Edit Token' : 'Create Token'}</CardTitle>
+            <CardDescription>
+              {isEdit ? 'Update token settings' : 'Create a new API token'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Token Name</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Enter token name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-                <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
-                  {filteredModels.map((model) => (
-                    <div key={model.value} className="relative flex items-center space-x-2">
-                      <Checkbox
-                        id={model.value}
-                        checked={selectedModels.includes(model.value)}
-                        onCheckedChange={() => toggleModel(model.value)}
-                      />
-                      <Label htmlFor={model.value} className="flex-1 cursor-pointer">
-                        {model.text}
-                      </Label>
-                    </div>
-                  ))}
-                </div>
-                <div className="flex flex-wrap gap-1">
-                  {selectedModels.map((model) => (
-                    <Badge
-                      key={model}
-                      variant="secondary"
-                      className="cursor-pointer"
-                      onClick={() => toggleModel(model)}
-                    >
-                      {model} ×
-                    </Badge>
-                  ))}
-                </div>
-              </div>
 
-              <FormField
-                control={form.control}
-                name="subnet"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>IP Restriction (Optional)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="e.g., 192.168.1.0/24 or 10.0.0.1"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="expired_time"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Expiration Time</FormLabel>
-                    <FormControl>
-                      <Input type="datetime-local" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setExpiredTime(0, 0, 0, 0)}
-                >
-                  Never Expire
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setExpiredTime(1, 0, 0, 0)}
-                >
-                  1 Month
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setExpiredTime(0, 1, 0, 0)}
-                >
-                  1 Day
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setExpiredTime(0, 0, 1, 0)}
-                >
-                  1 Hour
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setExpiredTime(0, 0, 0, 1)}
-                >
-                  1 Minute
-                </Button>
-              </div>
-
-              <div className="flex flex-row items-start space-x-3 space-y-0">
-                <FormControl>
-                  <Checkbox
-                    id="unlimited_quota"
-                    checked={!!watchUnlimitedQuota}
-                    onCheckedChange={(checked) => form.setValue('unlimited_quota', !!checked, { shouldDirty: true })}
+                <div className="space-y-4">
+                  <Label>Allowed Models</Label>
+                  <Input
+                    placeholder="Search models..."
+                    value={modelSearchTerm}
+                    onChange={(e) => setModelSearchTerm(e.target.value)}
                   />
-                </FormControl>
-                <div className="space-y-1 leading-none">
-                  <FormLabel htmlFor="unlimited_quota">Unlimited Quota</FormLabel>
+                  <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
+                    {filteredModels.map((model) => (
+                      <div key={model.value} className="relative flex items-center space-x-2">
+                        <Checkbox
+                          id={model.value}
+                          checked={selectedModels.includes(model.value)}
+                          onCheckedChange={() => toggleModel(model.value)}
+                        />
+                        <Label htmlFor={model.value} className="flex-1 cursor-pointer">
+                          {model.text}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedModels.map((model) => (
+                      <Badge
+                        key={model}
+                        variant="secondary"
+                        className="cursor-pointer"
+                        onClick={() => toggleModel(model)}
+                      >
+                        {model} ×
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
-              </div>
 
-              <FormField
-                control={form.control}
-                name="remain_quota"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Remaining Quota (tokens)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="0"
-                        disabled={watchUnlimitedQuota}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+                <FormField
+                  control={form.control}
+                  name="subnet"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>IP Restriction (Optional)</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g., 192.168.1.0/24 or 10.0.0.1"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="expired_time"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Expiration Time</FormLabel>
+                      <FormControl>
+                        <Input type="datetime-local" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setExpiredTime(0, 0, 0, 0)}
+                  >
+                    Never Expire
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setExpiredTime(1, 0, 0, 0)}
+                  >
+                    1 Month
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setExpiredTime(0, 1, 0, 0)}
+                  >
+                    1 Day
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setExpiredTime(0, 0, 1, 0)}
+                  >
+                    1 Hour
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setExpiredTime(0, 0, 0, 1)}
+                  >
+                    1 Minute
+                  </Button>
+                </div>
+
+                <div className="flex flex-row items-start space-x-3 space-y-0">
+                  <FormControl>
+                    <Checkbox
+                      id="unlimited_quota"
+                      checked={!!watchUnlimitedQuota}
+                      onCheckedChange={(checked) => form.setValue('unlimited_quota', !!checked, { shouldDirty: true })}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel htmlFor="unlimited_quota">Unlimited Quota</FormLabel>
+                  </div>
+                </div>
+
+                <FormField
+                  control={form.control}
+                  name="remain_quota"
+                  render={({ field }) => {
+                    const raw = field.value as any
+                    const fallback = form.getValues('remain_quota') as any
+                    const current = (raw ?? fallback) as any
+                    const numeric = Number(current)
+                    const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
+                    console.log('[QUOTA_DEBUG] field.value:', { raw, fallback, current, numeric, usdLabel, type: typeof raw })
+                    return (
+                      <FormItem>
+                        <FormLabel>
+                          Remaining Quota ({usdLabel})
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            disabled={watchUnlimitedQuota}
+                            {...field}
+                            onChange={(e) => {
+                              console.log('[QUOTA_DEBUG] Input onChange', { value: e.target.value })
+                              // Pass original event to RHF (prevents libs reading value.name from breaking)
+                              field.onChange(e)
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
+                />
+
+                {form.formState.errors.root && (
+                  <div className="text-sm text-destructive">
+                    {form.formState.errors.root.message}
+                  </div>
                 )}
-              />
 
-              {form.formState.errors.root && (
-                <div className="text-sm text-destructive">
-                  {form.formState.errors.root.message}
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting
+                      ? (isEdit ? 'Updating...' : 'Creating...')
+                      : (isEdit ? 'Update Token' : 'Create Token')
+                    }
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/tokens')}
+                  >
+                    Cancel
+                  </Button>
                 </div>
-              )}
-
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? (isEdit ? 'Updating...' : 'Creating...')
-                    : (isEdit ? 'Update Token' : 'Create Token')
-                  }
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/tokens')}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-  </div>
-  </>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </div>
+    </>
   )
 }
 
