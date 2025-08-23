@@ -258,6 +258,7 @@ export function EditChannelPage() {
   const [modelSearchTerm, setModelSearchTerm] = useState('')
   const [groups, setGroups] = useState<string[]>([])
   const [defaultPricing, setDefaultPricing] = useState<string>('')
+  const [defaultBaseURL, setDefaultBaseURL] = useState<string>('')
   const [batchMode, setBatchMode] = useState(false)
   const [customModel, setCustomModel] = useState('')
   const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
@@ -304,6 +305,34 @@ export function EditChannelPage() {
     console.log('[CHANNEL_TYPE_DEBUG] watchType changed:', watchType, typeof watchType)
     console.log('[CHANNEL_TYPE_DEBUG] selectedChannelType:', selectedChannelType)
   }, [watchType, selectedChannelType])
+
+  // Fetch server-side channel metadata (default base URL) when type changes
+  useEffect(() => {
+    let cancelled = false
+    const run = async () => {
+      try {
+        setDefaultBaseURL('')
+        const t = form.getValues('type')
+        if (!t) return
+        const res = await api.get(`/api/channel/metadata?type=${t}`)
+        const base = (res.data?.data?.default_base_url as string) || ''
+        if (!cancelled) {
+          setDefaultBaseURL(base)
+          // Prefill only on create when user left it blank and server has a default
+          if (!isEdit) {
+            const current = form.getValues('base_url') || ''
+            if (!current.trim() && base) {
+              form.setValue('base_url', base)
+            }
+          }
+        }
+      } catch (_) {
+        // ignore
+      }
+    }
+    run()
+    return () => { cancelled = true }
+  }, [watchType])
 
   // Additional effect to ensure type field is properly set after form initialization
   useEffect(() => {
@@ -846,7 +875,7 @@ export function EditChannelPage() {
                   <FormLabel>Azure OpenAI Endpoint *</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="https://your-resource.openai.azure.com"
+                      placeholder={defaultBaseURL || 'https://your-resource.openai.azure.com'}
                       {...field}
                     />
                   </FormControl>
@@ -1173,7 +1202,7 @@ export function EditChannelPage() {
                   <FormLabel>Base URL *</FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="https://api.your-provider.com/v1"
+                      placeholder={defaultBaseURL || 'https://api.your-provider.com/v1'}
                       {...field}
                     />
                   </FormControl>
@@ -1338,7 +1367,7 @@ export function EditChannelPage() {
                     <FormLabel>Base URL (Optional)</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="e.g., https://api.openai.com"
+                        placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
                         {...field}
                       />
                     </FormControl>

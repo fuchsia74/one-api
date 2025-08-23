@@ -158,6 +158,17 @@ func AddChannel(c *gin.Context) {
 		}
 		localChannel := channel
 		localChannel.Key = key
+		// Auto-populate default BaseURL on creation if blank and default exists
+		if (localChannel.BaseURL == nil || *localChannel.BaseURL == "") && localChannel.Type >= 0 {
+			// Defensive bounds check against channeltype.ChannelBaseURLs
+			if localChannel.Type < len(channeltype.ChannelBaseURLs) {
+				def := channeltype.ChannelBaseURLs[localChannel.Type]
+				if strings.TrimSpace(def) != "" {
+					v := strings.TrimRight(def, "/")
+					localChannel.BaseURL = &v
+				}
+			}
+		}
 		channels = append(channels, localChannel)
 	}
 	err = model.BatchInsertChannels(channels)

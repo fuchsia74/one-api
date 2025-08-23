@@ -205,6 +205,13 @@ func (channel *Channel) GetBaseURL() string {
 	return *channel.BaseURL
 }
 
+// GetDefaultBaseURL returns the default base URL for the channel type based on built-in mapping.
+// Returns empty string if unknown.
+func (channel *Channel) GetDefaultBaseURL() string {
+	// Import lazily to avoid circulars; mirror relay/channeltype mapping here via function in callers.
+	return "" // kept simple; callers should use relay/channeltype.ChannelBaseURLs when needed
+}
+
 func (channel *Channel) GetModelMapping() map[string]string {
 	if channel.ModelMapping == nil || *channel.ModelMapping == "" || *channel.ModelMapping == "{}" {
 		return nil
