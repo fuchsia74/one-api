@@ -20,22 +20,7 @@ func TestPostConsumeQuotaWithStructuredOutput(t *testing.T) {
 		modelName        string
 		expectedMinQuota int64 // minimum expected quota due to structured output cost
 	}{
-		{
-			name:             "GPT-4o with structured output cost",
-			promptTokens:     100,
-			completionTokens: 1000,
-			toolsCost:        250, // Example structured output cost
-			modelName:        "gpt-4o",
-			expectedMinQuota: 250, // Should at least include the tools cost
-		},
-		{
-			name:             "GPT-4o-mini with structured output cost",
-			promptTokens:     100,
-			completionTokens: 1000,
-			toolsCost:        150, // Example structured output cost
-			modelName:        "gpt-4o-mini",
-			expectedMinQuota: 150, // Should at least include the tools cost
-		},
+		// ToolsCost is still included if other features add costs (e.g., web search), but structured outputs add none
 		{
 			name:             "No structured output cost",
 			promptTokens:     100,
@@ -101,30 +86,23 @@ func TestStructuredOutputCostIntegration(t *testing.T) {
 		},
 	}
 
-	// Simulate usage that would come from the adaptor with structured output cost
+	// Simulate usage that would come from the adaptor; structured outputs add no extra ToolsCost
 	completionTokens := 1000
-	modelRatio := ratio.GetModelRatioWithChannel("gpt-4o", channeltype.OpenAI, nil)
-	expectedStructuredCost := int64(float64(completionTokens) * 0.25 * modelRatio)
 
 	usage := &relaymodel.Usage{
 		PromptTokens:     100,
 		CompletionTokens: completionTokens,
 		TotalTokens:      1100,
-		ToolsCost:        expectedStructuredCost, // This would be set by the adaptor
+		ToolsCost:        0, // No structured output surcharge
 	}
 
 	// Calculate final quota as postConsumeQuota would
 	completionRatio := ratio.GetCompletionRatioWithChannel("gpt-4o", channeltype.OpenAI, nil)
 	quota := int64(float64(usage.PromptTokens)+float64(usage.CompletionTokens)*completionRatio) + usage.ToolsCost
 
-	// Verify structured output cost is included in final quota
-	if quota <= int64(float64(usage.PromptTokens)+float64(usage.CompletionTokens)*completionRatio) {
-		t.Error("Final quota should include structured output cost, but it appears to be missing")
-	}
-
-	// Verify the structured output cost is significant
-	if usage.ToolsCost == 0 {
-		t.Error("Expected structured output cost to be applied, but ToolsCost is 0")
+	// Verify final quota equals base cost when no additional tools cost is present
+	if quota != int64(float64(usage.PromptTokens)+float64(usage.CompletionTokens)*completionRatio) {
+		t.Error("Final quota should equal base cost when no ToolsCost is applied")
 	}
 
 	// Calculate the structured output portion of the total cost
@@ -139,8 +117,8 @@ func TestStructuredOutputCostIntegration(t *testing.T) {
 	t.Logf("  Total quota: %d", quota)
 	t.Logf("  Structured output portion: %.2f%%", structuredOutputPortion)
 
-	// Structured output should represent a reasonable portion of the cost
-	if structuredOutputPortion < 5 || structuredOutputPortion > 50 {
-		t.Errorf("Structured output cost portion (%.2f%%) seems unreasonable", structuredOutputPortion)
+	// No structured output surcharge should be present
+	if structuredOutputPortion != 0 {
+		t.Errorf("Structured output cost portion (%.2f%%) should be 0", structuredOutputPortion)
 	}
 }

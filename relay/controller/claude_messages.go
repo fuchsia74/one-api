@@ -585,33 +585,8 @@ func convertClaudeToolsToOpenAI(claudeTools []relaymodel.ClaudeTool) []relaymode
 }
 
 // calculateClaudeStructuredOutputCost calculates additional cost for structured output in Claude Messages API
-func calculateClaudeStructuredOutputCost(request *ClaudeMessagesRequest, completionTokens int, modelRatio float64, groupRatio float64) int64 {
-	// Check if this is a structured output request
-	// In Claude Messages API, structured output is typically indicated by specific tool usage or response format
-	// For now, we'll check if there are tools that might indicate structured output
-
-	// This is a simplified implementation - in a real scenario, you might want to:
-	// 1. Check for specific tool types that indicate structured output
-	// 2. Check for response format specifications
-	// 3. Analyze the actual response content for structured patterns
-
-	hasStructuredOutput := false
-
-	// Check if any tools are present (which might indicate structured output)
-	if len(request.Tools) > 0 {
-		// For now, assume any tool usage might involve structured output
-		// This could be refined based on specific tool types or patterns
-		hasStructuredOutput = true
-	}
-
-	// Apply 25% surcharge on completion tokens for structured output (same as OpenAI)
-	if hasStructuredOutput {
-		// Align surcharge with group ratio so it scales consistently with other priced terms
-		effectiveRatio := modelRatio * groupRatio
-		structuredOutputCost := int64(math.Ceil(float64(completionTokens) * 0.25 * effectiveRatio))
-		return structuredOutputCost
-	}
-
+func calculateClaudeStructuredOutputCost(_ *ClaudeMessagesRequest, _ int, _ float64, _ float64) int64 {
+	// No surcharge for structured outputs
 	return 0
 }
 
@@ -815,11 +790,8 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 	// Calculate base quota
 	baseQuota := int64(math.Ceil((float64(promptTokens) + float64(completionTokens)*completionRatio) * ratio))
 
-	// Add structured output cost if applicable
-	structuredOutputCost := calculateClaudeStructuredOutputCost(request, completionTokens, modelRatio, groupRatio)
-
-	// Total quota includes base cost, tools cost, and structured output cost
-	quota := baseQuota + usage.ToolsCost + structuredOutputCost
+	// No structured output surcharge
+	quota := baseQuota + usage.ToolsCost
 	if ratio != 0 && quota <= 0 {
 		quota = 1
 	}

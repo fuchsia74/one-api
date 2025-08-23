@@ -18,7 +18,8 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	imgutil "github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/logger"
-	dbmodel "github.com/songquanpeng/one-api/model"
+
+	// dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/alibailian"
 	"github.com/songquanpeng/one-api/relay/adaptor/baiduv2"
@@ -605,64 +606,11 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 					}
 				}
 
-				// -------------------------------------
-				// calculate structured output cost
-				// -------------------------------------
-				// Structured output with json_schema incurs additional costs
-				// Based on OpenAI's pricing, structured output typically has a multiplier applied
-				if req.ResponseFormat != nil &&
-					req.ResponseFormat.Type == "json_schema" &&
-					req.ResponseFormat.JsonSchema != nil {
-					// Apply structured output cost multiplier
-					// For structured output, there's typically an additional cost based on completion tokens
-					// Using a conservative estimate of 25% additional cost for structured output
-
-					// get channel-specific pricing if available
-					var channelModelRatio map[string]float64
-					if channelModel, ok := c.Get(ctxkey.ChannelModel); ok {
-						if channel, ok := channelModel.(*dbmodel.Channel); ok {
-							channelModelRatio = channel.GetModelRatio()
-						}
-					}
-
-					modelRatio := ratio.GetModelRatioWithChannel(meta.ActualModelName, meta.ChannelType, channelModelRatio)
-					structuredOutputCost := int64(math.Ceil(float64(usage.CompletionTokens) * 0.25 * modelRatio))
-					usage.ToolsCost += structuredOutputCost
-
-					// Log structured output cost application for debugging
-					logger.Logger.Debug(fmt.Sprintf("Applied structured output cost: %d (completion tokens: %d, model: %s)", structuredOutputCost, usage.CompletionTokens, meta.ActualModelName))
-				}
+				// No surcharge for structured outputs (json_schema); only token usage is billed.
 			}
 		}
 
-		// Also check the original request in case it wasn't converted
-		if req == nil {
-			if vi, ok := c.Get(ctxkey.RequestModel); ok {
-				if req, ok = vi.(*model.GeneralOpenAIRequest); ok && req != nil {
-					if req.ResponseFormat != nil &&
-						req.ResponseFormat.Type == "json_schema" &&
-						req.ResponseFormat.JsonSchema != nil {
-						// Apply structured output cost multiplier
-
-						// get channel-specific pricing if available
-						var channelModelRatio map[string]float64
-						if channelModel, ok := c.Get(ctxkey.ChannelModel); ok {
-							if channel, ok := channelModel.(*dbmodel.Channel); ok {
-								// Get from unified ModelConfigs only (after migration)
-								channelModelRatio = channel.GetModelRatioFromConfigs()
-							}
-						}
-
-						modelRatio := ratio.GetModelRatioWithChannel(meta.ActualModelName, meta.ChannelType, channelModelRatio)
-						structuredOutputCost := int64(math.Ceil(float64(usage.CompletionTokens) * 0.25 * modelRatio))
-						usage.ToolsCost += structuredOutputCost
-
-						// Log structured output cost application for debugging
-						logger.Logger.Debug(fmt.Sprintf("Applied structured output cost from original request: %d (completion tokens: %d, model: %s)", structuredOutputCost, usage.CompletionTokens, meta.ActualModelName))
-					}
-				}
-			}
-		}
+		// Also check the original request in case it wasn't converted — still no surcharge.
 	}
 
 	// Handle Claude Messages response conversion

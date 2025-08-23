@@ -4,10 +4,11 @@ import (
 	"context"
 	"testing"
 	"time"
-)
 
-// bring in model.Log type for constructing log entries
-import modelpkg "github.com/songquanpeng/one-api/model"
+	// bring in model.Log type for constructing log entries
+
+	modelpkg "github.com/songquanpeng/one-api/model"
+)
 
 // TestZeroQuotaFix verifies that the billing functions handle zero quota correctly
 // This addresses the critical bug where requests with 0 quota were not being logged

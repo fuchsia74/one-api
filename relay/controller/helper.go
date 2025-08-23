@@ -93,28 +93,6 @@ func getPreConsumedQuota(textRequest *relaymodel.GeneralOpenAIRequest, promptTok
 	}
 
 	baseQuota := int64(float64(preConsumedTokens) * ratio)
-
-	// Add estimated structured output cost if using JSON schema
-	// This ensures pre-consumption quota accounts for the additional structured output costs
-	if textRequest.ResponseFormat != nil &&
-		textRequest.ResponseFormat.Type == "json_schema" &&
-		textRequest.ResponseFormat.JsonSchema != nil {
-		// Estimate structured output cost based on max tokens (conservative approach)
-		estimatedCompletionTokens := textRequest.MaxTokens
-		if estimatedCompletionTokens == 0 {
-			// If no max tokens specified, use a conservative estimate
-			estimatedCompletionTokens = 1000
-		}
-
-		// Apply the same 25% multiplier used in post-consumption
-		// Note: We can't get exact model ratio here easily, so use the base ratio as approximation
-		estimatedStructuredCost := int64(float64(estimatedCompletionTokens) * 0.25 * ratio)
-		baseQuota += estimatedStructuredCost
-
-		logger.Logger.Debug("Pre-consumption: added estimated structured output cost",
-			zap.Int64("structured_output_cost", estimatedStructuredCost))
-	}
-
 	return baseQuota
 }
 

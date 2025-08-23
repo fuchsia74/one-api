@@ -29,7 +29,7 @@ func TestPreConsumedQuotaWithStructuredOutput(t *testing.T) {
 		expectStructuredSurcharge bool
 	}{
 		{
-			name: "Request with JSON schema should have additional pre-consumed quota",
+			name: "Request with JSON schema should have normal pre-consumed quota (no surcharge)",
 			textRequest: &relaymodel.GeneralOpenAIRequest{
 				Model:     "gpt-4o",
 				MaxTokens: 1000,
@@ -50,7 +50,7 @@ func TestPreConsumedQuotaWithStructuredOutput(t *testing.T) {
 			},
 			promptTokens:              100000, // Use larger token count to get non-zero quota
 			ratio:                     getTestModelRatio("gpt-4o", channeltype.OpenAI),
-			expectStructuredSurcharge: true,
+			expectStructuredSurcharge: false,
 		},
 		{
 			name: "Request without response format should have normal pre-consumed quota",
@@ -76,7 +76,7 @@ func TestPreConsumedQuotaWithStructuredOutput(t *testing.T) {
 			expectStructuredSurcharge: false,
 		},
 		{
-			name: "Request with JSON schema but no max tokens should still have structured surcharge",
+			name: "Request with JSON schema but no max tokens should have no surcharge",
 			textRequest: &relaymodel.GeneralOpenAIRequest{
 				Model: "gpt-4o",
 				ResponseFormat: &relaymodel.ResponseFormat{
@@ -91,7 +91,7 @@ func TestPreConsumedQuotaWithStructuredOutput(t *testing.T) {
 			},
 			promptTokens:              100000, // Use larger token count to get non-zero quota
 			ratio:                     getTestModelRatio("gpt-4o", channeltype.OpenAI),
-			expectStructuredSurcharge: true,
+			expectStructuredSurcharge: false,
 		},
 	}
 
@@ -106,32 +106,9 @@ func TestPreConsumedQuotaWithStructuredOutput(t *testing.T) {
 			}
 			baseQuota := int64(float64(basePreConsumedTokens) * tt.ratio)
 
-			if tt.expectStructuredSurcharge {
-				// Should have additional cost for structured output
-				if preConsumedQuota <= baseQuota {
-					t.Errorf("Expected pre-consumed quota to include structured output surcharge, but got %d (base: %d)",
-						preConsumedQuota, baseQuota)
-				}
-
-				// Calculate expected structured cost
-				estimatedTokens := tt.textRequest.MaxTokens
-				if estimatedTokens == 0 {
-					estimatedTokens = 1000 // default estimate
-				}
-				expectedStructuredCost := int64(float64(estimatedTokens) * 0.25 * tt.ratio)
-				expectedTotal := baseQuota + expectedStructuredCost
-
-				if preConsumedQuota != expectedTotal {
-					t.Errorf("Expected pre-consumed quota %d, got %d", expectedTotal, preConsumedQuota)
-				}
-
-				t.Logf("Pre-consumption correctly includes structured output cost: %d (base: %d, structured: %d)",
-					preConsumedQuota, baseQuota, expectedStructuredCost)
-			} else {
-				// Should not have additional cost
-				if preConsumedQuota != baseQuota {
-					t.Errorf("Expected pre-consumed quota %d (no surcharge), got %d", baseQuota, preConsumedQuota)
-				}
+			// Should not have additional cost
+			if preConsumedQuota != baseQuota {
+				t.Errorf("Expected pre-consumed quota %d (no surcharge), got %d", baseQuota, preConsumedQuota)
 			}
 		})
 	}
@@ -159,7 +136,7 @@ func TestStructuredOutputQuotaConsistency(t *testing.T) {
 	// Calculate pre-consumed quota
 	preConsumedQuota := getPreConsumedQuota(textRequest, promptTokens, modelRatio)
 
-	// Simulate post-consumption calculation
+	// Simulate post-consumption calculation (no structured output surcharge)
 	// Get completion ratio using the new two-layer approach
 	apiType := channeltype.ToAPIType(channeltype.OpenAI)
 	var completionRatio float64 = 1.0 // default
@@ -167,8 +144,7 @@ func TestStructuredOutputQuotaConsistency(t *testing.T) {
 		completionRatio = adaptor.GetCompletionRatio("gpt-4o")
 	}
 	basePostQuota := int64(float64(promptTokens)+float64(completionTokens)*completionRatio) * int64(modelRatio)
-	structuredOutputCost := int64(float64(completionTokens) * 0.25 * modelRatio)
-	actualPostQuota := basePostQuota + structuredOutputCost
+	actualPostQuota := basePostQuota
 
 	// Pre-consumption should be higher (conservative) but not excessively so
 	if preConsumedQuota <= actualPostQuota {

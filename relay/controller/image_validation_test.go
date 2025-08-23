@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+
 	metalib "github.com/songquanpeng/one-api/relay/meta"
 )
 

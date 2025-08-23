@@ -1256,18 +1256,11 @@ func ReturnPreConsumedQuota(ctx context.Context, quota int64, tokenId int) {
 
 ### Structured Output Pricing
 
-Special handling for structured output requests with additional cost multipliers:
+Structured outputs have no additional surcharge. Only token usage is billed.
 
-```go
-// Apply 25% additional cost for structured output
-structuredOutputCost := int64(math.Ceil(float64(completionTokens) * 0.25 * modelRatio))
-usage.ToolsCost += structuredOutputCost
-```
+#### Key Notes
 
-#### Key Files
-
-- `relay/adaptor/openai/adaptor.go` - Structured output cost calculation
-- Test files: `relay/adaptor/openai/structured_output_*_test.go`
+- OpenAI and Anthropic docs do not indicate any surcharge for structured outputs.
 
 ## Performance Considerations
 

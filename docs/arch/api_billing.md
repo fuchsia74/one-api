@@ -127,9 +127,9 @@ The system tracks and bills for the following token types:
 
 **`ToolsCost`**: Additional charges for special features:
 
-- **Structured Output**: 25% surcharge on completion tokens when using `json_schema` response format
-- **Function Calling**: Additional costs for tool usage (model-dependent)
-- **Web Search**: Variable costs based on search context size (small/medium/large)
+- Structured Output: No additional surcharge. Only token usage is billed.
+- Function Calling: Additional costs for tool usage (model-dependent)
+- Web Search: Variable costs based on search context size (small/medium/large)
 
 ### Billing Calculation Formula
 
@@ -140,7 +140,7 @@ Final Quota = Base Token Cost + Tools Cost
 
 Where:
 Base Token Cost = (PromptTokens + CompletionTokens × CompletionRatio) × ModelRatio × GroupRatio
-Tools Cost = Structured Output Cost + Function Call Cost + Web Search Cost
+Tools Cost = Function Call Cost + Web Search Cost
 ```
 
 #### Detailed Breakdown
@@ -151,11 +151,7 @@ Tools Cost = Structured Output Cost + Function Call Cost + Web Search Cost
 baseTokenCost = (promptTokens + completionTokens * completionRatio) * modelRatio * groupRatio
 ```
 
-**2. Structured Output Cost (when applicable):**
-
-```go
-structuredOutputCost = math.Ceil(completionTokens * 0.25 * modelRatio)
-```
+// No structured output surcharge is applied.
 
 **3. Final Quota:**
 
@@ -266,17 +262,13 @@ When using `response_format` with `json_schema`:
 if request.ResponseFormat != nil &&
    request.ResponseFormat.Type == "json_schema" &&
    request.ResponseFormat.JsonSchema != nil {
-    // Apply 25% surcharge on completion tokens
-    structuredOutputCost = ceil(completionTokens * 0.25 * modelRatio)
-    usage.ToolsCost += structuredOutputCost
+  // No surcharge; only token usage applies
 }
 ```
 
 **Cost Impact:**
 
-- Adds 25% surcharge to completion token costs
-- Applied only to the completion tokens, not prompt tokens
-- Calculated using the same model ratio as base pricing
+- No additional surcharge beyond token usage
 
 #### 2. Function Calling Billing
 
@@ -410,7 +402,7 @@ type Log struct {
 
 #### Structured Output
 
-- **`relay/adaptor/openai/adaptor.go`**: Structured output cost calculation
+- Structured output handling is implemented without surcharge in relevant controllers/adaptors
 - **`relay/adaptor/openai/structured_output_*_test.go`**: Test coverage for structured output billing
 
 #### Model Pricing
@@ -618,7 +610,7 @@ Final Quota = Base Token Cost + Tools Cost
 
 Where:
 Base Token Cost = (InputTokens + OutputTokens × CompletionRatio) × ModelRatio × GroupRatio
-Tools Cost = Structured Output Cost + Function Call Cost + Web Search Cost
+Tools Cost = Function Call Cost + Web Search Cost
 ```
 
 ### Advanced Features Support
@@ -638,7 +630,7 @@ Tools Cost = Structured Output Cost + Function Call Cost + Web Search Cost
 
 **Detection:** The system detects structured output requests when the Response API request includes `text.format.type: "json_schema"`
 
-**Billing:** Applies the same 25% surcharge on completion tokens as ChatCompletion API for structured output requests
+**Billing:** No additional surcharge for structured outputs; normal token pricing applies
 
 #### Function Calling Support
 
@@ -785,17 +777,10 @@ type Usage struct {
 
 #### 2. Additional Cost Components
 
-**Structured Output Billing:** Automatic detection and 25% surcharge for structured output patterns:
+**Structured Output Billing:** No surcharge for structured output patterns:
 
 ```go
-func calculateClaudeStructuredOutputCost(request *ClaudeMessagesRequest, completionTokens int, modelRatio float64) int64 {
-    // Detects structured output patterns in tool usage
-    // Applies 25% surcharge on completion tokens (same as OpenAI)
-    if hasStructuredOutput {
-        return int64(math.Ceil(float64(completionTokens) * 0.25 * modelRatio))
-    }
-    return 0
-}
+// No structured output surcharge is applied.
 ```
 
 **Image Processing Costs:** Accurate image token calculation based on Claude's specifications:
@@ -814,12 +799,12 @@ func calculateClaudeImageTokens(ctx context.Context, request *ClaudeMessagesRequ
 The Claude Messages API uses the same comprehensive billing formula as Chat Completion API:
 
 ```
-Total Quota = Base Cost + Tools Cost + Structured Output Cost + Image Cost
+Total Quota = Base Cost + Tools Cost + Image Cost
 
 Where:
 - Base Cost = (PromptTokens + CompletionTokens × CompletionRatio) × ModelRatio
 - Tools Cost = Calculated during request processing
-- Structured Output Cost = CompletionTokens × 0.25 × ModelRatio (if applicable)
+- No structured output surcharge
 - Image Cost = Σ(ImageTokens) × ModelRatio
 ```
 
@@ -856,11 +841,8 @@ func postConsumeClaudeMessagesQuota(ctx context.Context, usage *relaymodel.Usage
     // Calculate base quota
     baseQuota := int64(math.Ceil((float64(usage.PromptTokens) + float64(usage.CompletionTokens)*completionRatio) * modelRatio))
 
-    // Add structured output cost
-    structuredOutputCost := calculateClaudeStructuredOutputCost(request, usage.CompletionTokens, modelRatio)
-
-    // Total quota includes all components
-    totalQuota := baseQuota + usage.ToolsCost + structuredOutputCost
+  // Total quota includes all components (no structured output surcharge)
+  totalQuota := baseQuota + usage.ToolsCost
 
     // Use centralized billing system
     billing.PostConsumeQuotaDetailed(ctx, usage, meta, totalQuota, modelRatio, completionRatio, request.Model)
@@ -1011,7 +993,7 @@ type BillingLog struct {
     CompletionTokens int    `json:"completion_tokens"`
     TotalTokens     int     `json:"total_tokens"`
     ToolsCost       int64   `json:"tools_cost"`
-    StructuredCost  int64   `json:"structured_output_cost"`
+  // No separate structured output cost field
     ImageTokens     int     `json:"image_tokens"`
     ModelRatio      float64 `json:"model_ratio"`
     CompletionRatio float64 `json:"completion_ratio"`
@@ -1031,7 +1013,7 @@ type BillingLog struct {
 **Cost Metrics:**
 - Base model cost
 - Tools processing cost
-- Structured output surcharge
+- Structured output (no surcharge)
 - Image processing cost
 - Total quota consumed
 
@@ -1090,7 +1072,7 @@ The Claude Messages API provides complete billing parity with the Chat Completio
 **✅ Accurate Cost Calculation:**
 - Claude-specific image token calculation: `tokens = (width × height) / 750`
 - Proper tool schema tokenization
-- Structured output surcharge detection and application
+- No structured output surcharge detection or application
 - Comprehensive usage tracking and logging
 
 **✅ Production Ready:**

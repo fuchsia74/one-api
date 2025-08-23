@@ -11,7 +11,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -22,14 +21,13 @@ func TestStructuredOutputCostCalculation(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	tests := []struct {
-		name                    string
-		request                 *model.GeneralOpenAIRequest
-		expectedToolsCost       int64
-		completionTokens        int
-		shouldHaveStructuredFee bool
+		name              string
+		request           *model.GeneralOpenAIRequest
+		expectedToolsCost int64
+		completionTokens  int
 	}{
 		{
-			name: "Request with JSON schema should have additional cost",
+			name: "Request with JSON schema should have no additional cost",
 			request: &model.GeneralOpenAIRequest{
 				Model: "gpt-4o",
 				ResponseFormat: &model.ResponseFormat{
@@ -47,16 +45,16 @@ func TestStructuredOutputCostCalculation(t *testing.T) {
 					},
 				},
 			},
-			completionTokens:        1000,
-			shouldHaveStructuredFee: true,
+			completionTokens:  1000,
+			expectedToolsCost: 0,
 		},
 		{
 			name: "Request without response format should have no additional cost",
 			request: &model.GeneralOpenAIRequest{
 				Model: "gpt-4o",
 			},
-			completionTokens:        1000,
-			shouldHaveStructuredFee: false,
+			completionTokens:  1000,
+			expectedToolsCost: 0,
 		},
 		{
 			name: "Request with text response format should have no additional cost",
@@ -66,8 +64,8 @@ func TestStructuredOutputCostCalculation(t *testing.T) {
 					Type: "text",
 				},
 			},
-			completionTokens:        1000,
-			shouldHaveStructuredFee: false,
+			completionTokens:  1000,
+			expectedToolsCost: 0,
 		},
 		{
 			name: "Request with json_schema but no schema should have no additional cost",
@@ -77,8 +75,8 @@ func TestStructuredOutputCostCalculation(t *testing.T) {
 					Type: "json_schema",
 				},
 			},
-			completionTokens:        1000,
-			shouldHaveStructuredFee: false,
+			completionTokens:  1000,
+			expectedToolsCost: 0,
 		},
 	}
 
@@ -138,26 +136,9 @@ func TestStructuredOutputCostCalculation(t *testing.T) {
 				t.Errorf("Expected completion tokens %d, got %d", tt.completionTokens, usage.CompletionTokens)
 			}
 
-			// Check structured output cost
-			if tt.shouldHaveStructuredFee {
-				if usage.ToolsCost == 0 {
-					t.Error("Expected structured output cost to be applied, but ToolsCost is 0")
-				}
-
-				// Calculate expected cost (25% of completion tokens * model ratio)
-				modelRatio := ratio.GetModelRatioWithChannel(tt.request.Model, channeltype.OpenAI, nil)
-				expectedStructuredCost := int64(float64(tt.completionTokens) * 0.25 * modelRatio)
-
-				// Allow for rounding differences due to math.Ceil
-				if usage.ToolsCost < expectedStructuredCost || usage.ToolsCost > expectedStructuredCost+1 {
-					t.Errorf("Expected structured output cost around %d, got %d", expectedStructuredCost, usage.ToolsCost)
-				}
-
-				t.Logf("Structured output cost correctly applied: %d for model %s", usage.ToolsCost, tt.request.Model)
-			} else {
-				if usage.ToolsCost != 0 {
-					t.Errorf("Expected no structured output cost, but got %d", usage.ToolsCost)
-				}
+			// No structured output surcharge should be applied
+			if usage.ToolsCost != tt.expectedToolsCost {
+				t.Errorf("Expected ToolsCost %d, got %d", tt.expectedToolsCost, usage.ToolsCost)
 			}
 		})
 	}
@@ -235,19 +216,8 @@ func TestStructuredOutputCostWithOriginalRequest(t *testing.T) {
 		t.Fatal("Usage should not be nil")
 	}
 
-	// Check that structured output cost is applied
-	if usage.ToolsCost == 0 {
-		t.Error("Expected structured output cost to be applied from RequestModel context, but ToolsCost is 0")
+	// No structured output surcharge should be applied even when original request is used
+	if usage.ToolsCost != 0 {
+		t.Errorf("Expected no structured output cost from RequestModel context, but got %d", usage.ToolsCost)
 	}
-
-	// Calculate expected cost
-	modelRatio := ratio.GetModelRatioWithChannel(request.Model, channeltype.OpenAI, nil)
-	expectedStructuredCost := int64(float64(completionTokens) * 0.25 * modelRatio)
-
-	// Allow for rounding differences due to math.Ceil
-	if usage.ToolsCost < expectedStructuredCost || usage.ToolsCost > expectedStructuredCost+1 {
-		t.Errorf("Expected structured output cost around %d, got %d", expectedStructuredCost, usage.ToolsCost)
-	}
-
-	t.Logf("Structured output cost correctly applied from RequestModel context: %d", usage.ToolsCost)
 }
