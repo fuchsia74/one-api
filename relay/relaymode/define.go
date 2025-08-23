@@ -19,4 +19,6 @@ const (
 	ResponseAPI
 	// ClaudeMessages is for Claude Messages API direct requests
 	ClaudeMessages
+	// Realtime is for OpenAI Realtime API websocket sessions
+	Realtime
 )

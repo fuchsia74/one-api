@@ -49,6 +49,20 @@ func getAndValidateTextRequest(c *gin.Context, relayMode int) (*relaymodel.Gener
 	return textRequest, nil
 }
 
+// For Realtime websocket sessions, upgrade and proxy immediately.
+// This keeps the rest of the text pipeline unchanged for other modes.
+func maybeHandleRealtime(c *gin.Context) *relaymodel.ErrorWithStatusCode {
+	m := meta.GetByContext(c)
+	if m.Mode == relaymode.Realtime && m.ChannelType == channeltype.OpenAI {
+		if bizErr, _ := openai.RealtimeHandler(c, m); bizErr != nil {
+			return bizErr
+		}
+		return nil
+	}
+	return nil
+}
+
+
 func getPromptTokens(ctx context.Context, textRequest *relaymodel.GeneralOpenAIRequest, relayMode int) int {
 	switch relayMode {
 	case relaymode.ChatCompletions:

@@ -32,6 +32,10 @@ import (
 func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 	var err *model.ErrorWithStatusCode
 	switch relayMode {
+	case relaymode.Realtime:
+		// For Phase 1, route through text helper which will delegate to adaptor based on meta.Mode
+		// Realtime adaptor code will handle websocket upgrade and upstream pass-through.
+		err = controller.RelayTextHelper(c)
 	case relaymode.ImagesGenerations,
 		relaymode.ImagesEdits:
 		err = controller.RelayImageHelper(c, relayMode)

@@ -22,6 +22,7 @@ func SetRelayRouter(router *gin.Engine) {
 	relayV1Router.Use(middleware.GlobalRelayRateLimit())
 	relayV1Router.Use(middleware.ChannelRateLimit())
 	{
+	relayV1Router.GET("/realtime", controller.RelayRealtime)
 		relayV1Router.Any("/oneapi/proxy/:channelid/*target", controller.Relay)
 		relayV1Router.POST("/completions", controller.Relay)
 		relayV1Router.POST("/chat/completions", controller.Relay)

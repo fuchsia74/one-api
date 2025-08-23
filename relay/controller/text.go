@@ -35,6 +35,11 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
 
+	// Early WebSocket handling for Realtime
+	if err := maybeHandleRealtime(c); err != nil {
+		return err
+	}
+
 	// BUG: should not override meta.BaseURL and meta.ChannelId outside of metalib.GetByContext
 	// meta.BaseURL = c.GetString(ctxkey.BaseURL)
 	// meta.ChannelId = c.GetInt(ctxkey.ChannelId)
