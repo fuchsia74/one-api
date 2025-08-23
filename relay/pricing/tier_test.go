@@ -125,3 +125,31 @@ func TestResolveEffectivePricing_CachedNegativeFree(t *testing.T) {
 	}
 	// No cached output pricing; nothing to assert here
 }
+
+// New: ensure output price remains input*completion regardless of cached input and across tier transitions
+func TestResolveEffectivePricing_TierTransitionCacheIndependence(t *testing.T) {
+	a := &localMockAdaptor{pricing: map[string]adaptor.ModelConfig{
+		"tm": {
+			Ratio:            1.0,
+			CompletionRatio:  2.0,
+			CachedInputRatio: 0.5,
+			Tiers: []adaptor.ModelRatioTier{
+				{InputTokenThreshold: 1000, Ratio: 0.8},
+				{InputTokenThreshold: 5000, Ratio: 0.6},
+			},
+		},
+	}}
+
+	eff := ResolveEffectivePricing("tm", 6000, a) // tier2
+	if eff.InputRatio != 0.6 {
+		t.Fatalf("expected tier2 input ratio 0.6, got %v", eff.InputRatio)
+	}
+	if abs(eff.OutputRatio-1.2) > 1e-8 { // 0.6 * 2.0
+		t.Fatalf("expected output ratio 1.2, got %v", eff.OutputRatio)
+	}
+
+	// Cached input ratio should not affect output ratio
+	if abs(eff.CachedInputRatio-0.5) > 1e-9 {
+		t.Fatalf("expected cached input 0.5, got %v", eff.CachedInputRatio)
+	}
+}

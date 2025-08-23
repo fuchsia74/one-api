@@ -585,7 +585,7 @@ func convertClaudeToolsToOpenAI(claudeTools []relaymodel.ClaudeTool) []relaymode
 }
 
 // calculateClaudeStructuredOutputCost calculates additional cost for structured output in Claude Messages API
-func calculateClaudeStructuredOutputCost(request *ClaudeMessagesRequest, completionTokens int, modelRatio float64) int64 {
+func calculateClaudeStructuredOutputCost(request *ClaudeMessagesRequest, completionTokens int, modelRatio float64, groupRatio float64) int64 {
 	// Check if this is a structured output request
 	// In Claude Messages API, structured output is typically indicated by specific tool usage or response format
 	// For now, we'll check if there are tools that might indicate structured output
@@ -606,7 +606,9 @@ func calculateClaudeStructuredOutputCost(request *ClaudeMessagesRequest, complet
 
 	// Apply 25% surcharge on completion tokens for structured output (same as OpenAI)
 	if hasStructuredOutput {
-		structuredOutputCost := int64(math.Ceil(float64(completionTokens) * 0.25 * modelRatio))
+		// Align surcharge with group ratio so it scales consistently with other priced terms
+		effectiveRatio := modelRatio * groupRatio
+		structuredOutputCost := int64(math.Ceil(float64(completionTokens) * 0.25 * effectiveRatio))
 		return structuredOutputCost
 	}
 
@@ -814,7 +816,7 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 	baseQuota := int64(math.Ceil((float64(promptTokens) + float64(completionTokens)*completionRatio) * ratio))
 
 	// Add structured output cost if applicable
-	structuredOutputCost := calculateClaudeStructuredOutputCost(request, completionTokens, modelRatio)
+	structuredOutputCost := calculateClaudeStructuredOutputCost(request, completionTokens, modelRatio, groupRatio)
 
 	// Total quota includes base cost, tools cost, and structured output cost
 	quota := baseQuota + usage.ToolsCost + structuredOutputCost
