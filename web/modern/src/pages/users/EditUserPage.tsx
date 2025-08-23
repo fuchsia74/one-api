@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { useForm } from 'react-hook-form'
+import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Button } from '@/components/ui/button'
@@ -25,7 +25,8 @@ const userSchema = z.object({
   display_name: z.string().optional(),
   password: z.string().optional(),
   email: z.string().email('Valid email is required').optional(),
-  quota: z.number().min(0, 'Quota must be non-negative'),
+  // Coerce to number since HTML inputs provide string values
+  quota: z.coerce.number().min(0, 'Quota must be non-negative'),
   group: z.string().min(1, 'Group is required'),
 })
 
@@ -59,7 +60,7 @@ export function EditUserPage() {
     },
   })
 
-  const watchQuota = form.watch('quota')
+  const watchQuota = useWatch({ control: form.control, name: 'quota' })
   useEffect(() => {
     console.log('[QUOTA_DEBUG][User] watchQuota changed:', watchQuota, typeof watchQuota)
   }, [watchQuota])
@@ -161,7 +162,7 @@ export function EditUserPage() {
             <span className="ml-3">Loading user...</span>
           </CardContent>
         </Card>
-      </div>
+  </div>
     )
   }
 
@@ -244,7 +245,12 @@ export function EditUserPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Quota {typeof field.value === 'number' ? renderQuotaWithPrompt(field.value) : ''}
+                        {(() => {
+                          const current = watchQuota ?? field.value ?? 0
+                          const numeric = Number(current)
+                          const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
+                          return `Quota (${usdLabel})`
+                        })()}
                       </FormLabel>
                       <FormControl>
                         <Input
@@ -268,7 +274,7 @@ export function EditUserPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Group *</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a group" />
