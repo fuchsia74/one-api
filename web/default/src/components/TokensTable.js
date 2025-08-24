@@ -16,6 +16,7 @@ import {
   showSuccess,
   timestamp2string,
   renderQuota,
+  copy,
 } from '../helpers';
 import { ITEMS_PER_PAGE } from '../constants';
 import BaseTable from './shared/BaseTable';
@@ -71,6 +72,35 @@ const TokensTable = () => {
   const [sortOrder, setSortOrder] = useState('desc');
   const [tokenOptions, setTokenOptions] = useState([]);
   const [tokenSearchLoading, setTokenSearchLoading] = useState(false);
+  const [showKeys, setShowKeys] = useState({});
+
+  // Function to mask token key for security
+  const maskKey = (key) => {
+    if (!key || key.length <= 8) return '***';
+    return key.substring(0, 4) + '***' + key.substring(key.length - 4);
+  };
+
+  // Function to toggle key visibility
+  const toggleKeyVisibility = (tokenId) => {
+    setShowKeys(prev => ({
+      ...prev,
+      [tokenId]: !prev[tokenId]
+    }));
+  };
+
+  // Function to copy key to clipboard
+  const copyTokenKey = async (key) => {
+    try {
+      const success = await copy(key);
+      if (success) {
+        showSuccess(t('common:copy_success', 'Copied to clipboard!'));
+      } else {
+        showError(t('common:copy_failed', 'Failed to copy to clipboard'));
+      }
+    } catch (error) {
+      showError(t('common:copy_failed', 'Failed to copy to clipboard'));
+    }
+  };
 
   const SORT_OPTIONS = [
     { key: '', text: t('tokens.sort.default', 'Default'), value: '' },
@@ -248,6 +278,10 @@ const TokensTable = () => {
       onClick: () => sortToken('name'),
     },
     {
+      content: t('key'),
+      sortable: false,
+    },
+    {
       content: (
         <>
           {t('status')} {getSortIcon('status')}
@@ -350,7 +384,7 @@ const TokensTable = () => {
         onPageChange={onPaginationChange}
         headerCells={headerCells}
         footerButtons={footerButtons}
-        colSpan={7}
+        colSpan={8}
       >
         {tokens.map((token, idx) => {
           if (token.deleted) return null;
@@ -359,6 +393,41 @@ const TokensTable = () => {
               <Table.Cell data-label="ID">{token.id}</Table.Cell>
               <Table.Cell data-label="Name">
                 {cleanDisplay(token.name)}
+              </Table.Cell>
+              <Table.Cell data-label="Key">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: '0.9em' }}>
+                    {showKeys[token.id] ? token.key : maskKey(token.key)}
+                  </span>
+                  <Popup
+                    trigger={
+                      <Button
+                        size="mini"
+                        icon
+                        onClick={() => toggleKeyVisibility(token.id)}
+                      >
+                        <Icon name={showKeys[token.id] ? 'eye slash' : 'eye'} />
+                      </Button>
+                    }
+                    content={showKeys[token.id] ? t('common:hide') : t('common:show')}
+                    basic
+                    inverted
+                  />
+                  <Popup
+                    trigger={
+                      <Button
+                        size="mini"
+                        icon
+                        onClick={() => copyTokenKey(token.key)}
+                      >
+                        <Icon name="copy" />
+                      </Button>
+                    }
+                    content={t('common:copy')}
+                    basic
+                    inverted
+                  />
+                </div>
               </Table.Cell>
               <Table.Cell data-label="Status">{renderTokenStatus(token.status, t)}</Table.Cell>
               <Table.Cell data-label="Used Quota">
