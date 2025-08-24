@@ -62,7 +62,6 @@ func maybeHandleRealtime(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	return nil
 }
 
-
 func getPromptTokens(ctx context.Context, textRequest *relaymodel.GeneralOpenAIRequest, relayMode int) int {
 	switch relayMode {
 	case relaymode.ChatCompletions:

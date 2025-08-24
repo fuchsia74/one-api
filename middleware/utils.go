@@ -44,6 +44,15 @@ func ignoreServerError(err error) bool {
 }
 
 func getRequestModel(c *gin.Context) (string, error) {
+	// Realtime WS uses model in query string
+	if strings.HasPrefix(c.Request.URL.Path, "/v1/realtime") {
+		m := c.Query("model")
+		if m == "" {
+			return "", errors.New("missing required query parameter: model")
+		}
+		return m, nil
+	}
+
 	var modelRequest ModelRequest
 	err := common.UnmarshalBodyReusable(c, &modelRequest)
 	if err != nil {
