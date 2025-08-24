@@ -94,5 +94,4 @@ func GetUsage(c *gin.Context) {
 		TotalUsage: amount * 100,
 	}
 	c.JSON(200, usage)
-	return
 }

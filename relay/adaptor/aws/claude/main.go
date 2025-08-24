@@ -23,7 +23,8 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
+
+	// no global logger
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor/anthropic"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
@@ -68,7 +69,10 @@ func AwsClaudeModelTransArn(c *gin.Context, awsCli *bedrockruntime.Client) strin
 			arnMap := channel.GetInferenceProfileArnMap()
 			if arnMap != nil {
 				if arn, exists := arnMap[reqModelID]; exists && arn != "" {
-					logger.Logger.Debug(fmt.Sprintf("Using channel inference profile ARN for model %s: %s", reqModelID, arn))
+					gmw.GetLogger(c).Debug("using channel inference profile ARN",
+						zap.String("request_model", reqModelID),
+						zap.String("arn", arn),
+					)
 					return arn
 				}
 			}
@@ -102,7 +106,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 
 	if arn := AwsClaudeModelTransArn(c, awsCli); arn != "" {
 		awsReq.ModelId = aws.String(arn)
-		logger.Logger.Debug(fmt.Sprintf("final use modelID [%s]", arn))
+		logger.Debug("final modelId override applied", zap.String("model_id", arn))
 	}
 
 	claudeReq_, ok := c.Get(ctxkey.ConvertedRequest)
@@ -136,9 +140,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
 	}
 
-	logger.Debug("received response from AWS Bedrock",
-		zap.ByteString("response_body", awsResp.Body),
-	)
+	logger.Debug("received response from AWS Bedrock", zap.ByteString("response_body", awsResp.Body))
 	claudeResponse := new(anthropic.Response)
 	err = json.Unmarshal(awsResp.Body, claudeResponse)
 	if err != nil {
@@ -175,7 +177,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	if arn := AwsClaudeModelTransArn(c, awsCli); arn != "" {
 		awsReq.ModelId = aws.String(arn)
-		logger.Logger.Debug(fmt.Sprintf("final use modelID [%s]", arn))
+		gmw.GetLogger(c).Debug("final modelId override applied", zap.String("model_id", arn))
 	}
 
 	claudeReq_, ok := c.Get(ctxkey.ConvertedRequest)
@@ -229,7 +231,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			claudeResp := new(anthropic.StreamResponse)
 			err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(claudeResp)
 			if err != nil {
-				logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+				gmw.GetLogger(c).Error("error unmarshalling stream response: " + err.Error())
 				return false
 			}
 
@@ -266,7 +268,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			}
 			jsonStr, err := json.Marshal(response)
 			if err != nil {
-				logger.Logger.Error("error marshalling stream response: " + err.Error())
+				gmw.GetLogger(c).Error("error marshalling stream response", zap.Error(err))
 				return true
 			}
 			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})

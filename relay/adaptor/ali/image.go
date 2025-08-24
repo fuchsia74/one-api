@@ -13,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -85,7 +84,7 @@ func asyncTask(taskID string, key string) (*TaskResponse, error, []byte) {
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		logger.Logger.Error("aliAsyncTask client.Do err: " + err.Error())
+		// no request context here
 		return &aliResponse, err, nil
 	}
 	defer resp.Body.Close()
@@ -95,7 +94,7 @@ func asyncTask(taskID string, key string) (*TaskResponse, error, []byte) {
 	var response TaskResponse
 	err = json.Unmarshal(responseBody, &response)
 	if err != nil {
-		logger.Logger.Error("aliAsyncTask NewDecoder err: " + err.Error())
+		// no request context here
 		return &aliResponse, err, nil
 	}
 
@@ -152,8 +151,7 @@ func responseAli2OpenAIImage(response *TaskResponse, responseFormat string) *ope
 			// Read the image data from data.Url and store it in b64Json
 			imageData, err := getImageData(data.Url)
 			if err != nil {
-				// Handle the case where getting image data fails
-				logger.Logger.Error("getImageData Error getting image data: " + err.Error())
+				// no request context here
 				continue
 			}
 

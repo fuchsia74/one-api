@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
-	"github.com/songquanpeng/one-api/common/logger"
 	rmeta "github.com/songquanpeng/one-api/relay/meta"
 	rmodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -21,6 +21,7 @@ import (
 // RealtimeHandler proxies a WebSocket session to the upstream OpenAI Realtime endpoint.
 // It preserves text/binary frames and mirrors the `Sec-WebSocket-Protocol` when present.
 func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusCode, *rmodel.Usage) {
+	lg := gmw.GetLogger(c)
 	if meta.Mode != relaymode.Realtime {
 		return &rmodel.ErrorWithStatusCode{
 			Error: rmodel.Error{
@@ -102,7 +103,7 @@ func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusC
 
 	// Wait for either direction to error/close
 	if e := <-errc; e != nil {
-		logger.Logger.Debug("realtime ws closed", zap.String("error", e.Error()))
+		lg.Debug("realtime ws closed", zap.String("error", e.Error()))
 	}
 
 	// Compute total tokens if we have parts

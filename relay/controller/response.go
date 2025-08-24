@@ -16,7 +16,6 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -71,7 +70,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeResponseAPIQuota(c, responseAPIRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		logger.Logger.Warn("preConsumeResponseAPIQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeResponseAPIQuota failed", zap.Any("error", *bizErr))
 		return bizErr
 	}
 
@@ -320,7 +319,7 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 
 	if usage == nil {
 		// No gin context here; cannot use request-scoped logger
-		logger.Logger.Error("usage is nil, which is unexpected")
+		// Keep silent here to avoid global logger; caller should ensure usage
 		return
 	}
 

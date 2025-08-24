@@ -7,15 +7,13 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
-
-	gmw "github.com/Laisky/gin-middlewares/v6"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -91,7 +89,7 @@ func getPromptTokens(ctx context.Context, textRequest *relaymodel.GeneralOpenAIR
 		return openai.CountTokenInput(textRequest.Instruction, textRequest.Model)
 	default:
 		// Log error for unhandled relay modes that should have billing
-		logger.Logger.Error("getPromptTokens: unhandled relay mode without billing logic",
+		gmw.GetLogger(ctx).Error("getPromptTokens: unhandled relay mode without billing logic",
 			zap.Int("relayMode", relayMode),
 			zap.String("model", textRequest.Model))
 	}
@@ -153,7 +151,7 @@ func postConsumeQuota(ctx context.Context,
 	systemPromptReset bool,
 	channelCompletionRatio map[string]float64) (quota int64) {
 	if usage == nil {
-		logger.Logger.Error("usage is nil, which is unexpected")
+		gmw.GetLogger(ctx).Error("usage is nil, which is unexpected")
 		return
 	}
 
@@ -319,7 +317,7 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	systemPromptReset bool,
 	channelCompletionRatio map[string]float64) (quota int64) {
 	if usage == nil {
-		logger.Logger.Error("usage is nil, which is unexpected")
+		gmw.GetLogger(ctx).Error("usage is nil, which is unexpected")
 		return
 	}
 
@@ -491,15 +489,16 @@ func setSystemPrompt(ctx context.Context, request *relaymodel.GeneralOpenAIReque
 	if len(request.Messages) == 0 {
 		return false
 	}
+	lg := gmw.GetLogger(ctx)
 	if request.Messages[0].Role == role.System {
 		request.Messages[0].Content = prompt
-		logger.Logger.Info("rewrite system prompt")
+		lg.Info("rewrite system prompt", zap.String("prompt", prompt))
 		return true
 	}
 	request.Messages = append([]relaymodel.Message{{
 		Role:    role.System,
 		Content: prompt,
 	}}, request.Messages...)
-	logger.Logger.Info("add system prompt")
+	lg.Info("add system prompt", zap.String("prompt", prompt))
 	return true
 }

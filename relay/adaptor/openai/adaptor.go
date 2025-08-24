@@ -11,13 +11,13 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
-	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	imgutil "github.com/songquanpeng/one-api/common/image"
-	"github.com/songquanpeng/one-api/common/logger"
+
+	// "github.com/songquanpeng/one-api/common/logger"
 
 	// dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor"
@@ -35,6 +35,10 @@ import (
 )
 
 type Adaptor struct {
+	// failed to inline image URL; sending original URL upstream
+	// logger.Logger.Warn("failed to inline image URL; sending original URL upstream",
+	//     zap.String("url", url),
+	//     zap.Error(err))
 	ChannelType int
 }
 
@@ -195,7 +199,7 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	}
 
 	if request.Stream && !config.EnforceIncludeUsage {
-		logger.Logger.Warn("please set ENFORCE_INCLUDE_USAGE=true to ensure accurate billing in stream mode")
+		// Stream mode without ENFORCE_INCLUDE_USAGE may cause under-billing; consider enabling it.
 	}
 
 	if config.EnforceIncludeUsage && request.Stream {
@@ -269,11 +273,6 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 					if dataURL, err := toDataURL(url); err == nil && dataURL != "" {
 						parts[pi].ImageURL.Url = dataURL
 						changed = true
-					} else if err != nil {
-						// Wrap but do not fail the whole request; log at info to avoid noisy errors
-						logger.Logger.Warn("failed to inline image URL; sending original URL upstream",
-							zap.String("url", url),
-							zap.Error(err))
 					}
 				}
 			}

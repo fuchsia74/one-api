@@ -16,7 +16,6 @@ import (
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -231,17 +230,17 @@ func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.
 	var requestBody io.Reader
 	convertedRequest, err := adaptor.ConvertRequest(c, meta.Mode, textRequest)
 	if err != nil {
-		logger.Logger.Debug("converted request failed", zap.Error(err))
+		gmw.GetLogger(c).Debug("converted request failed", zap.Error(err))
 		return nil, err
 	}
 	c.Set(ctxkey.ConvertedRequest, convertedRequest)
 
 	jsonData, err := json.Marshal(convertedRequest)
 	if err != nil {
-		logger.Logger.Debug("converted request json_marshal_failed", zap.Error(err))
+		gmw.GetLogger(c).Debug("converted request json_marshal_failed", zap.Error(err))
 		return nil, err
 	}
-	logger.Logger.Debug("converted request", zap.ByteString("json", jsonData))
+	gmw.GetLogger(c).Debug("converted request", zap.ByteString("json", jsonData))
 	requestBody = bytes.NewBuffer(jsonData)
 	return requestBody, nil
 }

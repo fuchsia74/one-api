@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
@@ -15,7 +16,6 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/image"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -108,6 +108,7 @@ func streamResponseOllama2OpenAI(ollamaResponse *ChatResponse) *openai.ChatCompl
 }
 
 func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+	lg := gmw.GetLogger(c)
 	var usage model.Usage
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(func(data []byte, atEOF bool) (advance int, token []byte, err error) {
@@ -134,7 +135,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var ollamaResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &ollamaResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
+			lg.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 
@@ -147,12 +148,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		response := streamResponseOllama2OpenAI(&ollamaResponse)
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error("error rendering response", zap.Error(err))
+			lg.Error("error rendering response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream", zap.Error(err))
+		lg.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)
@@ -238,7 +239,7 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if err != nil {
 		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
 	}
-	logger.Logger.Debug(fmt.Sprintf("ollama response: %s", string(responseBody)))
+	gmw.GetLogger(c).Debug("ollama response", zap.ByteString("body", responseBody))
 	err = resp.Body.Close()
 	if err != nil {
 		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil

@@ -17,7 +17,6 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/middleware"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
@@ -59,6 +58,7 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 
 func Relay(c *gin.Context) {
 	ctx := gmw.Ctx(c)
+	lg := gmw.GetLogger(c)
 	relayMode := relaymode.GetByPath(c.Request.URL.Path)
 	channelId := c.GetInt(ctxkey.ChannelId)
 	userId := c.GetInt(ctxkey.Id)
@@ -67,7 +67,7 @@ func Relay(c *gin.Context) {
 	startTime := time.Now()
 
 	// Request start log for traceability
-	logger.Logger.Debug("incoming relay request",
+	lg.Debug("incoming relay request",
 		zap.String("method", c.Request.Method),
 		zap.String("path", c.Request.URL.Path),
 		zap.Int("relay_mode", relayMode),
@@ -104,7 +104,7 @@ func Relay(c *gin.Context) {
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
 	if err := shouldRetry(c, bizErr.StatusCode); err != nil {
-		logger.Logger.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
+		lg.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
 		retryTimes = 0
 	}
 
@@ -114,7 +114,7 @@ func Relay(c *gin.Context) {
 		// Try to get an estimate of available channels for this model/group
 		// to increase retry attempts accordingly
 		retryTimes = retryTimes * 2 // Increase retry attempts for 429 errors
-		logger.Logger.Info(fmt.Sprintf("429 error detected, increasing retry attempts to %d to exhaust alternative channels", retryTimes))
+		lg.Info(fmt.Sprintf("429 error detected, increasing retry attempts to %d to exhaust alternative channels", retryTimes))
 	}
 
 	// For 413 errors, increase retry attempts to exhaust all available channels
@@ -125,11 +125,11 @@ func Relay(c *gin.Context) {
 		channels, err := dbmodel.GetChannelsFromCache(group, originalModel)
 		if err != nil {
 			retryTimes = 1
-			logger.Logger.Debug(fmt.Sprintf("413 error detected, Get channels from cache error: %v", err))
-			logger.Logger.Warn(fmt.Sprintf("413 error detected, Failed to get total number of channels for a model/group from cache. increasing retry attempts to %d", retryTimes))
+			lg.Debug(fmt.Sprintf("413 error detected, Get channels from cache error: %v", err))
+			lg.Warn(fmt.Sprintf("413 error detected, Failed to get total number of channels for a model/group from cache. increasing retry attempts to %d", retryTimes))
 		} else {
 			retryTimes = len(channels) - 1
-			logger.Logger.Info(fmt.Sprintf("413 error detected, increasing retry attempts to %d to exhaust alternative channels", retryTimes))
+			lg.Info(fmt.Sprintf("413 error detected, increasing retry attempts to %d to exhaust alternative channels", retryTimes))
 		}
 	}
 
@@ -139,7 +139,7 @@ func Relay(c *gin.Context) {
 
 	// Debug logging to track channel exclusions (only when debug is enabled)
 	if config.DebugEnabled {
-		logger.Logger.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		lg.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
 	}
 
 	// For 429 errors, we should try lower priority channels first
@@ -155,7 +155,7 @@ func Relay(c *gin.Context) {
 
 		// Try to find an available channel, preferring lower priority channels for 429 errors
 		if config.DebugEnabled {
-			logger.Logger.Info("Debug: Attempting retry",
+			lg.Info("Debug: Attempting retry",
 				zap.Int("retry_attempt", retryTimes-i+1),
 				zap.Ints("excluded_channels", getChannelIds(failedChannels)),
 				zap.Bool("try_lower_priority_first", shouldTryLowerPriorityFirst),
@@ -170,21 +170,21 @@ func Relay(c *gin.Context) {
 			channel, err = dbmodel.CacheGetRandomSatisfiedChannelExcluding(group, originalModel, true, failedChannels, false)
 			if err != nil {
 				// If no lower priority channels available, try highest priority channels (excluding failed ones)
-				logger.Logger.Info(fmt.Sprintf("No lower priority channels available, trying highest priority channels, excluding: %v", getChannelIds(failedChannels)))
+				lg.Info(fmt.Sprintf("No lower priority channels available, trying highest priority channels, excluding: %v", getChannelIds(failedChannels)))
 				channel, err = dbmodel.CacheGetRandomSatisfiedChannelExcluding(group, originalModel, false, failedChannels, false)
 			}
 		} else {
 			// For non-429 errors, try highest priority first, then lower priority (excluding failed ones)
 			channel, err = dbmodel.CacheGetRandomSatisfiedChannelExcluding(group, originalModel, false, failedChannels, false)
 			if err != nil {
-				logger.Logger.Info("No highest priority channels available, trying lower priority channels",
+				lg.Info("No highest priority channels available, trying lower priority channels",
 					zap.Ints("excluded_channels", getChannelIds(failedChannels)))
 				channel, err = dbmodel.CacheGetRandomSatisfiedChannelExcluding(group, originalModel, true, failedChannels, false)
 			}
 		}
 
 		if err != nil {
-			logger.Logger.Error("CacheGetRandomSatisfiedChannelExcluding failed",
+			lg.Error("CacheGetRandomSatisfiedChannelExcluding failed",
 				zap.Error(err),
 				zap.Ints("excluded_channels", getChannelIds(failedChannels)),
 				zap.String("model", originalModel),
@@ -196,7 +196,7 @@ func Relay(c *gin.Context) {
 			break
 		}
 
-		logger.Logger.Info(fmt.Sprintf("using channel #%d to retry (remain times %d)", channel.Id, i))
+		lg.Info(fmt.Sprintf("using channel #%d to retry (remain times %d)", channel.Id, i))
 		middleware.SetupContextForSelectedChannel(c, channel, originalModel)
 		requestBody, err := common.GetRequestBody(c)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
@@ -221,7 +221,7 @@ func Relay(c *gin.Context) {
 
 		// Debug logging to track which channels are being added to failed list (only when debug is enabled)
 		if config.DebugEnabled {
-			logger.Logger.Info("Debug: Added channel to failed channels list",
+			lg.Info("Debug: Added channel to failed channels list",
 				zap.Int("channel_id", channelId),
 				zap.Ints("total_failed_channels", getChannelIds(failedChannels)),
 				zap.String("request_id", requestId))
@@ -297,7 +297,7 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 
 	err := dbmodel.DB.Where(groupCol+" = ? AND model = ? AND channel_id IN (?)", group, model, channelIds).Find(&abilities).Error
 	if err != nil {
-		logger.Logger.Error("Failed to check suspension status", zap.Error(err))
+		gmw.GetLogger(ctx).Error("Failed to check suspension status", zap.Error(err))
 		return
 	}
 
@@ -313,12 +313,12 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 	}
 
 	if len(suspended) > 0 {
-		logger.Logger.Info(fmt.Sprintf("Debug: Database suspension status - Suspended channels: %v, Available channels: %v, Model: %s, Group: %s", suspended, available, model, group))
+		gmw.GetLogger(ctx).Info(fmt.Sprintf("Debug: Database suspension status - Suspended channels: %v, Available channels: %v, Model: %s, Group: %s", suspended, available, model, group))
 	}
 }
 
 func processChannelRelayError(ctx context.Context, userId int, channelId int, channelName string, group string, originalModel string, err model.ErrorWithStatusCode) {
-	logger.Logger.Error("relay error",
+	gmw.GetLogger(ctx).Error("relay error",
 		zap.Int("channel_id", channelId),
 		zap.String("channel_name", channelName),
 		zap.Int("user_id", userId),
@@ -330,7 +330,7 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 	if err.StatusCode == http.StatusBadRequest {
 		// For 400 errors, log but don't disable channel or suspend abilities
 		// These are typically schema validation errors or malformed requests
-		logger.Logger.Info(fmt.Sprintf("client request error (400) for channel %d (%s) - not disabling channel as this is not a channel issue", channelId, channelName))
+		gmw.GetLogger(ctx).Info(fmt.Sprintf("client request error (400) for channel %d (%s) - not disabling channel as this is not a channel issue", channelId, channelName))
 		// Still emit failure for monitoring purposes, but don't disable the channel
 		monitor.Emit(channelId, false)
 		return
@@ -338,11 +338,11 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 
 	if err.StatusCode == http.StatusTooManyRequests {
 		// For 429, we will suspend the specific model for a while
-		logger.Logger.Info(fmt.Sprintf("suspending model %s in group %s on channel %d (%s) due to rate limit", originalModel, group, channelId, channelName))
+		gmw.GetLogger(ctx).Info(fmt.Sprintf("suspending model %s in group %s on channel %d (%s) due to rate limit", originalModel, group, channelId, channelName))
 		if suspendErr := dbmodel.SuspendAbility(ctx,
 			group, originalModel, channelId,
 			config.ChannelSuspendSecondsFor429); suspendErr != nil {
-			logger.Logger.Error("failed to suspend ability for channel",
+			gmw.GetLogger(ctx).Error("failed to suspend ability for channel",
 				zap.Int("channel_id", channelId),
 				zap.String("model", originalModel),
 				zap.String("group", group),

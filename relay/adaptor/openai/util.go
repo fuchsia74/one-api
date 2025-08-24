@@ -1,18 +1,12 @@
 package openai
 
 import (
-	"github.com/Laisky/zap"
-
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
 func ErrorWrapper(err error, code string, statusCode int) *model.ErrorWithStatusCode {
-	logger.Logger.Error("API error",
-		zap.String("code", code),
-		zap.Error(err))
-
+	// Avoid using global logger here; callers should log with request-scoped logger.
 	Error := model.Error{
 		Message: err.Error(),
 		Type:    "one_api_error",

@@ -13,13 +13,14 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
@@ -61,10 +62,7 @@ func requestOpenAI2Xunfei(request model.GeneralOpenAIRequest, xunfeiAppId string
 				functions[i] = *tool.Function
 			}
 		}
-
-		xunfeiRequest.Payload.Functions = &Functions{
-			Text: functions,
-		}
+		xunfeiRequest.Payload.Functions = &Functions{Text: functions}
 	}
 
 	return &xunfeiRequest
@@ -117,15 +115,10 @@ func responseXunfei2OpenAI(response *ChatResponse) *openai.TextResponse {
 
 func streamResponseXunfei2OpenAI(xunfeiResponse *ChatResponse) *openai.ChatCompletionsStreamResponse {
 	if len(xunfeiResponse.Payload.Choices.Text) == 0 {
-		xunfeiResponse.Payload.Choices.Text = []ChatResponseTextItem{
-			{
-				Content: "",
-			},
-		}
+		xunfeiResponse.Payload.Choices.Text = []ChatResponseTextItem{{Content: ""}}
 	}
 	var choice openai.ChatCompletionsStreamResponseChoice
 	choice.Delta.Content = xunfeiResponse.Payload.Choices.Text[0].Content
-	choice.Delta.ToolCalls = getToolCalls(xunfeiResponse)
 	if xunfeiResponse.Payload.Choices.Status == 2 {
 		choice.FinishReason = &constant.StopFinishReason
 	}
@@ -166,6 +159,7 @@ func buildXunfeiAuthUrl(hostUrl string, apiKey, apiSecret string) string {
 }
 
 func StreamHandler(c *gin.Context, meta *meta.Meta, textRequest model.GeneralOpenAIRequest, appId string, apiSecret string, apiKey string) (*model.ErrorWithStatusCode, *model.Usage) {
+	lg := gmw.GetLogger(c)
 	domain, authUrl := getXunfeiAuthUrl(meta.Config.APIVersion, apiKey, apiSecret)
 	dataChan, stopChan, err := xunfeiMakeRequest(textRequest, domain, authUrl, appId)
 	if err != nil {
@@ -182,7 +176,7 @@ func StreamHandler(c *gin.Context, meta *meta.Meta, textRequest model.GeneralOpe
 			response := streamResponseXunfei2OpenAI(&xunfeiResponse)
 			jsonResponse, err := json.Marshal(response)
 			if err != nil {
-				logger.Logger.Error("error marshalling stream response: " + err.Error())
+				lg.Error("error marshalling stream response", zap.Error(err))
 				return true
 			}
 			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonResponse)})
@@ -258,14 +252,14 @@ func xunfeiMakeRequest(textRequest model.GeneralOpenAIRequest, domain, authUrl, 
 			if msg == nil {
 				_, msg, err = conn.ReadMessage()
 				if err != nil {
-					logger.Logger.Error("error reading stream response: " + err.Error())
+					// cannot use request-scoped logger in this helper without context
 					break
 				}
 			}
 			var response ChatResponse
 			err = json.Unmarshal(msg, &response)
 			if err != nil {
-				logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+				// cannot use request-scoped logger in this helper without context
 				break
 			}
 			msg = nil
@@ -273,7 +267,7 @@ func xunfeiMakeRequest(textRequest model.GeneralOpenAIRequest, domain, authUrl, 
 			if response.Payload.Choices.Status == 2 {
 				err := conn.Close()
 				if err != nil {
-					logger.Logger.Error("error closing websocket connection: " + err.Error())
+					// cannot use request-scoped logger in this helper without context
 				}
 				break
 			}

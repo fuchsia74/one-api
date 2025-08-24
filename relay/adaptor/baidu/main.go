@@ -11,13 +11,13 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
@@ -143,6 +143,7 @@ func embeddingResponseBaidu2OpenAI(response *EmbeddingResponse) *openai.Embeddin
 }
 
 func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+	lg := gmw.GetLogger(c)
 	var usage model.Usage
 	scanner := bufio.NewScanner(resp.Body)
 	scanner.Split(bufio.ScanLines)
@@ -159,7 +160,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var baiduResponse ChatStreamResponse
 		err := json.Unmarshal([]byte(data), &baiduResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
+			lg.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 		if baiduResponse.Usage.TotalTokens != 0 {
@@ -170,12 +171,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		response := streamResponseBaidu2OpenAI(&baiduResponse)
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error("error rendering stream response", zap.Error(err))
+			lg.Error("error rendering stream response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream", zap.Error(err))
+		lg.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)

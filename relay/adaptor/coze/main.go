@@ -8,6 +8,9 @@ import (
 	"net/http"
 	"strings"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/render"
 
 	"github.com/gin-gonic/gin"
@@ -15,7 +18,6 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/conv"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/coze/constant/messagetype"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -110,6 +112,7 @@ func ResponseCoze2OpenAI(cozeResponse *Response) *openai.TextResponse {
 }
 
 func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *string) {
+	lg := gmw.GetLogger(c)
 	var responseText string
 	createdTime := helper.GetTimestamp()
 	scanner := bufio.NewScanner(resp.Body)
@@ -129,7 +132,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var cozeResponse StreamResponse
 		err := json.Unmarshal([]byte(data), &cozeResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+			lg.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 
@@ -146,12 +149,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error(err.Error())
+			lg.Error("error rendering stream response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		lg.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)

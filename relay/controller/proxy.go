@@ -13,7 +13,6 @@ import (
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -79,7 +78,7 @@ func RelayProxyHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			0,
 		)
 		if err = docu.Insert(); err != nil {
-			logger.Logger.Error("insert user request cost failed", zap.Error(err))
+			gmw.GetLogger(ctx).Error("insert user request cost failed", zap.Error(err))
 		}
 	}()
 

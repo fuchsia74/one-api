@@ -1,14 +1,18 @@
 package controller
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"strconv"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
+	"github.com/gin-gonic/gin"
+
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -53,6 +57,8 @@ func (e GeneralErrorResponse) ToMessage() string {
 	return ""
 }
 
+// RelayErrorHandler parses upstream error responses into our unified error model.
+// For request-scoped logging, prefer RelayErrorHandlerWithContext.
 func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWithStatusCode) {
 	if resp == nil {
 		return &model.ErrorWithStatusCode{
@@ -77,9 +83,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	if err != nil {
 		return
 	}
-	if config.DebugEnabled {
-		logger.Logger.Info(fmt.Sprintf("error happened, status code: %d, response: \n%s", resp.StatusCode, string(responseBody)))
-	}
+	// Intentionally avoid global logger here; use context variant where possible.
 	err = resp.Body.Close()
 	if err != nil {
 		return
@@ -99,4 +103,23 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 		ErrorWithStatusCode.Error.Message = fmt.Sprintf("bad response status code %d", resp.StatusCode)
 	}
 	return
+}
+
+// RelayErrorHandlerWithContext is a context-aware variant that logs using the request-scoped logger.
+func RelayErrorHandlerWithContext(c *gin.Context, resp *http.Response) *model.ErrorWithStatusCode {
+	if resp == nil {
+		return RelayErrorHandler(resp)
+	}
+	// Read and restore response body for downstream use
+	responseBody, _ := io.ReadAll(resp.Body)
+	_ = resp.Body.Close()
+	if config.DebugEnabled {
+		gmw.GetLogger(c).Info("error happened",
+			zap.Int("status_code", resp.StatusCode),
+			zap.ByteString("response", responseBody),
+		)
+	}
+	// Reconstruct a new ReadCloser for any further reads (not commonly needed here)
+	resp.Body = io.NopCloser(bytes.NewReader(responseBody))
+	return RelayErrorHandler(resp)
 }

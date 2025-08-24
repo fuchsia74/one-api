@@ -26,6 +26,10 @@ Never use `err == nil` to avoid shadowing the error variable.
 
 Use `github.com/Laisky/errors/v2`, its interface is as same as `github.com/Laisky/errors/v2`. Never return bare error, always wrap it by `errors.Wrap`/`errors.Wrapf`/`errors.WithStack`, check all files
 
+Every error must be processed a single time—either returned or logged—but never both.
+
+Avoid returning raw errors; wrap them with errors.Wrap, errors.Wrapf, or errors.WithStack to preserve essential stack traces and contextual information.
+
 ### Golang ORM
 
 Use `gorm.io/gorm`, never use `gorm.io/gorm/clause`/`Preload`.
@@ -49,6 +53,17 @@ db.Model(&User{}).
     Scan(&result{})
 
 ```
+
+### Logging
+
+All code paths invoked by a request must use `gmw.GetLogger(c)` to retrieve the logger instead of the global `logger.Logger`. The logger returned by `gmw.GetLogger(c)` embeds rich call‑specific context.
+
+Adopt these logger and error‑handling best practices:
+
+1. Call `gmw.GetLogger(c)` only once per function and store the result in a local variable.
+2. Use `zap.Error(err)` rather than `err.Error()` when logging errors.
+3. Prefer the structured Zap logger over `fmt.Sprintf` for log messages.
+4. Never swallow errors silently; every error should be returned or recorded in the logs.
 
 ## CSS Style
 

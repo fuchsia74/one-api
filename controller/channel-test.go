@@ -23,7 +23,6 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
 	"github.com/songquanpeng/one-api/middleware"
 	"github.com/songquanpeng/one-api/model"
@@ -100,6 +99,7 @@ func calculateTestCost(usage *relaymodel.Usage, meta *meta.Meta, request *relaym
 }
 
 func testChannel(ctx context.Context, channel *model.Channel, request *relaymodel.GeneralOpenAIRequest) (responseMessage string, err error, openaiErr *relaymodel.Error) {
+	lg := gmw.GetLogger(ctx)
 	startTime := time.Now()
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
@@ -191,7 +191,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 
 		go model.RecordTestLog(ctx, testLog)
 	}()
-	logger.Logger.Info(string(jsonData))
+	lg.Info(string(jsonData))
 	requestBody := bytes.NewBuffer(jsonData)
 	c.Request.Body = io.NopCloser(requestBody)
 	var resp *http.Response
@@ -223,9 +223,10 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 	rawResponse := w.Body.String()
 	_, responseMessage, err = parseTestResponse(rawResponse)
 	if err != nil {
-		logger.Logger.Error("failed to parse error", zap.Error(err), zap.String("response", rawResponse))
+		lg.Error("failed to parse error", zap.Error(err), zap.String("response", rawResponse))
 		return "", err, nil
 	}
+
 	result := w.Result()
 	// print result.Body
 	var respBody []byte
@@ -233,7 +234,8 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 	if err != nil {
 		return "", err, nil
 	}
-	logger.Logger.Info(fmt.Sprintf("testing channel #%d, response: \n%s", channel.Id, string(respBody)))
+
+	lg.Info("testing channel response", zap.Int("channel_id", channel.Id), zap.ByteString("response", respBody))
 	return responseMessage, nil, nil
 }
 
@@ -281,7 +283,6 @@ func TestChannel(c *gin.Context) {
 		"time":      consumedTime,
 		"modelName": modelName,
 	})
-	return
 }
 
 var testAllChannelsLock sync.Mutex
@@ -337,7 +338,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 		if notify {
 			err := message.Notify(message.ByAll, "Channel test completed", "", "Channel test completed, if you have not received the disable notification, it means that all channels are normal")
 			if err != nil {
-				logger.Logger.Error("failed to send notify", zap.Error(err))
+				gmw.GetLogger(ctx).Error("failed to send notify", zap.Error(err))
 			}
 		}
 	}()
@@ -362,15 +363,14 @@ func TestChannels(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func AutomaticallyTestChannels(frequency int) {
 	ctx := context.Background()
 	for {
 		time.Sleep(time.Duration(frequency) * time.Minute)
-		logger.Logger.Info("testing all channels")
+		gmw.GetLogger(ctx).Info("testing all channels")
 		_ = testChannels(ctx, false, "all")
-		logger.Logger.Info("channel test finished")
+		gmw.GetLogger(ctx).Info("channel test finished")
 	}
 }

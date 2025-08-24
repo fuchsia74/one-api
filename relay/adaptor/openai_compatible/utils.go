@@ -13,7 +13,6 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -65,9 +64,6 @@ func NormalizeDataLine(data string) string {
 
 // ErrorWrapper creates an error response
 func ErrorWrapper(err error, code string, statusCode int) *model.ErrorWithStatusCode {
-	logger.Logger.Error("API error",
-		zap.String("code", code),
-		zap.Error(err))
 	return &model.ErrorWithStatusCode{
 		Error: model.Error{
 			Message: err.Error(),

@@ -6,7 +6,6 @@ import (
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/meta"
 )
@@ -30,6 +29,6 @@ func RelayRealtime(c *gin.Context) {
 	}
 
 	// If we reach here, the WS session completed normally (handler handled I/O).
-	logger.Logger.Debug("realtime session closed")
+	gmw.GetLogger(c).Debug("realtime session closed")
 	PrometheusMonitor.RecordRelayRequest(c, relayMeta, start, true, 0, 0, 0)
 }

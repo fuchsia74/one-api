@@ -22,7 +22,6 @@ import (
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -190,7 +189,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 					// negative means add quota back for token & user
 					err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
 					if err != nil {
-						logger.Logger.Error("error rollback pre-consumed quota", zap.Error(err))
+						gmw.GetLogger(ctx).Error("error rollback pre-consumed quota", zap.Error(err))
 					}
 				}()
 			}()
@@ -250,7 +249,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 
 	// Log upstream request for billing tracking
-	logger.Logger.Info("sending audio request to upstream channel",
+	gmw.GetLogger(c).Info("sending audio request to upstream channel",
 		zap.String("url", fullRequestURL),
 		zap.Int("channelId", channelId),
 		zap.Int("userId", userId),

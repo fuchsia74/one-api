@@ -19,7 +19,6 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
@@ -426,7 +425,12 @@ func getClaudeMessagesPromptTokens(ctx context.Context, request *ClaudeMessagesR
 
 	textTokens := promptTokens - imageTokens - toolsTokens
 
-	logger.Debug(fmt.Sprintf("estimated prompt tokens for Claude Messages: %d (text: %d, tools: %d, images: %d)", promptTokens, textTokens, toolsTokens, imageTokens))
+	logger.Debug("estimated prompt tokens for Claude Messages",
+		zap.Int("total", promptTokens),
+		zap.Int("text", textTokens),
+		zap.Int("tools", toolsTokens),
+		zap.Int("images", imageTokens),
+	)
 	return promptTokens
 }
 
@@ -626,7 +630,7 @@ func calculateClaudeImageTokens(ctx context.Context, request *ClaudeMessagesRequ
 		}
 	}
 
-	logger.Debug(fmt.Sprintf("calculated image tokens for Claude Messages: %d", totalImageTokens))
+	logger.Debug("calculated image tokens for Claude Messages", zap.Int("image_tokens", totalImageTokens))
 	return totalImageTokens
 }
 
@@ -651,41 +655,31 @@ func calculateSingleImageTokens(ctx context.Context, imageBlock map[string]any) 
 
 	switch sourceType {
 	case "base64":
-		// For base64 images, we need to decode and get dimensions
-		// This is complex, so we'll use a reasonable estimate
-		// Based on Claude's examples: ~1590 tokens for 1092x1092 px image
-		// We'll estimate based on data size as a proxy
 		if data, exists := sourceMap["data"]; exists {
 			if dataStr, ok := data.(string); ok {
-				// Rough estimation: base64 data length correlates with image size
-				// A 1092x1092 image (~1.19 megapixels) with ~1590 tokens has base64 length ~1.5MB
-				// Estimate: tokens ≈ base64_length / 1000 (very rough approximation)
 				estimatedTokens := len(dataStr) / 1000
 				if estimatedTokens < 50 {
-					estimatedTokens = 50 // Minimum for small images
+					estimatedTokens = 50
 				}
 				if estimatedTokens > 2000 {
-					estimatedTokens = 2000 // Cap for very large images
+					estimatedTokens = 2000
 				}
-				logger.Debug(fmt.Sprintf("estimated tokens for base64 image: %d (based on data length %d)", estimatedTokens, len(dataStr)))
+				logger.Debug("estimated tokens for base64 image",
+					zap.Int("tokens", estimatedTokens),
+					zap.Int("data_length", len(dataStr)),
+				)
 				return estimatedTokens
 			}
 		}
 
 	case "url":
-		// For URL images, we can't easily determine size without fetching
-		// Use a reasonable default based on typical web images
-		// Most web images are in the 500x500 to 1000x1000 range
-		// Using Claude's formula: (800 * 800) / 750 ≈ 853 tokens
 		estimatedTokens := 853
-		logger.Debug(fmt.Sprintf("estimated tokens for URL image: %d (default estimate)", estimatedTokens))
+		logger.Debug("estimated tokens for URL image", zap.Int("tokens", estimatedTokens))
 		return estimatedTokens
 
 	case "file":
-		// For file-based images, we also can't determine size easily
-		// Use a similar default as URL images
 		estimatedTokens := 853
-		logger.Debug(fmt.Sprintf("estimated tokens for file image: %d (default estimate)", estimatedTokens))
+		logger.Debug("estimated tokens for file image", zap.Int("tokens", estimatedTokens))
 		return estimatedTokens
 	}
 
@@ -757,7 +751,7 @@ func preConsumeClaudeMessagesQuota(c *gin.Context, request *ClaudeMessagesReques
 		// in this case, we do not pre-consume quota
 		// because the user and token have enough quota
 		baseQuota = 0
-		logger.Logger.Info(fmt.Sprintf("user %d has enough quota %d, trusted and no need to pre-consume", meta.UserId, userQuota))
+		gmw.GetLogger(c).Info(fmt.Sprintf("user %d has enough quota %d, trusted and no need to pre-consume", meta.UserId, userQuota))
 	}
 	if baseQuota > 0 {
 		err := model.PreConsumeTokenQuota(meta.TokenId, baseQuota)
@@ -776,8 +770,8 @@ func preConsumeClaudeMessagesQuota(c *gin.Context, request *ClaudeMessagesReques
 // postConsumeClaudeMessagesQuotaWithTraceID calculates and applies final quota consumption for Claude Messages API with explicit trace ID
 func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId string, traceId string, usage *relaymodel.Usage, meta *metalib.Meta, request *ClaudeMessagesRequest, ratio float64, preConsumedQuota int64, modelRatio float64, groupRatio float64, channelCompletionRatio map[string]float64) int64 {
 	if usage == nil {
-		// No gin context available here; keep global logger
-		logger.Logger.Warn("usage is nil for Claude Messages API")
+		// Context may be detached; log with context if available
+		gmw.GetLogger(ctx).Warn("usage is nil for Claude Messages API")
 		return 0
 	}
 
@@ -828,7 +822,11 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 		TraceId:                traceId,
 	})
 
-	// No gin context available here; keep global logger
-	logger.Logger.Debug(fmt.Sprintf("Claude Messages quota with trace ID: pre-consumed=%d, actual=%d, difference=%d", preConsumedQuota, quota, quotaDelta))
+	// Log with context if available
+	gmw.GetLogger(ctx).Debug("Claude Messages quota with trace ID",
+		zap.Int64("pre_consumed", preConsumedQuota),
+		zap.Int64("actual", quota),
+		zap.Int64("difference", quotaDelta),
+	)
 	return quota
 }

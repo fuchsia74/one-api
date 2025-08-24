@@ -14,13 +14,13 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/conv"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -165,7 +165,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var tencentResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &tencentResponse)
 		if err != nil {
-			logger.Logger.Error("error unmarshalling stream response: " + err.Error())
+			gmw.GetLogger(c).Error("error unmarshalling stream response: " + err.Error())
 			continue
 		}
 
@@ -176,12 +176,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 		err = render.ObjectData(c, response)
 		if err != nil {
-			logger.Logger.Error(err.Error())
+			gmw.GetLogger(c).Error(err.Error())
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		logger.Logger.Error("error reading stream: " + err.Error())
+		gmw.GetLogger(c).Error("error reading stream: " + err.Error())
 	}
 
 	render.Done(c)

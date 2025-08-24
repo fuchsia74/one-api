@@ -23,7 +23,8 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
-	"github.com/songquanpeng/one-api/common/logger"
+
+	// "github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
@@ -54,7 +55,7 @@ func RenderPrompt(messages []relaymodel.Message) string {
 	var buf bytes.Buffer
 	err := promptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
 	if err != nil {
-		logger.Logger.Error("error rendering prompt messages", zap.Error(err))
+		// rendering prompt failed
 	}
 	return buf.String()
 }
@@ -143,6 +144,7 @@ func ResponseLlama2OpenAI(llamaResponse *Response) *openai.TextResponse {
 }
 
 func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+	lg := gmw.GetLogger(c)
 	createdTime := helper.GetTimestamp()
 	awsModelID, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
@@ -167,7 +169,6 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	awsResp, err := awsCli.InvokeModelWithResponseStream(gmw.Ctx(c), awsReq)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "InvokeModelWithResponseStream")), nil
 	}
 	stream := awsResp.GetStream()
 	defer stream.Close()
@@ -186,7 +187,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			var llamaResp StreamResponse
 			err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(&llamaResp)
 			if err != nil {
-				logger.Logger.Error("error unmarshalling stream response", zap.Error(err))
+				lg.Error("error unmarshalling stream response", zap.Error(err))
 				return false
 			}
 
@@ -203,7 +204,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			response.Created = createdTime
 			jsonStr, err := json.Marshal(response)
 			if err != nil {
-				logger.Logger.Error("error marshalling stream response", zap.Error(err))
+				lg.Error("error marshalling stream response", zap.Error(err))
 				return true
 			}
 			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
