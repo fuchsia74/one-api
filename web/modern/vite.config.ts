@@ -18,6 +18,8 @@ export default defineConfig(({ mode }) => ({
     sourcemap: mode === 'development',
     rollupOptions: {
       output: {
+        // Use only hash values for chunk file names (removing descriptive prefixes) to enhance privacy (This can also help with cache busting)
+        chunkFileNames: '[hash].js',
         manualChunks: {
           vendor: ['react', 'react-dom'],
           router: ['react-router-dom'],
