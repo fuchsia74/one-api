@@ -214,6 +214,10 @@ var RelayProxy = env.String("RELAY_PROXY", "")
 var UserContentRequestProxy = env.String("USER_CONTENT_REQUEST_PROXY", "")
 var UserContentRequestTimeout = env.Int("USER_CONTENT_REQUEST_TIMEOUT", 30)
 
+// TokenKeyPrefix is the prefix automatically added to token keys when returned via API
+// Default is "sk-" to match common client expectations
+var TokenKeyPrefix = env.String("TOKEN_KEY_PREFIX", "sk-")
+
 // EnforceIncludeUsage is used to determine whether to include usage in the response
 var EnforceIncludeUsage = env.Bool("ENFORCE_INCLUDE_USAGE", false)
 var TestPrompt = env.String("TEST_PROMPT", "2 + 2 = ?")

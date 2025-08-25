@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 )
 
@@ -99,6 +100,12 @@ func isModelInList(modelName string, models string) bool {
 func GetTokenKeyParts(c *gin.Context) []string {
 	key := c.Request.Header.Get("Authorization")
 	key = strings.TrimPrefix(key, "Bearer ")
-	key = strings.TrimPrefix(strings.TrimPrefix(key, "sk-"), "laisky-")
+	// Trim current configured prefix first
+	if p := config.TokenKeyPrefix; p != "" {
+		key = strings.TrimPrefix(key, p)
+	}
+	// Backward compatibility with historical prefixes
+	key = strings.TrimPrefix(key, "sk-")
+	key = strings.TrimPrefix(key, "laisky-")
 	return strings.Split(key, "-")
 }
