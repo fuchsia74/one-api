@@ -111,7 +111,8 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	// Handle image generation requests differently
 	if meta.Mode == relaymode.ImagesGenerations {
-		return a.handleImageResponse(c, resp, meta)
+		// TODO: Do we need a meta tag to include the actual model name for this image generation?
+		return a.handleImageResponse(c, resp)
 	}
 
 	// Use the shared OpenAI-compatible response handling for text completions
@@ -124,7 +125,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 }
 
 // handleImageResponse processes XAI image generation responses and converts them to OpenAI format
-func (a *Adaptor) handleImageResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+func (a *Adaptor) handleImageResponse(c *gin.Context, resp *http.Response) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	// Always close the upstream body
 	defer resp.Body.Close()
 	// Read the response body
