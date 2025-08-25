@@ -66,7 +66,7 @@ func getImageRequest(c *gin.Context, _ int) (*relaymodel.ImageRequest, error) {
 			// OpenAI only supports 'standard' and 'hd' for DALL·E 3; 'auto' is invalid
 			imageRequest.Quality = "standard"
 		case "gpt-image-1":
-			imageRequest.Quality = "standard"
+			imageRequest.Quality = "high"
 		case "grok-2-image", "grok-2-image-1212":
 			imageRequest.Quality = "standard" // Default quality for Grok-2 image generation
 		}
