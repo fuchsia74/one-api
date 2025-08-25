@@ -38,16 +38,9 @@ type ImageData struct {
 	RevisedPrompt string `json:"revised_prompt,omitempty"`
 }
 
-type ImageUsage struct {
-	TotalTokens  int `json:"total_tokens"`
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
-}
-
 type ImageResponse struct {
 	Created int64       `json:"created"`
 	Data    []ImageData `json:"data"`
-	Usage   ImageUsage  `json:"usage"`
 }
 
 // Implement required adaptor interface methods (XAI uses OpenAI-compatible API)
@@ -151,17 +144,11 @@ func (a *Adaptor) handleImageResponse(c *gin.Context, resp *http.Response) (usag
 		imageDataList = append(imageDataList, imageData)
 	}
 
-	// Create OpenAI compatible response
+	// Create OpenAI-compatible response
 	openaiResponse := &ImageResponse{
 		Created: helper.GetTimestamp(),
 		Data:    imageDataList,
-		// Note: xAI doesn't provide detailed token usage for image generation.
-		// Setting minimal values to satisfy the interface; zero values should also be acceptable.
-		Usage: ImageUsage{
-			TotalTokens:  0,
-			InputTokens:  0,
-			OutputTokens: 0,
-		},
+		// Note: The Usage field might be better removed for xAI
 	}
 
 	// Return the response as JSON
