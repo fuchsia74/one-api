@@ -155,9 +155,9 @@ func (a *Adaptor) handleImageResponse(c *gin.Context, resp *http.Response) (usag
 	openaiResponse := &ImageResponse{
 		Created: helper.GetTimestamp(),
 		Data:    imageDataList,
+		// Note: xAI doesn't provide detailed token usage for image generation.
+		// Setting minimal values to satisfy the interface; zero values should also be acceptable.
 		Usage: ImageUsage{
-			// XAI doesn't provide detailed token usage for image generation
-			// Set minimal values to satisfy the interface
 			TotalTokens:  0,
 			InputTokens:  0,
 			OutputTokens: 0,
