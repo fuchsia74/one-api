@@ -167,13 +167,7 @@ func (a *Adaptor) handleImageResponse(c *gin.Context, resp *http.Response) (usag
 	// Return the response as JSON
 	c.JSON(http.StatusOK, openaiResponse)
 
-	// Return minimal usage info for billing
-	usage = &model.Usage{
-		PromptTokens:     10, // Estimated tokens for the prompt
-		CompletionTokens: 0,  // Images don't have completion tokens
-		TotalTokens:      10,
-	}
-
+	// Per-image billing is handled by the controller; no token usage to return.
 	return usage, nil
 }
 
