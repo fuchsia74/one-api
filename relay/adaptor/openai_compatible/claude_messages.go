@@ -205,15 +205,21 @@ func HandleClaudeMessagesResponse(c *gin.Context, resp *http.Response, meta *met
 		return usage, err
 	}
 
-	// This is a Claude Messages conversion, we need to convert the response
-	// For now, we'll use a simplified approach - let the normal handler process the response
-	// and then indicate that Claude Messages conversion was handled
-	err, _ := handler(c, resp, meta.PromptTokens, meta.ActualModelName)
-	if err != nil {
-		return nil, err
+	// Claude Messages conversion path
+	if meta.IsStream {
+		// Convert OpenAI-compatible SSE to Claude-native SSE, write to client, return usage
+		usage, convErr := ConvertOpenAIStreamToClaudeSSE(c, resp, meta.PromptTokens, meta.ActualModelName)
+		if convErr != nil {
+			return nil, convErr
+		}
+		return usage, nil
 	}
 
-	// For Claude Messages conversion, we return nil usage to indicate
-	// that the conversion was handled by the adapter
+	// Non-stream: convert to Claude JSON and let controller forward it
+	claudeResp, convErr := ConvertOpenAIResponseToClaudeResponse(c, resp)
+	if convErr != nil {
+		return nil, convErr
+	}
+	c.Set(ctxkey.ConvertedResponse, claudeResp)
 	return nil, nil
 }

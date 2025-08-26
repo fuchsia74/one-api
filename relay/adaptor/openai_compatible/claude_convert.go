@@ -1,14 +1,18 @@
 package openai_compatible
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -181,6 +185,299 @@ func marshalClaudeHTTPResponse(orig *http.Response, payload relaymodel.ClaudeRes
 	newResp.Header.Set("Content-Type", "application/json")
 	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(b)))
 	return newResp, nil
+}
+
+// ConvertOpenAIStreamToClaudeSSE reads an OpenAI-compatible chat completion/response-api SSE stream
+// and writes Claude-native SSE events to the client, returning computed usage.
+func ConvertOpenAIStreamToClaudeSSE(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*relaymodel.Usage, *relaymodel.ErrorWithStatusCode) {
+	_ = gmw.GetLogger(c)
+
+	// Prepare client for SSE
+	common.SetEventStreamHeaders(c)
+
+	scanner := bufio.NewScanner(resp.Body)
+	buffer := make([]byte, 1024*1024)
+	scanner.Buffer(buffer, len(buffer))
+	scanner.Split(bufio.ScanLines)
+
+	accumText := ""
+	accumThinking := ""
+	accumToolArgs := ""
+	var usage *relaymodel.Usage
+
+	// Track content blocks and indices
+	nextIndex := 0
+	thinkingIndex := -1
+	textIndex := -1
+	toolStarted := map[string]int{} // tool_call_id -> index
+
+	// Emit message_start
+	msgStart := map[string]any{
+		"type": "message_start",
+		"message": map[string]any{
+			"type":    "message",
+			"role":    "assistant",
+			"model":   modelName,
+			"content": []any{},
+		},
+	}
+	if b, err := json.Marshal(msgStart); err == nil {
+		c.Writer.Write([]byte("data: "))
+		c.Writer.Write(b)
+		c.Writer.Write([]byte("\n\n"))
+		c.Writer.(http.Flusher).Flush()
+	}
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "[DONE]" {
+			break
+		}
+
+		// Parse OpenAI-compatible streaming chunk
+		var chunk ChatCompletionsStreamResponse
+		if err := json.Unmarshal([]byte(payload), &chunk); err != nil {
+			continue
+		}
+
+		// Process choices
+		for _, choice := range chunk.Choices {
+			// Thinking delta
+			if choice.Delta.Thinking != nil && *choice.Delta.Thinking != "" {
+				if thinkingIndex == -1 {
+					// Start thinking block at next index
+					start := map[string]any{
+						"type":          "content_block_start",
+						"index":         nextIndex,
+						"content_block": map[string]any{"type": "thinking", "thinking": ""},
+					}
+					if b, e := json.Marshal(start); e == nil {
+						c.Writer.Write([]byte("data: "))
+						c.Writer.Write(b)
+						c.Writer.Write([]byte("\n\n"))
+						c.Writer.(http.Flusher).Flush()
+					}
+					thinkingIndex = nextIndex
+					nextIndex++
+				}
+				thinkingDelta := *choice.Delta.Thinking
+				accumThinking += thinkingDelta
+				delta := map[string]any{
+					"type":  "content_block_delta",
+					"index": thinkingIndex,
+					"delta": map[string]any{"type": "thinking_delta", "thinking": thinkingDelta},
+				}
+				if b, e := json.Marshal(delta); e == nil {
+					c.Writer.Write([]byte("data: "))
+					c.Writer.Write(b)
+					c.Writer.Write([]byte("\n\n"))
+					c.Writer.(http.Flusher).Flush()
+				}
+			}
+
+			// Signature delta (attached to thinking block)
+			if choice.Delta.Signature != nil && *choice.Delta.Signature != "" {
+				if thinkingIndex == -1 {
+					// Start thinking block to attach signature
+					start := map[string]any{
+						"type":          "content_block_start",
+						"index":         nextIndex,
+						"content_block": map[string]any{"type": "thinking", "thinking": ""},
+					}
+					if b, e := json.Marshal(start); e == nil {
+						c.Writer.Write([]byte("data: "))
+						c.Writer.Write(b)
+						c.Writer.Write([]byte("\n\n"))
+						c.Writer.(http.Flusher).Flush()
+					}
+					thinkingIndex = nextIndex
+					nextIndex++
+				}
+				sig := *choice.Delta.Signature
+				delta := map[string]any{
+					"type":  "content_block_delta",
+					"index": thinkingIndex,
+					"delta": map[string]any{"type": "signature_delta", "signature": sig},
+				}
+				if b, e := json.Marshal(delta); e == nil {
+					c.Writer.Write([]byte("data: "))
+					c.Writer.Write(b)
+					c.Writer.Write([]byte("\n\n"))
+					c.Writer.(http.Flusher).Flush()
+				}
+			}
+
+			// Text delta
+			deltaText := choice.Delta.StringContent()
+			if deltaText != "" {
+				if textIndex == -1 {
+					// Start text content block at next index
+					start := map[string]any{
+						"type":          "content_block_start",
+						"index":         nextIndex,
+						"content_block": map[string]any{"type": "text", "text": ""},
+					}
+					if b, e := json.Marshal(start); e == nil {
+						c.Writer.Write([]byte("data: "))
+						c.Writer.Write(b)
+						c.Writer.Write([]byte("\n\n"))
+						c.Writer.(http.Flusher).Flush()
+					}
+					textIndex = nextIndex
+					nextIndex++
+				}
+				accumText += deltaText
+				delta := map[string]any{
+					"type":  "content_block_delta",
+					"index": textIndex,
+					"delta": map[string]any{"type": "text_delta", "text": deltaText},
+				}
+				if b, e := json.Marshal(delta); e == nil {
+					c.Writer.Write([]byte("data: "))
+					c.Writer.Write(b)
+					c.Writer.Write([]byte("\n\n"))
+					c.Writer.(http.Flusher).Flush()
+				}
+			}
+
+			// Tool call deltas
+			if len(choice.Delta.ToolCalls) > 0 {
+				for _, tc := range choice.Delta.ToolCalls {
+					id := tc.Id
+					if id == "" {
+						id = fmt.Sprintf("tool_%d", nextIndex)
+					}
+					idx, exists := toolStarted[id]
+					if !exists {
+						// Start a new tool_use block
+						idx = nextIndex
+						toolStarted[id] = idx
+						nextIndex++
+						start := map[string]any{
+							"type":  "content_block_start",
+							"index": idx,
+							"content_block": map[string]any{
+								"type": "tool_use",
+								"id":   id,
+								"name": func() string {
+									if tc.Function != nil {
+										return tc.Function.Name
+									}
+									return ""
+								}(),
+								"input": map[string]any{},
+							},
+						}
+						if b, e := json.Marshal(start); e == nil {
+							c.Writer.Write([]byte("data: "))
+							c.Writer.Write(b)
+							c.Writer.Write([]byte("\n\n"))
+							c.Writer.(http.Flusher).Flush()
+						}
+					}
+
+					// Delta arguments
+					var argStr string
+					if tc.Function != nil && tc.Function.Arguments != nil {
+						switch v := tc.Function.Arguments.(type) {
+						case string:
+							argStr = v
+						default:
+							if b, e := json.Marshal(v); e == nil {
+								argStr = string(b)
+							}
+						}
+					}
+					if argStr != "" {
+						accumToolArgs += argStr
+						delta := map[string]any{
+							"type":  "content_block_delta",
+							"index": idx,
+							"delta": map[string]any{"type": "input_json_delta", "partial_json": argStr},
+						}
+						if b, e := json.Marshal(delta); e == nil {
+							c.Writer.Write([]byte("data: "))
+							c.Writer.Write(b)
+							c.Writer.Write([]byte("\n\n"))
+							c.Writer.(http.Flusher).Flush()
+						}
+					}
+				}
+			}
+		}
+
+		// Usage delta
+		if chunk.Usage != nil {
+			usage = chunk.Usage
+			msgDelta := map[string]any{
+				"type": "message_delta",
+				"usage": map[string]any{
+					"input_tokens":  usage.PromptTokens,
+					"output_tokens": usage.CompletionTokens,
+				},
+			}
+			if b, e := json.Marshal(msgDelta); e == nil {
+				c.Writer.Write([]byte("data: "))
+				c.Writer.Write(b)
+				c.Writer.Write([]byte("\n\n"))
+				c.Writer.(http.Flusher).Flush()
+			}
+		}
+	}
+
+	// Close any started blocks
+	if thinkingIndex >= 0 {
+		stop := map[string]any{"type": "content_block_stop", "index": thinkingIndex}
+		if b, e := json.Marshal(stop); e == nil {
+			c.Writer.Write([]byte("data: "))
+			c.Writer.Write(b)
+			c.Writer.Write([]byte("\n\n"))
+			c.Writer.(http.Flusher).Flush()
+		}
+	}
+	if textIndex >= 0 {
+		stop := map[string]any{"type": "content_block_stop", "index": textIndex}
+		if b, e := json.Marshal(stop); e == nil {
+			c.Writer.Write([]byte("data: "))
+			c.Writer.Write(b)
+			c.Writer.Write([]byte("\n\n"))
+			c.Writer.(http.Flusher).Flush()
+		}
+	}
+	for _, idx := range toolStarted {
+		stop := map[string]any{"type": "content_block_stop", "index": idx}
+		if b, e := json.Marshal(stop); e == nil {
+			c.Writer.Write([]byte("data: "))
+			c.Writer.Write(b)
+			c.Writer.Write([]byte("\n\n"))
+			c.Writer.(http.Flusher).Flush()
+		}
+	}
+
+	// Finalize usage if upstream omitted
+	if usage == nil {
+		completion := CountTokenText(accumText, modelName) + CountTokenText(accumThinking, modelName) + CountTokenText(accumToolArgs, modelName)
+		usage = &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completion, TotalTokens: promptTokens + completion}
+	} else if usage.TotalTokens == 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+
+	// message_stop and [DONE]
+	msgStop := map[string]any{"type": "message_stop"}
+	if b, e := json.Marshal(msgStop); e == nil {
+		c.Writer.Write([]byte("data: "))
+		c.Writer.Write(b)
+		c.Writer.Write([]byte("\n\n"))
+		c.Writer.(http.Flusher).Flush()
+	}
+	c.Writer.Write([]byte("data: [DONE]\n\n"))
+	c.Writer.(http.Flusher).Flush()
+	_ = resp.Body.Close()
+	return usage, nil
 }
 
 // --- Minimal local response types to avoid import cycles ---

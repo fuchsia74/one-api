@@ -10,7 +10,6 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
-	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -116,43 +115,10 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("content_type", resp.Header.Get("Content-Type")))
 
-	// If this request originated from Claude Messages, convert the OpenAI-compatible
-	// response to Claude Messages format and let controller forward it.
-	if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
-		// Convert to Claude Messages format
-		claudeResp, convErr := openai_compatible.ConvertOpenAIResponseToClaudeResponse(c, resp)
-		if convErr != nil {
-			return nil, convErr
+	return openai_compatible.HandleClaudeMessagesResponse(c, resp, meta, func(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+		if meta.IsStream {
+			return openai_compatible.StreamHandler(c, resp, promptTokens, modelName)
 		}
-
-		// Store converted response for the controller to forward verbatim
-		c.Set(ctxkey.ConvertedResponse, claudeResp)
-
-		// Do not return usage here; controller will extract it from Claude body if present
-		return nil, nil
-	}
-
-	// Use the shared OpenAI-compatible response handling
-	if meta.IsStream {
-		err, usage = openai_compatible.StreamHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
-	} else {
-		err, usage = openai_compatible.Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
-	}
-
-	// Log any errors for debugging
-	if err != nil {
-		logger.Error("groq response processing failed",
-			zap.String("model", meta.ActualModelName),
-			zap.Any("error_code", err.Error.Code),
-			zap.String("error_message", err.Error.Message),
-			zap.Int("error_status", err.StatusCode))
-	} else if usage != nil {
-		logger.Debug("groq response processed successfully",
-			zap.String("model", meta.ActualModelName),
-			zap.Int("prompt_tokens", usage.PromptTokens),
-			zap.Int("completion_tokens", usage.CompletionTokens),
-			zap.Int("total_tokens", usage.TotalTokens))
-	}
-
-	return
+		return openai_compatible.Handler(c, resp, promptTokens, modelName)
+	})
 }

@@ -91,6 +91,7 @@ func GetFullRequestURL(baseURL string, requestURL string, channelType int) strin
 // StreamHandler processes streaming responses from OpenAI-compatible APIs
 func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
 	responseText := ""
+	toolArgsText := ""
 	var usage *model.Usage
 
 	logger := gmw.GetLogger(c).With(
@@ -169,9 +170,23 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 
 		chunksProcessed++
 
-		// Accumulate response text
+		// Accumulate response text and tool call arguments
 		for _, choice := range streamResponse.Choices {
 			responseText += choice.Delta.StringContent()
+			if len(choice.Delta.ToolCalls) > 0 {
+				for _, tc := range choice.Delta.ToolCalls {
+					if tc.Function != nil && tc.Function.Arguments != nil {
+						switch v := tc.Function.Arguments.(type) {
+						case string:
+							toolArgsText += v
+						default:
+							if b, e := json.Marshal(v); e == nil {
+								toolArgsText += string(b)
+							}
+						}
+					}
+				}
+			}
 		}
 
 		// Accumulate usage information
@@ -204,13 +219,38 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), usage
 	}
 
-	// Calculate usage if not provided
+	// Calculate or fix usage when missing or incomplete
 	if usage == nil {
+		// No usage provided by upstream: compute from text
+		computed := CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 		usage = &model.Usage{
 			PromptTokens:     promptTokens,
-			CompletionTokens: CountTokenText(responseText, modelName),
+			CompletionTokens: computed,
+			TotalTokens:      promptTokens + computed,
 		}
-		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+		logger.Debug("computed usage for stream (no upstream usage)",
+			zap.Int("prompt_tokens", usage.PromptTokens),
+			zap.Int("completion_tokens", usage.CompletionTokens),
+			zap.Int("total_tokens", usage.TotalTokens),
+			zap.Int("response_text_len", len(responseText)),
+			zap.Int("tool_args_len", len(toolArgsText)))
+	} else {
+		// Upstream provided some usage; fill missing parts
+		if usage.PromptTokens == 0 {
+			usage.PromptTokens = promptTokens
+		}
+		if usage.CompletionTokens == 0 {
+			usage.CompletionTokens = CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
+		}
+		if usage.TotalTokens == 0 {
+			usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+		}
+		logger.Debug("finalized usage for stream (with upstream usage)",
+			zap.Int("prompt_tokens", usage.PromptTokens),
+			zap.Int("completion_tokens", usage.CompletionTokens),
+			zap.Int("total_tokens", usage.TotalTokens),
+			zap.Int("response_text_len", len(responseText)),
+			zap.Int("tool_args_len", len(toolArgsText)))
 	}
 
 	return nil, usage
@@ -274,16 +314,35 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		usage.PromptTokens = promptTokens
 	}
 	if usage.CompletionTokens == 0 {
-		// Calculate completion tokens from response text
+		// Calculate completion tokens from response text and tool call arguments
 		responseText := ""
+		toolArgsText := ""
 		for _, choice := range textResponse.Choices {
 			responseText += choice.Message.StringContent()
+			if len(choice.Message.ToolCalls) > 0 {
+				for _, tc := range choice.Message.ToolCalls {
+					if tc.Function != nil && tc.Function.Arguments != nil {
+						switch v := tc.Function.Arguments.(type) {
+						case string:
+							toolArgsText += v
+						default:
+							if b, e := json.Marshal(v); e == nil {
+								toolArgsText += string(b)
+							}
+						}
+					}
+				}
+			}
 		}
-		usage.CompletionTokens = CountTokenText(responseText, modelName)
+		usage.CompletionTokens = CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 	}
 	if usage.TotalTokens == 0 {
 		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	}
+	logger.Debug("finalized usage for non-stream (openai-compatible)",
+		zap.Int("prompt_tokens", usage.PromptTokens),
+		zap.Int("completion_tokens", usage.CompletionTokens),
+		zap.Int("total_tokens", usage.TotalTokens))
 
 	return nil, &usage
 }

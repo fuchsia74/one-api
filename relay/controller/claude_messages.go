@@ -236,21 +236,88 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 			} else {
 				c.Data(resp.StatusCode, resp.Header.Get("Content-Type"), body)
 
-				// Extract usage information from the Claude response body for billing
+				// Extract usage information from the response body for billing
+				// 1) Try Claude JSON body with usage
 				var claudeResp relaymodel.ClaudeResponse
-				if parseErr := json.Unmarshal(body, &claudeResp); parseErr == nil && claudeResp.Usage.InputTokens > 0 {
-					usage = &relaymodel.Usage{
-						PromptTokens:     claudeResp.Usage.InputTokens,
-						CompletionTokens: claudeResp.Usage.OutputTokens,
-						TotalTokens:      claudeResp.Usage.InputTokens + claudeResp.Usage.OutputTokens,
+				if parseErr := json.Unmarshal(body, &claudeResp); parseErr == nil {
+					if claudeResp.Usage.InputTokens > 0 || claudeResp.Usage.OutputTokens > 0 {
+						usage = &relaymodel.Usage{
+							PromptTokens:     claudeResp.Usage.InputTokens,
+							CompletionTokens: claudeResp.Usage.OutputTokens,
+							TotalTokens:      claudeResp.Usage.InputTokens + claudeResp.Usage.OutputTokens,
+						}
+					} else {
+						// No usage provided: compute completion tokens from content text
+						accumulated := ""
+						for _, part := range claudeResp.Content {
+							if part.Type == "text" && part.Text != "" {
+								accumulated += part.Text
+							}
+						}
+						promptTokens := getClaudeMessagesPromptTokens(ctx, claudeRequest)
+						completion := openai.CountTokenText(accumulated, meta.ActualModelName)
+						usage = &relaymodel.Usage{
+							PromptTokens:     promptTokens,
+							CompletionTokens: completion,
+							TotalTokens:      promptTokens + completion,
+						}
 					}
 				} else {
-					// Fallback: use estimated prompt tokens if parsing fails
-					promptTokens := getClaudeMessagesPromptTokens(ctx, claudeRequest)
-					usage = &relaymodel.Usage{
-						PromptTokens:     promptTokens,
-						CompletionTokens: 0, // Unknown completion tokens
-						TotalTokens:      promptTokens,
+					// 2) If not Claude JSON, it may be SSE (OpenAI-compatible). Detect and compute from stream text.
+					ct := resp.Header.Get("Content-Type")
+					if strings.Contains(strings.ToLower(ct), "text/event-stream") || bytes.HasPrefix(body, []byte("data:")) || bytes.Contains(body, []byte("\ndata:")) {
+						accumulated := ""
+						for _, line := range bytes.Split(body, []byte("\n")) {
+							line = bytes.TrimSpace(line)
+							if !bytes.HasPrefix(line, []byte("data:")) {
+								continue
+							}
+							payload := bytes.TrimSpace(bytes.TrimPrefix(line, []byte("data:")))
+							if bytes.Equal(payload, []byte("[DONE]")) {
+								continue
+							}
+							// Minimal parse of OpenAI chat stream chunk
+							var chunk struct {
+								Choices []struct {
+									Delta struct {
+										Content any `json:"content"`
+									} `json:"delta"`
+								} `json:"choices"`
+							}
+							if err := json.Unmarshal(payload, &chunk); err == nil {
+								for _, ch := range chunk.Choices {
+									switch v := ch.Delta.Content.(type) {
+									case string:
+										accumulated += v
+									case []any:
+										for _, p := range v {
+											if m, ok := p.(map[string]any); ok {
+												if t, _ := m["type"].(string); t == "text" {
+													if s, ok := m["text"].(string); ok {
+														accumulated += s
+													}
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+						promptTokens := getClaudeMessagesPromptTokens(ctx, claudeRequest)
+						completion := openai.CountTokenText(accumulated, meta.ActualModelName)
+						usage = &relaymodel.Usage{
+							PromptTokens:     promptTokens,
+							CompletionTokens: completion,
+							TotalTokens:      promptTokens + completion,
+						}
+					} else {
+						// 3) Fallback: estimate prompt only
+						promptTokens := getClaudeMessagesPromptTokens(ctx, claudeRequest)
+						usage = &relaymodel.Usage{
+							PromptTokens:     promptTokens,
+							CompletionTokens: 0,
+							TotalTokens:      promptTokens,
+						}
 					}
 				}
 			}
