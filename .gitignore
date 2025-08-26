@@ -17,3 +17,4 @@ temp
 /cmd/migrate/migrate
 /patch
 /logs/
+errlog

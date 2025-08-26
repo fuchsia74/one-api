@@ -10,6 +10,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -114,6 +115,22 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		zap.Bool("is_stream", meta.IsStream),
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("content_type", resp.Header.Get("Content-Type")))
+
+	// If this request originated from Claude Messages, convert the OpenAI-compatible
+	// response to Claude Messages format and let controller forward it.
+	if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
+		// Convert to Claude Messages format
+		claudeResp, convErr := openai_compatible.ConvertOpenAIResponseToClaudeResponse(c, resp)
+		if convErr != nil {
+			return nil, convErr
+		}
+
+		// Store converted response for the controller to forward verbatim
+		c.Set(ctxkey.ConvertedResponse, claudeResp)
+
+		// Do not return usage here; controller will extract it from Claude body if present
+		return nil, nil
+	}
 
 	// Use the shared OpenAI-compatible response handling
 	if meta.IsStream {
