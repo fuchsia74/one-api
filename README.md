@@ -343,6 +343,8 @@ export ANTHROPIC_BASE_URL="https://oneapi.laisky.com/"
 export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
 ```
 
+You can use any model you like for Claude Code, even if the model doesn’t natively support the Claude Messages API.
+
 ### Support Tracing info in logs
 
 ![](https://s3.laisky.com/uploads/2025/08/tracing.png)
