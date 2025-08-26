@@ -144,8 +144,27 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 		"claude-sonnet-4-20250514":   {Ratio: 3 * MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 
 		// Llama Models on AWS Bedrock
-		"llama3-8b-8192":  {Ratio: 0.3 * MilliTokensUsd, CompletionRatio: 2},  // $0.3/$0.6 per 1M tokens
-		"llama3-70b-8192": {Ratio: 2.65 * MilliTokensUsd, CompletionRatio: 1}, // $2.65/$2.65 per 1M tokens
+		// Note: Pricing may need to be updated later; also this model is significantly faster on AWS GPUs.
+		// Llama 4 models
+		"llama4-maverick-17b-1m": {Ratio: 0.24 * MilliTokensUsd, CompletionRatio: 4.04}, // $0.00024/$0.00097 per 1K tokens
+		"llama4-scout-17b-3.5m":  {Ratio: 0.17 * MilliTokensUsd, CompletionRatio: 3.88}, // $0.00017/$0.00066 per 1K tokens
+
+		// Llama 3.3 models
+		"llama3-3-70b-128k": {Ratio: 0.72 * MilliTokensUsd, CompletionRatio: 1}, // $0.00072/$0.00072 per 1K tokens
+
+		// Llama 3.2 models
+		"llama3-2-1b-131k":         {Ratio: 0.1 * MilliTokensUsd, CompletionRatio: 1},  // $0.0001/$0.0001 per 1K tokens
+		"llama3-2-3b-131k":         {Ratio: 0.15 * MilliTokensUsd, CompletionRatio: 1}, // $0.00015/$0.00015 per 1K tokens
+		"llama3-2-11b-vision-131k": {Ratio: 0.16 * MilliTokensUsd, CompletionRatio: 1}, // $0.00016/$0.00016 per 1K tokens
+		"llama3-2-90b-128k":        {Ratio: 0.72 * MilliTokensUsd, CompletionRatio: 1}, // $0.00072/$0.00072 per 1K tokens
+
+		// Llama 3.1 models
+		"llama3-1-8b-128k":  {Ratio: 0.22 * MilliTokensUsd, CompletionRatio: 1}, // $0.00022/$0.00022 per 1K tokens
+		"llama3-1-70b-128k": {Ratio: 0.72 * MilliTokensUsd, CompletionRatio: 1}, // $0.00072/$0.00072 per 1K tokens
+
+		// Llama 3 models (updated pricing)
+		"llama3-8b-8192":  {Ratio: 0.3 * MilliTokensUsd, CompletionRatio: 2},     // $0.0003/$0.0006 per 1K tokens
+		"llama3-70b-8192": {Ratio: 2.65 * MilliTokensUsd, CompletionRatio: 1.32}, // $0.00265/$0.0035 per 1K tokens
 
 		// Amazon Nova Models (if supported)
 		"amazon-nova-micro":   {Ratio: 0.035 * MilliTokensUsd, CompletionRatio: 4.28}, // $0.035/$0.15 per 1M tokens

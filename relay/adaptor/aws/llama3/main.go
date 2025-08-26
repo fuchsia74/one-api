@@ -30,11 +30,29 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-// Only support llama-3-8b and llama-3-70b instruction models
+// Support for Llama 3, 3.1, 3.2, 3.3, and 4.0 instruction models
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html
 var AwsModelIDMap = map[string]string{
+	// Llama 3 models
 	"llama3-8b-8192":  "meta.llama3-8b-instruct-v1:0",
 	"llama3-70b-8192": "meta.llama3-70b-instruct-v1:0",
+
+	// Llama 3.1 models
+	"llama3-1-8b-128k":  "meta.llama3-1-8b-instruct-v1:0",
+	"llama3-1-70b-128k": "meta.llama3-1-70b-instruct-v1:0",
+
+	// Llama 3.2 models
+	"llama3-2-90b-128k":        "meta.llama3-2-90b-instruct-v1:0",
+	"llama3-2-3b-131k":         "meta.llama3-2-3b-instruct-v1:0",
+	"llama3-2-1b-131k":         "meta.llama3-2-1b-instruct-v1:0",
+	"llama3-2-11b-vision-131k": "meta.llama3-2-11b-instruct-v1:0",
+
+	// Llama 3.3 models
+	"llama3-3-70b-128k": "meta.llama3-3-70b-instruct-v1:0",
+
+	// Llama 4 models
+	"llama4-scout-17b-3.5m":  "meta.llama4-scout-17b-instruct-v1:0",
+	"llama4-maverick-17b-1m": "meta.llama4-maverick-17b-instruct-v1:0",
 }
 
 func awsModelID(requestModel string) (string, error) {
@@ -45,15 +63,30 @@ func awsModelID(requestModel string) (string, error) {
 	return "", errors.Errorf("model %s not found", requestModel)
 }
 
-// promptTemplate with range
-const promptTemplate = `<|begin_of_text|>{{range .Messages}}<|start_header_id|>{{.Role}}<|end_header_id|>{{.StringContent}}<|eot_id|>{{end}}<|start_header_id|>assistant<|end_header_id|>
-`
+// promptTemplate for legacy Llama models (3, 3.1, 3.2, 3.3)
+const legacyPromptTemplate = `<|begin_of_text|>{{range .Messages}}<|start_header_id|>{{.Role}}<|end_header_id|>{{.StringContent}}<|eot_id|>{{end}}<|start_header_id|>assistant<|end_header_id|>`
 
-var promptTpl = template.Must(template.New("llama3-chat").Parse(promptTemplate))
+// promptTemplate for Llama 4 models
+const llama4PromptTemplate = `<|begin_of_text|>{{range .Messages}}<|start_header_id|>{{.Role}}<|end_header_id|>{{.StringContent}}<|eot|>{{end}}<|start_header_id|>assistant<|end_header_id|>`
 
-func RenderPrompt(messages []relaymodel.Message) string {
+var legacyPromptTpl = template.Must(template.New("llama-legacy-chat").Parse(legacyPromptTemplate))
+var llama4PromptTpl = template.Must(template.New("llama4-chat").Parse(llama4PromptTemplate))
+
+// isLlama4Model checks if the given model is a Llama 4 model
+func isLlama4Model(model string) bool {
+	return model == "llama4-scout-17b-3.5m" || model == "llama4-maverick-17b-1m"
+}
+
+func RenderPrompt(messages []relaymodel.Message, model string) string {
 	var buf bytes.Buffer
-	err := promptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
+	var err error
+
+	if isLlama4Model(model) {
+		err = llama4PromptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
+	} else {
+		err = legacyPromptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
+	}
+
 	if err != nil {
 		// rendering prompt failed
 	}
@@ -69,7 +102,7 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 	if llamaRequest.MaxGenLen == 0 {
 		llamaRequest.MaxGenLen = config.DefaultMaxToken
 	}
-	prompt := RenderPrompt(textRequest.Messages)
+	prompt := RenderPrompt(textRequest.Messages, textRequest.Model)
 	llamaRequest.Prompt = prompt
 	return &llamaRequest
 }
