@@ -57,6 +57,8 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support Claude Code](#support-claude-code)
     - [Support Tracing info in logs](#support-tracing-info-in-logs)
     - [Support Cached Input](#support-cached-input)
+      - [Support Anthropic Prompt caching](#support-anthropic-prompt-caching)
+    - [Support XAI/Grok Text \& Image Models](#support-xaigrok-text--image-models)
   - [Bug fix](#bug-fix)
 
 ## Turtorial
@@ -354,6 +356,14 @@ You can use any model you like for Claude Code, even if the model doesn’t nati
 Now supports cached input, which can significantly reduce the cost.
 
 ![](https://s3.laisky.com/uploads/2025/08/cached_input.png)
+
+#### Support Anthropic Prompt caching
+
+- <https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching>
+
+### Support XAI/Grok Text & Image Models
+
+![](https://s3.laisky.com/uploads/2025/08/groq.png)
 
 ## Bug fix
 
