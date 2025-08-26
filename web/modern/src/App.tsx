@@ -26,6 +26,7 @@ import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { ModelsPage } from '@/pages/models/ModelsPage'
 import { TopUpPage } from '@/pages/topup/TopUpPage'
 import { ChatPage } from '@/pages/chat/ChatPage'
+import { NotFoundPage } from '@/pages/NotFoundPage'
 import { api } from '@/lib/api'
 import { ResponsiveDebugger } from '@/components/dev/responsive-debugger'
 import { ResponsiveValidator } from '@/components/dev/responsive-validator'
@@ -111,6 +112,11 @@ function App() {
                   <Route path="topup" element={<TopUpPage />} />
                   <Route path="chat" element={<ChatPage />} />
                 </Route>
+              </Route>
+
+              {/* Fallback 404 route within layout */}
+              <Route path="/" element={<Layout />}>
+                <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Routes>
           </div>

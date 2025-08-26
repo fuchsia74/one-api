@@ -50,7 +50,9 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 		if err != nil {
 			return nil, err
 		}
-		jsonBytes, err := json.Marshal(token)
+		// Marshal without custom Token.MarshalJSON to keep raw key in cache
+		type plainToken Token
+		jsonBytes, err := json.Marshal(plainToken(token))
 		if err != nil {
 			return nil, err
 		}

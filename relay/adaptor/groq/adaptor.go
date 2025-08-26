@@ -3,6 +3,7 @@ package groq
 import (
 	"io"
 	"net/http"
+	"strings"
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
@@ -56,7 +57,11 @@ func (a *Adaptor) Init(meta *meta.Meta) {}
 
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 	// Handle Claude Messages requests - convert to OpenAI Chat Completions endpoint
-	if meta.RequestURLPath == "/v1/messages" {
+	requestPath := meta.RequestURLPath
+	if idx := strings.Index(requestPath, "?"); idx >= 0 {
+		requestPath = requestPath[:idx]
+	}
+	if requestPath == "/v1/messages" {
 		// Claude Messages requests should use OpenAI's chat completions endpoint
 		chatCompletionsPath := "/v1/chat/completions"
 		return openai_compatible.GetFullRequestURL(meta.BaseURL, chatCompletionsPath, meta.ChannelType), nil
@@ -110,27 +115,10 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		zap.Int("status_code", resp.StatusCode),
 		zap.String("content_type", resp.Header.Get("Content-Type")))
 
-	// Use the shared OpenAI-compatible response handling
-	if meta.IsStream {
-		err, usage = openai_compatible.StreamHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
-	} else {
-		err, usage = openai_compatible.Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
-	}
-
-	// Log any errors for debugging
-	if err != nil {
-		logger.Error("groq response processing failed",
-			zap.String("model", meta.ActualModelName),
-			zap.Any("error_code", err.Error.Code),
-			zap.String("error_message", err.Error.Message),
-			zap.Int("error_status", err.StatusCode))
-	} else if usage != nil {
-		logger.Debug("groq response processed successfully",
-			zap.String("model", meta.ActualModelName),
-			zap.Int("prompt_tokens", usage.PromptTokens),
-			zap.Int("completion_tokens", usage.CompletionTokens),
-			zap.Int("total_tokens", usage.TotalTokens))
-	}
-
-	return
+	return openai_compatible.HandleClaudeMessagesResponse(c, resp, meta, func(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+		if meta.IsStream {
+			return openai_compatible.StreamHandler(c, resp, promptTokens, modelName)
+		}
+		return openai_compatible.Handler(c, resp, promptTokens, modelName)
+	})
 }

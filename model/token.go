@@ -1,7 +1,9 @@
 package model
 
 import (
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
@@ -37,6 +39,55 @@ type Token struct {
 	UpdatedAt      int64   `json:"updated_at" gorm:"bigint;autoUpdateTime:milli"`
 	Models         *string `json:"models" gorm:"type:text"`  // allowed models
 	Subnet         *string `json:"subnet" gorm:"default:''"` // allowed subnet
+}
+
+// MarshalJSON ensures that any token serialized to JSON will include the configured key prefix.
+// This does not modify the stored key; it's applied only at response time.
+func (t Token) MarshalJSON() ([]byte, error) {
+	// Normalize: strip any known legacy prefixes from stored value, then apply configured prefix
+	raw := t.Key
+	raw = strings.TrimPrefix(raw, "sk-")
+	raw = strings.TrimPrefix(raw, "laisky-")
+	prefix := config.TokenKeyPrefix
+	if prefix == "" {
+		prefix = "sk-"
+	}
+
+	type tokenDTO struct {
+		Id             int     `json:"id"`
+		UserId         int     `json:"user_id"`
+		Key            string  `json:"key"`
+		Status         int     `json:"status"`
+		Name           string  `json:"name"`
+		CreatedTime    int64   `json:"created_time"`
+		AccessedTime   int64   `json:"accessed_time"`
+		ExpiredTime    int64   `json:"expired_time"`
+		RemainQuota    int64   `json:"remain_quota"`
+		UnlimitedQuota bool    `json:"unlimited_quota"`
+		UsedQuota      int64   `json:"used_quota"`
+		CreatedAt      int64   `json:"created_at"`
+		UpdatedAt      int64   `json:"updated_at"`
+		Models         *string `json:"models"`
+		Subnet         *string `json:"subnet"`
+	}
+	dto := tokenDTO{
+		Id:             t.Id,
+		UserId:         t.UserId,
+		Key:            prefix + raw,
+		Status:         t.Status,
+		Name:           t.Name,
+		CreatedTime:    t.CreatedTime,
+		AccessedTime:   t.AccessedTime,
+		ExpiredTime:    t.ExpiredTime,
+		RemainQuota:    t.RemainQuota,
+		UnlimitedQuota: t.UnlimitedQuota,
+		UsedQuota:      t.UsedQuota,
+		CreatedAt:      t.CreatedAt,
+		UpdatedAt:      t.UpdatedAt,
+		Models:         t.Models,
+		Subnet:         t.Subnet,
+	}
+	return json.Marshal(dto)
 }
 
 func clearTokenCache(key string) {

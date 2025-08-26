@@ -54,6 +54,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Support OpenAI Response API](#support-openai-response-api)
     - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
     - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
+      - [Support Claude Code](#support-claude-code)
     - [Support Tracing info in logs](#support-tracing-info-in-logs)
     - [Support Cached Input](#support-cached-input)
   - [Bug fix](#bug-fix)
@@ -333,6 +334,16 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 ### Support /v1/messages Claude Messages API
 
 ![](https://s3.laisky.com/uploads/2025/07/claude_messages.png)
+
+#### Support Claude Code
+
+```sh
+export ANTHROPIC_MODEL="openai/gpt-oss-120b"
+export ANTHROPIC_BASE_URL="https://oneapi.laisky.com/"
+export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
+```
+
+You can use any model you like for Claude Code, even if the model doesn’t natively support the Claude Messages API.
 
 ### Support Tracing info in logs
 

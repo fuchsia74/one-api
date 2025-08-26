@@ -8,6 +8,14 @@ import (
 )
 
 func SetRelayRouter(router *gin.Engine) {
+	// Rewrite various Claude Code prefixes to the canonical /v1/messages path.
+	// Put this before other middlewares to avoid double-running them on redispatch.
+	router.Use(
+		middleware.RewriteClaudeMessagesPrefix("/v1/v1/messages", router),
+		middleware.RewriteClaudeMessagesPrefix("/openai/v1/messages", router),
+		middleware.RewriteClaudeMessagesPrefix("/openai/v1/v1/messages", router),
+		middleware.RewriteClaudeMessagesPrefix("/api/v1/v1/messages", router),
+	)
 	router.Use(middleware.CORS())
 	router.Use(middleware.GzipDecodeMiddleware())
 	// https://platform.openai.com/docs/api-reference/introduction
@@ -17,10 +25,19 @@ func SetRelayRouter(router *gin.Engine) {
 		modelsRouter.GET("", controller.ListModels)
 		modelsRouter.GET("/:model", controller.RetrieveModel)
 	}
+
+	relayMws := []gin.HandlerFunc{
+		middleware.RelayPanicRecover(), middleware.TokenAuth(),
+		middleware.Distribute(),
+		middleware.GlobalRelayRateLimit(),
+		middleware.ChannelRateLimit(),
+	}
+
 	relayV1Router := router.Group("/v1")
-	relayV1Router.Use(middleware.RelayPanicRecover(), middleware.TokenAuth(), middleware.Distribute())
-	relayV1Router.Use(middleware.GlobalRelayRateLimit())
-	relayV1Router.Use(middleware.ChannelRateLimit())
+	relayV1Router.Use(relayMws...)
+
+	// Legacy compatibility is maintained via middleware rewrite to /v1/messages.
+
 	{
 		relayV1Router.GET("/realtime", controller.RelayRealtime)
 		relayV1Router.Any("/oneapi/proxy/:channelid/*target", controller.Relay)

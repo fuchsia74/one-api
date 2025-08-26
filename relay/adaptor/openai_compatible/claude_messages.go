@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/gin-gonic/gin"
@@ -40,26 +41,23 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 				})
 			}
 		case []any:
-			// Handle structured system content
-			var systemContent []model.MessageContent
+			// Extract text parts and join; ignore non-text
+			var parts []string
 			for _, block := range system {
 				if blockMap, ok := block.(map[string]any); ok {
-					if blockType, exists := blockMap["type"]; exists && blockType == "text" {
+					if t, ok := blockMap["type"].(string); ok && t == "text" {
 						if text, exists := blockMap["text"]; exists {
-							if textStr, ok := text.(string); ok {
-								systemContent = append(systemContent, model.MessageContent{
-									Type: "text",
-									Text: &textStr,
-								})
+							if textStr, ok := text.(string); ok && textStr != "" {
+								parts = append(parts, textStr)
 							}
 						}
 					}
 				}
 			}
-			if len(systemContent) > 0 {
+			if len(parts) > 0 {
 				openaiRequest.Messages = append(openaiRequest.Messages, model.Message{
 					Role:    "system",
-					Content: systemContent,
+					Content: strings.Join(parts, "\n"),
 				})
 			}
 		}
@@ -67,125 +65,101 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 
 	// Convert messages
 	for _, msg := range request.Messages {
-		openaiMessage := model.Message{
-			Role: msg.Role,
-		}
+		openaiMessage := model.Message{Role: msg.Role}
 
-		// Convert content based on type
 		switch content := msg.Content.(type) {
 		case string:
-			// Simple string content
 			openaiMessage.Content = content
 		case []any:
-			// Structured content blocks - convert to OpenAI format
 			var contentParts []model.MessageContent
 			for _, block := range content {
-				if blockMap, ok := block.(map[string]any); ok {
-					if blockType, exists := blockMap["type"]; exists {
-						switch blockType {
-						case "text":
-							if text, exists := blockMap["text"]; exists {
-								if textStr, ok := text.(string); ok {
+				blockMap, ok := block.(map[string]any)
+				if !ok {
+					continue
+				}
+				bt, _ := blockMap["type"].(string)
+				switch bt {
+				case "text":
+					if text, exists := blockMap["text"]; exists {
+						if textStr, ok := text.(string); ok {
+							contentParts = append(contentParts, model.MessageContent{Type: "text", Text: &textStr})
+						}
+					}
+				case "image":
+					if source, exists := blockMap["source"]; exists {
+						if sourceMap, ok := source.(map[string]any); ok {
+							if st, _ := sourceMap["type"].(string); st == "base64" {
+								if mt, ok := sourceMap["media_type"].(string); ok {
+									if data, ok := sourceMap["data"].(string); ok {
+										contentParts = append(contentParts, model.MessageContent{
+											Type:     "image_url",
+											ImageURL: &model.ImageURL{Url: fmt.Sprintf("data:%s;base64,%s", mt, data)},
+										})
+									}
+								}
+							} else if st == "url" {
+								if urlStr, ok := sourceMap["url"].(string); ok {
 									contentParts = append(contentParts, model.MessageContent{
-										Type: "text",
-										Text: &textStr,
+										Type:     "image_url",
+										ImageURL: &model.ImageURL{Url: urlStr},
 									})
-								}
-							}
-						case "image":
-							// Handle image content
-							if source, exists := blockMap["source"]; exists {
-								if sourceMap, ok := source.(map[string]any); ok {
-									if sourceType, exists := sourceMap["type"]; exists {
-										switch sourceType {
-										case "base64":
-											if mediaType, exists := sourceMap["media_type"]; exists {
-												if data, exists := sourceMap["data"]; exists {
-													if mediaTypeStr, ok := mediaType.(string); ok {
-														if dataStr, ok := data.(string); ok {
-															contentParts = append(contentParts, model.MessageContent{
-																Type: "image_url",
-																ImageURL: &model.ImageURL{
-																	Url: fmt.Sprintf("data:%s;base64,%s", mediaTypeStr, dataStr),
-																},
-															})
-														}
-													}
-												}
-											}
-										case "url":
-											if url, exists := sourceMap["url"]; exists {
-												if urlStr, ok := url.(string); ok {
-													contentParts = append(contentParts, model.MessageContent{
-														Type: "image_url",
-														ImageURL: &model.ImageURL{
-															Url: urlStr,
-														},
-													})
-												}
-											}
-										}
-									}
-								}
-							}
-						case "tool_use":
-							// Handle tool use - convert to OpenAI tool call format
-							if id, exists := blockMap["id"]; exists {
-								if name, exists := blockMap["name"]; exists {
-									if input, exists := blockMap["input"]; exists {
-										if idStr, ok := id.(string); ok {
-											if nameStr, ok := name.(string); ok {
-												var argsStr string
-												if inputBytes, err := json.Marshal(input); err == nil {
-													argsStr = string(inputBytes)
-												}
-												openaiMessage.ToolCalls = append(openaiMessage.ToolCalls, model.Tool{
-													Id:   idStr,
-													Type: "function",
-													Function: &model.Function{
-														Name:      nameStr,
-														Arguments: argsStr,
-													},
-												})
-											}
-										}
-									}
-								}
-							}
-						case "tool_result":
-							// Handle tool result - this should be in a separate message
-							if toolCallId, exists := blockMap["tool_call_id"]; exists {
-								if content, exists := blockMap["content"]; exists {
-									if toolCallIdStr, ok := toolCallId.(string); ok {
-										var contentStr string
-										switch c := content.(type) {
-										case string:
-											contentStr = c
-										case []any:
-											// Handle structured tool result content
-											for _, item := range c {
-												if itemMap, ok := item.(map[string]any); ok {
-													if itemType, exists := itemMap["type"]; exists && itemType == "text" {
-														if text, exists := itemMap["text"]; exists {
-															if textStr, ok := text.(string); ok {
-																contentStr += textStr
-															}
-														}
-													}
-												}
-											}
-										}
-										openaiMessage.ToolCallId = toolCallIdStr
-										openaiMessage.Content = contentStr
-									}
 								}
 							}
 						}
 					}
+				case "tool_use":
+					if id, ok := blockMap["id"].(string); ok {
+						if name, ok := blockMap["name"].(string); ok {
+							input := blockMap["input"]
+							var argsStr string
+							if inputBytes, err := json.Marshal(input); err == nil {
+								argsStr = string(inputBytes)
+							}
+							openaiMessage.ToolCalls = append(openaiMessage.ToolCalls, model.Tool{
+								Id:   id,
+								Type: "function",
+								Function: &model.Function{
+									Name:      name,
+									Arguments: argsStr,
+								},
+							})
+						}
+					}
+				case "tool_result":
+					if toolCallId, ok := blockMap["tool_call_id"].(string); ok {
+						var contentStr string
+						switch cc := blockMap["content"].(type) {
+						case string:
+							contentStr = cc
+						case []any:
+							for _, item := range cc {
+								if itemMap, ok := item.(map[string]any); ok {
+									if t, _ := itemMap["type"].(string); t == "text" {
+										if txt, ok := itemMap["text"].(string); ok {
+											contentStr += txt
+										}
+									}
+								}
+							}
+						}
+						openaiMessage.ToolCallId = toolCallId
+						openaiMessage.Content = contentStr
+					}
+				default:
+					// ignore unknown block types gracefully
 				}
 			}
 			if len(contentParts) > 0 {
 				openaiMessage.Content = contentParts
+			} else if openaiMessage.Content == nil {
+				// Ensure content is present for providers requiring it
+				openaiMessage.Content = ""
+			}
+		default:
+			if b, err := json.Marshal(content); err == nil {
+				openaiMessage.Content = string(b)
+			} else {
+				openaiMessage.Content = ""
 			}
 		}
 
@@ -231,15 +205,21 @@ func HandleClaudeMessagesResponse(c *gin.Context, resp *http.Response, meta *met
 		return usage, err
 	}
 
-	// This is a Claude Messages conversion, we need to convert the response
-	// For now, we'll use a simplified approach - let the normal handler process the response
-	// and then indicate that Claude Messages conversion was handled
-	err, _ := handler(c, resp, meta.PromptTokens, meta.ActualModelName)
-	if err != nil {
-		return nil, err
+	// Claude Messages conversion path
+	if meta.IsStream {
+		// Convert OpenAI-compatible SSE to Claude-native SSE, write to client, return usage
+		usage, convErr := ConvertOpenAIStreamToClaudeSSE(c, resp, meta.PromptTokens, meta.ActualModelName)
+		if convErr != nil {
+			return nil, convErr
+		}
+		return usage, nil
 	}
 
-	// For Claude Messages conversion, we return nil usage to indicate
-	// that the conversion was handled by the adapter
+	// Non-stream: convert to Claude JSON and let controller forward it
+	claudeResp, convErr := ConvertOpenAIResponseToClaudeResponse(c, resp)
+	if convErr != nil {
+		return nil, convErr
+	}
+	c.Set(ctxkey.ConvertedResponse, claudeResp)
 	return nil, nil
 }

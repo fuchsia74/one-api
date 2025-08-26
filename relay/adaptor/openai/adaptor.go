@@ -89,7 +89,11 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		return geminiOpenaiCompatible.GetRequestURL(meta)
 	default:
 		// Handle Claude Messages requests - check if model should use Response API
-		if meta.RequestURLPath == "/v1/messages" {
+		requestPath := meta.RequestURLPath
+		if idx := strings.Index(requestPath, "?"); idx >= 0 {
+			requestPath = requestPath[:idx]
+		}
+		if requestPath == "/v1/messages" {
 			// For OpenAI channels, check if the model should use Response API
 			if meta.ChannelType == channeltype.OpenAI &&
 				!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {

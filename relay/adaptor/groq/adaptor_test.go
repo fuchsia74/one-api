@@ -18,6 +18,13 @@ func TestGetRequestURL(t *testing.T) {
 		channelType    int
 	}{
 		{
+			name:           "Claude Messages API with query conversion",
+			requestURLPath: "/v1/messages?beta=true",
+			expectedURL:    "https://api.groq.com/v1/chat/completions",
+			baseURL:        "https://api.groq.com",
+			channelType:    channeltype.Groq,
+		},
+		{
 			name:           "Claude Messages API conversion",
 			requestURLPath: "/v1/messages",
 			expectedURL:    "https://api.groq.com/v1/chat/completions",

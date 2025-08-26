@@ -1,127 +1,224 @@
-# API Format Conversion Architecture
+# API Format Conversion Guide
+
+This guide explains how one-api transparently converts between different AI API formats, enabling users and developers to interact with a wide range of models using familiar interfaces. It covers both usage guidelines and implementation details.
+
+- [API Format Conversion Guide](#api-format-conversion-guide)
+  - [1. Introduction](#1-introduction)
+  - [2. Usage Overview](#2-usage-overview)
+    - [2.1 Supported API Styles](#21-supported-api-styles)
+    - [2.2 How It Works for Users](#22-how-it-works-for-users)
+  - [3. Conversion Architecture](#3-conversion-architecture)
+    - [3.1 High-Level Flow](#31-high-level-flow)
+  - [Overview](#overview)
+  - [4. User-Facing Behavior \& Guidelines](#4-user-facing-behavior--guidelines)
+    - [4.1 Model/Endpoint Selection](#41-modelendpoint-selection)
+    - [4.2 Streaming, Function Calling, and Structured Content](#42-streaming-function-calling-and-structured-content)
+    - [4.3 Example Usage](#43-example-usage)
+  - [5. Implementation Details (For Developers)](#5-implementation-details-for-developers)
+    - [5.1 OpenAI ↔ Response API Conversion](#51-openai--response-api-conversion)
+    - [5.2 Claude Messages API Conversion](#52-claude-messages-api-conversion)
+    - [5.3 Model Support Detection](#53-model-support-detection)
+  - [6. Data Structure Mappings](#6-data-structure-mappings)
+    - [6.1 Request Conversion](#61-request-conversion)
+    - [6.2 Response Conversion (Non-streaming)](#62-response-conversion-non-streaming)
+    - [6.3 Response Conversion (Streaming)](#63-response-conversion-streaming)
+    - [6.4 Request Format Mapping](#64-request-format-mapping)
+    - [6.5 Response Format Mapping](#65-response-format-mapping)
+    - [6.6 Status Mapping](#66-status-mapping)
+  - [7. Advanced Features](#7-advanced-features)
+    - [7.1 Function Calling Support](#71-function-calling-support)
+    - [7.2 Streaming Implementation](#72-streaming-implementation)
+    - [7.3 Example Conversion](#73-example-conversion)
+    - [7.4 Event Processing](#74-event-processing)
+    - [7.5 Deduplication Strategy](#75-deduplication-strategy)
+  - [8. Error Handling \& Fallbacks](#8-error-handling--fallbacks)
+    - [8.1 Parse Errors](#81-parse-errors)
+    - [8.2 API Errors](#82-api-errors)
+    - [8.3 Fallback Mechanisms](#83-fallback-mechanisms)
+  - [9. Testing \& Extensibility](#9-testing--extensibility)
+    - [9.1 Test Coverage](#91-test-coverage)
+    - [9.2 Integration Tests](#92-integration-tests)
+  - [10. Context Management \& Configuration](#10-context-management--configuration)
+    - [10.1 Context Keys](#101-context-keys)
+    - [10.2 Context Flow](#102-context-flow)
+    - [10.3 Model Support Integration](#103-model-support-integration)
+      - [Current Implementation](#current-implementation)
+      - [Model Categories](#model-categories)
+        - [ChatCompletion-Only Models (API: `/v1/chat/completions`)](#chatcompletion-only-models-api-v1chatcompletions)
+        - [Response API Compatible Models (API: `/v1/responses`)](#response-api-compatible-models-api-v1responses)
+      - [Integration Points](#integration-points)
+        - [1. Request Processing](#1-request-processing)
+        - [2. URL Generation](#2-url-generation)
+      - [Implementation Strategy](#implementation-strategy)
+  - [11. Performance Considerations](#11-performance-considerations)
+    - [11.1 Memory Management](#111-memory-management)
+    - [11.2 Processing Efficiency](#112-processing-efficiency)
+  - [12. Future Enhancements](#12-future-enhancements)
+    - [12.1 Dynamic Model Support Detection](#121-dynamic-model-support-detection)
+    - [12.2 Enhanced Error Recovery](#122-enhanced-error-recovery)
+    - [12.3 Performance Optimizations](#123-performance-optimizations)
+  - [13. Configuration Reference](#13-configuration-reference)
+    - [13.1 Channel Type Detection](#131-channel-type-detection)
+    - [13.2 Relay Mode Detection](#132-relay-mode-detection)
+  - [14. Summary](#14-summary)
+- [Claude Messages API Conversion Architecture](#claude-messages-api-conversion-architecture)
+  - [Overview](#overview-1)
+  - [Recent Changes (2025-08)](#recent-changes-2025-08)
+  - [Problem Statement](#problem-statement)
+  - [Architecture](#architecture)
+    - [High-Level Flow](#high-level-flow)
+    - [Key Components](#key-components)
+      - [1. Claude Messages Controller](#1-claude-messages-controller)
+      - [2. Adapter Conversion Interface](#2-adapter-conversion-interface)
+      - [3. Shared OpenAI-Compatible Conversion](#3-shared-openai-compatible-conversion)
+  - [Adapter Implementation Patterns](#adapter-implementation-patterns)
+    - [Pattern 1: Native Claude Support (Anthropic)](#pattern-1-native-claude-support-anthropic)
+    - [Pattern 2: OpenAI-Compatible Conversion](#pattern-2-openai-compatible-conversion)
+    - [Pattern 3: Custom Conversion (Gemini)](#pattern-3-custom-conversion-gemini)
+  - [Supported Adapters](#supported-adapters)
+    - [✅ Native Claude Messages Support](#-native-claude-messages-support)
+    - [✅ OpenAI-Compatible Conversion](#-openai-compatible-conversion)
+    - [✅ Custom Conversion](#-custom-conversion)
+    - [❌ Limited or No Support](#-limited-or-no-support)
+    - [📋 Test Results Summary](#-test-results-summary)
+  - [Data Structure Mappings](#data-structure-mappings)
+    - [Claude Messages to OpenAI Format](#claude-messages-to-openai-format)
+    - [Message Content Conversion](#message-content-conversion)
+      - [Text Content](#text-content)
+      - [Structured Content](#structured-content)
+      - [Tool Use](#tool-use)
+    - [Response Format Conversion](#response-format-conversion)
+      - [OpenAI to Claude Messages](#openai-to-claude-messages)
+      - [Finish Reason Mapping](#finish-reason-mapping)
+  - [Context Management](#context-management)
+    - [Context Keys](#context-keys)
+    - [Context Flow](#context-flow)
+  - [Error Handling](#error-handling)
+    - [Conversion Errors](#conversion-errors)
+    - [Adapter Errors](#adapter-errors)
+    - [Fallback Mechanisms](#fallback-mechanisms)
+  - [Performance Considerations](#performance-considerations)
+    - [Memory Management](#memory-management)
+    - [Processing Efficiency](#processing-efficiency)
+  - [Testing](#testing)
+    - [Test Coverage](#test-coverage)
+  - [Future Enhancements](#future-enhancements)
+    - [1. Enhanced Content Support](#1-enhanced-content-support)
+    - [2. Performance Optimizations](#2-performance-optimizations)
+    - [3. Extended Adapter Support](#3-extended-adapter-support)
+  - [Summary](#summary)
+
+
+## 1. Introduction
+
+one-api provides seamless compatibility between OpenAI, Claude, Gemini, and other AI APIs. It automatically converts requests and responses between formats, so you can use your preferred API style regardless of the underlying model or provider.
+
+## 2. Usage Overview
+
+### 2.1 Supported API Styles
+
+- **OpenAI ChatCompletion API** (`/v1/chat/completions`)
+- **OpenAI Response API** (`/v1/responses`)
+- **Claude Messages API** (`/v1/messages`)
+
+### 2.2 How It Works for Users
+
+- You send requests in your preferred format (e.g., OpenAI ChatCompletion or Claude Messages).
+- one-api detects the target model/provider and automatically converts the request/response as needed.
+- You receive responses in the same format you used for your request.
+
+**Example:**
+
+- You can use the Claude Messages API to access OpenAI-compatible models, or use OpenAI's API to access Claude models, with no code changes on your side.
+
+## 3. Conversion Architecture
+
+### 3.1 High-Level Flow
+
+```plaintext
+User Request (Any Supported API)
+  ↓
+[Route to Appropriate Controller]
+  ↓
+[Detect Model/Provider]
+  ↓
+[Convert Request Format if Needed]
+  ↓
+[Send to Upstream]
+  ↓
+[Convert Response Format if Needed]
+  ↓
+User Response (Original API Format)
+```
 
 ## Overview
 
-This document describes the architecture and implementation of the API format conversion system in the one-api project. The system enables automatic conversion between different API formats:
+The system supports:
 
-1. **OpenAI Response API Conversion**: Conversion between OpenAI's ChatCompletion API format and the newer Response API format
-2. **Claude Messages API Conversion**: Conversion from Claude Messages API format to various adapter formats (OpenAI, Gemini, etc.)
+- **OpenAI ↔ Response API**: Converts between ChatCompletion and Response API formats.
+- **Claude Messages API**: Converts Claude Messages requests/responses to/from OpenAI, Gemini, and other formats.
 
-This allows users to access different API capabilities through standardized interfaces.
+## 4. User-Facing Behavior & Guidelines
 
-## Problem Statement
+### 4.1 Model/Endpoint Selection
 
-OpenAI introduced the Response API format as a new interface that provides enhanced capabilities for certain models. However, not all models support the Response API format - some models only support the traditional ChatCompletion API. The project needs to:
+- For most models, you can use either the ChatCompletion or Claude Messages API.
+- Some models (e.g., OpenAI search models) only support ChatCompletion; others (e.g., Claude) only support Claude Messages.
+- one-api automatically routes and converts as needed.
 
-1. Support transparent conversion from ChatCompletion requests to Response API format for compatible models
-2. Convert Response API responses back to ChatCompletion format for client compatibility
-3. Skip conversion for models that only support ChatCompletion API
-4. Maintain full feature compatibility including function calling, streaming, and reasoning content
+### 4.2 Streaming, Function Calling, and Structured Content
 
-## Architecture
+- Streaming, function calling, and structured content are fully supported and converted between formats.
+- Usage (token counting) is as accurate as possible, including tool/function arguments.
 
-### High-Level Flow
+### 4.3 Example Usage
 
-```plaintext
-User Request (ChatCompletion)
-    ↓
-[Model Support Check]
-    ↓
-┌─ If Model Only Supports ChatCompletion ─→ Direct Processing
-│
-└─ If Model Supports Response API
-    ↓
-[Convert to Response API]
-    ↓
-[Send to Upstream]
-    ↓
-[Response API Response]
-    ↓
-[Convert back to ChatCompletion]
-    ↓
-User Response (ChatCompletion)
+**Using Claude Messages API with OpenAI-compatible models:**
+
+```sh
+export ANTHROPIC_MODEL="openai/gpt-4o"
+export ANTHROPIC_BASE_URL="https://oneapi.laisky.com/"
+export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
 ```
 
-### Key Components
+## 5. Implementation Details (For Developers)
 
-#### 1. Request Conversion Pipeline
+### 5.1 OpenAI ↔ Response API Conversion
 
-**Location**: `relay/adaptor/openai/adaptor.go`
+**Location:** `relay/adaptor/openai/adaptor.go`
 
-**Entry Point**: `DoRequest()` method (lines 113-130)
+**Key Logic:**
 
-```go
-if relayMode == relaymode.ChatCompletions && meta.ChannelType == channeltype.OpenAI {
-    // Convert to Response API format
-    responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
+- Converts ChatCompletion requests to Response API format for compatible models.
+- Stores converted request in context for response detection.
 
-    // Store converted request in context for response detection
-    c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
+**Key Condition:**
 
-    return responseAPIRequest, nil
-}
-```
+- Only converts when relay mode is ChatCompletion and channel type is OpenAI, and the model supports Response API.
 
-**Key Condition**: Only converts when:
+### 5.2 Claude Messages API Conversion
 
-- Relay mode is ChatCompletion (`relaymode.ChatCompletions`)
-- Channel type is OpenAI (`channeltype.OpenAI`)
+**Location:** `relay/controller/claude_messages.go`, `relay/adaptor/openai_compatible/claude_messages.go`
 
-#### 2. Response Conversion Pipeline
+**Key Logic:**
 
-**Location**: `relay/adaptor/openai/adaptor.go`
+- All OpenAI-compatible adapters use a shared handler (`HandleClaudeMessagesResponse`) for both streaming and non-streaming Claude Messages conversion.
+- Streaming conversion uses `ConvertOpenAIStreamToClaudeSSE` to emit Claude-native SSE events and accumulate all relevant content for usage calculation.
+- Usage calculation includes both text and tool call arguments.
 
-**Entry Point**: `DoResponse()` method (lines 230-280)
+**Controller Fallback Logic:**
 
-**Detection Logic**:
+- The controller attempts to extract usage from the Claude response body (JSON), then from SSE (stream), and finally falls back to prompt-only estimation if all else fails.
 
-```go
-// Check if we need to convert Response API response back to ChatCompletion format
-if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
-    if _, ok := vi.(*ResponseAPIRequest); ok {
-        // This is a Response API response that needs conversion
-        err, usage = ResponseAPIHandler(c, resp, meta.PromptTokens, meta.ActualModelName)
-    } else {
-        // Regular ChatCompletion request
-        err, usage = Handler(c, resp, meta.PromptTokens, meta.ActualModelName)
-    }
-}
-```
+### 5.3 Model Support Detection
 
-**For Streaming**:
+**Function:** `IsModelsOnlySupportedByChatCompletionAPI(model string) bool` (see `relay/adaptor/openai/response_model.go`)
 
-```go
-if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
-    if _, ok := vi.(*ResponseAPIRequest); ok {
-        // This is a Response API streaming response that needs conversion
-        err, responseText, usage = ResponseAPIStreamHandler(c, resp, meta.Mode)
-    } else {
-        // Regular streaming response
-        err, responseText, usage = StreamHandler(c, resp, meta.Mode)
-    }
-}
-```
+**Behavior:**
 
-#### 3. Model Support Detection Function
+- Returns true for models that only support ChatCompletion (e.g., search models), false otherwise.
 
-**Current Status**: ✅ **Implemented**
-**Function**: `IsModelsOnlySupportedByChatCompletionAPI(model string) bool`
-**Location**: `relay/adaptor/openai/response_model.go:15`
-
-**Current Implementation**:
-
-```go
-func IsModelsOnlySupportedByChatCompletionAPI(actualModel string) bool {
-	switch {
-	case strings.Contains(actualModel, "gpt") && strings.Contains(actualModel, "-search-"):
-		return true
-	default:
-		return false
-	}
-}
-```
-
-**Integration Points**: ✅ **Integrated**
+**Integration Points:** Used in request processing and URL generation to determine conversion logic.
 
 1. **Request Processing** - `adaptor.go:117`:
 
@@ -145,21 +242,20 @@ if meta.Mode == relaymode.ChatCompletions &&
 return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), nil
 ```
 
-**Current Behavior**:
+**Current Behavior:**
 
 - ✅ **Search Models**: Models containing "gpt" and "-search-" use ChatCompletion API (`/v1/chat/completions`)
 - ✅ **Regular Models**: All other models use Response API (`/v1/responses`)
 - ✅ **URL Consistency**: Endpoint selection matches conversion logic
 - ✅ **Test Coverage**: Comprehensive tests verify both URL generation and conversion consistency
 
-## Core Conversion Functions
+## 6. Data Structure Mappings
 
-### 1. Request Conversion
+### 6.1 Request Conversion
 
-**Function**: `ConvertChatCompletionToResponseAPI()`
-**Location**: `relay/adaptor/openai/response_model.go:105`
+**Function:** `ConvertChatCompletionToResponseAPI()`
 
-**Key Transformations**:
+**Key Transformations:**
 
 - Messages → Input array
 - System message → Instructions field
@@ -167,7 +263,7 @@ return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), n
 - Function call history → Text summaries
 - Parameters mapping (temperature, top_p, etc.)
 
-**Function Call History Handling**:
+**Function Call History Handling:**
 The Response API doesn't support ChatCompletion's function call history format. The converter creates text summaries:
 
 ```plaintext
@@ -176,15 +272,13 @@ Previous function calls:
 - Called get_weather({"location":"Boston"}) → {"temperature":22,"condition":"sunny"}
 ```
 
-### 2. Response Conversion (Non-streaming)
+### 6.2 Response Conversion (Non-streaming)
 
-**Function**: `ConvertResponseAPIToChatCompletion()`
-**Location**: `relay/adaptor/openai/response_model.go:383`
+**Function:** `ConvertResponseAPIToChatCompletion()`
 
-**Handler**: `ResponseAPIHandler()`
-**Location**: `relay/adaptor/openai/main.go:330`
+**Handler:** `ResponseAPIHandler()`
 
-**Key Transformations**:
+**Key Transformations:**
 
 - Output array → Choices array
 - Message content → Choice message content
@@ -192,24 +286,20 @@ Previous function calls:
 - Status → Finish reason
 - Usage field mapping
 
-### 3. Response Conversion (Streaming)
+### 6.3 Response Conversion (Streaming)
 
-**Function**: `ConvertResponseAPIStreamToChatCompletion()`
-**Location**: `relay/adaptor/openai/response_model.go:487`
+**Function:** `ConvertResponseAPIStreamToChatCompletion()`
 
-**Handler**: `ResponseAPIStreamHandler()`
-**Location**: `relay/adaptor/openai/main.go:489`
+**Handler:** `ResponseAPIStreamHandler()`
 
-**Stream Event Processing**:
+**Stream Event Processing:**
 
 - `response.output_text.delta` → Content deltas
 - `response.reasoning_summary_text.delta` → Reasoning deltas
 - `response.completed` → Usage information
 - Function call events → Tool call deltas
 
-## Data Structure Mappings
-
-### Request Format Mapping
+### 6.4 Request Format Mapping
 
 | ChatCompletion Field   | Response API Field  | Notes                                |
 | ---------------------- | ------------------- | ------------------------------------ |
@@ -221,7 +311,7 @@ Previous function calls:
 | `stream`               | `stream`            | Direct mapping                       |
 | `user`                 | `user`              | Direct mapping                       |
 
-### Response Format Mapping
+### 6.5 Response Format Mapping
 
 | Response API Field              | ChatCompletion Field           | Notes             |
 | ------------------------------- | ------------------------------ | ----------------- |
@@ -232,7 +322,7 @@ Previous function calls:
 | `usage.input_tokens`            | `usage.prompt_tokens`          | Token usage       |
 | `usage.output_tokens`           | `usage.completion_tokens`      | Token usage       |
 
-### Status Mapping
+### 6.6 Status Mapping
 
 | Response API Status | ChatCompletion finish_reason | Notes                                    |
 | ------------------- | ---------------------------- | ---------------------------------------- |
@@ -241,22 +331,22 @@ Previous function calls:
 | `incomplete`        | `length`                     |                                          |
 | `cancelled`         | `stop`                       |                                          |
 
-## Function Calling Support
+## 7. Advanced Features
 
-### Request Flow
+### 7.1 Function Calling Support
 
 1. ChatCompletion tools → Response API tools (format conversion)
 2. Function call history → Text summaries in input
 3. Tool choice → Tool choice (preserved)
 
-### Response Flow
+### 7.2 Streaming Implementation
 
 1. Response API function_call output → ChatCompletion tool_calls
 2. Call ID mapping with prefix handling (`fc_` ↔ `call_`)
 3. Function name and arguments preservation
 4. Finish reason set to `tool_calls` when functions present
 
-### Example Conversion
+### 7.3 Example Conversion
 
 **Input (ChatCompletion)**:
 
@@ -291,9 +381,7 @@ Previous function calls:
 }
 ```
 
-## Streaming Implementation
-
-### Event Processing
+### 7.4 Event Processing
 
 The streaming handler processes different event types:
 
@@ -310,7 +398,7 @@ The streaming handler processes different event types:
 - **Function Call Events**: Function call streaming support
   - Converted to tool_call deltas in ChatCompletion format
 
-### Deduplication Strategy
+### 7.5 Deduplication Strategy
 
 Response API emits both delta and completion events. The implementation:
 
@@ -318,27 +406,27 @@ Response API emits both delta and completion events. The implementation:
 2. Discards completion events to prevent duplication
 3. Forwards usage information from final completion events
 
-## Error Handling
+## 8. Error Handling & Fallbacks
 
-### Parse Errors
+### 8.1 Parse Errors
 
 - Request conversion errors wrapped with `ErrorWrapper()`
 - Response parsing errors logged and processing continues
 - Malformed chunks skipped with debug logging
 
-### API Errors
+### 8.2 API Errors
 
 - Response API errors passed through unchanged
 - Error format preserved for client compatibility
 
-### Fallback Mechanisms
+### 8.3 Fallback Mechanisms
 
 - Token usage calculation fallback when API doesn't provide usage
 - Content extraction fallback for malformed responses
 
-## Testing Infrastructure
+## 9. Testing & Extensibility
 
-### Test Coverage
+### 9.1 Test Coverage
 
 **Location**: `relay/adaptor/openai/response_model_test.go`
 
@@ -350,7 +438,7 @@ Response API emits both delta and completion events. The implementation:
 - `TestFunctionCallWorkflow()` - End-to-end function calling
 - `TestChannelSpecificConversion()` - Channel type filtering
 
-### Integration Tests
+### 9.2 Integration Tests
 
 **Location**: `relay/adaptor/openai/channel_conversion_test.go`
 
@@ -359,9 +447,9 @@ Tests conversion behavior for different channel types:
 - OpenAI: Conversion enabled
 - Azure, AI360, etc.: Conversion disabled
 
-## Context Management
+## 10. Context Management & Configuration
 
-### Context Keys
+### 10.1 Context Keys
 
 **Location**: `common/ctxkey/key.go`
 
@@ -372,14 +460,14 @@ Tests conversion behavior for different channel types:
 - Request phase: Store converted ResponseAPI request
 - Response phase: Detect need for response conversion
 
-### Context Flow
+### 10.2 Context Flow
 
 1. **Request**: `c.Set(ctxkey.ConvertedRequest, responseAPIRequest)`
 2. **Response**: `c.Get(ctxkey.ConvertedRequest)` to detect conversion need
 
-## Model Support Integration
+### 10.3 Model Support Integration
 
-### Current Implementation
+#### Current Implementation
 
 ✅ **Function**: `IsModelsOnlySupportedByChatCompletionAPI(modelName string) bool`
 **Location**: `relay/adaptor/openai/response_model.go:15`
@@ -397,9 +485,9 @@ func IsModelsOnlySupportedByChatCompletionAPI(actualModel string) bool {
 }
 ```
 
-### Model Categories
+#### Model Categories
 
-#### ChatCompletion-Only Models (API: `/v1/chat/completions`)
+##### ChatCompletion-Only Models (API: `/v1/chat/completions`)
 
 These models return `true` from `IsModelsOnlySupportedByChatCompletionAPI()`:
 
@@ -408,7 +496,7 @@ These models return `true` from `IsModelsOnlySupportedByChatCompletionAPI()`:
 - 📍 **Endpoint**: `https://api.openai.com/v1/chat/completions`
 - 🔄 **Conversion**: **Disabled** - Request stays in ChatCompletion format
 
-#### Response API Compatible Models (API: `/v1/responses`)
+##### Response API Compatible Models (API: `/v1/responses`)
 
 These models return `false` from `IsModelsOnlySupportedByChatCompletionAPI()`:
 
@@ -418,9 +506,9 @@ These models return `false` from `IsModelsOnlySupportedByChatCompletionAPI()`:
 - 📍 **Endpoint**: `https://api.openai.com/v1/responses`
 - 🔄 **Conversion**: **Enabled** - ChatCompletion → Response API → ChatCompletion
 
-### Integration Points
+#### Integration Points
 
-#### 1. Request Processing
+##### 1. Request Processing
 
 **Location**: `relay/adaptor/openai/adaptor.go:117`
 
@@ -434,7 +522,7 @@ if relayMode == relaymode.ChatCompletions &&
 }
 ```
 
-#### 2. URL Generation
+##### 2. URL Generation
 
 **Location**: `relay/adaptor/openai/adaptor.go:84`
 
@@ -450,7 +538,7 @@ if meta.Mode == relaymode.ChatCompletions &&
 return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), nil
 ```
 
-### Implementation Strategy
+#### Implementation Strategy
 
 ✅ **Completed**:
 
@@ -467,56 +555,56 @@ return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), n
 3. **Runtime Updates**: Dynamic model support updates without code changes
 4. **Enhanced Patterns**: More sophisticated model pattern matching
 
-## Performance Considerations
+## 11. Performance Considerations
 
-### Memory Management
+### 11.1 Memory Management
 
 - Streaming buffers: 1MB buffer for large messages
 - Content accumulation: Separate tracking for reasoning vs content
 - Context storage: Minimal object stored in gin context
 
-### Processing Efficiency
+### 11.2 Processing Efficiency
 
 - Single-pass conversion: Request and response converted once
 - Lazy evaluation: Conversion only when needed
 - Early detection: Context check before processing
 
-## Future Enhancements
+## 12. Future Enhancements
 
-### 1. Dynamic Model Support Detection
+### 12.1 Dynamic Model Support Detection
 
 - API-based model capability detection
 - Configuration-driven model support mapping
 - Runtime model support updates
 
-### 2. Enhanced Error Recovery
+### 12.2 Enhanced Error Recovery
 
 - Partial response recovery for streaming failures
 - Automatic fallback to ChatCompletion for unsupported features
 
-### 3. Performance Optimizations
+### 12.3 Performance Optimizations
 
 - Response format detection optimization
 - Memory usage optimization for large responses
 - Caching for repeated conversions
 
-## Configuration
+## 13. Configuration Reference
 
-### Channel Type Detection
+### 13.1 Channel Type Detection
 
 **Location**: `relay/channeltype/define.go`
 
 **OpenAI Channel Type**: `channeltype.OpenAI = 1`
 
-### Relay Mode Detection
+### 13.2 Relay Mode Detection
 
 **Location**: `relay/relaymode/`
 
 **ChatCompletion Mode**: `relaymode.ChatCompletions`
 
-## Summary
+## 14. Summary
 
-The API conversion system provides transparent bidirectional conversion between ChatCompletion and Response API formats, enabling:
+The API conversion system provides transparent, bidirectional conversion between ChatCompletion, Response API, and Claude Messages formats, enabling:
 
 1. **Backward Compatibility**: Users can continue using ChatCompletion API
 2. **Forward Compatibility**: Access to Response API features and models
@@ -524,15 +612,22 @@ The API conversion system provides transparent bidirectional conversion between 
 4. **Full Feature Support**: Function calling, streaming, reasoning content
 5. **Error Resilience**: Comprehensive error handling and fallbacks
 
-The implementation maintains the familiar ChatCompletion interface while leveraging Response API capabilities when beneficial, with proper safeguards for models that only support the traditional format.
-
----
+The implementation maintains familiar API interfaces for users, while leveraging advanced capabilities and compatibility under the hood. Both users and developers benefit from seamless integration, robust error handling, and extensibility.
 
 # Claude Messages API Conversion Architecture
 
 ## Overview
 
 The Claude Messages API conversion system enables users to access various AI models through the standardized Claude Messages API format (`/v1/messages`). This system automatically converts Claude Messages requests to the appropriate format for each adapter (OpenAI, Gemini, Groq, etc.) and converts responses back to Claude Messages format.
+
+## Recent Changes (2025-08)
+
+- **Unified Conversion Handler:** All OpenAI-compatible adapters now use a shared handler (`HandleClaudeMessagesResponse`) for both streaming and non-streaming Claude Messages conversion. This ensures consistent conversion and usage calculation across all adapters.
+- **Streaming Conversion Logic:** Streaming responses are converted using `ConvertOpenAIStreamToClaudeSSE`, which emits Claude-native SSE events (`message_start`, `content_block_start`, `content_block_delta`, etc.) and accumulates text, tool arguments, and "thinking" blocks for accurate token usage calculation.
+- **Usage Calculation:** Token usage calculation now includes tool call arguments in addition to text, for both streaming and non-streaming responses. If the upstream does not provide usage, or provides incomplete usage, the system computes/fills in the missing values.
+- **Controller Fallback Logic:** The controller attempts to extract usage from the Claude response body (JSON), then from SSE (stream), and finally falls back to prompt-only estimation if all else fails.
+- **Adapter Implementation Requirement:** All OpenAI-compatible adapters must delegate response handling to the shared handler. This is now the required pattern for new adapters.
+- **Billing Impact:** These changes may affect billing and quotas, as more accurate (and sometimes higher) token usage is now reported. All new adapters must follow the unified conversion and usage calculation logic.
 
 ## Problem Statement
 
@@ -590,6 +685,7 @@ User Response (Claude Messages API)
 - Route to appropriate adapter based on model
 - Handle response conversion coordination
 - Manage streaming and non-streaming responses
+- Extract usage information from the response body (JSON or SSE), including tool call arguments, and compute usage if missing.
 
 #### 2. Adapter Conversion Interface
 
@@ -608,7 +704,11 @@ User Response (Claude Messages API)
 2. **Conversion Support** (OpenAI, Gemini, etc.):
    - Sets `ClaudeMessagesConversion` flag
    - Converts request format in `ConvertClaudeRequest`
-   - Converts response format in `DoResponse`
+
+- Converts response format in `DoResponse` using the shared handler (`HandleClaudeMessagesResponse`).
+- For streaming, uses `ConvertOpenAIStreamToClaudeSSE` to emit Claude-native SSE events and accumulate all relevant content for usage calculation.
+- For non-streaming, converts to Claude-native JSON and stores in context for the controller to forward.
+- Usage calculation includes both text and tool call arguments.
 
 #### 3. Shared OpenAI-Compatible Conversion
 
@@ -638,6 +738,16 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, error) {
     // Use shared OpenAI-compatible conversion
     return openai_compatible.ConvertClaudeRequest(c, request)
+}
+
+func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
+  // Use the shared Claude Messages response handler for both streaming and non-streaming
+  return openai_compatible.HandleClaudeMessagesResponse(c, resp, meta, func(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
+    if meta.IsStream {
+      return openai_compatible.StreamHandler(c, resp, promptTokens, modelName)
+    }
+    return openai_compatible.Handler(c, resp, promptTokens, modelName)
+  })
 }
 ```
 
@@ -812,14 +922,15 @@ Based on comprehensive testing:
 
 #### OpenAI to Claude Messages
 
-| OpenAI Field                    | Claude Messages Field | Notes                               |
-| ------------------------------- | --------------------- | ----------------------------------- |
-| `id`                            | `id`                  | Generate Claude-style ID if missing |
-| `choices[0].message.content`    | `content[0].text`     | Text content                        |
-| `choices[0].message.tool_calls` | `content[].tool_use`  | Tool calls conversion               |
-| `choices[0].finish_reason`      | `stop_reason`         | Reason mapping required             |
-| `usage.prompt_tokens`           | `usage.input_tokens`  | Direct mapping                      |
-| `usage.completion_tokens`       | `usage.output_tokens` | Direct mapping                      |
+| OpenAI Field                    | Claude Messages Field | Notes                                                    |
+| ------------------------------- | --------------------- | -------------------------------------------------------- |
+| `id`                            | `id`                  | Generate Claude-style ID if missing                      |
+| `choices[0].message.content`    | `content[0].text`     | Text content                                             |
+| `choices[0].message.tool_calls` | `content[].tool_use`  | Tool calls conversion                                    |
+| `choices[0].finish_reason`      | `stop_reason`         | Reason mapping required                                  |
+| `usage.prompt_tokens`           | `usage.input_tokens`  | Direct mapping                                           |
+| `usage.completion_tokens`       | `usage.output_tokens` | Direct mapping                                           |
+| tool call arguments             | included in usage     | Token usage calculation now includes tool call arguments |
 
 #### Finish Reason Mapping
 
@@ -868,6 +979,7 @@ Based on comprehensive testing:
 - Request conversion errors wrapped with proper error types
 - Response parsing errors logged with debug information
 - Malformed content handled gracefully with fallbacks
+- Usage calculation fallbacks: If usage is missing, the system computes it from all available content (including tool call arguments). If still missing, only prompt tokens are counted.
 
 ### Adapter Errors
 
