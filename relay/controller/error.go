@@ -91,14 +91,17 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	var errResponse GeneralErrorResponse
 	err = json.Unmarshal(responseBody, &errResponse)
 	if err != nil {
+		errResponse.Error.Message = string(responseBody)
 		return
 	}
+
 	if errResponse.Error.Message != "" {
 		// OpenAI format error, so we override the default one
 		ErrorWithStatusCode.Error = errResponse.Error
 	} else {
 		ErrorWithStatusCode.Error.Message = errResponse.ToMessage()
 	}
+
 	if ErrorWithStatusCode.Error.Message == "" {
 		ErrorWithStatusCode.Error.Message = fmt.Sprintf("bad response status code %d", resp.StatusCode)
 	}
