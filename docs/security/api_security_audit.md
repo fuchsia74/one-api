@@ -117,8 +117,6 @@ GET  /api/channel/models            - List all models
 GET  /api/channel/:id               - Get channel
 GET  /api/channel/test              - Test all channels
 GET  /api/channel/test/:id          - Test specific channel
-GET  /api/channel/update_balance    - Update all channel balances
-GET  /api/channel/update_balance/:id - Update channel balance
 GET  /api/channel/pricing/:id       - Get channel pricing
 GET  /api/channel/default-pricing   - Get default pricing
 POST /api/channel/                  - Add channel

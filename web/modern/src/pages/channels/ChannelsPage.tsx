@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatTimestamp, cn } from '@/lib/utils'
-import { Plus, TestTube, RefreshCw, DollarSign, Trash2, Settings, AlertCircle } from 'lucide-react'
+import { Plus, TestTube, RefreshCw, Trash2, Settings, AlertCircle } from 'lucide-react'
 
 interface Channel {
   id: number
@@ -24,8 +24,6 @@ interface Channel {
   weight?: number
   models?: string
   group?: string
-  balance?: number
-  balance_updated_time?: number
   used_quota?: number
   test_time?: number
 }
@@ -97,12 +95,6 @@ const getStatusBadge = (status: number, priority?: number) => {
   return <Badge variant="default" className="bg-green-100 text-green-800">Active</Badge>
 }
 
-const formatBalance = (balance?: number) => {
-  if (balance === undefined || balance === null) return '-'
-  if (balance === -1) return 'Not Supported'
-  return `$${balance.toFixed(2)}`
-}
-
 const formatResponseTime = (time?: number) => {
   if (!time) return '-'
   const color = time < 1000 ? 'text-green-600' : time < 3000 ? 'text-yellow-600' : 'text-red-600'
@@ -123,7 +115,6 @@ export function ChannelsPage() {
   const [sortBy, setSortBy] = useState('id')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [bulkTesting, setBulkTesting] = useState(false)
-  const [bulkUpdating, setBulkUpdating] = useState(false)
   const initializedRef = useRef(false)
 
   const load = async (p = 0, size = pageSize) => {
@@ -235,7 +226,7 @@ export function ChannelsPage() {
     }
   }, [sortBy, sortOrder])
 
-  const manage = async (id: number, action: 'enable' | 'disable' | 'delete' | 'test' | 'balance', index?: number) => {
+  const manage = async (id: number, action: 'enable' | 'disable' | 'delete' | 'test', index?: number) => {
     try {
       if (action === 'delete') {
         if (!confirm('Are you sure you want to delete this channel?')) return
@@ -259,19 +250,6 @@ export function ChannelsPage() {
           const newData = [...data]
           newData[index] = { ...newData[index], response_time: time, test_time: Date.now() }
           setData(newData)
-        }
-        return
-      }
-
-      if (action === 'balance') {
-        // Unified API call - complete URL with /api prefix
-        const res = await api.get(`/api/channel/update_balance/${id}`)
-        if (res.data?.success) {
-          if (searchKeyword.trim()) {
-            performSearch()
-          } else {
-            load(pageIndex, pageSize)
-          }
         }
         return
       }
@@ -301,19 +279,6 @@ export function ChannelsPage() {
       console.error('Bulk test failed:', error)
     } finally {
       setBulkTesting(false)
-    }
-  }
-
-  const handleBulkUpdateBalance = async () => {
-    setBulkUpdating(true)
-    try {
-      // Unified API call - complete URL with /api prefix
-      await api.get('/api/channel/update_balance')
-      load(pageIndex, pageSize)
-    } catch (error) {
-      console.error('Bulk balance update failed:', error)
-    } finally {
-      setBulkUpdating(false)
     }
   }
 
@@ -376,20 +341,6 @@ export function ChannelsPage() {
       ),
     },
     {
-      accessorKey: 'balance',
-      header: 'Balance',
-      cell: ({ row }) => (
-        <div className="text-sm" title={`Balance: ${formatBalance(row.original.balance)}${row.original.balance_updated_time ? ` (Updated: ${formatTimestamp(row.original.balance_updated_time)})` : ''}`}>
-          {formatBalance(row.original.balance)}
-          {row.original.balance_updated_time && (
-            <div className="text-xs text-muted-foreground">
-              {formatTimestamp(row.original.balance_updated_time)}
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
       accessorKey: 'response_time',
       header: 'Response',
       cell: ({ row }) => (
@@ -446,15 +397,6 @@ export function ChannelsPage() {
             >
               <TestTube className="h-3 w-3" />
               Test
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => manage(channel.id, 'balance')}
-              className="gap-1"
-            >
-              <DollarSign className="h-3 w-3" />
-              Balance
             </Button>
             <Button
               variant="destructive"
@@ -516,23 +458,6 @@ export function ChannelsPage() {
           <TestTube className="h-4 w-4" />
         )}
         {isMobile ? "Test All Channels" : "Test All"}
-      </Button>
-      <Button
-        variant="outline"
-        onClick={handleBulkUpdateBalance}
-        disabled={bulkUpdating || loading}
-        className={cn(
-          "gap-2",
-          isMobile ? "w-full touch-target" : ""
-        )}
-        size="sm"
-      >
-        {bulkUpdating ? (
-          <RefreshCw className="h-4 w-4 animate-spin" />
-        ) : (
-          <DollarSign className="h-4 w-4" />
-        )}
-        {isMobile ? "Update All Balances" : "Update Balances"}
       </Button>
       <Button
         variant="destructive"
