@@ -14,6 +14,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
@@ -276,8 +277,12 @@ func postConsumeQuota(ctx context.Context,
 	}
 	// Use centralized detailed billing function to follow DRY principle
 	quotaDelta := quota - preConsumedQuota
-	// We don't have gin.Context here, so RequestId/TraceId must be captured by caller and stored in meta if needed.
-	// For now, leave them empty.
+	// Derive RequestId/TraceId from std context if possible (gin ctx embedded by gmw.BackgroundCtx)
+	var requestId string
+	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
+		requestId = ginCtx.GetString(ctxkey.RequestId)
+	}
+	traceId := tracing.GetTraceIDFromContext(ctx)
 	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
 		Ctx:                    ctx,
 		TokenId:                meta.TokenId,
@@ -298,8 +303,8 @@ func postConsumeQuota(ctx context.Context,
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     cachedPrompt,
 		CachedCompletionTokens: 0,
-		RequestId:              "",
-		TraceId:                "",
+		RequestId:              requestId,
+		TraceId:                traceId,
 	})
 
 	return quota
@@ -429,6 +434,10 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	}
 	// Use centralized detailed billing function with explicit trace ID
 	quotaDelta := quota - preConsumedQuota
+	var requestId string
+	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
+		requestId = ginCtx.GetString(ctxkey.RequestId)
+	}
 	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
 		Ctx:                    ctx,
 		TokenId:                meta.TokenId,
@@ -449,7 +458,7 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     cachedPrompt,
 		CachedCompletionTokens: 0,
-		RequestId:              "",
+		RequestId:              requestId,
 		TraceId:                traceId,
 	})
 

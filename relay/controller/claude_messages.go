@@ -865,6 +865,12 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 	}
 	// Use centralized detailed billing function with explicit trace ID
 	quotaDelta := quota - preConsumedQuota
+	// If requestId somehow empty, try derive from ctx (best-effort)
+	if requestId == "" {
+		if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
+			requestId = ginCtx.GetString(ctxkey.RequestId)
+		}
+	}
 	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
 		Ctx:                    ctx,
 		TokenId:                meta.TokenId,
@@ -885,7 +891,7 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     0,
 		CachedCompletionTokens: 0,
-		RequestId:              "",
+		RequestId:              requestId,
 		TraceId:                traceId,
 	})
 

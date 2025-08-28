@@ -51,8 +51,8 @@ github.com/Laisky/errors/v2 v2.0.1 h1:yqCBrRzaP012AMB+7fVlXrP34OWRHrSO/hZ38CFdH8
 github.com/Laisky/errors/v2 v2.0.1/go.mod h1:mTn1LHSmKm4CYug0rpYO7rz13dp/DKrtzlSELSrxvT0=
 github.com/Laisky/fast-skiplist/v2 v2.0.1 h1:mZD3G/cwNovXsd21Vyvt3HCI9dEg1V7OD64qXsUUgpQ=
 github.com/Laisky/fast-skiplist/v2 v2.0.1/go.mod h1:JlDGOmsJOwW7Uo46L9aVG7nJAeqP7X7nfU5TABOiiE8=
-github.com/Laisky/gin-middlewares/v6 v6.1.1-0.20250822145037-bfdcd7d1b070 h1:h0cX3qZ5u1dBnFFD/LTItHXlCUZ/PXsYUG3wNFDWXeg=
-github.com/Laisky/gin-middlewares/v6 v6.1.1-0.20250822145037-bfdcd7d1b070/go.mod h1:fNTjIublol5x8CBr5hkJeplTHVXOVwIiCNatXwU7L10=
+github.com/Laisky/gin-middlewares/v6 v6.1.1-0.20250828201657-4992ce2267e9 h1:S2Mq9ttKCNcFwjEL7gQMc//6Dkaocej7O0RbzN2mELI=
+github.com/Laisky/gin-middlewares/v6 v6.1.1-0.20250828201657-4992ce2267e9/go.mod h1:fNTjIublol5x8CBr5hkJeplTHVXOVwIiCNatXwU7L10=
 github.com/Laisky/go-chaining v0.0.0-20180507092046-43dcdc5a21be h1:7Rxhm6IjOtDAyj8eScOFntevwzkWhx94zi48lxo4m4w=
 github.com/Laisky/go-chaining v0.0.0-20180507092046-43dcdc5a21be/go.mod h1:1mdzaETo0kjvCQICPSePsoaatJN4l7JvEA1200lyevo=
 github.com/Laisky/go-gin-prometheus v1.0.1 h1:0xxZ0SeuycO65sQyZpwVCr19blGtkbwv39pQrw+hrWo=
