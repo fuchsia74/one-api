@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { formatTimestamp, cn } from '@/lib/utils'
 import { Plus, TestTube, RefreshCw, Trash2, Settings, AlertCircle } from 'lucide-react'
+import { useNotifications } from '@/components/ui/notifications'
 
 interface Channel {
   id: number
@@ -26,6 +27,7 @@ interface Channel {
   group?: string
   used_quota?: number
   test_time?: number
+  testing_model?: string | null
 }
 
 /**
@@ -104,6 +106,7 @@ const formatResponseTime = (time?: number) => {
 export function ChannelsPage() {
   const navigate = useNavigate()
   const { isMobile } = useResponsive()
+  const { notify } = useNotifications()
   const [data, setData] = useState<Channel[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -245,11 +248,16 @@ export function ChannelsPage() {
       if (action === 'test') {
         // Unified API call - complete URL with /api prefix
         const res = await api.get(`/api/channel/test/${id}`)
-        const { success, time } = res.data
-        if (success && index !== undefined) {
+        const { success, time, message } = res.data
+        if (index !== undefined) {
           const newData = [...data]
           newData[index] = { ...newData[index], response_time: time, test_time: Date.now() }
           setData(newData)
+        }
+        if (success) {
+          notify({ type: 'success', message: 'Channel test successful.' })
+        } else {
+          notify({ type: 'error', title: 'Channel test failed', message: message || 'Unknown error' })
         }
         return
       }
@@ -269,14 +277,42 @@ export function ChannelsPage() {
     }
   }
 
+  const updateTestingModel = async (id: number, testingModel: string | null) => {
+    try {
+      const current = data.find((c) => c.id === id)
+      const payload: any = { id, name: current?.name }
+      // When null, let backend clear it (auto-cheapest)
+      if (testingModel === null) {
+        payload.testing_model = null
+      } else {
+        payload.testing_model = testingModel
+      }
+      // Unified API call - complete URL with /api prefix
+      const res = await api.put('/api/channel/', payload)
+      if (res.data?.success) {
+        // Update local row to reflect change
+        setData((prev) => prev.map((ch) => (ch.id === id ? { ...ch, testing_model: testingModel } : ch)))
+        notify({ type: 'success', message: 'Testing model saved.' })
+      } else {
+        const msg = res.data?.message || 'Failed to save testing model'
+        notify({ type: 'error', title: 'Save failed', message: msg })
+      }
+    } catch (error) {
+      console.error('Failed to update testing model:', error)
+      notify({ type: 'error', title: 'Save failed', message: 'Failed to update testing model' })
+    }
+  }
+
   const handleBulkTest = async () => {
     setBulkTesting(true)
     try {
       // Unified API call - complete URL with /api prefix
-      await api.get('/api/channel/test')
+  await api.get('/api/channel/test')
       load(pageIndex, pageSize)
+  notify({ type: 'info', message: 'Bulk channel test started.' })
     } catch (error) {
       console.error('Bulk test failed:', error)
+  notify({ type: 'error', title: 'Bulk test failed', message: error instanceof Error ? error.message : 'Unknown error' })
     } finally {
       setBulkTesting(false)
     }
@@ -287,10 +323,12 @@ export function ChannelsPage() {
 
     try {
       // Unified API call - complete URL with /api prefix
-      await api.delete('/api/channel/disabled')
+  await api.delete('/api/channel/disabled')
       load(pageIndex, pageSize)
+  notify({ type: 'success', message: 'Disabled channels deleted.' })
     } catch (error) {
       console.error('Failed to delete disabled channels:', error)
+  notify({ type: 'error', title: 'Delete failed', message: error instanceof Error ? error.message : 'Unknown error' })
     }
   }
 
@@ -353,6 +391,37 @@ export function ChannelsPage() {
           )}
         </div>
       ),
+    },
+    {
+      accessorKey: 'testing_model',
+      header: 'Testing Model',
+      cell: ({ row }) => {
+        const ch = row.original
+        const models = (ch.models || '')
+          .split(',')
+          .map((m) => m.trim())
+          .filter(Boolean)
+        const value = ch.testing_model ?? '' // empty => Auto (cheapest)
+        return (
+          <div className="w-[140px] md:w-[160px] max-w-[220px]">
+            <select
+              className="w-full border rounded px-2 py-1 text-sm bg-background"
+              value={value}
+              onChange={(e) => {
+                const v = e.target.value
+                updateTestingModel(ch.id, v === '' ? null : v)
+              }}
+            >
+              <option value="">CHEAPEST</option>
+              {models.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </div>
+        )
+      },
     },
     {
       accessorKey: 'created_time',

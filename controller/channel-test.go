@@ -257,7 +257,33 @@ func TestChannel(c *gin.Context) {
 		})
 		return
 	}
-	modelName := c.Query("model")
+	modelName := strings.TrimSpace(c.Query("model"))
+	// If not explicitly provided by query, use stored testing_model; if missing, default to cheapest supported model
+	if modelName == "" {
+		if channel.TestingModel != nil && *channel.TestingModel != "" {
+			// ensure still supported; if not, clear per requirement
+			tm := *channel.TestingModel
+			supported := false
+			for _, name := range channel.GetSupportedModelNames() {
+				if name == tm {
+					supported = true
+					break
+				}
+			}
+			if supported {
+				modelName = tm
+			} else {
+				// clear invalid stored value and pick cheapest
+				channel.TestingModel = nil
+				if err := model.DB.Model(channel).Where("id = ?", channel.Id).Update("testing_model", nil).Error; err != nil {
+					gmw.GetLogger(c).Error("failed to clear invalid testing_model", zap.Error(err))
+				}
+			}
+		}
+		if modelName == "" {
+			modelName = channel.GetCheapestSupportedModel()
+		}
+	}
 	testRequest := buildTestRequest(modelName)
 	tik := time.Now()
 	responseMessage, err, _ := testChannel(ctx, channel, testRequest)
@@ -311,7 +337,30 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 		for _, channel := range channels {
 			isChannelEnabled := channel.Status == model.ChannelStatusEnabled
 			tik := time.Now()
-			testRequest := buildTestRequest("")
+			// Determine model for this channel: stored testing_model if valid, else cheapest
+			chosenModel := ""
+			if channel.TestingModel != nil && *channel.TestingModel != "" {
+				tm := *channel.TestingModel
+				valid := false
+				for _, name := range channel.GetSupportedModelNames() {
+					if name == tm {
+						valid = true
+						break
+					}
+				}
+				if valid {
+					chosenModel = tm
+				} else {
+					channel.TestingModel = nil
+					if err := model.DB.Model(channel).Where("id = ?", channel.Id).Update("testing_model", nil).Error; err != nil {
+						gmw.GetLogger(ctx).Error("failed to clear invalid testing_model in bulk test", zap.Error(err))
+					}
+				}
+			}
+			if chosenModel == "" {
+				chosenModel = channel.GetCheapestSupportedModel()
+			}
+			testRequest := buildTestRequest(chosenModel)
 			_, err, openaiErr := testChannel(ctx, channel, testRequest)
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
@@ -323,8 +372,21 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 					_ = message.Notify(message.ByAll, fmt.Sprintf("Channel %s （%d）Test超时", channel.Name, channel.Id), "", err.Error())
 				}
 			}
+			// Only disable a channel on failure when AutomaticDisableChannelEnabled is true.
 			if isChannelEnabled && (err != nil || monitor.ShouldDisableChannel(openaiErr, -1)) {
-				monitor.DisableChannel(channel.Id, channel.Name, err.Error())
+				// Build a safe reason string to avoid nil dereference
+				reason := "channel test failed"
+				if err != nil {
+					reason = err.Error()
+				} else if openaiErr != nil {
+					reason = openaiErr.Message
+				}
+				if config.AutomaticDisableChannelEnabled {
+					monitor.DisableChannel(channel.Id, channel.Name, reason)
+				} else {
+					// Notify only when auto-disable is off
+					_ = message.Notify(message.ByAll, fmt.Sprintf("Channel %s （%d）Test失败", channel.Name, channel.Id), "", reason)
+				}
 			}
 			if !isChannelEnabled && (err == nil && monitor.ShouldEnableChannel(err, openaiErr)) {
 				monitor.EnableChannel(channel.Id, channel.Name)

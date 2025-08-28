@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { ThemeProvider } from '@/components/theme-provider'
+import { NotificationsProvider } from '@/components/ui/notifications'
 import { Layout } from '@/components/layout/Layout'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { HomePage } from '@/pages/HomePage'
@@ -72,6 +73,7 @@ function App() {
   return (
     <ThemeProvider defaultTheme="system" storageKey="one-api-theme">
       <QueryClientProvider client={queryClient}>
+        <NotificationsProvider>
         <Router>
           <div className="bg-background">
             <Routes>
@@ -128,7 +130,8 @@ function App() {
               <ResponsiveValidator />
             </>
           )}
-        </Router>
+  </Router>
+  </NotificationsProvider>
       </QueryClientProvider>
     </ThemeProvider>
   )

@@ -150,6 +150,24 @@ func AddChannel(c *gin.Context) {
 	}
 
 	channel.CreatedTime = helper.GetTimestamp()
+	// Sanitize testing model at creation: only keep if present in models list
+	if channel.TestingModel != nil {
+		tm := strings.TrimSpace(*channel.TestingModel)
+		if tm == "" {
+			channel.TestingModel = nil
+		} else {
+			ok := false
+			for _, name := range strings.Split(channel.Models, ",") {
+				if strings.TrimSpace(name) == tm {
+					ok = true
+					break
+				}
+			}
+			if !ok {
+				channel.TestingModel = nil
+			}
+		}
+	}
 	keys := strings.Split(channel.Key, "\n")
 	channels := make([]model.Channel, 0, len(keys))
 	for _, key := range keys {

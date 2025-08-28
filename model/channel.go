@@ -50,6 +50,9 @@ type Channel struct {
 	Config             string  `json:"config"`
 	SystemPrompt       *string `json:"system_prompt" gorm:"type:text"`
 	RateLimit          *int    `json:"ratelimit" gorm:"column:ratelimit;default:0"`
+	// Preferred testing model for this channel (optional)
+	// If empty or nil, the system will auto-select the cheapest supported model at test time.
+	TestingModel *string `json:"testing_model" gorm:"column:testing_model;type:varchar(255)"`
 	// Channel-specific pricing tables
 	// DEPRECATED: Use ModelConfigs instead. These fields are kept for backward compatibility and migration.
 	ModelRatio      *string `json:"model_ratio" gorm:"type:text"`      // DEPRECATED: JSON string of model pricing ratios
@@ -225,6 +228,64 @@ func (channel *Channel) GetModelMapping() map[string]string {
 		return nil
 	}
 	return modelMapping
+}
+
+// GetSupportedModelNames returns the list of model names the channel currently supports
+// based on the comma-separated Models field.
+func (channel *Channel) GetSupportedModelNames() []string {
+	models := strings.TrimSpace(channel.Models)
+	if models == "" {
+		return nil
+	}
+	parts := strings.Split(models, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// GetCheapestSupportedModel returns the cheapest model among the channel's currently
+// supported models using channel-specific ModelConfigs ratios when available.
+// Returns empty string if none found.
+func (channel *Channel) GetCheapestSupportedModel() string {
+	names := channel.GetSupportedModelNames()
+	if len(names) == 0 {
+		return ""
+	}
+	// Use unified ModelConfigs to get ratio if available
+	configs := channel.GetModelPriceConfigs()
+	var (
+		cheapestName  string
+		cheapestRatio float64 = 0
+		initialized   bool
+	)
+	for _, name := range names {
+		var r float64
+		if cfg, ok := configs[name]; ok {
+			r = cfg.Ratio
+		} else {
+			// fallback to old per-field ratios if still present
+			if mr := channel.GetModelRatio(); mr != nil {
+				r = mr[name]
+			}
+		}
+		// only consider positive ratios; if zero, still consider but at lowest weight
+		if !initialized {
+			cheapestName, cheapestRatio, initialized = name, r, true
+			continue
+		}
+		if r < cheapestRatio {
+			cheapestName, cheapestRatio = name, r
+		}
+	}
+	return cheapestName
 }
 
 // GetModelConfig returns the model configuration for a specific model
@@ -600,11 +661,55 @@ func (channel *Channel) Insert() error {
 }
 
 func (channel *Channel) Update() error {
+	// Validate/sync TestingModel with latest supported models
+	clearTestingModel := false
+	var existing Channel
+	if channel.Id != 0 {
+		_ = DB.Select("id", "models", "testing_model").First(&existing, "id = ?", channel.Id).Error
+	}
+	// Determine models to validate against: new value if provided, else existing
+	modelsForValidation := channel.Models
+	if strings.TrimSpace(modelsForValidation) == "" {
+		modelsForValidation = existing.Models
+	}
+	// Helper to check containment
+	contains := func(listCSV, name string) bool {
+		for _, n := range strings.Split(listCSV, ",") {
+			if strings.TrimSpace(n) == name {
+				return true
+			}
+		}
+		return false
+	}
+	if channel.TestingModel != nil {
+		tm := strings.TrimSpace(*channel.TestingModel)
+		if tm == "" {
+			clearTestingModel = true
+			channel.TestingModel = nil
+		} else if !contains(modelsForValidation, tm) {
+			// requested value not supported by current models
+			clearTestingModel = true
+			channel.TestingModel = nil
+		}
+	} else if existing.TestingModel != nil && *existing.TestingModel != "" {
+		// No explicit testing_model provided in payload, but existing one may become invalid due to models change
+		if !contains(modelsForValidation, *existing.TestingModel) {
+			clearTestingModel = true
+		}
+	}
+
 	err := DB.Model(channel).Updates(channel).Error
 	if err != nil {
 		return errors.Wrapf(err, "failed to update channel: id=%d, name=%s", channel.Id, channel.Name)
 	}
 	DB.Model(channel).First(channel, "id = ?", channel.Id)
+	if clearTestingModel {
+		if err := DB.Model(channel).Where("id = ?", channel.Id).Update("testing_model", nil).Error; err != nil {
+			return errors.Wrapf(err, "failed to clear testing_model for channel: id=%d", channel.Id)
+		}
+		// refresh field after manual clear
+		channel.TestingModel = nil
+	}
 	err = channel.UpdateAbilities()
 	if err != nil {
 		return errors.Wrapf(err, "failed to update abilities for channel: id=%d, name=%s", channel.Id, channel.Name)
