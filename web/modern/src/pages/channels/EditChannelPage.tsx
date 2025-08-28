@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
 import { Separator } from '@/components/ui/separator'
 import { AlertCircle, Info } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { logEditPageLayout } from '@/dev/layout-debug'
 
@@ -872,7 +873,10 @@ export function EditChannelPage() {
               name="base_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Azure OpenAI Endpoint *</FormLabel>
+                  <LabelWithHelp
+                    label="Azure OpenAI Endpoint *"
+                    help={'Your resource endpoint, e.g., https://your-resource.openai.azure.com'}
+                  />
                   <FormControl>
                     <Input
                       placeholder={defaultBaseURL || 'https://your-resource.openai.azure.com'}
@@ -888,7 +892,10 @@ export function EditChannelPage() {
               name="other"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>API Version</FormLabel>
+                  <LabelWithHelp
+                    label="API Version"
+                    help={'Default API version used when the request does not specify one (e.g., 2024-03-01-preview).'}
+                  />
                   <FormControl>
                     <Input
                       placeholder="2024-03-01-preview"
@@ -923,7 +930,10 @@ export function EditChannelPage() {
                 name="config.region"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Region *</FormLabel>
+                    <LabelWithHelp
+                      label="Region *"
+                      help={'AWS region for Bedrock (e.g., us-east-1). Must match where your models/profiles reside.'}
+                    />
                     <FormControl>
                       <Input placeholder="us-east-1" {...field} />
                     </FormControl>
@@ -936,7 +946,10 @@ export function EditChannelPage() {
                 name="config.ak"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Access Key *</FormLabel>
+                    <LabelWithHelp
+                      label="Access Key *"
+                      help={'AWS Access Key ID with permissions to call Bedrock.'}
+                    />
                     <FormControl>
                       <Input placeholder="AKIA..." {...field} />
                     </FormControl>
@@ -949,7 +962,10 @@ export function EditChannelPage() {
                 name="config.sk"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Secret Key *</FormLabel>
+                    <LabelWithHelp
+                      label="Secret Key *"
+                      help={'AWS Secret Access Key for the above Access Key ID.'}
+                    />
                     <FormControl>
                       <Input type="password" placeholder="Secret Key" {...field} />
                     </FormControl>
@@ -973,7 +989,10 @@ export function EditChannelPage() {
               control={form.control}
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Authentication Type</FormLabel>
+                  <LabelWithHelp
+                    label="Authentication Type"
+                    help={'Choose how to authenticate to Coze: Personal Access Token or OAuth JWT.'}
+                  />
                   <Select
                     value={field.value ?? ''}
                     onValueChange={(v) => field.onChange(v)}
@@ -1001,7 +1020,10 @@ export function EditChannelPage() {
                 name="key"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Personal Access Token *</FormLabel>
+                    <LabelWithHelp
+                      label="Personal Access Token *"
+                      help={'Your Coze Personal Access Token (pat_...).'}
+                    />
                     <FormControl>
                       <Input type="password" placeholder="pat_..." {...field} />
                     </FormControl>
@@ -1015,7 +1037,10 @@ export function EditChannelPage() {
                 name="key"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>OAuth JWT Configuration *</FormLabel>
+                    <LabelWithHelp
+                      label="OAuth JWT Configuration *"
+                      help={'JSON configuration for Coze OAuth JWT: client_type, client_id, coze_www_base, coze_api_base, private_key, public_key_id.'}
+                    />
                     <FormControl>
                       <Textarea
                         placeholder={`OAuth JWT configuration in JSON format:\n${JSON.stringify(OAUTH_JWT_CONFIG_EXAMPLE, null, 2)}`}
@@ -1036,7 +1061,10 @@ export function EditChannelPage() {
               name="config.user_id"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>User ID</FormLabel>
+                  <LabelWithHelp
+                    label="User ID"
+                    help={'Optional Coze user ID used for bot operations (if required by your setup).'}
+                  />
                   <FormControl>
                     <Input placeholder="User ID for bot operations" {...field} />
                   </FormControl>
@@ -1057,7 +1085,10 @@ export function EditChannelPage() {
                 name="config.region"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Region *</FormLabel>
+                    <LabelWithHelp
+                      label="Region *"
+                      help={'Google Cloud region for Vertex AI (e.g., us-central1).'}
+                    />
                     <FormControl>
                       <Input placeholder="us-central1" {...field} />
                     </FormControl>
@@ -1070,7 +1101,10 @@ export function EditChannelPage() {
                 name="config.vertex_ai_project_id"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Project ID *</FormLabel>
+                    <LabelWithHelp
+                      label="Project ID *"
+                      help={'Your GCP Project ID hosting Vertex AI resources.'}
+                    />
                     <FormControl>
                       <Input placeholder="my-project-id" {...field} />
                     </FormControl>
@@ -1083,7 +1117,10 @@ export function EditChannelPage() {
                 name="config.vertex_ai_adc"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Service Account Credentials *</FormLabel>
+                    <LabelWithHelp
+                      label="Service Account Credentials *"
+                      help={'Paste the JSON of a service account with Vertex AI permissions.'}
+                    />
                     <FormControl>
                       <Textarea
                         placeholder="Google service account JSON credentials"
@@ -1106,7 +1143,10 @@ export function EditChannelPage() {
             control={form.control}
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Spark Version</FormLabel>
+                <LabelWithHelp
+                  label="Spark Version"
+                  help={'Select the API version for iFlytek Spark (e.g., v3.5).'}
+                />
                 <Select value={field.value ?? ''} onValueChange={(v) => field.onChange(v)}>
                   <FormControl>
                     <SelectTrigger>
@@ -1133,7 +1173,10 @@ export function EditChannelPage() {
             name="other"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Knowledge ID</FormLabel>
+                <LabelWithHelp
+                  label="Knowledge ID"
+                  help={'Knowledge base identifier for AI Proxy knowledge retrieval.'}
+                />
                 <FormControl>
                   <Input placeholder="Knowledge base ID" {...field} />
                 </FormControl>
@@ -1150,7 +1193,10 @@ export function EditChannelPage() {
             name="other"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Plugin Parameters</FormLabel>
+                <LabelWithHelp
+                  label="Plugin Parameters"
+                  help={'Provider/plugin‑specific parameters if required.'}
+                />
                 <FormControl>
                   <Input placeholder="Plugin-specific parameters" {...field} />
                 </FormControl>
@@ -1167,7 +1213,10 @@ export function EditChannelPage() {
             name="config.user_id"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Account ID</FormLabel>
+                <LabelWithHelp
+                  label="Account ID"
+                  help={'Your Cloudflare account ID for the AI gateway.'}
+                />
                 <FormControl>
                   <Input placeholder="d8d7c61dbc334c32d3ced580e4bf42b4" {...field} />
                 </FormControl>
@@ -1199,7 +1248,10 @@ export function EditChannelPage() {
               name="base_url"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Base URL *</FormLabel>
+                  <LabelWithHelp
+                    label="Base URL *"
+                    help={'Base URL of the OpenAI‑compatible endpoint, e.g., https://api.your-provider.com/v1'}
+                  />
                   <FormControl>
                     <Input
                       placeholder={defaultBaseURL || 'https://api.your-provider.com/v1'}
@@ -1256,8 +1308,22 @@ export function EditChannelPage() {
 
   console.log('[CHANNEL_TYPE_DEBUG] Rendering main form')
 
+  // Small helper to render a label with a tooltip icon
+  const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
+    <div className="flex items-center gap-1">
+      <FormLabel>{label}</FormLabel>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
+      </Tooltip>
+    </div>
+  )
+
   return (
     <div className="container mx-auto px-4 py-6">
+      <TooltipProvider>
       <Card>
         <CardHeader>
           <CardTitle>{isEdit ? 'Edit Channel' : 'Create Channel'}</CardTitle>
@@ -1287,7 +1353,10 @@ export function EditChannelPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Channel Name *</FormLabel>
+                      <LabelWithHelp
+                        label="Channel Name *"
+                        help={'Human‑readable identifier. Use provider/environment in the name, for example "OpenAI GPT‑4 Production".'}
+                      />
                       <FormControl>
                         <Input placeholder="Enter channel name" {...field} />
                       </FormControl>
@@ -1304,7 +1373,10 @@ export function EditChannelPage() {
                     console.log('[CHANNEL_TYPE_DEBUG] Select render (Controller) - value:', field.value, 'string:', stringValue, 'isEdit:', isEdit)
                     return (
                       <FormItem>
-                        <FormLabel>Channel Type *</FormLabel>
+                        <LabelWithHelp
+                          label="Channel Type *"
+                          help={'Select the upstream provider. This determines models, auth method, and default Base URL.'}
+                        />
                         <Select
                           value={stringValue}
                           onValueChange={(v) => {
@@ -1341,7 +1413,10 @@ export function EditChannelPage() {
                 name="key"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>API Key</FormLabel>
+                    <LabelWithHelp
+                      label="API Key"
+                      help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
+                    />
                     <FormControl>
                       <Input
                         type="password"
@@ -1364,7 +1439,10 @@ export function EditChannelPage() {
                 name="base_url"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Base URL (Optional)</FormLabel>
+                    <LabelWithHelp
+                      label="Base URL (Optional)"
+                      help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
+                    />
                     <FormControl>
                       <Input
                         placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
@@ -1386,7 +1464,10 @@ export function EditChannelPage() {
                   name="models"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Supported Models *</FormLabel>
+                      <LabelWithHelp
+                        label="Supported Models *"
+                        help={'Models available through this channel. Leave empty to allow all provider models. Use the buttons to fill related/all models; duplicates are removed.'}
+                      />
                       <div className="flex gap-2 mb-3">
                         <Button
                           type="button"
@@ -1486,7 +1567,10 @@ export function EditChannelPage() {
                 name="groups"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Groups *</FormLabel>
+                    <LabelWithHelp
+                      label="Groups *"
+                      help={'Restrict access to specific user groups. Empty means all users can access. The default group is always kept.'}
+                    />
                     <div className="space-y-2">
                       <div className="flex flex-wrap gap-2">
                         {groups.map((group) => (
@@ -1539,7 +1623,10 @@ export function EditChannelPage() {
                   name="priority"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Priority</FormLabel>
+                      <LabelWithHelp
+                        label="Priority"
+                        help={'Lower numbers are tried first when multiple channels support a model.'}
+                      />
                       <FormControl>
                         <Input
                           type="number"
@@ -1557,7 +1644,10 @@ export function EditChannelPage() {
                   name="weight"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Weight</FormLabel>
+                      <LabelWithHelp
+                        label="Weight"
+                        help={'Load balancing weight among channels with the same priority. Higher weight receives more requests.'}
+                      />
                       <FormControl>
                         <Input
                           type="number"
@@ -1577,7 +1667,10 @@ export function EditChannelPage() {
                 render={({ field }) => (
                   <FormItem>
                     <div className="flex items-center gap-2">
-                      <FormLabel>Model Mapping (JSON)</FormLabel>
+                      <LabelWithHelp
+                        label="Model Mapping (JSON)"
+                        help={'Map external/legacy model names to this provider\'s actual model names. JSON object: { "from": "to" }.'}
+                      />
                       <Button
                         type="button"
                         variant="outline"
@@ -1633,7 +1726,10 @@ export function EditChannelPage() {
                   render={({ field }) => (
                     <FormItem>
                       <div className="flex items-center gap-2">
-                        <FormLabel>Model Configs (JSON)</FormLabel>
+                        <LabelWithHelp
+                          label="Model Configs (JSON)"
+                          help={'Unified per‑model settings. Fields: ratio (input pricing multiplier), completion_ratio (output multiplier), max_tokens (limit).'}
+                        />
                         <Button
                           type="button"
                           variant="outline"
@@ -1697,7 +1793,10 @@ export function EditChannelPage() {
                 name="system_prompt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>System Prompt</FormLabel>
+                    <LabelWithHelp
+                      label="System Prompt"
+                      help={'Optional text prepended as a system message to every request sent through this channel. Use for guardrails or style. Clients can still override with their own system messages.'}
+                    />
                     <FormControl>
                       <Textarea
                         placeholder="Optional system prompt to prepend to all requests"
@@ -1718,7 +1817,10 @@ export function EditChannelPage() {
                   render={({ field }) => (
                     <FormItem>
                       <div className="flex items-center gap-2">
-                        <FormLabel>Inference Profile ARN Map (AWS Bedrock)</FormLabel>
+                        <LabelWithHelp
+                          label="Inference Profile ARN Map (AWS Bedrock)"
+                          help={'JSON map of model name → AWS Bedrock Inference Profile ARN. Use to route certain models via specific Bedrock inference profiles.'}
+                        />
                         <Button
                           type="button"
                           variant="outline"
@@ -1791,6 +1893,7 @@ export function EditChannelPage() {
           </Form>
         </CardContent>
       </Card>
+      </TooltipProvider>
     </div>
   )
 }

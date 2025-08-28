@@ -255,6 +255,28 @@ The Channel Settings page is the central hub for configuring and managing API ch
 - **Implementation**: Uses token-based rate limiting with SHA-256 hashed keys for privacy
 - **Example**: Setting to 100 allows maximum 100 requests per token per channel every 3 minutes
 
+##### System Prompt
+
+- **Purpose**: Optional text prepended as a system message to every request routed through this channel
+- **Behavior**: Injected at the start of the conversation; clients may still provide their own system messages which are merged according to adapter rules
+- **Use Cases**: Enforce guardrails, tone/style guidance, safety or compliance instructions
+- **Notes**: Keep concise; overly long prompts increase token usage and costs
+
+##### AWS Bedrock Inference Profile ARN Map
+
+- **Purpose**: Route specific model names to AWS Bedrock Inference Profiles
+- **Format**: JSON object mapping model name → Inference Profile ARN
+- **Example**:
+
+  ```json
+  {
+    "claude-3-5-sonnet-20241022": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+    "claude-3-haiku-20240307": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
+  }
+  ```
+
+- **Notes**: Only applicable to AWS Bedrock channels; values must be valid ARNs in the configured region/account
+
 ## Model Configs: Unified Pricing System
 
 ### What is Model Configs?

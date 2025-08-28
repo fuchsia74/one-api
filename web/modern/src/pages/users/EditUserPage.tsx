@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 
 // Helper function to render quota with USD conversion (USD only)
 const renderQuotaWithPrompt = (quota: number): string => {
@@ -168,6 +170,7 @@ export function EditUserPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
+      <TooltipProvider>
       <Card>
         <CardHeader>
           <CardTitle>{isEdit ? 'Edit User' : 'Create User'}</CardTitle>
@@ -178,13 +181,39 @@ export function EditUserPage() {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              {/* helper for label + tooltip */}
+              {(() => {
+                // small inline helper component
+                const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      {label}
+                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
+                    </Tooltip>
+                  </div>
+                )
+                return null
+              })()}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
                   control={form.control}
                   name="username"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Username *</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>Username *</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Username" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Unique login name. Min 3 characters.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input placeholder="Enter username" {...field} />
                       </FormControl>
@@ -198,7 +227,15 @@ export function EditUserPage() {
                   name="display_name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Display Name</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>Display Name</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Display Name" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Optional human‑readable name shown in the UI.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input placeholder="Enter display name" {...field} />
                       </FormControl>
@@ -214,7 +251,15 @@ export function EditUserPage() {
                   name="email"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Email</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>Email</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Email" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Optional contact address for password reset and notifications.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input type="email" placeholder="Enter email" {...field} />
                       </FormControl>
@@ -228,7 +273,15 @@ export function EditUserPage() {
                   name="password"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{isEdit ? 'New Password (leave empty to keep current)' : 'Password *'}</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>{isEdit ? 'New Password (leave empty to keep current)' : 'Password *'}</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Password" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Minimum length depends on policy. Leave empty when editing to keep unchanged.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input type="password" placeholder="Enter password" {...field} />
                       </FormControl>
@@ -244,14 +297,22 @@ export function EditUserPage() {
                   name="quota"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>
-                        {(() => {
-                          const current = watchQuota ?? field.value ?? 0
-                          const numeric = Number(current)
-                          const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
-                          return `Quota (${usdLabel})`
-                        })()}
-                      </FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>
+                          {(() => {
+                            const current = watchQuota ?? field.value ?? 0
+                            const numeric = Number(current)
+                            const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
+                            return `Quota (${usdLabel})`
+                          })()}
+                        </FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Quota" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Quota units are tokens. USD estimate uses the per‑unit ratio configured by admin.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input
                           type="number"
@@ -273,7 +334,15 @@ export function EditUserPage() {
                   name="group"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Group *</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>Group *</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Group" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">User group controls access and model/channel visibility.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <Select onValueChange={field.onChange} value={field.value}>
                         <FormControl>
                           <SelectTrigger>
@@ -319,6 +388,7 @@ export function EditUserPage() {
           </Form>
         </CardContent>
       </Card>
+  </TooltipProvider>
     </div>
   )
 }

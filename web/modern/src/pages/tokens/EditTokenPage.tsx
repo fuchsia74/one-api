@@ -12,6 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { api } from '@/lib/api'
 import { logEditPageLayout } from '@/dev/layout-debug'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 
 // Helper function to render quota with USD conversion (USD only)
 const renderQuotaWithPrompt = (quota: number): string => {
@@ -264,6 +266,7 @@ export function EditTokenPage() {
     <>
       {(() => { logEditPageLayout('EditTokenPage'); return null })()}
       <div className="container mx-auto px-4 py-8">
+  <TooltipProvider>
         <Card>
           <CardHeader>
             <CardTitle>{isEdit ? 'Edit Token' : 'Create Token'}</CardTitle>
@@ -279,7 +282,15 @@ export function EditTokenPage() {
                   name="name"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Token Name</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>Token Name</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Token Name" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Human‑readable identifier for this token.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input placeholder="Enter token name" {...field} />
                       </FormControl>
@@ -289,7 +300,15 @@ export function EditTokenPage() {
                 />
 
                 <div className="space-y-4">
-                  <Label>Allowed Models</Label>
+                  <div className="flex items-center gap-1">
+                    <Label>Allowed Models</Label>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Allowed Models" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">Restrict this token to specific models. Leave empty to allow all models available to the user/group.</TooltipContent>
+                    </Tooltip>
+                  </div>
                   <Input
                     placeholder="Search models..."
                     value={modelSearchTerm}
@@ -328,7 +347,15 @@ export function EditTokenPage() {
                   name="subnet"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>IP Restriction (Optional)</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>IP Restriction (Optional)</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: IP Restriction" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Allow requests only from these IPs or CIDR ranges (e.g., 192.168.1.0/24). Multiple entries are comma‑separated.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input
                           placeholder="e.g., 192.168.1.0/24 or 10.0.0.1"
@@ -345,7 +372,15 @@ export function EditTokenPage() {
                   name="expired_time"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Expiration Time</FormLabel>
+                      <div className="flex items-center gap-1">
+                        <FormLabel>Expiration Time</FormLabel>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Expiration Time" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">Set when this token expires. Leave empty for never. Use quick buttons for common durations.</TooltipContent>
+                        </Tooltip>
+                      </div>
                       <FormControl>
                         <Input type="datetime-local" {...field} />
                       </FormControl>
@@ -400,8 +435,14 @@ export function EditTokenPage() {
                       onCheckedChange={(checked) => form.setValue('unlimited_quota', !!checked, { shouldDirty: true })}
                     />
                   </FormControl>
-                  <div className="space-y-1 leading-none">
+                  <div className="flex items-center gap-1 space-y-0">
                     <FormLabel htmlFor="unlimited_quota">Unlimited Quota</FormLabel>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Unlimited Quota" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">If enabled, this token ignores remaining quota checks.</TooltipContent>
+                    </Tooltip>
                   </div>
                 </div>
 
@@ -417,9 +458,17 @@ export function EditTokenPage() {
                     console.log('[QUOTA_DEBUG] field.value:', { raw, fallback, current, numeric, usdLabel, type: typeof raw })
                     return (
                       <FormItem>
-                        <FormLabel>
-                          Remaining Quota ({usdLabel})
-                        </FormLabel>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>
+                            Remaining Quota ({usdLabel})
+                          </FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Remaining Quota" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Quota is measured in tokens. USD is an estimate based on admin‑configured per‑unit pricing.</TooltipContent>
+                          </Tooltip>
+                        </div>
                         <FormControl>
                           <Input
                             type="number"
@@ -463,7 +512,8 @@ export function EditTokenPage() {
               </form>
             </Form>
           </CardContent>
-        </Card>
+  </Card>
+  </TooltipProvider>
       </div>
     </>
   )
