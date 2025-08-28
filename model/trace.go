@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
-
-	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 // Trace represents a request tracing record with key timestamps
@@ -46,6 +47,7 @@ const (
 
 // CreateTrace creates a new trace record with initial data
 func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int64) (*Trace, error) {
+	lg := gmw.GetLogger(ctx)
 	now := time.Now().UnixMilli()
 
 	timestamps := &TraceTimestamps{
@@ -54,7 +56,7 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 
 	timestampsJSON, err := json.Marshal(timestamps)
 	if err != nil {
-		logger.Logger.Error("failed to marshal trace timestamps",
+		lg.Error("failed to marshal trace timestamps",
 			zap.Error(err),
 			zap.String("trace_id", traceId))
 		return nil, errors.Wrapf(err, "failed to marshal trace timestamps for trace_id: %s", traceId)
@@ -69,13 +71,13 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 	}
 
 	if err := DB.Create(trace).Error; err != nil {
-		logger.Logger.Error("failed to create trace record",
+		lg.Error("failed to create trace record",
 			zap.Error(err),
 			zap.String("trace_id", traceId))
 		return nil, errors.Wrapf(err, "failed to create trace record for trace_id: %s", traceId)
 	}
 
-	logger.Logger.Debug("created trace record",
+	lg.Debug("created trace record",
 		zap.String("trace_id", traceId),
 		zap.String("url", url),
 		zap.String("method", method))
@@ -84,19 +86,28 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 }
 
 // UpdateTraceTimestamp updates a specific timestamp in the trace record
-func UpdateTraceTimestamp(ctx context.Context, traceId, timestampKey string) error {
+func UpdateTraceTimestamp(ctx *gin.Context, traceId, timestampKey string) error {
+	lg := gmw.GetLogger(ctx)
 	var trace Trace
 	if err := DB.Where("trace_id = ?", traceId).First(&trace).Error; err != nil {
-		logger.Logger.Warn("trace record not found for timestamp update",
+		// For some internal flows (e.g., channel test helper using a synthetic gin.Context),
+		// trace IDs may not correspond to a persisted request trace. Treat not found as best-effort.
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			lg.Debug("trace record not found for timestamp update (best-effort, skipping)",
+				zap.String("trace_id", traceId),
+				zap.String("timestamp_key", timestampKey))
+			return nil
+		}
+		lg.Error("failed to query trace record for timestamp update",
+			zap.Error(err),
 			zap.String("trace_id", traceId),
-			zap.String("timestamp_key", timestampKey),
-			zap.Error(err))
-		return errors.Wrapf(err, "trace record not found for timestamp update, trace_id: %s, key: %s", traceId, timestampKey)
+			zap.String("timestamp_key", timestampKey))
+		return errors.Wrapf(err, "failed to query trace record for timestamp update, trace_id: %s, key: %s", traceId, timestampKey)
 	}
 
 	var timestamps TraceTimestamps
 	if err := json.Unmarshal([]byte(trace.Timestamps), &timestamps); err != nil {
-		logger.Logger.Error("failed to unmarshal trace timestamps",
+		lg.Error("failed to unmarshal trace timestamps",
 			zap.Error(err),
 			zap.String("trace_id", traceId))
 		return errors.Wrapf(err, "failed to unmarshal trace timestamps for trace_id: %s", traceId)
@@ -117,7 +128,7 @@ func UpdateTraceTimestamp(ctx context.Context, traceId, timestampKey string) err
 	case TimestampRequestCompleted:
 		timestamps.RequestCompleted = &now
 	default:
-		logger.Logger.Warn("unknown timestamp key",
+		lg.Warn("unknown timestamp key",
 			zap.String("trace_id", traceId),
 			zap.String("timestamp_key", timestampKey))
 		return nil
@@ -125,21 +136,21 @@ func UpdateTraceTimestamp(ctx context.Context, traceId, timestampKey string) err
 
 	timestampsJSON, err := json.Marshal(timestamps)
 	if err != nil {
-		logger.Logger.Error("failed to marshal updated trace timestamps",
+		lg.Error("failed to marshal updated trace timestamps",
 			zap.Error(err),
 			zap.String("trace_id", traceId))
 		return errors.Wrapf(err, "failed to marshal updated trace timestamps for trace_id: %s", traceId)
 	}
 
 	if err := DB.Model(&trace).Update("timestamps", string(timestampsJSON)).Error; err != nil {
-		logger.Logger.Error("failed to update trace timestamp",
+		lg.Error("failed to update trace timestamp",
 			zap.Error(err),
 			zap.String("trace_id", traceId),
 			zap.String("timestamp_key", timestampKey))
 		return errors.Wrapf(err, "failed to update trace timestamp for trace_id: %s, key: %s", traceId, timestampKey)
 	}
 
-	logger.Logger.Debug("updated trace timestamp",
+	lg.Debug("updated trace timestamp",
 		zap.String("trace_id", traceId),
 		zap.String("timestamp_key", timestampKey))
 
@@ -148,15 +159,24 @@ func UpdateTraceTimestamp(ctx context.Context, traceId, timestampKey string) err
 
 // UpdateTraceStatus updates the HTTP status code for a trace
 func UpdateTraceStatus(ctx context.Context, traceId string, status int) error {
-	if err := DB.Model(&Trace{}).Where("trace_id = ?", traceId).Update("status", status).Error; err != nil {
-		logger.Logger.Error("failed to update trace status",
-			zap.Error(err),
+	lg := gmw.GetLogger(ctx)
+	// Use RowsAffected to determine if the record exists; treat 0 as best-effort no-op.
+	tx := DB.Model(&Trace{}).Where("trace_id = ?", traceId).Update("status", status)
+	if tx.Error != nil {
+		lg.Error("failed to update trace status",
+			zap.Error(tx.Error),
 			zap.String("trace_id", traceId),
 			zap.Int("status", status))
-		return errors.Wrapf(err, "failed to update trace status for trace_id: %s", traceId)
+		return errors.Wrapf(tx.Error, "failed to update trace status for trace_id: %s", traceId)
+	}
+	if tx.RowsAffected == 0 {
+		lg.Debug("trace record not found for status update (best-effort, skipping)",
+			zap.String("trace_id", traceId),
+			zap.Int("status", status))
+		return nil
 	}
 
-	logger.Logger.Debug("updated trace status",
+	lg.Debug("updated trace status",
 		zap.String("trace_id", traceId),
 		zap.Int("status", status))
 

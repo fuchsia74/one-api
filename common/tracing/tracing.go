@@ -70,32 +70,29 @@ func RecordTraceTimestamp(c *gin.Context, timestampKey string) {
 		return
 	}
 
-	ctx := gmw.Ctx(c)
-	// propagate tagged logger downstream
-	ctx = gmw.SetLogger(ctx, lg)
-	err := model.UpdateTraceTimestamp(ctx, traceID, timestampKey)
+	err := model.UpdateTraceTimestamp(c, traceID, timestampKey)
 	if err != nil {
 		lg.Error("failed to update trace timestamp", zap.Error(err))
 	}
 }
 
 // RecordTraceTimestampFromContext updates a timestamp using standard context
-func RecordTraceTimestampFromContext(ctx context.Context, timestampKey string) {
-	traceID := GetTraceIDFromContext(ctx)
-	if traceID == "" {
-		logger.Logger.Warn("empty trace ID from context, skipping timestamp update",
-			zap.String("timestamp_key", timestampKey))
-		return
-	}
+// func RecordTraceTimestampFromContext(ctx context.Context, timestampKey string) {
+// 	traceID := GetTraceIDFromContext(ctx)
+// 	if traceID == "" {
+// 		logger.Logger.Warn("empty trace ID from context, skipping timestamp update",
+// 			zap.String("timestamp_key", timestampKey))
+// 		return
+// 	}
 
-	err := model.UpdateTraceTimestamp(ctx, traceID, timestampKey)
-	if err != nil {
-		logger.Logger.Error("failed to update trace timestamp from context",
-			zap.Error(err),
-			zap.String("trace_id", traceID),
-			zap.String("timestamp_key", timestampKey))
-	}
-}
+// 	// Best-effort update; model handles not-found quietly.
+// 	if err := model.UpdateTraceTimestamp(ctx, traceID, timestampKey); err != nil {
+// 		logger.Logger.Error("failed to update trace timestamp from context",
+// 			zap.Error(err),
+// 			zap.String("trace_id", traceID),
+// 			zap.String("timestamp_key", timestampKey))
+// 	}
+// }
 
 // RecordTraceStatus updates the HTTP status code for a trace
 func RecordTraceStatus(c *gin.Context, status int) {
