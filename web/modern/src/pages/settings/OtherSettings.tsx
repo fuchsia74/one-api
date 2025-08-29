@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -9,6 +9,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Separator } from '@/components/ui/separator'
 import { api } from '@/lib/api'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 
 const otherSchema = z.object({
   Footer: z.string().default(''),
@@ -25,6 +27,20 @@ type OtherForm = z.infer<typeof otherSchema>
 export function OtherSettings() {
   const [loading, setLoading] = useState(true)
   const [updateData, setUpdateData] = useState<{ tag_name: string; content: string } | null>(null)
+
+  // Descriptions for each setting on this page
+  const descriptions = useMemo<Record<string, string>>(
+    () => ({
+      SystemName: 'System display name shown in the UI and emails.',
+      Logo: 'Logo image URL displayed in the header/login screens.',
+      Theme: 'UI theme name. Supported: default, berry, air, modern.',
+      Notice: 'Site‑wide announcement content shown to all users. Markdown supported.',
+      About: 'Content for the About page. Markdown supported.',
+      HomePageContent: 'Content displayed on the home page. Markdown supported.',
+      Footer: 'Footer content rendered site‑wide. HTML allowed; use responsibly.',
+    }),
+    []
+  )
 
   const form = useForm<OtherForm>({
     resolver: zodResolver(otherSchema),
@@ -112,6 +128,7 @@ export function OtherSettings() {
   }
 
   return (
+    <TooltipProvider>
     <div className="space-y-6">
       {/* System Branding */}
       <Card>
@@ -127,7 +144,19 @@ export function OtherSettings() {
                 name="SystemName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>System Name</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      System Name
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About System Name">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.SystemName}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
                         <Input placeholder="One API" {...field} />
@@ -144,7 +173,19 @@ export function OtherSettings() {
                 name="Logo"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Logo URL</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      Logo URL
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Logo URL">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.Logo}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
                         <Input placeholder="https://..." {...field} />
@@ -161,7 +202,19 @@ export function OtherSettings() {
                 name="Theme"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Theme</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      Theme
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Theme">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.Theme}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="flex gap-2">
                       <FormControl>
                         <Input placeholder="default" {...field} />
@@ -191,7 +244,19 @@ export function OtherSettings() {
                 name="Notice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Notice (supports Markdown)</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      Notice (supports Markdown)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Notice">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.Notice}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="space-y-2">
                       <FormControl>
                         <Textarea
@@ -212,7 +277,19 @@ export function OtherSettings() {
                 name="About"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>About Page Content (supports Markdown)</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      About Page Content (supports Markdown)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About About Page Content">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.About}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="space-y-2">
                       <FormControl>
                         <Textarea
@@ -233,7 +310,19 @@ export function OtherSettings() {
                 name="HomePageContent"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Home Page Content (supports Markdown)</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      Home Page Content (supports Markdown)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Home Page Content">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.HomePageContent}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="space-y-2">
                       <FormControl>
                         <Textarea
@@ -254,7 +343,19 @@ export function OtherSettings() {
                 name="Footer"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Footer Content (supports HTML)</FormLabel>
+                    <FormLabel className="flex items-center gap-2">
+                      Footer Content (supports HTML)
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Footer Content">
+                            <Info className="h-4 w-4" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-[320px]">
+                          {descriptions.Footer}
+                        </TooltipContent>
+                      </Tooltip>
+                    </FormLabel>
                     <div className="space-y-2">
                       <FormControl>
                         <Textarea
@@ -300,7 +401,8 @@ export function OtherSettings() {
           </div>
         </CardContent>
       </Card>
-    </div>
+  </div>
+  </TooltipProvider>
   )
 }
 
