@@ -99,6 +99,11 @@ func isModelInList(modelName string, models string) bool {
 // key like `sk-{token}[-{channelid}]`
 func GetTokenKeyParts(c *gin.Context) []string {
 	key := c.Request.Header.Get("Authorization")
+	if key == "" {
+		// compatible with Anthropic
+		key = c.Request.Header.Get("X-Api-Key")
+	}
+
 	key = strings.TrimPrefix(key, "Bearer ")
 	// Trim current configured prefix first
 	if p := config.TokenKeyPrefix; p != "" {
