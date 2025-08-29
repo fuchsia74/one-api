@@ -21,9 +21,10 @@ const renderQuotaWithPrompt = (quota: number): string => {
 }
 
 const redemptionSchema = z.object({
-  name: z.string().min(1, 'Name is required'),
-  quota: z.number().min(1, 'Quota must be positive'),
-  count: z.number().min(1, 'Count must be positive').default(1),
+  name: z.string().min(1, 'Name is required').max(20, 'Max 20 chars'),
+  // Coerce numeric fields so typing works and validation runs
+  quota: z.coerce.number().int().min(0, 'Quota cannot be negative'),
+  count: z.coerce.number().int().min(1, 'Count must be positive').max(100, 'Count cannot exceed 100').default(1),
 })
 
 type RedemptionForm = z.infer<typeof redemptionSchema>
@@ -41,8 +42,8 @@ export function EditRedemptionPage() {
     resolver: zodResolver(redemptionSchema),
     defaultValues: {
       name: '',
-      quota: 0,
-      count: 1,
+  quota: 0,
+  count: 1,
     },
   })
 
@@ -152,15 +153,22 @@ export function EditRedemptionPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Quota {typeof field.value === 'number' ? renderQuotaWithPrompt(field.value) : ''}
+                        {(() => {
+                          const current = (watchQuota ?? field.value ?? 0) as any
+                          const numeric = Number(current)
+                          const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
+                          return `Quota (${usdLabel})`
+                        })()}
                       </FormLabel>
                       <FormControl>
                         <Input
                           type="number"
-                          min="1"
+                          min="0"
+                          step="1"
                           {...field}
                           onChange={(e) => {
                             console.log('[QUOTA_DEBUG][Redemption] Input onChange', { value: e.target.value })
+                            // Pass original event to RHF to keep name & target intact
                             field.onChange(e)
                           }}
                         />
@@ -180,8 +188,12 @@ export function EditRedemptionPage() {
                         <Input
                           type="number"
                           min="1"
+                          step="1"
                           {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
+                          onChange={(e) => {
+                            // Pass original event for consistency with RHF expectations
+                            field.onChange(e)
+                          }}
                         />
                       </FormControl>
                       <FormMessage />
