@@ -9,7 +9,7 @@
 //   - DeepSeek-R1's unique reasoning capabilities with structured reasoning content
 //
 // 2. Streaming Chat Completions API:
-//   - StreamResponse structures for real-time response streaming  
+//   - StreamResponse structures for real-time response streaming
 //   - Delta-based message updates for incremental content delivery
 //   - Support for reasoning content in streaming responses
 //
