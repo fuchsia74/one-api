@@ -181,6 +181,9 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			id = fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c))
 			return true
 
+			// Note: This reasoning and content are streamed together,
+			// so ensure that client-side implementations handle them correctly,
+			// especially in chatbots.
 		case *types.ConverseStreamOutputMemberContentBlockDelta:
 			// Handle content delta - this is where the actual text content comes from ConverseStream
 			if v.Value.Delta != nil {

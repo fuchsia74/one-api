@@ -150,6 +150,24 @@ DeepSeek-R1's reasoning content is handled specially:
 - **Streaming**: Reasoning content is streamed via `reasoning_content` field
 - **OpenAI Compatibility**: Maintains compatibility while preserving reasoning data
 
+#### Important Streaming Behavior
+**Note**: In streaming responses, reasoning content and regular content are streamed together in the same response stream. This requires careful handling in client-side implementations:
+
+- **Mixed Content Streaming**: Both `reasoning_content` and regular `content` deltas can arrive in any order within the same stream
+- **Client-Side Processing**: Applications must be prepared to handle both content types simultaneously
+- **Chatbot Considerations**: Chat applications should implement proper logic to:
+  - Display reasoning content separately from the main response (if desired)
+  - Handle the interleaved nature of reasoning and content chunks
+  - Maintain proper message ordering and presentation
+  - Consider whether to show reasoning content to end users or use it for internal processing only
+
+#### Stream Processing Recommendations
+For robust client-side implementation:
+1. **Buffer Management**: Maintain separate buffers for reasoning content and regular content
+2. **Content Type Detection**: Check each delta for either `content` or `reasoning_content` fields
+3. **UI Handling**: Decide how to present reasoning content in your user interface
+4. **Error Recovery**: Implement proper error handling for interrupted streams containing mixed content types
+
 ### Error Handling
 The adapter provides comprehensive error handling:
 - Model ID validation
@@ -170,6 +188,10 @@ The adapter provides comprehensive error handling:
 - Configure appropriate timeouts for your use case
 - Monitor token usage for cost optimization
 - Implement proper retry logic for production usage
+- **Mixed Content Handling**: When implementing streaming clients, ensure proper handling of interleaved reasoning and content deltas
+- **Chatbot Integration**: For chatbot applications, implement separate rendering logic for reasoning content vs. main response content
+- **Real-time Processing**: Design your client to process both content types in real-time without blocking the stream
+- **Content Validation**: Always check for both `content` and `reasoning_content` fields in each streaming delta
 
 ## Testing
 
