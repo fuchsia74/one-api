@@ -92,8 +92,8 @@ export function PersonalSettings() {
   // Confirm TOTP setup with verification code
   const confirmTotp = async () => {
     setConfirmTotpError('') // Clear previous error
-    if (!totpCode) {
-      setConfirmTotpError('Please enter the TOTP code')
+    if (!/^\d{6}$/.test(totpCode)) {
+      setConfirmTotpError('Enter a valid 6-digit code')
       return
     }
 
@@ -109,15 +109,17 @@ export function PersonalSettings() {
         setTotpEnabled(true)
         setShowTotpSetup(false)
         setTotpCode('')
+        setTotpSecret('')
+        setTotpQRCode('')
       } else {
         setConfirmTotpError(res.data.message || 'Failed to confirm TOTP')
       }
     } catch (error) {
       setConfirmTotpError(error instanceof Error ? error.message : 'Failed to confirm TOTP')
+    } finally {
+      setTotpLoading(false)
     }
-    setTotpLoading(false)
   }
-
   // Disable TOTP for the user
   const disableTotp = async () => {
     setDisableTotpError('') // Clear previous error
