@@ -18,6 +18,7 @@ import { AlertCircle, Info } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { api } from '@/lib/api'
 import { logEditPageLayout } from '@/dev/layout-debug'
+import { useNotifications } from '@/components/ui/notifications'
 
 // Enhanced channel schema with comprehensive validation
 const channelSchema = z.object({
@@ -251,6 +252,7 @@ export function EditChannelPage() {
   const channelId = params.id
   const isEdit = channelId !== undefined
   const navigate = useNavigate()
+  const { notify } = useNotifications()
 
   const [loading, setLoading] = useState(isEdit)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -561,15 +563,7 @@ export function EditChannelPage() {
     }
   }
 
-  const formatJSON = (jsonString: string) => {
-    if (!jsonString || jsonString.trim() === '') return ''
-    try {
-      const parsed = JSON.parse(jsonString)
-      return JSON.stringify(parsed, null, 2)
-    } catch (e) {
-      return jsonString
-    }
-  }
+  // formatJSON helper defined above at module scope is reused here
 
   const loadGroups = async () => {
     try {
@@ -642,14 +636,27 @@ export function EditChannelPage() {
   const onSubmit = async (data: ChannelForm) => {
     setIsSubmitting(true)
     try {
-      // Require key only on create (unless special auth path builds it)
-      if (!isEdit && (!data.key || data.key.trim() === '')) {
+      // Prepare payload first so provider-specific key construction happens before key validation
+      let payload: any = { ...data }
+
+      // Handle special key construction for AWS and Vertex AI
+      if (watchType === 33 && watchConfig.ak && watchConfig.sk && watchConfig.region) {
+        payload.key = `${watchConfig.ak}|${watchConfig.sk}|${watchConfig.region}`
+      } else if (watchType === 42 && watchConfig.region && watchConfig.vertex_ai_project_id && watchConfig.vertex_ai_adc) {
+        payload.key = `${watchConfig.region}|${watchConfig.vertex_ai_project_id}|${watchConfig.vertex_ai_adc}`
+      }
+
+      // Require key only on create (after provider-specific construction)
+      if (!isEdit && (!payload.key || payload.key.trim() === '')) {
         form.setError('key', { message: 'API key is required' })
+        notify({ type: 'error', title: 'Validation error', message: 'API key is required.' })
         return
       }
+
       // Validate JSON fields
       if (data.model_mapping && !isValidJSON(data.model_mapping)) {
         form.setError('model_mapping', { message: 'Invalid JSON format in model mapping' })
+        notify({ type: 'error', title: 'Invalid JSON', message: 'Model Mapping has invalid JSON.' })
         return
       }
 
@@ -657,17 +664,20 @@ export function EditChannelPage() {
         const validation = validateModelConfigs(data.model_configs)
         if (!validation.valid) {
           form.setError('model_configs', { message: validation.error || 'Invalid model configs format' })
+          notify({ type: 'error', title: 'Invalid configs', message: validation.error || 'Model Configs are invalid.' })
           return
         }
       }
 
       if (data.other && !isValidJSON(data.other)) {
         form.setError('other', { message: 'Invalid JSON format in other configuration' })
+  notify({ type: 'error', title: 'Invalid JSON', message: 'Other configuration has invalid JSON.' })
         return
       }
 
       if (data.inference_profile_arn_map && !isValidJSON(data.inference_profile_arn_map)) {
         form.setError('inference_profile_arn_map', { message: 'Invalid JSON format in inference profile ARN map' })
+  notify({ type: 'error', title: 'Invalid JSON', message: 'Inference Profile ARN Map has invalid JSON.' })
         return
       }
 
@@ -675,6 +685,7 @@ export function EditChannelPage() {
       if (watchType === 34 && watchConfig.auth_type === 'oauth_jwt') {
         if (!isValidJSON(data.key)) {
           form.setError('key', { message: 'Invalid JSON format for OAuth JWT configuration' })
+          notify({ type: 'error', title: 'Invalid JSON', message: 'OAuth JWT configuration JSON is invalid.' })
           return
         }
 
@@ -685,23 +696,15 @@ export function EditChannelPage() {
           for (const field of requiredFields) {
             if (!oauthConfig.hasOwnProperty(field)) {
               form.setError('key', { message: `Missing required field: ${field}` })
+        notify({ type: 'error', title: 'Missing field', message: `OAuth JWT configuration missing: ${field}` })
               return
             }
           }
         } catch (error) {
           form.setError('key', { message: `OAuth config parse error: ${(error as Error).message}` })
+      notify({ type: 'error', title: 'Parse error', message: `OAuth JWT parse error: ${(error as Error).message}` })
           return
         }
-      }
-
-      // Prepare payload
-      let payload: any = { ...data }
-
-      // Handle special key construction for AWS and Vertex AI
-      if (watchType === 33 && watchConfig.ak && watchConfig.sk && watchConfig.region) {
-        payload.key = `${watchConfig.ak}|${watchConfig.sk}|${watchConfig.region}`
-      } else if (watchType === 42 && watchConfig.region && watchConfig.vertex_ai_project_id && watchConfig.vertex_ai_adc) {
-        payload.key = `${watchConfig.region}|${watchConfig.vertex_ai_project_id}|${watchConfig.vertex_ai_adc}`
       }
 
       // Convert arrays to comma-separated strings for backend
@@ -752,13 +755,27 @@ export function EditChannelPage() {
         })
       } else {
         form.setError('root', { message: message || 'Operation failed' })
+        notify({ type: 'error', title: 'Request failed', message: message || 'Operation failed' })
       }
     } catch (error) {
       form.setError('root', {
         message: error instanceof Error ? error.message : 'Operation failed'
       })
+      notify({ type: 'error', title: 'Unexpected error', message: error instanceof Error ? error.message : 'Operation failed' })
     } finally {
       setIsSubmitting(false)
+    }
+  }
+
+  // RHF invalid handler: toast and focus first invalid field
+  const onInvalid = (errors: any) => {
+    const firstKey = Object.keys(errors)[0]
+    const firstMsg = errors[firstKey]?.message || 'Please correct the highlighted fields.'
+    notify({ type: 'error', title: 'Validation error', message: String(firstMsg) })
+    const el = document.querySelector(`[name="${firstKey}"]`) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      ;(el as any).focus?.()
     }
   }
 
@@ -859,6 +876,10 @@ export function EditChannelPage() {
     }
   }
 
+  // Helpers for error highlighting
+  const fieldHasError = (name: string) => !!(form.formState.errors as any)?.[name]
+  const errorClass = (name: string) => (fieldHasError(name) ? 'border-destructive focus-visible:ring-destructive' : '')
+
   // Render channel-specific configuration fields
   const renderChannelSpecificFields = () => {
     const channelType = watchType
@@ -880,6 +901,7 @@ export function EditChannelPage() {
                   <FormControl>
                     <Input
                       placeholder={defaultBaseURL || 'https://your-resource.openai.azure.com'}
+                      className={errorClass('base_url')}
                       {...field}
                     />
                   </FormControl>
@@ -899,6 +921,7 @@ export function EditChannelPage() {
                   <FormControl>
                     <Input
                       placeholder="2024-03-01-preview"
+                      className={errorClass('other')}
                       {...field}
                     />
                   </FormControl>
@@ -935,7 +958,7 @@ export function EditChannelPage() {
                       help={'AWS region for Bedrock (e.g., us-east-1). Must match where your models/profiles reside.'}
                     />
                     <FormControl>
-                      <Input placeholder="us-east-1" {...field} />
+                      <Input placeholder="us-east-1" className={errorClass('config.region')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -951,7 +974,7 @@ export function EditChannelPage() {
                       help={'AWS Access Key ID with permissions to call Bedrock.'}
                     />
                     <FormControl>
-                      <Input placeholder="AKIA..." {...field} />
+                      <Input placeholder="AKIA..." className={errorClass('config.ak')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -967,7 +990,7 @@ export function EditChannelPage() {
                       help={'AWS Secret Access Key for the above Access Key ID.'}
                     />
                     <FormControl>
-                      <Input type="password" placeholder="Secret Key" {...field} />
+                      <Input type="password" placeholder="Secret Key" className={errorClass('config.sk')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1025,7 +1048,7 @@ export function EditChannelPage() {
                       help={'Your Coze Personal Access Token (pat_...).'}
                     />
                     <FormControl>
-                      <Input type="password" placeholder="pat_..." {...field} />
+                      <Input type="password" placeholder="pat_..." className={errorClass('key')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1044,7 +1067,7 @@ export function EditChannelPage() {
                     <FormControl>
                       <Textarea
                         placeholder={`OAuth JWT configuration in JSON format:\n${JSON.stringify(OAUTH_JWT_CONFIG_EXAMPLE, null, 2)}`}
-                        className="font-mono text-sm min-h-[120px]"
+                        className={`font-mono text-sm min-h-[120px] ${errorClass('key')}`}
                         {...field}
                       />
                     </FormControl>
@@ -1066,7 +1089,7 @@ export function EditChannelPage() {
                     help={'Optional Coze user ID used for bot operations (if required by your setup).'}
                   />
                   <FormControl>
-                    <Input placeholder="User ID for bot operations" {...field} />
+                    <Input placeholder="User ID for bot operations" className={errorClass('config.user_id')} {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1090,7 +1113,7 @@ export function EditChannelPage() {
                       help={'Google Cloud region for Vertex AI (e.g., us-central1).'}
                     />
                     <FormControl>
-                      <Input placeholder="us-central1" {...field} />
+                      <Input placeholder="us-central1" className={errorClass('config.region')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1106,7 +1129,7 @@ export function EditChannelPage() {
                       help={'Your GCP Project ID hosting Vertex AI resources.'}
                     />
                     <FormControl>
-                      <Input placeholder="my-project-id" {...field} />
+                      <Input placeholder="my-project-id" className={errorClass('config.vertex_ai_project_id')} {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -1124,7 +1147,7 @@ export function EditChannelPage() {
                     <FormControl>
                       <Textarea
                         placeholder="Google service account JSON credentials"
-                        className="font-mono text-xs"
+                        className={`font-mono text-xs ${errorClass('config.vertex_ai_adc')}`}
                         {...field}
                       />
                     </FormControl>
@@ -1345,7 +1368,7 @@ export function EditChannelPage() {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
               {/* Basic Configuration */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField
@@ -1358,7 +1381,7 @@ export function EditChannelPage() {
                         help={'Human‑readable identifier. Use provider/environment in the name, for example "OpenAI GPT‑4 Production".'}
                       />
                       <FormControl>
-                        <Input placeholder="Enter channel name" {...field} />
+                        <Input placeholder="Enter channel name" className={errorClass('name')} {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -1389,7 +1412,7 @@ export function EditChannelPage() {
                           }}
                         >
                           <FormControl>
-                            <SelectTrigger>
+                            <SelectTrigger className={errorClass('type')}>
                               <SelectValue placeholder="Select channel type" />
                             </SelectTrigger>
                           </FormControl>
@@ -1421,6 +1444,7 @@ export function EditChannelPage() {
                       <Input
                         type="password"
                         placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
+                        className={errorClass('key')}
                         {...field}
                       />
                     </FormControl>
@@ -1446,6 +1470,7 @@ export function EditChannelPage() {
                     <FormControl>
                       <Input
                         placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
+                        className={errorClass('base_url')}
                         {...field}
                       />
                     </FormControl>
@@ -1695,7 +1720,7 @@ export function EditChannelPage() {
                     <FormControl>
                       <Textarea
                         placeholder={`Model name mapping in JSON format:\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
-                        className="font-mono text-sm min-h-[100px]"
+                        className={`font-mono text-sm min-h-[100px] ${errorClass('model_mapping')}`}
                         {...field}
                       />
                     </FormControl>
@@ -1762,7 +1787,7 @@ export function EditChannelPage() {
                       <FormControl>
                         <Textarea
                           placeholder={`Model configurations in JSON format:\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
-                          className="font-mono text-sm min-h-[120px]"
+                          className={`font-mono text-sm min-h-[120px] ${errorClass('model_configs')}`}
                           {...field}
                         />
                       </FormControl>
@@ -1800,7 +1825,7 @@ export function EditChannelPage() {
                     <FormControl>
                       <Textarea
                         placeholder="Optional system prompt to prepend to all requests"
-                        className="min-h-[100px]"
+                        className={`min-h-[100px] ${errorClass('system_prompt')}`}
                         {...field}
                       />
                     </FormControl>
@@ -1837,7 +1862,7 @@ export function EditChannelPage() {
                             "claude-3-5-sonnet-20241022": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
                             "claude-3-haiku-20240307": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
                           }, null, 2)}`}
-                          className="font-mono text-sm min-h-[100px]"
+                          className={`font-mono text-sm min-h-[100px] ${errorClass('inference_profile_arn_map')}`}
                           {...field}
                         />
                       </FormControl>
