@@ -4,7 +4,7 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-// Request is the request for AWS Llama3 using Converse API
+// Request is the request for AWS Llama using Converse API
 type Request struct {
 	// Messages contains the conversation history using the relay model format.
 	// This field is required and must contain at least one message.
