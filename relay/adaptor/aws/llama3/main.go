@@ -2,15 +2,13 @@
 package aws
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"text/template"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/random"
+	"github.com/songquanpeng/one-api/common/tracing"
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
@@ -23,8 +21,6 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
-
-	// "github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
@@ -63,101 +59,173 @@ func awsModelID(requestModel string) (string, error) {
 	return "", errors.Errorf("model %s not found", requestModel)
 }
 
-// promptTemplate for legacy Llama models (3, 3.1, 3.2, 3.3)
-const legacyPromptTemplate = `<|begin_of_text|>{{range .Messages}}<|start_header_id|>{{.Role}}<|end_header_id|>{{.StringContent}}<|eot_id|>{{end}}<|start_header_id|>assistant<|end_header_id|>`
-
-// promptTemplate for Llama 4 models
-const llama4PromptTemplate = `<|begin_of_text|>{{range .Messages}}<|start_header_id|>{{.Role}}<|end_header_id|>{{.StringContent}}<|eot|>{{end}}<|start_header_id|>assistant<|end_header_id|>`
-
-var legacyPromptTpl = template.Must(template.New("llama-legacy-chat").Parse(legacyPromptTemplate))
-var llama4PromptTpl = template.Must(template.New("llama4-chat").Parse(llama4PromptTemplate))
-
-// isLlama4Model checks if the given model is a Llama 4 model
-func isLlama4Model(model string) bool {
-	return model == "llama4-scout-17b-3.5m" || model == "llama4-maverick-17b-1m"
-}
-
-func RenderPrompt(messages []relaymodel.Message, model string) string {
-	var buf bytes.Buffer
-	var err error
-
-	if isLlama4Model(model) {
-		err = llama4PromptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
-	} else {
-		err = legacyPromptTpl.Execute(&buf, struct{ Messages []relaymodel.Message }{messages})
-	}
-
-	if err != nil {
-		// rendering prompt failed
-	}
-	return buf.String()
-}
-
 func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
-	llamaRequest := Request{
-		MaxGenLen:   textRequest.MaxTokens,
+	llamaRequest := &Request{
+		Messages:    textRequest.Messages,
 		Temperature: textRequest.Temperature,
 		TopP:        textRequest.TopP,
 	}
-	if llamaRequest.MaxGenLen == 0 {
-		llamaRequest.MaxGenLen = config.DefaultMaxToken
+
+	// Handle max tokens
+	if textRequest.MaxTokens == 0 {
+		llamaRequest.MaxTokens = config.DefaultMaxToken
+	} else {
+		llamaRequest.MaxTokens = textRequest.MaxTokens
 	}
-	prompt := RenderPrompt(textRequest.Messages, textRequest.Model)
-	llamaRequest.Prompt = prompt
-	return &llamaRequest
+
+	// Handle stop sequences
+	if textRequest.Stop != nil {
+		if stopSlice, ok := textRequest.Stop.([]interface{}); ok {
+			stopSequences := make([]string, len(stopSlice))
+			for i, stop := range stopSlice {
+				if stopStr, ok := stop.(string); ok {
+					stopSequences[i] = stopStr
+				}
+			}
+			llamaRequest.Stop = stopSequences
+		} else if stopStr, ok := textRequest.Stop.(string); ok {
+			llamaRequest.Stop = []string{stopStr}
+		} else if stopSlice, ok := textRequest.Stop.([]string); ok {
+			llamaRequest.Stop = stopSlice
+		}
+	}
+
+	return llamaRequest
 }
 
-func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
-	awsModelID, err := awsModelID(c.GetString(ctxkey.RequestModel))
-	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
-	}
-	awsModelID = utils.ConvertModelID2CrossRegionProfile(awsModelID, awsCli.Options().Region)
-	awsReq := &bedrockruntime.InvokeModelInput{
-		ModelId:     aws.String(awsModelID),
-		Accept:      aws.String("application/json"),
-		ContentType: aws.String("application/json"),
+// convertLlamaToConverseRequest converts Llama request to Converse API format
+func convertLlamaToConverseRequest(llamaReq *Request, modelID string) (*bedrockruntime.ConverseInput, error) {
+	var converseMessages []types.Message
+	var systemMessages []types.SystemContentBlock
+
+	// Convert messages using standard Converse API format
+	for _, msg := range llamaReq.Messages {
+		switch msg.Role {
+		case "system":
+			// System messages go to the system field in Converse API
+			systemMessages = append(systemMessages, &types.SystemContentBlockMemberText{
+				Value: msg.StringContent(),
+			})
+		case "user":
+			// User messages use standard Converse API format
+			contentBlocks := []types.ContentBlock{
+				&types.ContentBlockMemberText{
+					Value: msg.StringContent(),
+				},
+			}
+
+			converseMessages = append(converseMessages, types.Message{
+				Role:    types.ConversationRole(msg.Role),
+				Content: contentBlocks,
+			})
+		case "assistant":
+			// Assistant messages use standard Converse API format
+			contentBlocks := []types.ContentBlock{
+				&types.ContentBlockMemberText{
+					Value: msg.StringContent(),
+				},
+			}
+
+			converseMessages = append(converseMessages, types.Message{
+				Role:    types.ConversationRole(msg.Role),
+				Content: contentBlocks,
+			})
+		}
 	}
 
-	llamaReq, ok := c.Get(ctxkey.ConvertedRequest)
-	if !ok {
-		return utils.WrapErr(errors.New("request not found")), nil
+	// Create inference configuration
+	inferenceConfig := &types.InferenceConfiguration{}
+	if llamaReq.MaxTokens != 0 {
+		inferenceConfig.MaxTokens = aws.Int32(int32(llamaReq.MaxTokens))
 	}
 
-	awsReq.Body, err = json.Marshal(llamaReq)
-	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
+	if llamaReq.Temperature != nil {
+		inferenceConfig.Temperature = aws.Float32(float32(*llamaReq.Temperature))
+	}
+	if llamaReq.TopP != nil {
+		inferenceConfig.TopP = aws.Float32(float32(*llamaReq.TopP))
+	}
+	if len(llamaReq.Stop) > 0 {
+		stopSequences := make([]string, len(llamaReq.Stop))
+		copy(stopSequences, llamaReq.Stop)
+		inferenceConfig.StopSequences = stopSequences
 	}
 
-	awsResp, err := awsCli.InvokeModel(gmw.Ctx(c), awsReq)
-	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "InvokeModel")), nil
+	converseReq := &bedrockruntime.ConverseInput{
+		ModelId:         aws.String(modelID),
+		Messages:        converseMessages,
+		InferenceConfig: inferenceConfig,
 	}
 
-	var llamaResponse Response
-	err = json.Unmarshal(awsResp.Body, &llamaResponse)
-	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "unmarshal response")), nil
+	// Add system messages if any
+	if len(systemMessages) > 0 {
+		converseReq.System = systemMessages
 	}
 
-	openaiResp := ResponseLlama2OpenAI(&llamaResponse)
-	openaiResp.Model = modelName
-	usage := relaymodel.Usage{
-		PromptTokens:     llamaResponse.PromptTokenCount,
-		CompletionTokens: llamaResponse.GenerationTokenCount,
-		TotalTokens:      llamaResponse.PromptTokenCount + llamaResponse.GenerationTokenCount,
-	}
-	openaiResp.Usage = usage
-
-	c.JSON(http.StatusOK, openaiResp)
-	return nil, &usage
+	return converseReq, nil
 }
 
-func ResponseLlama2OpenAI(llamaResponse *Response) *openai.TextResponse {
+// convertLlamaToConverseStreamRequest converts Llama request to Converse Stream API format
+func convertLlamaToConverseStreamRequest(llamaReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
+	converseReq, err := convertLlamaToConverseRequest(llamaReq, modelID)
+	if err != nil {
+		return nil, err
+	}
+
+	return &bedrockruntime.ConverseStreamInput{
+		ModelId:         converseReq.ModelId,
+		Messages:        converseReq.Messages,
+		System:          converseReq.System,
+		InferenceConfig: converseReq.InferenceConfig,
+	}, nil
+}
+
+// convertStopReason converts AWS converse stop reason to OpenAI format
+func convertStopReason(awsReason string) *string {
+	if awsReason == "" {
+		return nil
+	}
+
+	var result string
+	switch awsReason {
+	case "max_tokens":
+		result = "length"
+	default:
+		result = awsReason // Return the actual AWS response instead of hardcoded "stop"
+	}
+	return &result
+}
+
+// convertConverseResponseToOpenAI converts AWS Converse response to OpenAI format
+func convertConverseResponseToOpenAI(c *gin.Context, converseResp *bedrockruntime.ConverseOutput, modelName string) *openai.TextResponse {
 	var responseText string
-	if len(llamaResponse.Generation) > 0 {
-		responseText = llamaResponse.Generation
+	var finishReason string
+
+	// Extract response content from Converse API response
+	if converseResp.Output != nil {
+		switch outputValue := converseResp.Output.(type) {
+		case *types.ConverseOutputMemberMessage:
+			if len(outputValue.Value.Content) > 0 {
+				// Process content blocks
+				for _, contentBlock := range outputValue.Value.Content {
+					switch contentValue := contentBlock.(type) {
+					case *types.ContentBlockMemberText:
+						// Add text content
+						if contentValue.Value != "" {
+							responseText = contentValue.Value
+							break
+						}
+					}
+				}
+			}
+			// Convert stop reason
+			if stopReason := convertStopReason(string(converseResp.StopReason)); stopReason != nil {
+				finishReason = *stopReason
+			}
+		}
 	}
+
+	// Create OpenAI-compatible choice
 	choice := openai.TextResponseChoice{
 		Index: 0,
 		Message: relaymodel.Message{
@@ -165,49 +233,108 @@ func ResponseLlama2OpenAI(llamaResponse *Response) *openai.TextResponse {
 			Content: responseText,
 			Name:    nil,
 		},
-		FinishReason: llamaResponse.StopReason,
+		FinishReason: finishReason,
 	}
+
+	// Create OpenAI-compatible response
 	fullTextResponse := openai.TextResponse{
-		Id:      fmt.Sprintf("chatcmpl-%s", random.GetUUID()),
+		Id:      fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c)),
 		Object:  "chat.completion",
 		Created: helper.GetTimestamp(),
+		Model:   modelName,
 		Choices: []openai.TextResponseChoice{choice},
 	}
+
 	return &fullTextResponse
 }
 
-func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
-	lg := gmw.GetLogger(c)
-	createdTime := helper.GetTimestamp()
-	awsModelID, err := awsModelID(c.GetString(ctxkey.RequestModel))
+// Handler handles non-streaming requests using Converse API
+func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+	awsModelName, err := awsModelID(c.GetString(ctxkey.RequestModel))
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
 	}
-	awsModelID = utils.ConvertModelID2CrossRegionProfile(awsModelID, awsCli.Options().Region)
-	awsReq := &bedrockruntime.InvokeModelWithResponseStreamInput{
-		ModelId:     aws.String(awsModelID),
-		Accept:      aws.String("application/json"),
-		ContentType: aws.String("application/json"),
-	}
+	awsModelName = utils.ConvertModelID2CrossRegionProfile(awsModelName, awsCli.Options().Region)
 
 	llamaReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
 		return utils.WrapErr(errors.New("request not found")), nil
 	}
 
-	awsReq.Body, err = json.Marshal(llamaReq)
+	// Convert Llama request to Converse API format
+	converseReq, err := convertLlamaToConverseRequest(llamaReq.(*Request), awsModelName)
 	if err != nil {
-		return utils.WrapErr(errors.Wrap(err, "marshal request")), nil
+		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
 
-	awsResp, err := awsCli.InvokeModelWithResponseStream(gmw.Ctx(c), awsReq)
+	// Use Converse API to get actual token counts
+	awsResp, err := awsCli.Converse(gmw.Ctx(c), converseReq)
 	if err != nil {
+		return utils.WrapErr(errors.Wrap(err, "Converse")), nil
+	}
+
+	// Convert Converse response to OpenAI format
+	openaiResp := convertConverseResponseToOpenAI(c, awsResp, modelName)
+
+	// Convert usage to relaymodel.Usage for billing
+	var usage relaymodel.Usage
+	if awsResp.Usage != nil {
+		if awsResp.Usage.InputTokens != nil {
+			usage.PromptTokens = int(*awsResp.Usage.InputTokens)
+		}
+		if awsResp.Usage.OutputTokens != nil {
+			usage.CompletionTokens = int(*awsResp.Usage.OutputTokens)
+		}
+		if awsResp.Usage.TotalTokens != nil {
+			usage.TotalTokens = int(*awsResp.Usage.TotalTokens)
+		} else {
+			// Calculate total if not provided
+			usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+		}
+	}
+
+	c.JSON(http.StatusOK, openaiResp)
+	return nil, &usage
+}
+
+// StreamHandler handles streaming requests using Converse API
+func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.ErrorWithStatusCode, *relaymodel.Usage) {
+	lg := gmw.GetLogger(c)
+	createdTime := helper.GetTimestamp()
+	awsModelName, err := awsModelID(c.GetString(ctxkey.RequestModel))
+	if err != nil {
+		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
+	}
+	awsModelName = utils.ConvertModelID2CrossRegionProfile(awsModelName, awsCli.Options().Region)
+
+	llamaReq, ok := c.Get(ctxkey.ConvertedRequest)
+	if !ok {
+		return utils.WrapErr(errors.New("request not found")), nil
+	}
+
+	// Convert Llama request to Converse API format
+	converseReq, err := convertLlamaToConverseStreamRequest(llamaReq.(*Request), awsModelName)
+	if err != nil {
+		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
+	}
+
+	awsResp, err := awsCli.ConverseStream(gmw.Ctx(c), converseReq)
+	if err != nil {
+		return utils.WrapErr(errors.Wrap(err, "ConverseStream")), nil
 	}
 	stream := awsResp.GetStream()
 	defer stream.Close()
 
 	c.Writer.Header().Set("Content-Type", "text/event-stream")
+	// This change addresses an issue with nginx that could be annoying regarding buffering.
+	c.Writer.Header().Set("Cache-Control", "no-cache")
+	c.Writer.Header().Set("Connection", "keep-alive")
+	c.Writer.Header().Set("X-Accel-Buffering", "no")
+	c.Writer.Header().Set("Pragma", "no-cache") // This is for legacy HTTP; I'm pretty sure.
+
 	var usage relaymodel.Usage
+	var id string
+
 	c.Stream(func(w io.Writer) bool {
 		event, ok := <-stream.Events()
 		if !ok {
@@ -216,54 +343,96 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 		}
 
 		switch v := event.(type) {
-		case *types.ResponseStreamMemberChunk:
-			var llamaResp StreamResponse
-			err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(&llamaResp)
-			if err != nil {
-				lg.Error("error unmarshalling stream response", zap.Error(err))
-				return false
+		case *types.ConverseStreamOutputMemberMessageStart:
+			// Handle message start
+			id = fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c))
+			return true
+
+		case *types.ConverseStreamOutputMemberContentBlockDelta:
+			// Handle content delta - this is where the actual text content comes from ConverseStream
+			if v.Value.Delta != nil {
+				var response *openai.ChatCompletionsStreamResponse
+
+				// Check if this is a text delta (AWS SDK union type pattern)
+				switch deltaValue := v.Value.Delta.(type) {
+				case *types.ContentBlockDeltaMemberText:
+					if textDelta := deltaValue.Value; textDelta != "" {
+						// Create OpenAI-compatible streaming response with simple string content
+						response = &openai.ChatCompletionsStreamResponse{
+							Id:      id,
+							Object:  "chat.completion.chunk",
+							Created: createdTime,
+							Model:   c.GetString(ctxkey.OriginalModel),
+							Choices: []openai.ChatCompletionsStreamResponseChoice{
+								{
+									Index: 0,
+									Delta: relaymodel.Message{
+										Role:    "assistant",
+										Content: textDelta,
+									},
+								},
+							},
+						}
+					}
+				}
+
+				// Send the response if we have one
+				if response != nil {
+					jsonStr, err := json.Marshal(response)
+					if err != nil {
+						lg.Error("error marshalling stream response", zap.Error(err))
+						return true
+					}
+					c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
+				}
+			}
+			return true
+
+		case *types.ConverseStreamOutputMemberMessageStop:
+			// Handle message stop with OpenAI-compatible response structure
+			finishReason := convertStopReason(string(v.Value.StopReason))
+			response := &openai.ChatCompletionsStreamResponse{
+				Id:      id,
+				Object:  "chat.completion.chunk",
+				Created: createdTime,
+				Model:   c.GetString(ctxkey.OriginalModel),
+				Choices: []openai.ChatCompletionsStreamResponseChoice{
+					{
+						Index:        0,
+						Delta:        relaymodel.Message{},
+						FinishReason: finishReason,
+					},
+				},
 			}
 
-			if llamaResp.PromptTokenCount > 0 {
-				usage.PromptTokens = llamaResp.PromptTokenCount
-			}
-			if llamaResp.StopReason == "stop" {
-				usage.CompletionTokens = llamaResp.GenerationTokenCount
-				usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
-			}
-			response := StreamResponseLlama2OpenAI(&llamaResp)
-			response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
-			response.Model = c.GetString(ctxkey.OriginalModel)
-			response.Created = createdTime
 			jsonStr, err := json.Marshal(response)
 			if err != nil {
-				lg.Error("error marshalling stream response", zap.Error(err))
-				return true
+				lg.Error("error marshalling final stream response", zap.Error(err))
+				return false
 			}
 			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
 			return true
-		case *types.UnknownUnionMember:
-			fmt.Println("unknown tag:", v.Tag)
-			return false
+
+		case *types.ConverseStreamOutputMemberMetadata:
+			// Handle metadata (usage)
+			if streamUsage := v.Value.Usage; streamUsage != nil {
+				if streamUsage.InputTokens != nil {
+					usage.PromptTokens = int(*streamUsage.InputTokens)
+				}
+				if streamUsage.OutputTokens != nil {
+					usage.CompletionTokens = int(*streamUsage.OutputTokens)
+				}
+				if streamUsage.TotalTokens != nil {
+					usage.TotalTokens = int(*streamUsage.TotalTokens)
+				}
+			}
+			return true
+
 		default:
-			fmt.Println("union is nil or unknown type")
-			return false
+			// Handle other event types
+			return true
 		}
 	})
 
 	return nil, &usage
-}
-
-func StreamResponseLlama2OpenAI(llamaResponse *StreamResponse) *openai.ChatCompletionsStreamResponse {
-	var choice openai.ChatCompletionsStreamResponseChoice
-	choice.Delta.Content = llamaResponse.Generation
-	choice.Delta.Role = "assistant"
-	finishReason := llamaResponse.StopReason
-	if finishReason != "null" {
-		choice.FinishReason = &finishReason
-	}
-	var openaiResponse openai.ChatCompletionsStreamResponse
-	openaiResponse.Object = "chat.completion.chunk"
-	openaiResponse.Choices = []openai.ChatCompletionsStreamResponseChoice{choice}
-	return &openaiResponse
 }
