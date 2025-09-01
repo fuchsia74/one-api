@@ -106,7 +106,14 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	}
 
 	// Convert DeepSeek request to Converse API format
-	converseReq, err := convertDeepSeekToConverseRequest(deepseekReq.(*Request), awsModelName)
+	req, ok := deepseekReq.(*Request)
+	if !ok {
+		return utils.WrapErr(errors.New("invalid converted request type")), nil
+	}
+	if len(req.Messages) == 0 {
+		return utils.WrapErr(errors.New("empty messages")), nil
+	}
+	converseReq, err := convertDeepSeekToConverseRequest(req, awsModelName)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
@@ -145,8 +152,17 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 		return utils.WrapErr(errors.New("request not found")), nil
 	}
 
+	// guard against invalid type and empty messages to avoid panics in the streaming path
+	req, ok := deepseekReq.(*Request)
+	if !ok {
+		return utils.WrapErr(errors.New("invalid converted request type")), nil
+	}
+	if len(req.Messages) == 0 {
+		return utils.WrapErr(errors.New("empty messages")), nil
+	}
+
 	// Convert DeepSeek request to Converse API format
-	converseReq, err := convertDeepSeekToConverseStreamRequest(deepseekReq.(*Request), awsModelName)
+	converseReq, err := convertDeepSeekToConverseStreamRequest(req, awsModelName)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
