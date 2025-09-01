@@ -27,6 +27,7 @@ var (
 	adaptors = map[string]AwsModelType{}
 )
 var awsArnMatch *regexp.Regexp
+var awsCohereArnMatch *regexp.Regexp
 
 func init() {
 	for model := range claude.AwsModelIDMap {
@@ -41,19 +42,34 @@ func init() {
 	for model := range mistral.AwsModelIDMap {
 		adaptors[model] = AwsMistral
 	}
+	for model := range cohere.AwsModelIDMap {
+		adaptors[model] = AwsCohere
+	}
+
 	match, err := regexp.Compile("arn:aws:bedrock.+claude")
 	if err != nil {
 		logger.Logger.Warn(fmt.Sprintf("compile %v", err))
 		return
 	}
+
 	awsArnMatch = match
+
+	matchCohere, err := regexp.Compile("arn:aws:bedrock.+cohere")
+	if err != nil {
+		logger.Logger.Warn(fmt.Sprintf("compile %v", err))
+		return
+	}
+	awsCohereArnMatch = matchCohere
 }
 
 func GetAdaptor(model string) utils.AwsAdapter {
 	adaptorType := adaptors[model]
 	if awsArnMatch.MatchString(model) {
 		adaptorType = AwsClaude
+	} else if awsCohereArnMatch != nil && awsCohereArnMatch.MatchString(model) {
+		adaptorType = AwsCohere
 	}
+
 	switch adaptorType {
 	case AwsClaude:
 		return &claude.Adaptor{}
