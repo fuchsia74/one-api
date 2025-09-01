@@ -274,6 +274,7 @@ export function EditChannelPage() {
   const [customModel, setCustomModel] = useState('')
   const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
   const [loadedChannelType, setLoadedChannelType] = useState<number | null>(null) // Track the loaded channel type
+  const [autoFilledType, setAutoFilledType] = useState<number | null>(null) // Prevent repeated auto-fill per type
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -668,11 +669,9 @@ export function EditChannelPage() {
         }
       }
 
-      if (data.other && !isValidJSON(data.other)) {
-        form.setError('other', { message: 'Invalid JSON format in other configuration' })
-        notify({ type: 'error', title: 'Invalid JSON', message: 'Other configuration has invalid JSON.' })
-        return
-      }
+  // Note: 'other' is a plain string for many providers (e.g., Azure API version,
+  // iFlytek Spark version, plugin params, knowledge ID). Do not validate as JSON.
+  // If a future provider requires JSON in `other`, add a conditional check by type here.
 
       if (data.inference_profile_arn_map && !isValidJSON(data.inference_profile_arn_map)) {
         form.setError('inference_profile_arn_map', { message: 'Invalid JSON format in inference profile ARN map' })
@@ -730,15 +729,16 @@ export function EditChannelPage() {
         payload.base_url = payload.base_url.slice(0, -1)
       }
 
-      // Handle Azure default API version
-      if (watchType === 3 && !payload.other) {
+      // Handle Azure default API version (plain string)
+      if (watchType === 3 && (!payload.other || payload.other.trim() === '')) {
         payload.other = '2024-03-01-preview'
       }
 
-      // Convert empty strings to null for optional JSON fields
-      const jsonFields = ['model_mapping', 'model_configs', 'other', 'inference_profile_arn_map', 'system_prompt']
-      jsonFields.forEach(field => {
-        if (payload[field] === '') {
+  // Convert empty/whitespace-only strings to null for optional JSON fields (exclude `other`, it's plain text)
+  const jsonFields = ['model_mapping', 'model_configs', 'inference_profile_arn_map', 'system_prompt']
+      jsonFields.forEach((field) => {
+        const v = payload[field]
+        if (typeof v === 'string' && v.trim() === '') {
           payload[field] = null
         }
       })
@@ -888,6 +888,12 @@ export function EditChannelPage() {
     const current = form.getValues('other')
     const formatted = formatJSON(current)
     form.setValue('other', formatted)
+  }
+
+  const formatInferenceProfileArnMap = () => {
+    const current = form.getValues('inference_profile_arn_map')
+    const formatted = formatJSON(current)
+    form.setValue('inference_profile_arn_map', formatted)
   }
 
   const loadDefaultModelConfigs = () => {
@@ -1335,6 +1341,17 @@ export function EditChannelPage() {
     // Re-run when channel type changes as sections expand/collapse
   }, [shouldShowLoading, watchType])
 
+  // Default pricing auto-fill: when Model Configs is empty, auto-populate once per type (no preview shown)
+  useEffect(() => {
+    if (watchType && defaultPricing && autoFilledType !== watchType) {
+      const current = form.getValues('model_configs') || ''
+      if (!current.trim()) {
+        form.setValue('model_configs', defaultPricing, { shouldDirty: true })
+        setAutoFilledType(watchType)
+      }
+    }
+  }, [watchType, defaultPricing, autoFilledType])
+
   if (shouldShowLoading) {
     console.log('[CHANNEL_TYPE_DEBUG] Showing loading screen')
     return (
@@ -1721,7 +1738,6 @@ export function EditChannelPage() {
                           variant="outline"
                           size="sm"
                           onClick={formatModelMapping}
-                          disabled={!field.value || field.value.trim() === ''}
                         >
                           Format JSON
                         </Button>
@@ -1742,6 +1758,24 @@ export function EditChannelPage() {
                           placeholder={`Model name mapping in JSON format:\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
                           className={`font-mono text-sm min-h-[100px] ${errorClass('model_mapping')}`}
                           {...field}
+                          onBlur={() => {
+                            // Avoid reading from the blur event; rely on current field value only
+                            try {
+                              field.onBlur()
+                              const val = String(field.value ?? '')
+                              if (!val || val.trim() === '') {
+                                form.clearErrors('model_mapping')
+                                return
+                              }
+                              if (!isValidJSON(val)) {
+                                form.setError('model_mapping', { message: 'Invalid JSON format' })
+                              } else {
+                                form.clearErrors('model_mapping')
+                              }
+                            } catch {
+                              // no-op
+                            }
+                          }}
                         />
                       </FormControl>
                       <div className="flex justify-between items-center text-sm">
@@ -1780,35 +1814,50 @@ export function EditChannelPage() {
                             variant="outline"
                             size="sm"
                             onClick={formatModelConfigs}
-                            disabled={!field.value || field.value.trim() === ''}
                           >
                             Format JSON
                           </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={loadDefaultModelConfigs}
-                            disabled={!defaultPricing}
-                          >
-                            Load Defaults
-                          </Button>
+                          {watchType !== 3 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={loadDefaultModelConfigs}
+                              disabled={!defaultPricing}
+                            >
+                              Load Defaults
+                            </Button>
+                          )}
                         </div>
-                        {defaultPricing && (
-                          <div className="bg-muted/50 p-4 rounded-lg mb-2">
-                            <h4 className="text-sm font-medium mb-2">
-                              Default Pricing for {selectedChannelType?.text}
-                            </h4>
-                            <pre className="text-xs bg-background p-2 rounded border overflow-auto max-h-40">
-                              {defaultPricing}
-                            </pre>
-                          </div>
-                        )}
+                        {/* Default pricing preview removed to reduce distraction; defaults are auto-filled when empty */}
                         <FormControl>
                           <Textarea
                             placeholder={`Model configurations in JSON format:\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
                             className={`font-mono text-sm min-h-[120px] ${errorClass('model_configs')}`}
                             {...field}
+                            onBlur={() => {
+                              // Avoid reading from the blur event; rely on current field value only
+                              try {
+                                field.onBlur()
+                                const val = String(field.value ?? '')
+                                if (!val || val.trim() === '') {
+                                  form.clearErrors('model_configs')
+                                  return
+                                }
+                                if (!isValidJSON(val)) {
+                                  form.setError('model_configs', { message: 'Invalid JSON format' })
+                                  return
+                                }
+                                const validation = validateModelConfigs(val)
+                                if (!validation.valid) {
+                                  form.setError('model_configs', { message: validation.error || 'Invalid model configs format' })
+                                } else {
+                                  form.clearErrors('model_configs')
+                                }
+                              } catch {
+                                // no-op
+                              }
+                            }}
                           />
                         </FormControl>
                         <div className="flex justify-between items-center text-sm">
@@ -1870,8 +1919,7 @@ export function EditChannelPage() {
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={formatOtherConfig}
-                            disabled={!field.value || field.value.trim() === ''}
+                            onClick={formatInferenceProfileArnMap}
                           >
                             Format JSON
                           </Button>
@@ -1884,6 +1932,24 @@ export function EditChannelPage() {
                             }, null, 2)}`}
                             className={`font-mono text-sm min-h-[100px] ${errorClass('inference_profile_arn_map')}`}
                             {...field}
+                            onBlur={() => {
+                              // Avoid reading from the blur event; rely on current field value only
+                              try {
+                                field.onBlur()
+                                const val = String(field.value ?? '')
+                                if (!val || val.trim() === '') {
+                                  form.clearErrors('inference_profile_arn_map')
+                                  return
+                                }
+                                if (!isValidJSON(val)) {
+                                  form.setError('inference_profile_arn_map', { message: 'Invalid JSON format' })
+                                } else {
+                                  form.clearErrors('inference_profile_arn_map')
+                                }
+                              } catch {
+                                // no-op
+                              }
+                            }}
                           />
                         </FormControl>
                         <div className="flex justify-between items-center text-sm">
