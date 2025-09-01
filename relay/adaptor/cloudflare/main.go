@@ -42,7 +42,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 
 	common.SetEventStreamHeaders(c)
 	id := helper.GetResponseID(c)
-	responseModel := c.GetString(ctxkey.OriginalModel)
+	responseModel := c.GetString(ctxkey.RequestModel)
 	var responseText string
 
 	for scanner.Scan() {
