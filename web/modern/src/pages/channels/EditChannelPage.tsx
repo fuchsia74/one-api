@@ -34,9 +34,10 @@ const channelSchema = z.object({
   model_configs: z.string().optional(),
   system_prompt: z.string().optional(),
   groups: z.array(z.string()).default(['default']),
-  priority: z.number().default(0),
-  weight: z.number().default(0),
-  ratelimit: z.number().min(0).default(0),
+  // Coerce because inputs emit strings; enforce integers for these numeric fields
+  priority: z.coerce.number().int().default(0),
+  weight: z.coerce.number().int().default(0),
+  ratelimit: z.coerce.number().int().min(0).default(0),
   // AWS and Vertex AI specific config
   config: z.object({
     region: z.string().optional(),
@@ -64,6 +65,13 @@ interface ChannelType {
 interface Model {
   id: string
   name: string
+}
+
+// Coercion helpers to ensure numbers are numbers (avoid Zod "expected number, received string")
+const toInt = (v: unknown, def = 0): number => {
+  if (typeof v === 'number' && Number.isFinite(v)) return Math.trunc(v)
+  const n = Number(v as any)
+  return Number.isFinite(n) ? Math.trunc(n) : def
 }
 
 // Comprehensive channel types with colors and descriptions
@@ -271,9 +279,9 @@ export function EditChannelPage() {
     resolver: zodResolver(channelSchema),
     defaultValues: {
       name: '',
-  // For create, do not preselect a type so dependent fields stay locked until user chooses
-  // Keep a sane default for edit; values will be reset after loading
-  type: isEdit ? 1 : (undefined as unknown as number),
+      // For create, do not preselect a type so dependent fields stay locked until user chooses
+      // Keep a sane default for edit; values will be reset after loading
+      type: isEdit ? 1 : (undefined as unknown as number),
       key: '',
       base_url: '',
       other: '',
@@ -305,8 +313,8 @@ export function EditChannelPage() {
 
   // Debug logging for watchType changes
   useEffect(() => {
-    console.log('[CHANNEL_TYPE_DEBUG] watchType changed:', watchType, typeof watchType)
-    console.log('[CHANNEL_TYPE_DEBUG] selectedChannelType:', selectedChannelType)
+    console.log(`[CHANNEL_TYPE_DEBUG] watchType changed value=${String(watchType)} typeof=${typeof watchType}`)
+    console.log(`[CHANNEL_TYPE_DEBUG] selectedChannelType value=${String(selectedChannelType?.value ?? '')} text=${String(selectedChannelType?.text ?? '')}`)
   }, [watchType, selectedChannelType])
 
   // Fetch server-side channel metadata (default base URL) when type changes
@@ -341,11 +349,11 @@ export function EditChannelPage() {
   useEffect(() => {
     if (isEdit && formInitialized && loadedChannelType) {
       const currentType = form.getValues('type')
-      console.log('[CHANNEL_TYPE_DEBUG] Form initialized effect - current type:', currentType, 'loaded type:', loadedChannelType)
+      console.log(`[CHANNEL_TYPE_DEBUG] form init currentType=${String(currentType)} loadedType=${String(loadedChannelType)}`)
 
       // If type is still not set correctly, force it to the loaded value
       if (currentType !== loadedChannelType) {
-        console.log('[CHANNEL_TYPE_DEBUG] Type mismatch detected in effect, forcing setValue:', { expected: loadedChannelType, actual: currentType })
+        console.log(`[CHANNEL_TYPE_DEBUG] type mismatch in effect expected=${String(loadedChannelType)} actual=${String(currentType)}`)
         form.setValue('type', loadedChannelType, { shouldValidate: true, shouldDirty: false })
       }
     }
@@ -354,7 +362,7 @@ export function EditChannelPage() {
   // Effect to sync watchType with loadedChannelType
   useEffect(() => {
     if (isEdit && loadedChannelType && watchType !== loadedChannelType) {
-      console.log('[CHANNEL_TYPE_DEBUG] watchType sync effect - watchType:', watchType, 'loadedChannelType:', loadedChannelType)
+      console.log(`[CHANNEL_TYPE_DEBUG] watchType sync watchType=${String(watchType)} loadedType=${String(loadedChannelType)}`)
       // This indicates the form value and watch value are out of sync
       form.setValue('type', loadedChannelType, { shouldValidate: true, shouldDirty: false })
     }
@@ -362,22 +370,22 @@ export function EditChannelPage() {
 
   const loadChannel = async () => {
     if (!channelId) {
-      console.log('[CHANNEL_TYPE_DEBUG] No channelId provided, skipping load')
+      console.log('[CHANNEL_TYPE_DEBUG] no channelId skip load')
       return
     }
 
-    console.log('[CHANNEL_TYPE_DEBUG] Starting to load channel:', channelId)
-    console.log('[CHANNEL_TYPE_DEBUG] Current form values before load:', form.getValues())
+    console.log(`[CHANNEL_TYPE_DEBUG] start load channel id=${String(channelId)}`)
+    console.log(`[CHANNEL_TYPE_DEBUG] before load type=${String(form.getValues('type') as any)}`)
 
     try {
       // Unified API call - complete URL with /api prefix
       const response = await api.get(`/api/channel/${channelId}`)
       const { success, message, data } = response.data
 
-      console.log('[CHANNEL_TYPE_DEBUG] API response:', { success, message, data })
+      console.log(`[CHANNEL_TYPE_DEBUG] api response success=${String(success)} message=${String(message ?? '')}`)
 
       if (success && data) {
-        console.log('[CHANNEL_TYPE_DEBUG] Raw channel data type:', typeof data.type, data.type)
+        console.log(`[CHANNEL_TYPE_DEBUG] raw data.type typeof=${typeof data.type} value=${String(data.type)}`)
 
         // Parse models field - convert string to array
         let models: string[] = []
@@ -422,16 +430,9 @@ export function EditChannelPage() {
         }
 
         // Ensure type is a number and handle edge cases
-        let channelType = data.type
-        if (typeof channelType === 'string') {
-          channelType = parseInt(channelType, 10)
-        }
-        if (!channelType || isNaN(channelType)) {
-          console.warn('[CHANNEL_TYPE_DEBUG] Invalid channel type, defaulting to 1:', data.type)
-          channelType = 1
-        }
+        let channelType = toInt(data.type, 1)
 
-        console.log('[CHANNEL_TYPE_DEBUG] Processed channel type:', channelType)
+        console.log(`[CHANNEL_TYPE_DEBUG] processed channelType=${String(channelType)}`)
 
         const formData: ChannelForm = {
           name: data.name || '',
@@ -444,26 +445,25 @@ export function EditChannelPage() {
           model_configs: formatJsonField(data.model_configs),
           system_prompt: data.system_prompt || '',
           groups,
-          priority: data.priority || 0,
-          weight: data.weight || 0,
-          ratelimit: data.ratelimit || 0,
+          priority: toInt(data.priority, 0),
+          weight: toInt(data.weight, 0),
+          ratelimit: toInt(data.ratelimit, 0),
           config,
           inference_profile_arn_map: formatJsonField(data.inference_profile_arn_map),
         }
 
-        console.log('[CHANNEL_TYPE_DEBUG] Prepared form data:', formData)
-        console.log('[CHANNEL_TYPE_DEBUG] Form data type field:', formData.type, typeof formData.type)
+        console.log(`[CHANNEL_TYPE_DEBUG] prepared form data type=${String(formData.type)} priority=${String(formData.priority)} weight=${String(formData.weight)} ratelimit=${String(formData.ratelimit)}`)
 
         // Load channel-specific models and default pricing
         if (channelType) {
-          console.log('[CHANNEL_TYPE_DEBUG] Loading channel models and pricing for type:', channelType)
+          console.log(`[CHANNEL_TYPE_DEBUG] load models+pricing for type=${String(channelType)}`)
           await Promise.all([
             loadChannelModels(channelType),
             loadDefaultPricing(channelType)
           ])
         }
 
-        console.log('[CHANNEL_TYPE_DEBUG] About to reset form with data:', formData)
+        console.log('[CHANNEL_TYPE_DEBUG] about to reset form with data')
 
         // Store the loaded channel type
         setLoadedChannelType(channelType)
@@ -473,23 +473,21 @@ export function EditChannelPage() {
         // Wait a tick to ensure form is updated
         await new Promise(resolve => setTimeout(resolve, 0))
 
-        console.log('[CHANNEL_TYPE_DEBUG] Form values after reset:', form.getValues())
-        console.log('[CHANNEL_TYPE_DEBUG] Form type value after reset:', form.getValues('type'))
-        console.log('[CHANNEL_TYPE_DEBUG] Form watch type after reset:', watchType)
+        console.log(`[CHANNEL_TYPE_DEBUG] after reset type=${String(form.getValues('type') as any)} watchType=${String(watchType)}`)
 
         // Force update the type field if it's not set correctly
         const currentTypeValue = form.getValues('type')
         if (currentTypeValue !== channelType) {
-          console.log('[CHANNEL_TYPE_DEBUG] Type mismatch detected, forcing setValue:', { expected: channelType, actual: currentTypeValue })
+          console.log(`[CHANNEL_TYPE_DEBUG] mismatch after reset expected=${String(channelType)} actual=${String(currentTypeValue)} force setValue`)
           form.setValue('type', channelType, { shouldValidate: true, shouldDirty: false })
 
           // Wait another tick and check again
           await new Promise(resolve => setTimeout(resolve, 0))
-          console.log('[CHANNEL_TYPE_DEBUG] Form type value after setValue:', form.getValues('type'))
+          console.log(`[CHANNEL_TYPE_DEBUG] type after setValue=${String(form.getValues('type') as any)}`)
         }
 
         // Mark form as initialized
-        console.log('[CHANNEL_TYPE_DEBUG] Setting formInitialized to true')
+        console.log('[CHANNEL_TYPE_DEBUG] set formInitialized true')
         setFormInitialized(true)
       } else {
         throw new Error(message || 'Failed to load channel')
@@ -638,6 +636,7 @@ export function EditChannelPage() {
     try {
       // Prepare payload first so provider-specific key construction happens before key validation
       let payload: any = { ...data }
+      console.log(`[EDIT_CHANNEL_SUBMIT] start isEdit=${String(isEdit)} type=${String(payload.type)} priority=${String(payload.priority)} weight=${String(payload.weight)} ratelimit=${String(payload.ratelimit)}`)
 
       // Handle special key construction for AWS and Vertex AI
       if (watchType === 33 && watchConfig.ak && watchConfig.sk && watchConfig.region) {
@@ -671,13 +670,13 @@ export function EditChannelPage() {
 
       if (data.other && !isValidJSON(data.other)) {
         form.setError('other', { message: 'Invalid JSON format in other configuration' })
-  notify({ type: 'error', title: 'Invalid JSON', message: 'Other configuration has invalid JSON.' })
+        notify({ type: 'error', title: 'Invalid JSON', message: 'Other configuration has invalid JSON.' })
         return
       }
 
       if (data.inference_profile_arn_map && !isValidJSON(data.inference_profile_arn_map)) {
         form.setError('inference_profile_arn_map', { message: 'Invalid JSON format in inference profile ARN map' })
-  notify({ type: 'error', title: 'Invalid JSON', message: 'Inference Profile ARN Map has invalid JSON.' })
+        notify({ type: 'error', title: 'Invalid JSON', message: 'Inference Profile ARN Map has invalid JSON.' })
         return
       }
 
@@ -696,16 +695,22 @@ export function EditChannelPage() {
           for (const field of requiredFields) {
             if (!oauthConfig.hasOwnProperty(field)) {
               form.setError('key', { message: `Missing required field: ${field}` })
-        notify({ type: 'error', title: 'Missing field', message: `OAuth JWT configuration missing: ${field}` })
+              notify({ type: 'error', title: 'Missing field', message: `OAuth JWT configuration missing: ${field}` })
               return
             }
           }
         } catch (error) {
           form.setError('key', { message: `OAuth config parse error: ${(error as Error).message}` })
-      notify({ type: 'error', title: 'Parse error', message: `OAuth JWT parse error: ${(error as Error).message}` })
+          notify({ type: 'error', title: 'Parse error', message: `OAuth JWT parse error: ${(error as Error).message}` })
           return
         }
       }
+
+      // Coerce numeric fields to numbers
+      payload.priority = toInt(payload.priority, 0)
+      payload.weight = toInt(payload.weight, 0)
+      payload.ratelimit = toInt(payload.ratelimit, 0)
+      console.log(`[EDIT_CHANNEL_SUBMIT] coerced numbers priority=${String(payload.priority)} weight=${String(payload.weight)} ratelimit=${String(payload.ratelimit)}`)
 
       // Convert arrays to comma-separated strings for backend
       payload.models = payload.models.join(',')
@@ -738,6 +743,8 @@ export function EditChannelPage() {
         }
       })
 
+      console.log('[EDIT_CHANNEL_SUBMIT] before request')
+      console.log(`[EDIT_CHANNEL_SUBMIT] payload summary before request type=${String(payload.type)} priority=${String(payload.priority)} weight=${String(payload.weight)} ratelimit=${String(payload.ratelimit)}`)
       let response
       if (isEdit && channelId) {
         // Unified API call - complete URL with /api prefix
@@ -745,6 +752,7 @@ export function EditChannelPage() {
       } else {
         response = await api.post('/api/channel/', payload)
       }
+      console.log('[EDIT_CHANNEL_SUBMIT] after request')
 
       const { success, message } = response.data
       if (success) {
@@ -769,13 +777,25 @@ export function EditChannelPage() {
 
   // RHF invalid handler: toast and focus first invalid field
   const onInvalid = (errors: any) => {
+    // Compact debug: log key and a brief snapshot of numeric field types (string-only output)
+    try {
+      const t = form.getValues('type') as unknown
+      const p = form.getValues('priority') as unknown
+      const w = form.getValues('weight') as unknown
+      const r = form.getValues('ratelimit') as unknown
+      console.log(
+        `[EDIT_CHANNEL_INVALID] key=${String(Object.keys(errors)[0] || '')} type=${String(t)}(${typeof t}) priority=${String(p)}(${typeof p}) weight=${String(w)}(${typeof w}) ratelimit=${String(r)}(${typeof r})`
+      )
+    } catch (_) {
+      // swallow
+    }
     const firstKey = Object.keys(errors)[0]
     const firstMsg = errors[firstKey]?.message || 'Please correct the highlighted fields.'
     notify({ type: 'error', title: 'Validation error', message: String(firstMsg) })
     const el = document.querySelector(`[name="${firstKey}"]`) as HTMLElement | null
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      ;(el as any).focus?.()
+        ; (el as any).focus?.()
     }
   }
 
@@ -1347,528 +1367,386 @@ export function EditChannelPage() {
   return (
     <div className="container mx-auto px-4 py-6">
       <TooltipProvider>
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEdit ? 'Edit Channel' : 'Create Channel'}</CardTitle>
-          <CardDescription>
-            {isEdit ? 'Update channel configuration' : 'Create a new API channel'}
-          </CardDescription>
-          {selectedChannelType?.description && (
-            <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <Info className="h-4 w-4 text-blue-600" />
-              <span className="text-sm text-blue-800">{selectedChannelType.description}</span>
-            </div>
-          )}
-          {selectedChannelType?.tip && (
-            <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <AlertCircle className="h-4 w-4 text-yellow-600" />
-              <span className="text-sm text-yellow-800" dangerouslySetInnerHTML={{ __html: selectedChannelType.tip }} />
-            </div>
-          )}
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
-              {/* Basic Configuration */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>{isEdit ? 'Edit Channel' : 'Create Channel'}</CardTitle>
+            <CardDescription>
+              {isEdit ? 'Update channel configuration' : 'Create a new API channel'}
+            </CardDescription>
+            {selectedChannelType?.description && (
+              <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <Info className="h-4 w-4 text-blue-600" />
+                <span className="text-sm text-blue-800">{selectedChannelType.description}</span>
+              </div>
+            )}
+            {selectedChannelType?.tip && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-yellow-600" />
+                <span className="text-sm text-yellow-800" dangerouslySetInnerHTML={{ __html: selectedChannelType.tip }} />
+              </div>
+            )}
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-4">
+                {/* Basic Configuration */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="Channel Name *"
+                          help={'Human‑readable identifier. Use provider/environment in the name, for example "OpenAI GPT‑4 Production".'}
+                        />
+                        <FormControl>
+                          <Input placeholder="Enter channel name" className={errorClass('name')} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <Controller
+                    name="type"
+                    control={form.control}
+                    render={({ field }) => {
+                      const stringValue = field.value ? String(field.value) : ''
+                      console.log('[CHANNEL_TYPE_DEBUG] Select render (Controller) - value:', field.value, 'string:', stringValue, 'isEdit:', isEdit)
+                      return (
+                        <FormItem>
+                          <LabelWithHelp
+                            label="Channel Type *"
+                            help={'Select the upstream provider. This determines models, auth method, and default Base URL.'}
+                          />
+                          <Select
+                            value={stringValue}
+                            onValueChange={(v) => {
+                              console.log(`[CHANNEL_TYPE_DEBUG] select onChange raw=${String(v)} typeof=${typeof v}`)
+                              const numValue = parseInt(v)
+                              field.onChange(numValue)
+                              if (isEdit) {
+                                setLoadedChannelType(numValue)
+                              }
+                            }}
+                          >
+                            <FormControl>
+                              <SelectTrigger className={errorClass('type')}>
+                                <SelectValue placeholder="Select channel type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent className="max-h-96 overflow-y-auto">
+                              {CHANNEL_TYPES.map((t) => (
+                                <SelectItem key={t.value} value={String(t.value)}>
+                                  {t.text}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
+                  />
+                </div>
+
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="key"
                   render={({ field }) => (
                     <FormItem>
                       <LabelWithHelp
-                        label="Channel Name *"
-                        help={'Human‑readable identifier. Use provider/environment in the name, for example "OpenAI GPT‑4 Production".'}
+                        label="API Key"
+                        help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
                       />
                       <FormControl>
-                        <Input placeholder="Enter channel name" className={errorClass('name')} {...field} />
+                        <Input
+                          type="password"
+                          placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
+                          className={errorClass('key')}
+                          {...field}
+                        />
+                      </FormControl>
+                      {isEdit && (
+                        <div className="text-xs text-muted-foreground">
+                          Current API key is hidden for security. Enter a new key only if you want to update it.
+                        </div>
+                      )}
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="base_url"
+                  render={({ field }) => (
+                    <FormItem>
+                      <LabelWithHelp
+                        label="Base URL (Optional)"
+                        help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
+                      />
+                      <FormControl>
+                        <Input
+                          placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
+                          className={errorClass('base_url')}
+                          {...field}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
-                <Controller
-                  name="type"
-                  control={form.control}
-                  render={({ field }) => {
-                    const stringValue = field.value ? String(field.value) : ''
-                    console.log('[CHANNEL_TYPE_DEBUG] Select render (Controller) - value:', field.value, 'string:', stringValue, 'isEdit:', isEdit)
-                    return (
+                {(!isEdit && !hasSelectedType) ? (
+                  <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
+                    Select a channel type to configure Supported Models.
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="models"
+                    render={({ field }) => (
                       <FormItem>
                         <LabelWithHelp
-                          label="Channel Type *"
-                          help={'Select the upstream provider. This determines models, auth method, and default Base URL.'}
+                          label="Supported Models *"
+                          help={'Models available through this channel. Leave empty to allow all provider models. Use the buttons to fill related/all models; duplicates are removed.'}
                         />
-                        <Select
-                          value={stringValue}
-                          onValueChange={(v) => {
-                            console.log('[CHANNEL_TYPE_DEBUG] Select onValueChange called with:', v, typeof v)
-                            const numValue = parseInt(v)
-                            field.onChange(numValue)
-                            if (isEdit) {
-                              setLoadedChannelType(numValue)
-                            }
-                          }}
-                        >
-                          <FormControl>
-                            <SelectTrigger className={errorClass('type')}>
-                              <SelectValue placeholder="Select channel type" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="max-h-96 overflow-y-auto">
-                            {CHANNEL_TYPES.map((t) => (
-                              <SelectItem key={t.value} value={String(t.value)}>
-                                {t.text}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )
-                  }}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="key"
-                render={({ field }) => (
-                  <FormItem>
-                    <LabelWithHelp
-                      label="API Key"
-                      help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
-                    />
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
-                        className={errorClass('key')}
-                        {...field}
-                      />
-                    </FormControl>
-                    {isEdit && (
-                      <div className="text-xs text-muted-foreground">
-                        Current API key is hidden for security. Enter a new key only if you want to update it.
-                      </div>
-                    )}
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="base_url"
-                render={({ field }) => (
-                  <FormItem>
-                    <LabelWithHelp
-                      label="Base URL (Optional)"
-                      help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
-                    />
-                    <FormControl>
-                      <Input
-                        placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
-                        className={errorClass('base_url')}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {(!isEdit && !hasSelectedType) ? (
-                <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
-                  Select a channel type to configure Supported Models.
-                </div>
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="models"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="Supported Models *"
-                        help={'Models available through this channel. Leave empty to allow all provider models. Use the buttons to fill related/all models; duplicates are removed.'}
-                      />
-                      <div className="flex gap-2 mb-3">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={fillRelatedModels}
-                          disabled={channelModels.length === 0}
-                          size="sm"
-                        >
-                          Fill Related Models ({channelModels.length})
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={fillAllModels}
-                          size="sm"
-                        >
-                          Fill All Models ({allModels.length})
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={clearModels}
-                          size="sm"
-                        >
-                          Clear All
-                        </Button>
-                      </div>
-                      <div className="mb-2">
-                        <Input
-                          placeholder="Search models..."
-                          value={modelSearchTerm}
-                          onChange={(e) => setModelSearchTerm(e.target.value)}
-                        />
-                      </div>
-            <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
-                        {filteredModels.map((model) => (
-              <div key={model.id} className="relative flex items-center space-x-2">
-                            <Checkbox
-                              id={model.id}
-                              checked={selectedModels.includes(model.id)}
-                              onCheckedChange={() => toggleModel(model.id)}
-                            />
-                            <Label
-                              htmlFor={model.id}
-                              className="flex-1 cursor-pointer text-sm"
-                              onClick={() => navigator.clipboard.writeText(model.id)}
-                              title="Click to copy model name"
-                            >
-                              {model.name}
-                            </Label>
-                          </div>
-                        ))}
-                      </div>
-                      <div className="mt-2">
-                        <div className="flex gap-2 mb-2">
-                          <Input
-                            placeholder="Add custom model..."
-                            value={customModel}
-                            onChange={(e) => setCustomModel(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault()
-                                addCustomModel()
-                              }
-                            }}
-                          />
+                        <div className="flex gap-2 mb-3">
                           <Button
                             type="button"
-                            onClick={addCustomModel}
-                            disabled={!customModel.trim()}
+                            variant="outline"
+                            onClick={fillRelatedModels}
+                            disabled={channelModels.length === 0}
                             size="sm"
                           >
-                            Add
+                            Fill Related Models ({channelModels.length})
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={fillAllModels}
+                            size="sm"
+                          >
+                            Fill All Models ({allModels.length})
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={clearModels}
+                            size="sm"
+                          >
+                            Clear All
                           </Button>
                         </div>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {selectedModels.map((model) => (
-                          <Badge
-                            key={model}
-                            variant="secondary"
-                            className="cursor-pointer"
-                            onClick={() => removeModel(model)}
-                          >
-                            {model} ×
-                          </Badge>
-                        ))}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              <FormField
-                control={form.control}
-                name="groups"
-                render={({ field }) => (
-                  <FormItem>
-                    <LabelWithHelp
-                      label="Groups *"
-                      help={'Restrict access to specific user groups. Empty means all users can access. The default group is always kept.'}
-                    />
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap gap-2">
-                        {groups.map((group) => (
-                          <div key={group} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={`group-${group}`}
-                              checked={form.watch('groups').includes(group)}
-                              onCheckedChange={(checked) => {
-                                const currentGroups = form.getValues('groups')
-                                if (checked) {
-                                  if (!currentGroups.includes(group)) {
-                                    form.setValue('groups', [...currentGroups, group])
-                                  }
-                                } else {
-                                  const newGroups = currentGroups.filter(g => g !== group)
-                                  if (newGroups.length === 0) {
-                                    newGroups.push('default')
-                                  }
-                                  form.setValue('groups', newGroups)
+                        <div className="mb-2">
+                          <Input
+                            placeholder="Search models..."
+                            value={modelSearchTerm}
+                            onChange={(e) => setModelSearchTerm(e.target.value)}
+                          />
+                        </div>
+                        <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
+                          {filteredModels.map((model) => (
+                            <div key={model.id} className="relative flex items-center space-x-2">
+                              <Checkbox
+                                id={model.id}
+                                checked={selectedModels.includes(model.id)}
+                                onCheckedChange={() => toggleModel(model.id)}
+                              />
+                              <Label
+                                htmlFor={model.id}
+                                className="flex-1 cursor-pointer text-sm"
+                                onClick={() => navigator.clipboard.writeText(model.id)}
+                                title="Click to copy model name"
+                              >
+                                {model.name}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2">
+                          <div className="flex gap-2 mb-2">
+                            <Input
+                              placeholder="Add custom model..."
+                              value={customModel}
+                              onChange={(e) => setCustomModel(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault()
+                                  addCustomModel()
                                 }
                               }}
                             />
-                            <Label htmlFor={`group-${group}`} className="cursor-pointer text-sm">
-                              {group}
-                            </Label>
+                            <Button
+                              type="button"
+                              onClick={addCustomModel}
+                              disabled={!customModel.trim()}
+                              size="sm"
+                            >
+                              Add
+                            </Button>
                           </div>
-                        ))}
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {form.watch('groups').map((group) => (
-                          <Badge
-                            key={group}
-                            variant="secondary"
-                            className="cursor-pointer"
-                            onClick={() => removeGroup(group)}
-                          >
-                            {group} ×
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="priority"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="Priority"
-                        help={'Lower numbers are tried first when multiple channels support a model.'}
-                      />
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="weight"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="Weight"
-                        help={'Load balancing weight among channels with the same priority. Higher weight receives more requests.'}
-                      />
-                      <FormControl>
-                        <Input
-                          type="number"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value))}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <FormField
-                control={form.control}
-                name="model_mapping"
-                render={({ field }) => (
-                  <FormItem>
-                    <div className="flex items-center gap-2">
-                      <LabelWithHelp
-                        label="Model Mapping (JSON)"
-                        help={'Map external/legacy model names to this provider\'s actual model names. JSON object: { "from": "to" }.'}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={formatModelMapping}
-                        disabled={!field.value || field.value.trim() === ''}
-                      >
-                        Format JSON
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const example = JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)
-                          form.setValue('model_mapping', example)
-                        }}
-                      >
-                        Fill Template
-                      </Button>
-                    </div>
-                    <FormControl>
-                      <Textarea
-                        placeholder={`Model name mapping in JSON format:\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
-                        className={`font-mono text-sm min-h-[100px] ${errorClass('model_mapping')}`}
-                        {...field}
-                      />
-                    </FormControl>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-muted-foreground">
-                        Map model names for this channel (optional)
-                      </span>
-                      {field.value && field.value.trim() !== '' && (
-                        <span className={`font-bold text-xs ${isValidJSON(field.value) ? 'text-green-600' : 'text-red-600'
-                          }`}>
-                          {isValidJSON(field.value) ? '✓ Valid JSON' : '✗ Invalid JSON'}
-                        </span>
-                      )}
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {(!isEdit && !hasSelectedType) ? (
-                <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
-                  Select a channel type to configure Model Configs.
-                </div>
-              ) : (
-                <FormField
-                  control={form.control}
-                  name="model_configs"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-2">
-                        <LabelWithHelp
-                          label="Model Configs (JSON)"
-                          help={'Unified per‑model settings. Fields: ratio (input pricing multiplier), completion_ratio (output multiplier), max_tokens (limit).'}
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={formatModelConfigs}
-                          disabled={!field.value || field.value.trim() === ''}
-                        >
-                          Format JSON
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={loadDefaultModelConfigs}
-                          disabled={!defaultPricing}
-                        >
-                          Load Defaults
-                        </Button>
-                      </div>
-                      {defaultPricing && (
-                        <div className="bg-muted/50 p-4 rounded-lg mb-2">
-                          <h4 className="text-sm font-medium mb-2">
-                            Default Pricing for {selectedChannelType?.text}
-                          </h4>
-                          <pre className="text-xs bg-background p-2 rounded border overflow-auto max-h-40">
-                            {defaultPricing}
-                          </pre>
                         </div>
-                      )}
-                      <FormControl>
-                        <Textarea
-                          placeholder={`Model configurations in JSON format:\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
-                          className={`font-mono text-sm min-h-[120px] ${errorClass('model_configs')}`}
-                          {...field}
-                        />
-                      </FormControl>
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-muted-foreground">
-                          Configure pricing and limits per model (optional)
-                        </span>
-                        {field.value && field.value.trim() !== '' && (
-                          <span className={`font-bold text-xs ${isValidJSON(field.value) && validateModelConfigs(field.value).valid
-                            ? 'text-green-600' : 'text-red-600'
-                            }`}>
-                            {isValidJSON(field.value) && validateModelConfigs(field.value).valid
-                              ? '✓ Valid Config' : '✗ Invalid Config'}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {selectedModels.map((model) => (
+                            <Badge
+                              key={model}
+                              variant="secondary"
+                              className="cursor-pointer"
+                              onClick={() => removeModel(model)}
+                            >
+                              {model} ×
+                            </Badge>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                <FormField
+                  control={form.control}
+                  name="groups"
+                  render={({ field }) => (
+                    <FormItem>
+                      <LabelWithHelp
+                        label="Groups *"
+                        help={'Restrict access to specific user groups. Empty means all users can access. The default group is always kept.'}
+                      />
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap gap-2">
+                          {groups.map((group) => (
+                            <div key={group} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`group-${group}`}
+                                checked={form.watch('groups').includes(group)}
+                                onCheckedChange={(checked) => {
+                                  const currentGroups = form.getValues('groups')
+                                  if (checked) {
+                                    if (!currentGroups.includes(group)) {
+                                      form.setValue('groups', [...currentGroups, group])
+                                    }
+                                  } else {
+                                    const newGroups = currentGroups.filter(g => g !== group)
+                                    if (newGroups.length === 0) {
+                                      newGroups.push('default')
+                                    }
+                                    form.setValue('groups', newGroups)
+                                  }
+                                }}
+                              />
+                              <Label htmlFor={`group-${group}`} className="cursor-pointer text-sm">
+                                {group}
+                              </Label>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {form.watch('groups').map((group) => (
+                            <Badge
+                              key={group}
+                              variant="secondary"
+                              className="cursor-pointer"
+                              onClick={() => removeGroup(group)}
+                            >
+                              {group} ×
+                            </Badge>
+                          ))}
+                        </div>
                       </div>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
 
-              {/* Channel-specific configuration sections */}
-              {renderChannelSpecificFields()}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="priority"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="Priority"
+                          help={'Lower numbers are tried first when multiple channels support a model.'}
+                        />
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => { console.log(`[EDIT_CHANNEL_INPUT] priority change value=${String(e.target.value)}`); field.onChange(e.target.value) }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              <FormField
-                control={form.control}
-                name="system_prompt"
-                render={({ field }) => (
-                  <FormItem>
-                    <LabelWithHelp
-                      label="System Prompt"
-                      help={'Optional text prepended as a system message to every request sent through this channel. Use for guardrails or style. Clients can still override with their own system messages.'}
-                    />
-                    <FormControl>
-                      <Textarea
-                        placeholder="Optional system prompt to prepend to all requests"
-                        className={`min-h-[100px] ${errorClass('system_prompt')}`}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                  <FormField
+                    control={form.control}
+                    name="weight"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="Weight"
+                          help={'Load balancing weight among channels with the same priority. Higher weight receives more requests.'}
+                        />
+                        <FormControl>
+                          <Input
+                            type="number"
+                            {...field}
+                            onChange={(e) => { console.log(`[EDIT_CHANNEL_INPUT] weight change value=${String(e.target.value)}`); field.onChange(e.target.value) }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
 
-              {/* AWS Bedrock specific field */}
-              {watchType === 33 && (
                 <FormField
                   control={form.control}
-                  name="inference_profile_arn_map"
+                  name="model_mapping"
                   render={({ field }) => (
                     <FormItem>
                       <div className="flex items-center gap-2">
                         <LabelWithHelp
-                          label="Inference Profile ARN Map (AWS Bedrock)"
-                          help={'JSON map of model name → AWS Bedrock Inference Profile ARN. Use to route certain models via specific Bedrock inference profiles.'}
+                          label="Model Mapping (JSON)"
+                          help={'Map external/legacy model names to this provider\'s actual model names. JSON object: { "from": "to" }.'}
                         />
                         <Button
                           type="button"
                           variant="outline"
                           size="sm"
-                          onClick={formatOtherConfig}
+                          onClick={formatModelMapping}
                           disabled={!field.value || field.value.trim() === ''}
                         >
                           Format JSON
                         </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const example = JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)
+                            form.setValue('model_mapping', example)
+                          }}
+                        >
+                          Fill Template
+                        </Button>
                       </div>
                       <FormControl>
                         <Textarea
-                          placeholder={`AWS Bedrock inference profile ARN mapping:\n${JSON.stringify({
-                            "claude-3-5-sonnet-20241022": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-                            "claude-3-haiku-20240307": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
-                          }, null, 2)}`}
-                          className={`font-mono text-sm min-h-[100px] ${errorClass('inference_profile_arn_map')}`}
+                          placeholder={`Model name mapping in JSON format:\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
+                          className={`font-mono text-sm min-h-[100px] ${errorClass('model_mapping')}`}
                           {...field}
                         />
                       </FormControl>
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-muted-foreground">
-                          Map model names to AWS Bedrock inference profile ARNs (optional)
+                          Map model names for this channel (optional)
                         </span>
                         {field.value && field.value.trim() !== '' && (
                           <span className={`font-bold text-xs ${isValidJSON(field.value) ? 'text-green-600' : 'text-red-600'
@@ -1881,43 +1759,185 @@ export function EditChannelPage() {
                     </FormItem>
                   )}
                 />
-              )}
 
-              {form.formState.errors.root && (
-                <div className="text-sm text-destructive">
-                  {form.formState.errors.root.message}
-                </div>
-              )}
+                {(!isEdit && !hasSelectedType) ? (
+                  <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
+                    Select a channel type to configure Model Configs.
+                  </div>
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="model_configs"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-2">
+                          <LabelWithHelp
+                            label="Model Configs (JSON)"
+                            help={'Unified per‑model settings. Fields: ratio (input pricing multiplier), completion_ratio (output multiplier), max_tokens (limit).'}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={formatModelConfigs}
+                            disabled={!field.value || field.value.trim() === ''}
+                          >
+                            Format JSON
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={loadDefaultModelConfigs}
+                            disabled={!defaultPricing}
+                          >
+                            Load Defaults
+                          </Button>
+                        </div>
+                        {defaultPricing && (
+                          <div className="bg-muted/50 p-4 rounded-lg mb-2">
+                            <h4 className="text-sm font-medium mb-2">
+                              Default Pricing for {selectedChannelType?.text}
+                            </h4>
+                            <pre className="text-xs bg-background p-2 rounded border overflow-auto max-h-40">
+                              {defaultPricing}
+                            </pre>
+                          </div>
+                        )}
+                        <FormControl>
+                          <Textarea
+                            placeholder={`Model configurations in JSON format:\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
+                            className={`font-mono text-sm min-h-[120px] ${errorClass('model_configs')}`}
+                            {...field}
+                          />
+                        </FormControl>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">
+                            Configure pricing and limits per model (optional)
+                          </span>
+                          {field.value && field.value.trim() !== '' && (
+                            <span className={`font-bold text-xs ${isValidJSON(field.value) && validateModelConfigs(field.value).valid
+                              ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                              {isValidJSON(field.value) && validateModelConfigs(field.value).valid
+                                ? '✓ Valid Config' : '✗ Invalid Config'}
+                            </span>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? (isEdit ? 'Updating...' : 'Creating...')
-                    : (isEdit ? 'Update Channel' : 'Create Channel')
-                  }
-                </Button>
-                {isEdit && (
+                {/* Channel-specific configuration sections */}
+                {renderChannelSpecificFields()}
+
+                <FormField
+                  control={form.control}
+                  name="system_prompt"
+                  render={({ field }) => (
+                    <FormItem>
+                      <LabelWithHelp
+                        label="System Prompt"
+                        help={'Optional text prepended as a system message to every request sent through this channel. Use for guardrails or style. Clients can still override with their own system messages.'}
+                      />
+                      <FormControl>
+                        <Textarea
+                          placeholder="Optional system prompt to prepend to all requests"
+                          className={`min-h-[100px] ${errorClass('system_prompt')}`}
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* AWS Bedrock specific field */}
+                {watchType === 33 && (
+                  <FormField
+                    control={form.control}
+                    name="inference_profile_arn_map"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-2">
+                          <LabelWithHelp
+                            label="Inference Profile ARN Map (AWS Bedrock)"
+                            help={'JSON map of model name → AWS Bedrock Inference Profile ARN. Use to route certain models via specific Bedrock inference profiles.'}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={formatOtherConfig}
+                            disabled={!field.value || field.value.trim() === ''}
+                          >
+                            Format JSON
+                          </Button>
+                        </div>
+                        <FormControl>
+                          <Textarea
+                            placeholder={`AWS Bedrock inference profile ARN mapping:\n${JSON.stringify({
+                              "claude-3-5-sonnet-20241022": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                              "claude-3-haiku-20240307": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
+                            }, null, 2)}`}
+                            className={`font-mono text-sm min-h-[100px] ${errorClass('inference_profile_arn_map')}`}
+                            {...field}
+                          />
+                        </FormControl>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-muted-foreground">
+                            Map model names to AWS Bedrock inference profile ARNs (optional)
+                          </span>
+                          {field.value && field.value.trim() !== '' && (
+                            <span className={`font-bold text-xs ${isValidJSON(field.value) ? 'text-green-600' : 'text-red-600'
+                              }`}>
+                              {isValidJSON(field.value) ? '✓ Valid JSON' : '✗ Invalid JSON'}
+                            </span>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {form.formState.errors.root && (
+                  <div className="text-sm text-destructive">
+                    {form.formState.errors.root.message}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting
+                      ? (isEdit ? 'Updating...' : 'Creating...')
+                      : (isEdit ? 'Update Channel' : 'Create Channel')
+                    }
+                  </Button>
+                  {isEdit && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={testChannel}
+                      disabled={isSubmitting}
+                    >
+                      Test Channel
+                    </Button>
+                  )}
                   <Button
                     type="button"
-                    variant="secondary"
-                    onClick={testChannel}
-                    disabled={isSubmitting}
+                    variant="outline"
+                    onClick={() => navigate('/channels')}
                   >
-                    Test Channel
+                    Cancel
                   </Button>
-                )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/channels')}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
       </TooltipProvider>
     </div>
   )
