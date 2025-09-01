@@ -117,7 +117,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, request *model.ImageReques
 	}
 	a.awsAdapter = adaptor
 
-	// Store the image request in context for the Titan adapter to use later
+	// Store the image request in context for the Titan or Canvas adapter to use later
 	c.Set("imageRequest", *request)
 	c.Set(ctxkey.RequestModel, request.Model)
 
