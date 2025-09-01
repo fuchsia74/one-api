@@ -7,7 +7,9 @@ import (
 	"github.com/songquanpeng/one-api/common/logger"
 	claude "github.com/songquanpeng/one-api/relay/adaptor/aws/claude"
 	cohere "github.com/songquanpeng/one-api/relay/adaptor/aws/cohere"
+	deepseek "github.com/songquanpeng/one-api/relay/adaptor/aws/deepseek"
 	llama3 "github.com/songquanpeng/one-api/relay/adaptor/aws/llama3"
+	mistral "github.com/songquanpeng/one-api/relay/adaptor/aws/mistral"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 )
 
@@ -16,7 +18,9 @@ type AwsModelType int
 const (
 	AwsClaude AwsModelType = iota + 1
 	AwsCohere
+	AwsDeepSeek
 	AwsLlama3
+	AwsMistral
 )
 
 var (
@@ -28,8 +32,14 @@ func init() {
 	for model := range claude.AwsModelIDMap {
 		adaptors[model] = AwsClaude
 	}
+	for model := range deepseek.AwsModelIDMap {
+		adaptors[model] = AwsDeepSeek
+	}
 	for model := range llama3.AwsModelIDMap {
 		adaptors[model] = AwsLlama3
+	}
+	for model := range mistral.AwsModelIDMap {
+		adaptors[model] = AwsMistral
 	}
 	match, err := regexp.Compile("arn:aws:bedrock.+claude")
 	if err != nil {
@@ -49,8 +59,12 @@ func GetAdaptor(model string) utils.AwsAdapter {
 		return &claude.Adaptor{}
 	case AwsCohere:
 		return &cohere.Adaptor{}
+	case AwsDeepSeek:
+		return &deepseek.Adaptor{}
 	case AwsLlama3:
 		return &llama3.Adaptor{}
+	case AwsMistral:
+		return &mistral.Adaptor{}
 	default:
 		return nil
 	}

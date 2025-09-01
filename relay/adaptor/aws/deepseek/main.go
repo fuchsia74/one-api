@@ -24,10 +24,10 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-// AwsModelIDMap provides mapping for Cohere Command R models via Converse API
+// AwsModelIDMap provides mapping for DeepSeek-R1 models via Converse API
+// https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html
 var AwsModelIDMap = map[string]string{
-	"command-r":      "cohere.command-r-v1:0",
-	"command-r-plus": "cohere.command-r-plus-v1:0",
+	"deepseek-r1": "deepseek.r1-v1:0",
 }
 
 func awsModelID(requestModel string) (string, error) {
@@ -37,25 +37,40 @@ func awsModelID(requestModel string) (string, error) {
 	return "", errors.Errorf("model %s not found", requestModel)
 }
 
-// ConvertRequest converts OpenAI request to Cohere request
+// ConvertMessages converts OpenAI messages to DeepSeek messages
+func ConvertMessages(messages []relaymodel.Message) []Message {
+	var deepseekMessages []Message
+
+	for _, msg := range messages {
+		deepseekMsg := Message{
+			Role:    msg.Role,
+			Content: msg.StringContent(),
+		}
+		deepseekMessages = append(deepseekMessages, deepseekMsg)
+	}
+
+	return deepseekMessages
+}
+
+// ConvertRequest converts OpenAI request to DeepSeek request
 func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
-	cohereReq := &Request{
+	deepseekReq := &Request{
 		Messages: ConvertMessages(textRequest.Messages),
 	}
 
 	// Handle inference parameters
 	if textRequest.MaxTokens == 0 {
-		cohereReq.MaxTokens = config.DefaultMaxToken
+		deepseekReq.MaxTokens = config.DefaultMaxToken
 	} else {
-		cohereReq.MaxTokens = textRequest.MaxTokens
+		deepseekReq.MaxTokens = textRequest.MaxTokens
 	}
 
 	if textRequest.Temperature != nil {
-		cohereReq.Temperature = textRequest.Temperature
+		deepseekReq.Temperature = textRequest.Temperature
 	}
 
 	if textRequest.TopP != nil {
-		cohereReq.TopP = textRequest.TopP
+		deepseekReq.TopP = textRequest.TopP
 	}
 
 	if textRequest.Stop != nil {
@@ -66,15 +81,15 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 					stopSequences[i] = stopStr
 				}
 			}
-			cohereReq.Stop = stopSequences
+			deepseekReq.Stop = stopSequences
 		} else if stopStr, ok := textRequest.Stop.(string); ok {
-			cohereReq.Stop = []string{stopStr}
+			deepseekReq.Stop = []string{stopStr}
 		} else if stopSlice, ok := textRequest.Stop.([]string); ok {
-			cohereReq.Stop = stopSlice
+			deepseekReq.Stop = stopSlice
 		}
 	}
 
-	return cohereReq
+	return deepseekReq
 }
 
 // Handler handles non-streaming requests using Converse API
@@ -85,13 +100,20 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	}
 	awsModelName = utils.ConvertModelID2CrossRegionProfile(awsModelName, awsCli.Options().Region)
 
-	cohereReq, ok := c.Get(ctxkey.ConvertedRequest)
+	deepseekReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
 		return utils.WrapErr(errors.New("request not found")), nil
 	}
 
-	// Convert Cohere request to Converse API format
-	converseReq, err := convertCohereToConverseRequest(cohereReq.(*Request), awsModelName)
+	// Convert DeepSeek request to Converse API format
+	req, ok := deepseekReq.(*Request)
+	if !ok {
+		return utils.WrapErr(errors.New("invalid converted request type")), nil
+	}
+	if len(req.Messages) == 0 {
+		return utils.WrapErr(errors.New("empty messages")), nil
+	}
+	converseReq, err := convertDeepSeekToConverseRequest(req, awsModelName)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
@@ -102,16 +124,16 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 		return utils.WrapErr(errors.Wrap(err, "Converse")), nil
 	}
 
-	// Convert Converse response to custom Cohere format
-	cohereResp := convertConverseResponseToCohere(c, awsResp, modelName)
+	// Convert Converse response to custom DeepSeek format
+	deepseekResp := convertConverseResponseToDeepSeek(c, awsResp, modelName)
 
-	// Convert Cohere usage to relaymodel.Usage for billing
+	// Convert DeepSeek usage to relaymodel.Usage for billing
 	var usage relaymodel.Usage
-	usage.PromptTokens = cohereResp.Usage.InputTokens
-	usage.CompletionTokens = cohereResp.Usage.OutputTokens
-	usage.TotalTokens = cohereResp.Usage.TotalTokens
+	usage.PromptTokens = deepseekResp.Usage.InputTokens
+	usage.CompletionTokens = deepseekResp.Usage.OutputTokens
+	usage.TotalTokens = deepseekResp.Usage.TotalTokens
 
-	c.JSON(http.StatusOK, cohereResp)
+	c.JSON(http.StatusOK, deepseekResp)
 	return nil, &usage
 }
 
@@ -125,13 +147,22 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	}
 	awsModelName = utils.ConvertModelID2CrossRegionProfile(awsModelName, awsCli.Options().Region)
 
-	cohereReq, ok := c.Get(ctxkey.ConvertedRequest)
+	deepseekReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
 		return utils.WrapErr(errors.New("request not found")), nil
 	}
 
-	// Convert Cohere request to Converse API format
-	converseReq, err := convertCohereToConverseStreamRequest(cohereReq.(*Request), awsModelName)
+	// guard against invalid type and empty messages to avoid panics in the streaming path
+	req, ok := deepseekReq.(*Request)
+	if !ok {
+		return utils.WrapErr(errors.New("invalid converted request type")), nil
+	}
+	if len(req.Messages) == 0 {
+		return utils.WrapErr(errors.New("empty messages")), nil
+	}
+
+	// Convert DeepSeek request to Converse API format
+	converseReq, err := convertDeepSeekToConverseStreamRequest(req, awsModelName)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
@@ -166,9 +197,13 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			id = fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c))
 			return true
 
+			// Note: This reasoning and content are streamed together,
+			// so ensure that client-side implementations handle them correctly,
+			// especially in chatbots.
 		case *types.ConverseStreamOutputMemberContentBlockDelta:
 			// Handle content delta - this is where the actual text content comes from ConverseStream
 			if v.Value.Delta != nil {
+				// Create a unified response structure to handle both text and reasoning content
 				var response *openai.ChatCompletionsStreamResponse
 
 				// Check if this is a text delta (AWS SDK union type pattern)
@@ -190,6 +225,31 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 									},
 								},
 							},
+						}
+					}
+				case *types.ContentBlockDeltaMemberReasoningContent:
+					// Handle reasoning content delta - now unified within ContentBlockDelta
+					if deltaValue.Value != nil {
+						switch reasoningDelta := deltaValue.Value.(type) {
+						case *types.ReasoningContentBlockDeltaMemberText:
+							if reasoningText := reasoningDelta.Value; reasoningText != "" {
+								// Create OpenAI-compatible streaming response with reasoning content as separate field
+								response = &openai.ChatCompletionsStreamResponse{
+									Id:      id,
+									Object:  "chat.completion.chunk",
+									Created: createdTime,
+									Model:   c.GetString(ctxkey.RequestModel),
+									Choices: []openai.ChatCompletionsStreamResponseChoice{
+										{
+											Index: 0,
+											Delta: relaymodel.Message{
+												Role:             "assistant",
+												ReasoningContent: &reasoningText,
+											},
+										},
+									},
+								}
+							}
 						}
 					}
 				}
@@ -255,13 +315,14 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	return nil, &usage
 }
 
-func convertStopReason(cohereReason string) *string {
-	if cohereReason == "" {
+// convertStopReason converts DeepSeek stop reason to OpenAI format
+func convertStopReason(deepseekReason string) *string {
+	if deepseekReason == "" {
 		return nil
 	}
 
 	var result string
-	switch cohereReason {
+	switch deepseekReason {
 	case "stop", "end_turn":
 		result = "stop"
 	case "length", "max_tokens":
@@ -272,13 +333,13 @@ func convertStopReason(cohereReason string) *string {
 	return &result
 }
 
-// convertCohereToConverseRequest converts Cohere request to Converse API format for non-streaming
-func convertCohereToConverseRequest(cohereReq *Request, modelID string) (*bedrockruntime.ConverseInput, error) {
+// convertDeepSeekToConverseRequest converts DeepSeek request to Converse API format for non-streaming
+func convertDeepSeekToConverseRequest(deepseekReq *Request, modelID string) (*bedrockruntime.ConverseInput, error) {
 	var converseMessages []types.Message
 	var systemMessages []types.SystemContentBlock
 
 	// Convert messages using standard Converse API format
-	for _, msg := range cohereReq.Messages {
+	for _, msg := range deepseekReq.Messages {
 		switch msg.Role {
 		case "system":
 			// System messages go to the system field in Converse API
@@ -286,7 +347,7 @@ func convertCohereToConverseRequest(cohereReq *Request, modelID string) (*bedroc
 				Value: msg.Content,
 			})
 		case "user":
-			// User messages use standard Converse API format
+			// User messages use standard Converse API format (no special formatting needed)
 			contentBlocks := []types.ContentBlock{
 				&types.ContentBlockMemberText{
 					Value: msg.Content,
@@ -298,7 +359,7 @@ func convertCohereToConverseRequest(cohereReq *Request, modelID string) (*bedroc
 				Content: contentBlocks,
 			})
 		case "assistant":
-			// Assistant messages
+			// Assistant messages don't need special formatting
 			contentBlocks := []types.ContentBlock{
 				&types.ContentBlockMemberText{
 					Value: msg.Content,
@@ -314,21 +375,21 @@ func convertCohereToConverseRequest(cohereReq *Request, modelID string) (*bedroc
 
 	// Create inference configuration
 	inferenceConfig := &types.InferenceConfiguration{}
-	if cohereReq.MaxTokens != 0 {
-		inferenceConfig.MaxTokens = aws.Int32(int32(cohereReq.MaxTokens))
+	if deepseekReq.MaxTokens != 0 {
+		inferenceConfig.MaxTokens = aws.Int32(int32(deepseekReq.MaxTokens))
 	} else {
 		inferenceConfig.MaxTokens = aws.Int32(int32(config.DefaultMaxToken))
 	}
 
-	if cohereReq.Temperature != nil {
-		inferenceConfig.Temperature = aws.Float32(float32(*cohereReq.Temperature))
+	if deepseekReq.Temperature != nil {
+		inferenceConfig.Temperature = aws.Float32(float32(*deepseekReq.Temperature))
 	}
-	if cohereReq.TopP != nil {
-		inferenceConfig.TopP = aws.Float32(float32(*cohereReq.TopP))
+	if deepseekReq.TopP != nil {
+		inferenceConfig.TopP = aws.Float32(float32(*deepseekReq.TopP))
 	}
-	if len(cohereReq.Stop) > 0 {
-		stopSequences := make([]string, len(cohereReq.Stop))
-		copy(stopSequences, cohereReq.Stop)
+	if len(deepseekReq.Stop) > 0 {
+		stopSequences := make([]string, len(deepseekReq.Stop))
+		copy(stopSequences, deepseekReq.Stop)
 		inferenceConfig.StopSequences = stopSequences
 	}
 
@@ -346,9 +407,9 @@ func convertCohereToConverseRequest(cohereReq *Request, modelID string) (*bedroc
 	return converseReq, nil
 }
 
-// convertConverseResponseToCohere converts AWS Converse response to AWS Bedrock format
-func convertConverseResponseToCohere(c *gin.Context, converseResp *bedrockruntime.ConverseOutput, modelName string) *CohereBedrockResponse {
-	var contentBlocks []CohereBedrockContentBlock
+// convertConverseResponseToDeepSeek converts AWS Converse response to AWS Bedrock format
+func convertConverseResponseToDeepSeek(c *gin.Context, converseResp *bedrockruntime.ConverseOutput, modelName string) *DeepSeekBedrockResponse {
+	var contentBlocks []DeepSeekBedrockContentBlock
 	var finishReason string
 
 	// Extract response content from Converse API response
@@ -356,16 +417,30 @@ func convertConverseResponseToCohere(c *gin.Context, converseResp *bedrockruntim
 		switch outputValue := converseResp.Output.(type) {
 		case *types.ConverseOutputMemberMessage:
 			if len(outputValue.Value.Content) > 0 {
-				// Process content blocks
+				// Process content blocks, keeping text and reasoning content separate in content array
 				for _, contentBlock := range outputValue.Value.Content {
 					switch contentValue := contentBlock.(type) {
 					case *types.ContentBlockMemberText:
 						// Add text content block
 						if contentValue.Value != "" {
 							textValue := contentValue.Value
-							contentBlocks = append(contentBlocks, CohereBedrockContentBlock{
+							contentBlocks = append(contentBlocks, DeepSeekBedrockContentBlock{
 								Text: &textValue,
 							})
+						}
+					case *types.ContentBlockMemberReasoningContent:
+						// Handle reasoning content blocks as separate content block
+						if contentValue.Value != nil {
+							switch reasoningBlock := contentValue.Value.(type) {
+							case *types.ReasoningContentBlockMemberReasoningText:
+								if reasoningBlock.Value.Text != nil && *reasoningBlock.Value.Text != "" {
+									contentBlocks = append(contentBlocks, DeepSeekBedrockContentBlock{
+										ReasoningContent: &DeepSeekReasoningContent{
+											ReasoningText: *reasoningBlock.Value.Text,
+										},
+									})
+								}
+							}
 						}
 					}
 				}
@@ -378,20 +453,20 @@ func convertConverseResponseToCohere(c *gin.Context, converseResp *bedrockruntim
 	}
 
 	// Create AWS Bedrock format message with content array
-	message := CohereBedrockMessage{
+	message := DeepSeekBedrockMessage{
 		Role:    "assistant",
 		Content: contentBlocks,
 	}
 
 	// Create AWS Bedrock format choice
-	choice := CohereBedrockChoice{
+	choice := DeepSeekBedrockChoice{
 		Index:        0,
 		Message:      message,
 		FinishReason: finishReason,
 	}
 
-	// Convert usage to Cohere format
-	var usage CohereUsage
+	// Convert usage to DeepSeek format
+	var usage DeepSeekUsage
 	if converseResp.Usage != nil {
 		if converseResp.Usage.InputTokens != nil {
 			usage.InputTokens = int(*converseResp.Usage.InputTokens)
@@ -407,23 +482,23 @@ func convertConverseResponseToCohere(c *gin.Context, converseResp *bedrockruntim
 		}
 	}
 
-	return &CohereBedrockResponse{
+	return &DeepSeekBedrockResponse{
 		ID:      fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c)),
 		Object:  "chat.completion",
 		Created: helper.GetTimestamp(),
 		Model:   modelName,
-		Choices: []CohereBedrockChoice{choice},
+		Choices: []DeepSeekBedrockChoice{choice},
 		Usage:   usage,
 	}
 }
 
-// convertCohereToConverseStreamRequest converts Cohere request to Converse API format for streaming
-func convertCohereToConverseStreamRequest(cohereReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
+// convertDeepSeekToConverseStreamRequest converts DeepSeek request to Converse API format for streaming
+func convertDeepSeekToConverseStreamRequest(deepseekReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
 	var converseMessages []types.Message
 	var systemMessages []types.SystemContentBlock
 
 	// Convert messages using standard Converse API format
-	for _, msg := range cohereReq.Messages {
+	for _, msg := range deepseekReq.Messages {
 		switch msg.Role {
 		case "system":
 			// System messages go to the system field in Converse API
@@ -431,7 +506,7 @@ func convertCohereToConverseStreamRequest(cohereReq *Request, modelID string) (*
 				Value: msg.Content,
 			})
 		case "user":
-			// User messages use standard Converse API format
+			// User messages use standard Converse API format (no special formatting needed)
 			contentBlocks := []types.ContentBlock{
 				&types.ContentBlockMemberText{
 					Value: msg.Content,
@@ -443,7 +518,7 @@ func convertCohereToConverseStreamRequest(cohereReq *Request, modelID string) (*
 				Content: contentBlocks,
 			})
 		case "assistant":
-			// Assistant messages
+			// Assistant messages don't need special formatting
 			contentBlocks := []types.ContentBlock{
 				&types.ContentBlockMemberText{
 					Value: msg.Content,
@@ -459,21 +534,21 @@ func convertCohereToConverseStreamRequest(cohereReq *Request, modelID string) (*
 
 	// Create inference configuration
 	inferenceConfig := &types.InferenceConfiguration{}
-	if cohereReq.MaxTokens != 0 {
-		inferenceConfig.MaxTokens = aws.Int32(int32(cohereReq.MaxTokens))
+	if deepseekReq.MaxTokens != 0 {
+		inferenceConfig.MaxTokens = aws.Int32(int32(deepseekReq.MaxTokens))
 	} else {
 		inferenceConfig.MaxTokens = aws.Int32(int32(config.DefaultMaxToken))
 	}
 
-	if cohereReq.Temperature != nil {
-		inferenceConfig.Temperature = aws.Float32(float32(*cohereReq.Temperature))
+	if deepseekReq.Temperature != nil {
+		inferenceConfig.Temperature = aws.Float32(float32(*deepseekReq.Temperature))
 	}
-	if cohereReq.TopP != nil {
-		inferenceConfig.TopP = aws.Float32(float32(*cohereReq.TopP))
+	if deepseekReq.TopP != nil {
+		inferenceConfig.TopP = aws.Float32(float32(*deepseekReq.TopP))
 	}
-	if len(cohereReq.Stop) > 0 {
-		stopSequences := make([]string, len(cohereReq.Stop))
-		copy(stopSequences, cohereReq.Stop)
+	if len(deepseekReq.Stop) > 0 {
+		stopSequences := make([]string, len(deepseekReq.Stop))
+		copy(stopSequences, deepseekReq.Stop)
 		inferenceConfig.StopSequences = stopSequences
 	}
 
@@ -489,16 +564,4 @@ func convertCohereToConverseStreamRequest(cohereReq *Request, modelID string) (*
 	}
 
 	return converseReq, nil
-}
-
-// ConvertMessages converts relay model message to Cohere message
-func ConvertMessages(messages []relaymodel.Message) []Message {
-	cohereMessages := make([]Message, 0, len(messages))
-	for _, msg := range messages {
-		cohereMessages = append(cohereMessages, Message{
-			Role:    msg.Role,
-			Content: msg.StringContent(),
-		})
-	}
-	return cohereMessages
 }

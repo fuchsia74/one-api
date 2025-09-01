@@ -274,8 +274,14 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		channeltype.XAI:
 		finalRequest, err := adaptor.ConvertImageRequest(c, imageRequest)
 		if err != nil {
+			// Check if this is a validation error and preserve the correct HTTP status code for AWS Bedrock
+			if strings.Contains(err.Error(), "does not support image generation") {
+				return openai.ErrorWrapper(err, "invalid_request_error", http.StatusBadRequest)
+			}
+
 			return openai.ErrorWrapper(err, "convert_image_request_failed", http.StatusInternalServerError)
 		}
+
 		jsonStr, err := json.Marshal(finalRequest)
 		if err != nil {
 			return openai.ErrorWrapper(err, "marshal_image_request_failed", http.StatusInternalServerError)

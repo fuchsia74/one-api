@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { api } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Info } from 'lucide-react'
+import { useNotifications } from '@/components/ui/notifications'
 
 // Helper function to render quota with USD conversion (USD only)
 const renderQuotaWithPrompt = (quota: number): string => {
@@ -18,7 +19,7 @@ const renderQuotaWithPrompt = (quota: number): string => {
   const quotaPerUnit = parseFloat(quotaPerUnitRaw || '500000')
   const usd = Number.isFinite(quota) && quotaPerUnit > 0 ? quota / quotaPerUnit : NaN
   const usdValue = Number.isFinite(usd) ? usd.toFixed(2) : '0.00'
-  console.log('[QUOTA_DEBUG][User] renderQuotaWithPrompt', { quota, quotaPerUnitRaw, quotaPerUnit, usd, usdValue })
+  console.log(`[QUOTA_DEBUG][User] renderQuotaWithPrompt quota=${String(quota)} ratioRaw=${String(quotaPerUnitRaw)} ratio=${String(quotaPerUnit)} usd=${String(usd)} usdValue=${usdValue}`)
   return `$${usdValue}`
 }
 
@@ -49,6 +50,7 @@ export function EditUserPage() {
   const [loading, setLoading] = useState(isEdit)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [groupOptions, setGroupOptions] = useState<Group[]>([])
+  const { notify } = useNotifications()
 
   const form = useForm<UserForm>({
     resolver: zodResolver(userSchema),
@@ -64,7 +66,7 @@ export function EditUserPage() {
 
   const watchQuota = useWatch({ control: form.control, name: 'quota' })
   useEffect(() => {
-    console.log('[QUOTA_DEBUG][User] watchQuota changed:', watchQuota, typeof watchQuota)
+    console.log(`[QUOTA_DEBUG][User] watchQuota=${String(watchQuota)} type=${typeof watchQuota}`)
   }, [watchQuota])
 
   const loadUser = async () => {
@@ -145,15 +147,33 @@ export function EditUserPage() {
         })
       } else {
         form.setError('root', { message: message || 'Operation failed' })
+        notify({ type: 'error', title: 'Request failed', message: message || 'Operation failed' })
       }
     } catch (error) {
       form.setError('root', {
         message: error instanceof Error ? error.message : 'Operation failed'
       })
+      notify({ type: 'error', title: 'Unexpected error', message: error instanceof Error ? error.message : 'Operation failed' })
     } finally {
       setIsSubmitting(false)
     }
   }
+
+  // RHF invalid handler: toast + focus first invalid field
+  const onInvalid = (errors: any) => {
+    const firstKey = Object.keys(errors)[0]
+    const firstMsg = errors[firstKey]?.message || 'Please correct the highlighted fields.'
+    notify({ type: 'error', title: 'Validation error', message: String(firstMsg) })
+    const el = document.querySelector(`[name="${firstKey}"]`) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        ; (el as any).focus?.()
+    }
+  }
+
+  // Error highlighting helpers
+  const hasError = (path: string): boolean => !!(form.formState.errors as any)?.[path]
+  const errorClass = (path: string) => (hasError(path) ? 'border-destructive focus-visible:ring-destructive' : '')
 
   if (loading) {
     return (
@@ -164,231 +184,232 @@ export function EditUserPage() {
             <span className="ml-3">Loading user...</span>
           </CardContent>
         </Card>
-  </div>
+      </div>
     )
   }
 
   return (
     <div className="container mx-auto px-4 py-8">
       <TooltipProvider>
-      <Card>
-        <CardHeader>
-          <CardTitle>{isEdit ? 'Edit User' : 'Create User'}</CardTitle>
-          <CardDescription>
-            {isEdit ? 'Update user information' : 'Create a new user account'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* helper for label + tooltip */}
-              {(() => {
-                // small inline helper component
-                const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      {label}
-                    </span>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
-                    </Tooltip>
-                  </div>
-                )
-                return null
-              })()}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="username"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>Username *</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Username" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Unique login name. Min 3 characters.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input placeholder="Enter username" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="display_name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>Display Name</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Display Name" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Optional human‑readable name shown in the UI.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input placeholder="Enter display name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="email"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>Email</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Email" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Optional contact address for password reset and notifications.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input type="email" placeholder="Enter email" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="password"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>{isEdit ? 'New Password (leave empty to keep current)' : 'Password *'}</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Password" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Minimum length depends on policy. Leave empty when editing to keep unchanged.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input type="password" placeholder="Enter password" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <FormField
-                  control={form.control}
-                  name="quota"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>
-                          {(() => {
-                            const current = watchQuota ?? field.value ?? 0
-                            const numeric = Number(current)
-                            const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
-                            return `Quota (${usdLabel})`
-                          })()}
-                        </FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Quota" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Quota units are tokens. USD estimate uses the per‑unit ratio configured by admin.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input
-                          type="number"
-                          min="0"
-                          {...field}
-                          onChange={(e) => {
-                            console.log('[QUOTA_DEBUG][User] Input onChange', { value: e.target.value })
-                            field.onChange(e)
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="group"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>Group *</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Group" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">User group controls access and model/channel visibility.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Select onValueChange={field.onChange} value={field.value}>
+        <Card>
+          <CardHeader>
+            <CardTitle>{isEdit ? 'Edit User' : 'Create User'}</CardTitle>
+            <CardDescription>
+              {isEdit ? 'Update user information' : 'Create a new user account'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
+                {/* helper for label + tooltip */}
+                {(() => {
+                  // small inline helper component
+                  const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                        {label}
+                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  )
+                  return null
+                })()}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="username"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>Username *</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Username" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Unique login name. Min 3 characters.</TooltipContent>
+                          </Tooltip>
+                        </div>
                         <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a group" />
-                          </SelectTrigger>
+                          <Input placeholder="Enter username" className={errorClass('username')} {...field} />
                         </FormControl>
-                        <SelectContent>
-                          {groupOptions.map((group) => (
-                            <SelectItem key={group.value} value={group.value}>
-                              {group.text}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
 
-              {form.formState.errors.root && (
-                <div className="text-sm text-destructive">
-                  {form.formState.errors.root.message}
+                  <FormField
+                    control={form.control}
+                    name="display_name"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>Display Name</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Display Name" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Optional human‑readable name shown in the UI.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <Input placeholder="Enter display name" className={errorClass('display_name')} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
-              )}
 
-              <div className="flex gap-2">
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting
-                    ? (isEdit ? 'Updating...' : 'Creating...')
-                    : (isEdit ? 'Update User' : 'Create User')
-                  }
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/users')}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-  </TooltipProvider>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>Email</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Email" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Optional contact address for password reset and notifications.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <Input type="email" placeholder="Enter email" className={errorClass('email')} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>{isEdit ? 'New Password (leave empty to keep current)' : 'Password *'}</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Password" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Minimum length depends on policy. Leave empty when editing to keep unchanged.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <Input type="password" placeholder="Enter password" className={errorClass('password')} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <FormField
+                    control={form.control}
+                    name="quota"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>
+                            {(() => {
+                              const current = watchQuota ?? field.value ?? 0
+                              const numeric = Number(current)
+                              const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
+                              return `Quota (${usdLabel})`
+                            })()}
+                          </FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Quota" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Quota units are tokens. USD estimate uses the per‑unit ratio configured by admin.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            className={errorClass('quota')}
+                            {...field}
+                            onChange={(e) => {
+                              console.log(`[QUOTA_DEBUG][User] onChange value=${String(e.target.value)}`)
+                              field.onChange(e)
+                            }}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="group"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>Group *</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Group" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">User group controls access and model/channel visibility.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger className={errorClass('group')}>
+                              <SelectValue placeholder="Select a group" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {groupOptions.map((group) => (
+                              <SelectItem key={group.value} value={group.value}>
+                                {group.text}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+
+                {form.formState.errors.root && (
+                  <div className="text-sm text-destructive">
+                    {form.formState.errors.root.message}
+                  </div>
+                )}
+
+                <div className="flex gap-2">
+                  <Button type="submit" disabled={isSubmitting}>
+                    {isSubmitting
+                      ? (isEdit ? 'Updating...' : 'Creating...')
+                      : (isEdit ? 'Update User' : 'Create User')
+                    }
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/users')}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            </Form>
+          </CardContent>
+        </Card>
+      </TooltipProvider>
     </div>
   )
 }
