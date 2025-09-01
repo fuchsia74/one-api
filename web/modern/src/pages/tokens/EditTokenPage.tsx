@@ -14,6 +14,7 @@ import { api } from '@/lib/api'
 import { logEditPageLayout } from '@/dev/layout-debug'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Info } from 'lucide-react'
+import { useNotifications } from '@/components/ui/notifications'
 
 // Helper function to render quota with USD conversion (USD only)
 const renderQuotaWithPrompt = (quota: number): string => {
@@ -21,7 +22,7 @@ const renderQuotaWithPrompt = (quota: number): string => {
   const quotaPerUnit = parseFloat(quotaPerUnitRaw || '500000')
   const usd = Number.isFinite(quota) && quotaPerUnit > 0 ? quota / quotaPerUnit : NaN
   const usdValue = Number.isFinite(usd) ? usd.toFixed(2) : '0.00'
-  console.log('[QUOTA_DEBUG] renderQuotaWithPrompt', { quota, quotaPerUnitRaw, quotaPerUnit, usd, usdValue })
+  console.log(`[QUOTA_DEBUG] renderQuota quota=${String(quota)} ratioRaw=${String(quotaPerUnitRaw)} ratio=${String(quotaPerUnit)} usd=${String(usd)} usdValue=${usdValue}`)
   return `$${usdValue}`
 }
 
@@ -58,6 +59,7 @@ export function EditTokenPage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modelOptions, setModelOptions] = useState<Model[]>([])
   const [modelSearchTerm, setModelSearchTerm] = useState('')
+  const { notify } = useNotifications()
 
   const form = useForm<TokenForm>({
     resolver: zodResolver(tokenSchema),
@@ -74,7 +76,7 @@ export function EditTokenPage() {
   const watchUnlimitedQuota = form.watch('unlimited_quota')
   const watchRemainQuota = form.watch('remain_quota')
   useEffect(() => {
-    console.log('[QUOTA_DEBUG] watchRemainQuota changed:', watchRemainQuota, typeof watchRemainQuota)
+    console.log(`[QUOTA_DEBUG] watchRemainQuota=${String(watchRemainQuota)} type=${typeof watchRemainQuota}`)
   }, [watchRemainQuota])
 
   const loadToken = async () => {
@@ -195,6 +197,7 @@ export function EditTokenPage() {
         const time = Date.parse(payload.expired_time)
         if (isNaN(time)) {
           form.setError('expired_time', { message: 'Invalid expiration time' })
+          notify({ type: 'error', title: 'Validation error', message: 'Invalid expiration time' })
           return
         }
         payload.expired_time = Math.ceil(time / 1000) as any
@@ -237,15 +240,33 @@ export function EditTokenPage() {
         })
       } else {
         form.setError('root', { message: message || 'Operation failed' })
+        notify({ type: 'error', title: 'Request failed', message: message || 'Operation failed' })
       }
     } catch (error) {
       form.setError('root', {
         message: error instanceof Error ? error.message : 'Operation failed'
       })
+      notify({ type: 'error', title: 'Unexpected error', message: error instanceof Error ? error.message : 'Operation failed' })
     } finally {
       setIsSubmitting(false)
     }
   }
+
+  // RHF invalid handler
+  const onInvalid = (errors: any) => {
+    const firstKey = Object.keys(errors)[0]
+    const firstMsg = errors[firstKey]?.message || 'Please correct the highlighted fields.'
+    notify({ type: 'error', title: 'Validation error', message: String(firstMsg) })
+    const el = document.querySelector(`[name="${firstKey}"]`) as HTMLElement | null
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        ; (el as any).focus?.()
+    }
+  }
+
+  // Error highlighting
+  const hasError = (path: string): boolean => !!(form.formState.errors as any)?.[path]
+  const errorClass = (path: string) => (hasError(path) ? 'border-destructive focus-visible:ring-destructive' : '')
 
   if (loading) {
     return (
@@ -266,254 +287,256 @@ export function EditTokenPage() {
     <>
       {(() => { logEditPageLayout('EditTokenPage'); return null })()}
       <div className="container mx-auto px-4 py-8">
-  <TooltipProvider>
-        <Card>
-          <CardHeader>
-            <CardTitle>{isEdit ? 'Edit Token' : 'Create Token'}</CardTitle>
-            <CardDescription>
-              {isEdit ? 'Update token settings' : 'Create a new API token'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                <FormField
-                  control={form.control}
-                  name="name"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>Token Name</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Token Name" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Human‑readable identifier for this token.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input placeholder="Enter token name" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-1">
-                    <Label>Allowed Models</Label>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Allowed Models" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">Restrict this token to specific models. Leave empty to allow all models available to the user/group.</TooltipContent>
-                    </Tooltip>
-                  </div>
-                  <Input
-                    placeholder="Search models..."
-                    value={modelSearchTerm}
-                    onChange={(e) => setModelSearchTerm(e.target.value)}
-                  />
-                  <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
-                    {filteredModels.map((model) => (
-                      <div key={model.value} className="relative flex items-center space-x-2">
-                        <Checkbox
-                          id={model.value}
-                          checked={selectedModels.includes(model.value)}
-                          onCheckedChange={() => toggleModel(model.value)}
-                        />
-                        <Label htmlFor={model.value} className="flex-1 cursor-pointer">
-                          {model.text}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-1">
-                    {selectedModels.map((model) => (
-                      <Badge
-                        key={model}
-                        variant="secondary"
-                        className="cursor-pointer"
-                        onClick={() => toggleModel(model)}
-                      >
-                        {model} ×
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="subnet"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>IP Restriction (Optional)</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: IP Restriction" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Allow requests only from these IPs or CIDR ranges (e.g., 192.168.1.0/24). Multiple entries are comma‑separated.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input
-                          placeholder="e.g., 192.168.1.0/24 or 10.0.0.1"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="expired_time"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-1">
-                        <FormLabel>Expiration Time</FormLabel>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Expiration Time" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">Set when this token expires. Leave empty for never. Use quick buttons for common durations.</TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <FormControl>
-                        <Input type="datetime-local" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setExpiredTime(0, 0, 0, 0)}
-                  >
-                    Never Expire
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setExpiredTime(1, 0, 0, 0)}
-                  >
-                    1 Month
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setExpiredTime(0, 1, 0, 0)}
-                  >
-                    1 Day
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setExpiredTime(0, 0, 1, 0)}
-                  >
-                    1 Hour
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setExpiredTime(0, 0, 0, 1)}
-                  >
-                    1 Minute
-                  </Button>
-                </div>
-
-                <div className="flex flex-row items-start space-x-3 space-y-0">
-                  <FormControl>
-                    <Checkbox
-                      id="unlimited_quota"
-                      checked={!!watchUnlimitedQuota}
-                      onCheckedChange={(checked) => form.setValue('unlimited_quota', !!checked, { shouldDirty: true })}
-                    />
-                  </FormControl>
-                  <div className="flex items-center gap-1 space-y-0">
-                    <FormLabel htmlFor="unlimited_quota">Unlimited Quota</FormLabel>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Unlimited Quota" />
-                      </TooltipTrigger>
-                      <TooltipContent className="max-w-xs">If enabled, this token ignores remaining quota checks.</TooltipContent>
-                    </Tooltip>
-                  </div>
-                </div>
-
-                <FormField
-                  control={form.control}
-                  name="remain_quota"
-                  render={({ field }) => {
-                    const raw = field.value as any
-                    const fallback = form.getValues('remain_quota') as any
-                    const current = (raw ?? fallback) as any
-                    const numeric = Number(current)
-                    const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
-                    console.log('[QUOTA_DEBUG] field.value:', { raw, fallback, current, numeric, usdLabel, type: typeof raw })
-                    return (
+        <TooltipProvider>
+          <Card>
+            <CardHeader>
+              <CardTitle>{isEdit ? 'Edit Token' : 'Create Token'}</CardTitle>
+              <CardDescription>
+                {isEdit ? 'Update token settings' : 'Create a new API token'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
+                  <FormField
+                    control={form.control}
+                    name="name"
+                    render={({ field }) => (
                       <FormItem>
                         <div className="flex items-center gap-1">
-                          <FormLabel>
-                            Remaining Quota ({usdLabel})
-                          </FormLabel>
+                          <FormLabel>Token Name</FormLabel>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Remaining Quota" />
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Token Name" />
                             </TooltipTrigger>
-                            <TooltipContent className="max-w-xs">Quota is measured in tokens. USD is an estimate based on admin‑configured per‑unit pricing.</TooltipContent>
+                            <TooltipContent className="max-w-xs">Human‑readable identifier for this token.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <Input placeholder="Enter token name" className={errorClass('name')} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-1">
+                      <Label>Allowed Models</Label>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Allowed Models" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">Restrict this token to specific models. Leave empty to allow all models available to the user/group.</TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input
+                      placeholder="Search models..."
+                      value={modelSearchTerm}
+                      onChange={(e) => setModelSearchTerm(e.target.value)}
+                    />
+                    <div className="relative isolate max-h-48 overflow-y-auto border rounded-md p-4 space-y-2">
+                      {filteredModels.map((model) => (
+                        <div key={model.value} className="relative flex items-center space-x-2">
+                          <Checkbox
+                            id={model.value}
+                            checked={selectedModels.includes(model.value)}
+                            onCheckedChange={() => toggleModel(model.value)}
+                          />
+                          <Label htmlFor={model.value} className="flex-1 cursor-pointer">
+                            {model.text}
+                          </Label>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedModels.map((model) => (
+                        <Badge
+                          key={model}
+                          variant="secondary"
+                          className="cursor-pointer"
+                          onClick={() => toggleModel(model)}
+                        >
+                          {model} ×
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="subnet"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>IP Restriction (Optional)</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: IP Restriction" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Allow requests only from these IPs or CIDR ranges (e.g., 192.168.1.0/24). Multiple entries are comma‑separated.</TooltipContent>
                           </Tooltip>
                         </div>
                         <FormControl>
                           <Input
-                            type="number"
-                            min="0"
-                            disabled={watchUnlimitedQuota}
+                            placeholder="e.g., 192.168.1.0/24 or 10.0.0.1"
+                            className={errorClass('subnet')}
                             {...field}
-                            onChange={(e) => {
-                              console.log('[QUOTA_DEBUG] Input onChange', { value: e.target.value })
-                              // Pass original event to RHF (prevents libs reading value.name from breaking)
-                              field.onChange(e)
-                            }}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
-                    )
-                  }}
-                />
+                    )}
+                  />
 
-                {form.formState.errors.root && (
-                  <div className="text-sm text-destructive">
-                    {form.formState.errors.root.message}
+                  <FormField
+                    control={form.control}
+                    name="expired_time"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="flex items-center gap-1">
+                          <FormLabel>Expiration Time</FormLabel>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Expiration Time" />
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">Set when this token expires. Leave empty for never. Use quick buttons for common durations.</TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <FormControl>
+                          <Input type="datetime-local" className={errorClass('expired_time')} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setExpiredTime(0, 0, 0, 0)}
+                    >
+                      Never Expire
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setExpiredTime(1, 0, 0, 0)}
+                    >
+                      1 Month
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setExpiredTime(0, 1, 0, 0)}
+                    >
+                      1 Day
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setExpiredTime(0, 0, 1, 0)}
+                    >
+                      1 Hour
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setExpiredTime(0, 0, 0, 1)}
+                    >
+                      1 Minute
+                    </Button>
                   </div>
-                )}
 
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={isSubmitting}>
-                    {isSubmitting
-                      ? (isEdit ? 'Updating...' : 'Creating...')
-                      : (isEdit ? 'Update Token' : 'Create Token')
-                    }
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate('/tokens')}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
-            </Form>
-          </CardContent>
-  </Card>
-  </TooltipProvider>
+                  <div className="flex flex-row items-start space-x-3 space-y-0">
+                    <FormControl>
+                      <Checkbox
+                        id="unlimited_quota"
+                        checked={!!watchUnlimitedQuota}
+                        onCheckedChange={(checked) => form.setValue('unlimited_quota', !!checked, { shouldDirty: true })}
+                      />
+                    </FormControl>
+                    <div className="flex items-center gap-1 space-y-0">
+                      <FormLabel htmlFor="unlimited_quota">Unlimited Quota</FormLabel>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Unlimited Quota" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">If enabled, this token ignores remaining quota checks.</TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="remain_quota"
+                    render={({ field }) => {
+                      const raw = field.value as any
+                      const fallback = form.getValues('remain_quota') as any
+                      const current = (raw ?? fallback) as any
+                      const numeric = Number(current)
+                      const usdLabel = Number.isFinite(numeric) && numeric >= 0 ? renderQuotaWithPrompt(numeric) : '$0.00'
+                      console.log(`[QUOTA_DEBUG] remainQuota raw=${String(raw)} fallback=${String(fallback)} current=${String(current)} numeric=${String(numeric)} usd=${usdLabel} type=${typeof raw}`)
+                      return (
+                        <FormItem>
+                          <div className="flex items-center gap-1">
+                            <FormLabel>
+                              Remaining Quota ({usdLabel})
+                            </FormLabel>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label="Help: Remaining Quota" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">Quota is measured in tokens. USD is an estimate based on admin‑configured per‑unit pricing.</TooltipContent>
+                            </Tooltip>
+                          </div>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min="0"
+                              disabled={watchUnlimitedQuota}
+                              className={errorClass('remain_quota')}
+                              {...field}
+                              onChange={(e) => {
+                                console.log(`[QUOTA_DEBUG] onChange remain_quota value=${String(e.target.value)}`)
+                                // Pass original event to RHF (prevents libs reading value.name from breaking)
+                                field.onChange(e)
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )
+                    }}
+                  />
+
+                  {form.formState.errors.root && (
+                    <div className="text-sm text-destructive">
+                      {form.formState.errors.root.message}
+                    </div>
+                  )}
+
+                  <div className="flex gap-2">
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting
+                        ? (isEdit ? 'Updating...' : 'Creating...')
+                        : (isEdit ? 'Update Token' : 'Create Token')
+                      }
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/tokens')}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+        </TooltipProvider>
       </div>
     </>
   )

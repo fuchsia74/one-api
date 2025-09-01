@@ -95,7 +95,7 @@ func Relay(c *gin.Context) {
 	lastFailedChannelId := channelId
 	channelName := c.GetString(ctxkey.ChannelName)
 	group := c.GetString(ctxkey.Group)
-	originalModel := c.GetString(ctxkey.OriginalModel)
+	originalModel := c.GetString(ctxkey.RequestModel)
 	go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
 
 	// Record failed relay request metrics
@@ -229,7 +229,7 @@ func Relay(c *gin.Context) {
 		channelName := c.GetString(ctxkey.ChannelName)
 		// Update group and originalModel potentially if changed by middleware, though unlikely for these.
 		group = c.GetString(ctxkey.Group)
-		originalModel = c.GetString(ctxkey.OriginalModel)
+		originalModel = c.GetString(ctxkey.RequestModel)
 		go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
 	}
 

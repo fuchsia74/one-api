@@ -382,7 +382,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 							Id:      id,
 							Object:  "chat.completion.chunk",
 							Created: createdTime,
-							Model:   c.GetString(ctxkey.OriginalModel),
+							Model:   c.GetString(ctxkey.RequestModel),
 							Choices: []openai.ChatCompletionsStreamResponseChoice{
 								{
 									Index: 0,
@@ -415,7 +415,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 				Id:      id,
 				Object:  "chat.completion.chunk",
 				Created: createdTime,
-				Model:   c.GetString(ctxkey.OriginalModel),
+				Model:   c.GetString(ctxkey.RequestModel),
 				Choices: []openai.ChatCompletionsStreamResponseChoice{
 					{
 						Index:        0,
