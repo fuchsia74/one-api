@@ -278,8 +278,10 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			if strings.Contains(err.Error(), "does not support image generation") {
 				return openai.ErrorWrapper(err, "invalid_request_error", http.StatusBadRequest)
 			}
+
 			return openai.ErrorWrapper(err, "convert_image_request_failed", http.StatusInternalServerError)
 		}
+
 		jsonStr, err := json.Marshal(finalRequest)
 		if err != nil {
 			return openai.ErrorWrapper(err, "marshal_image_request_failed", http.StatusInternalServerError)

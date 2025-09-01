@@ -32,18 +32,18 @@ func getAndValidateTextRequest(c *gin.Context, relayMode int) (*relaymodel.Gener
 	// Check for unknown parameters first
 	requestBody, err := common.GetRequestBody(c)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get request body")
 	}
 
 	// Validate for unknown parameters requests
 	if err = validator.ValidateUnknownParameters(requestBody); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unknown parameter validation failed")
 	}
 
 	textRequest := &relaymodel.GeneralOpenAIRequest{}
 	err = common.UnmarshalBodyReusable(c, textRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "failed to unmarshal request body")
 	}
 	if relayMode == relaymode.Moderations && textRequest.Model == "" {
 		textRequest.Model = "text-moderation-latest"
@@ -53,7 +53,7 @@ func getAndValidateTextRequest(c *gin.Context, relayMode int) (*relaymodel.Gener
 	}
 	err = validator.ValidateTextRequest(textRequest, relayMode)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "text request validation failed")
 	}
 	return textRequest, nil
 }
