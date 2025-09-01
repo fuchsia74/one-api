@@ -76,17 +76,29 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 	// Handle stop sequences
 	if textRequest.Stop != nil {
 		if stopSlice, ok := textRequest.Stop.([]interface{}); ok {
-			stopSequences := make([]string, len(stopSlice))
-			for i, stop := range stopSlice {
-				if stopStr, ok := stop.(string); ok {
-					stopSequences[i] = stopStr
+			stopSequences := make([]string, 0, len(stopSlice))
+			for _, stop := range stopSlice {
+				if stopStr, ok := stop.(string); ok && stopStr != "" {
+					stopSequences = append(stopSequences, stopStr)
 				}
 			}
-			llamaRequest.Stop = stopSequences
+			if len(stopSequences) > 0 {
+				llamaRequest.Stop = stopSequences
+			}
 		} else if stopStr, ok := textRequest.Stop.(string); ok {
-			llamaRequest.Stop = []string{stopStr}
+			if stopStr != "" {
+				llamaRequest.Stop = []string{stopStr}
+			}
 		} else if stopSlice, ok := textRequest.Stop.([]string); ok {
-			llamaRequest.Stop = stopSlice
+			filt := stopSlice[:0]
+			for _, s := range stopSlice {
+				if s != "" {
+					filt = append(filt, s)
+				}
+			}
+			if len(filt) > 0 {
+				llamaRequest.Stop = filt
+			}
 		}
 	}
 
@@ -190,9 +202,17 @@ func convertStopReason(awsReason string) *string {
 	switch awsReason {
 	case "max_tokens":
 		result = "length"
+	case "end_turn", "stop_sequence":
+		result = "stop"
+	case "content_filtered":
+		result = "content_filter"
 	default:
+		// Fallback to "stop" to match OpenAI schema expectations.
+		// result = "stop"
+
 		result = awsReason // Return the actual AWS response instead of hardcoded "stop"
 	}
+
 	return &result
 }
 
