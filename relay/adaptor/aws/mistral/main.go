@@ -411,7 +411,7 @@ func handleStreamWithInvokeModel(c *gin.Context, awsCli *bedrockruntime.Client, 
 				id = openaiResp.Id
 			}
 			openaiResp.Id = id
-			openaiResp.Model = c.GetString(ctxkey.OriginalModel)
+			openaiResp.Model = c.GetString(ctxkey.RequestModel)
 			openaiResp.Created = createdTime
 
 			jsonStr, err := json.Marshal(openaiResp)
@@ -489,7 +489,7 @@ func handleStreamWithConverseAPI(c *gin.Context, awsCli *bedrockruntime.Client, 
 							Id:      id,
 							Object:  "chat.completion.chunk",
 							Created: createdTime,
-							Model:   c.GetString(ctxkey.OriginalModel),
+							Model:   c.GetString(ctxkey.RequestModel),
 							Choices: []openai.ChatCompletionsStreamResponseChoice{
 								{
 									Index: 0,
@@ -519,7 +519,7 @@ func handleStreamWithConverseAPI(c *gin.Context, awsCli *bedrockruntime.Client, 
 				Id:      id,
 				Object:  "chat.completion.chunk",
 				Created: createdTime,
-				Model:   c.GetString(ctxkey.OriginalModel),
+				Model:   c.GetString(ctxkey.RequestModel),
 				Choices: []openai.ChatCompletionsStreamResponseChoice{
 					{
 						Index:        0,

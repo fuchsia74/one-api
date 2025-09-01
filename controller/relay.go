@@ -95,7 +95,7 @@ func Relay(c *gin.Context) {
 	lastFailedChannelId := channelId
 	channelName := c.GetString(ctxkey.ChannelName)
 	group := c.GetString(ctxkey.Group)
-	originalModel := c.GetString(ctxkey.OriginalModel)
+	originalModel := c.GetString(ctxkey.RequestModel)
 	go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
 
 	// Record failed relay request metrics
@@ -122,7 +122,7 @@ func Relay(c *gin.Context) {
 	if bizErr.StatusCode == http.StatusRequestEntityTooLarge {
 		// Get the total number of channels for this model/group
 		// and try to retry all channels
-		channels, err := dbmodel.GetChannelsFromCache(group, originalModel)
+	channels, err := dbmodel.GetChannelsFromCache(group, originalModel)
 		if err != nil {
 			retryTimes = 1
 			lg.Debug(fmt.Sprintf("413 error detected, Get channels from cache error: %v", err))
@@ -197,7 +197,7 @@ func Relay(c *gin.Context) {
 		}
 
 		lg.Info(fmt.Sprintf("using channel #%d to retry (remain times %d)", channel.Id, i))
-		middleware.SetupContextForSelectedChannel(c, channel, originalModel)
+	middleware.SetupContextForSelectedChannel(c, channel, originalModel)
 		requestBody, err := common.GetRequestBody(c)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 
@@ -229,7 +229,7 @@ func Relay(c *gin.Context) {
 		channelName := c.GetString(ctxkey.ChannelName)
 		// Update group and originalModel potentially if changed by middleware, though unlikely for these.
 		group = c.GetString(ctxkey.Group)
-		originalModel = c.GetString(ctxkey.OriginalModel)
+	originalModel = c.GetString(ctxkey.RequestModel)
 		go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
 	}
 

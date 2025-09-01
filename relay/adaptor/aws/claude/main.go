@@ -258,7 +258,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 				return true
 			}
 			response.Id = id
-			response.Model = c.GetString(ctxkey.OriginalModel)
+			response.Model = c.GetString(ctxkey.RequestModel)
 			response.Created = createdTime
 
 			for _, choice := range response.Choices {

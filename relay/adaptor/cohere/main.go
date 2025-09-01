@@ -11,6 +11,7 @@ import (
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/render"
 
 	"github.com/gin-gonic/gin"
@@ -170,7 +171,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		}
 
 		response.Id = fmt.Sprintf("chatcmpl-%d", createdTime)
-		response.Model = c.GetString("original_model")
+		response.Model = c.GetString(ctxkey.RequestModel)
 		response.Created = createdTime
 
 		err = render.ObjectData(c, response)

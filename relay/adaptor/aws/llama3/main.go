@@ -233,7 +233,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			}
 			response := StreamResponseLlama2OpenAI(&llamaResp)
 			response.Id = fmt.Sprintf("chatcmpl-%s", random.GetUUID())
-			response.Model = c.GetString(ctxkey.OriginalModel)
+			response.Model = c.GetString(ctxkey.RequestModel)
 			response.Created = createdTime
 			jsonStr, err := json.Marshal(response)
 			if err != nil {
