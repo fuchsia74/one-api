@@ -105,6 +105,14 @@ export function ModelsPage() {
     return maxTokens.toString()
   }
 
+  const formatChannelName = (channelName: string): string => {
+    const colonIndex = channelName.indexOf(':')
+    if (colonIndex !== -1) {
+      return channelName.substring(colonIndex + 1)
+    }
+    return channelName
+  }
+
   const toggleChannelFilter = (channelName: string) => {
     if (selectedChannels.includes(channelName)) {
       setSelectedChannels(selectedChannels.filter(ch => ch !== channelName))
@@ -131,7 +139,7 @@ export function ModelsPage() {
       <Card key={channelName} className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg">
-            {channelName} ({models.length} models)
+            {formatChannelName(channelName)} ({models.length} models)
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -210,7 +218,7 @@ export function ModelsPage() {
                     className="cursor-pointer"
                     onClick={() => toggleChannelFilter(channelName)}
                   >
-                    {channelName} ({Object.keys(modelsData[channelName].models).length})
+                    {formatChannelName(channelName)} ({Object.keys(modelsData[channelName].models).length})
                   </Badge>
                 ))}
               </div>
