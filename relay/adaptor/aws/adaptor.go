@@ -99,7 +99,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	return nil
 }
 
-func (a *Adaptor) ConvertImageRequest(_ *gin.Context, request *model.ImageRequest) (any, error) {
+func (a *Adaptor) ConvertImageRequest(c *gin.Context, request *model.ImageRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
 	}
@@ -110,7 +110,24 @@ func (a *Adaptor) ConvertImageRequest(_ *gin.Context, request *model.ImageReques
 		return nil, errors.Errorf("model '%s' does not support image generation", request.Model)
 	}
 
-	return request, nil
+	// Initialize the AWS adapter based on the model
+	adaptor := GetAdaptor(request.Model)
+	if adaptor == nil {
+		return nil, errors.New("adaptor not found for model: " + request.Model)
+	}
+	a.awsAdapter = adaptor
+
+	// Store the image request in context for the Titan or Canvas adapter to use later
+	c.Set("imageRequest", *request)
+	c.Set(ctxkey.RequestModel, request.Model)
+
+	// For image generation, we need to convert to GeneralOpenAIRequest format
+	// and then let the specific adapter handle the conversion
+	generalRequest := &model.GeneralOpenAIRequest{
+		Model: request.Model,
+	}
+
+	return adaptor.ConvertRequest(c, relaymode.ImagesGenerations, generalRequest)
 }
 
 func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, error) {
@@ -266,6 +283,7 @@ type ProviderCapabilities struct {
 	SupportsTopLogprobs         bool
 	SupportsPrediction          bool
 	SupportsMaxCompletionTokens bool
+	SupportsStop                bool
 	SupportsImageGeneration     bool
 	SupportsEmbedding           bool
 }
@@ -284,6 +302,9 @@ func isImageGenerationModel(modelName string) bool {
 
 // GetModelCapabilities returns the capabilities for a model based on its adapter type and specific model characteristics
 // This function now uses the same model registry as GetModelList for consistency
+//
+// Note: This implementation provides a flexible foundation for future enhancements,
+// allowing for easy addition of model-specific capabilities.
 func GetModelCapabilities(modelName string) ProviderCapabilities {
 	adaptorType := adaptors[modelName]
 	if awsArnMatch != nil && awsArnMatch.MatchString(modelName) {
@@ -319,6 +340,7 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsTopLogprobs:         false,
 			SupportsPrediction:          false,
 			SupportsMaxCompletionTokens: false,
+			SupportsStop:                false, // Claude models use different parameter handling
 			SupportsImageGeneration:     false, // Claude models don't support image generation
 			SupportsEmbedding:           false, // Claude models don't support embedding
 		}
@@ -339,6 +361,7 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsTopLogprobs:         false,
 			SupportsPrediction:          false,
 			SupportsMaxCompletionTokens: false,
+			SupportsStop:                true,  // Llama models support stop parameter
 			SupportsImageGeneration:     false, // Llama models don't support image generation
 			SupportsEmbedding:           false, // Llama models don't support embedding
 		}
@@ -364,6 +387,7 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsTopLogprobs:         false,
 			SupportsPrediction:          false,
 			SupportsMaxCompletionTokens: false,
+			SupportsStop:                true,  // Mistral models support stop parameter
 			SupportsImageGeneration:     false, // Mistral models don't support image generation
 			SupportsEmbedding:           false, // Mistral models don't support embedding
 		}
@@ -536,7 +560,13 @@ func ValidateUnsupportedParameters(request *model.GeneralOpenAIRequest, modelNam
 		})
 	}
 
-	// Note: Support for frequency_penalty and presence_penalty has been removed to reduce the number of if statements.
+	// Check for stop support
+	if request.Stop != nil && !capabilities.SupportsStop {
+		unsupportedParams = append(unsupportedParams, UnsupportedParameter{
+			Name:        "stop",
+			Description: "Stop parameter is not supported by this model",
+		})
+	}
 
 	// If we found unsupported parameters, return an error
 	if len(unsupportedParams) > 0 {

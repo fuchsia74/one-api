@@ -49,6 +49,11 @@ func (a *Adaptor) Init(meta *meta.Meta) {
 func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 	switch meta.ChannelType {
 	case channeltype.Azure:
+		// Azure requires a deployment name (model) in the URL.
+		if strings.TrimSpace(meta.ActualModelName) == "" {
+			return "", errors.Errorf("azure request url build failed: empty ActualModelName for path %q", meta.RequestURLPath)
+		}
+
 		defaultVersion := meta.Config.APIVersion
 
 		// https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/reasoning?tabs=python#api--feature-support
@@ -137,6 +142,12 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	}
 
 	meta := meta.GetByContext(c)
+	// Add debug info for conversion path
+	// This helps diagnose cases where model name may be missing or conversion selects Response API unexpectedly.
+	// Note: use request.Model for origin field and meta.ActualModelName for resolved model.
+	if config.DebugEnabled {
+		// avoid heavy logs by omitting full request body here
+	}
 
 	// Handle direct Response API requests
 	if relayMode == relaymode.ResponseAPI {
@@ -217,12 +228,26 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	// Set both max_tokens and max_completion_tokens for better compatibility
 	// For o-series models, max_tokens must be 0
 	if request.MaxTokens != 0 {
-		// Store the original value before potentially modifying MaxTokens
-		originalMaxTokens := request.MaxTokens
-		request.MaxCompletionTokens = &originalMaxTokens
-		// For o-series models, max_tokens must be set to 0
-		if strings.HasPrefix(meta.ActualModelName, "o") {
-			request.MaxTokens = 0
+		if meta.ChannelType == channeltype.Azure {
+			// Azure does not support setting both max_tokens and max_completion_tokens
+			request.MaxCompletionTokens = nil
+			// For o-series models, Azure still requires max_tokens=0
+			if strings.HasPrefix(meta.ActualModelName, "o") {
+				request.MaxTokens = 0
+			}
+		} else {
+			// Store the original value before potentially modifying MaxTokens
+			originalMaxTokens := request.MaxTokens
+			request.MaxCompletionTokens = &originalMaxTokens
+			// For o-series models, max_tokens must be set to 0
+			if strings.HasPrefix(meta.ActualModelName, "o") {
+				request.MaxTokens = 0
+			}
+		}
+	} else {
+		// Defensive: when Azure, ensure we never send max_completion_tokens by itself
+		if meta.ChannelType == channeltype.Azure {
+			request.MaxCompletionTokens = nil
 		}
 	}
 
@@ -323,6 +348,16 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 			openaiRequest.MaxTokens = 0
 		} else {
 			openaiRequest.MaxTokens = request.MaxTokens
+		}
+	}
+
+	// If target channel is Azure, ensure we do not send both max tokens fields
+	m := meta.GetByContext(c)
+	if m.ChannelType == channeltype.Azure {
+		if openaiRequest.MaxTokens != 0 {
+			openaiRequest.MaxCompletionTokens = nil
+		} else {
+			openaiRequest.MaxCompletionTokens = nil
 		}
 	}
 

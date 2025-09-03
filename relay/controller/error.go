@@ -70,6 +70,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 			},
 		}
 	}
+
 	ErrorWithStatusCode = &model.ErrorWithStatusCode{
 		StatusCode: resp.StatusCode,
 		Error: model.Error{
@@ -81,17 +82,21 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	}
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		ErrorWithStatusCode.Error.Message = fmt.Sprintf("failed to read response body: %+v\n\n", err) + ErrorWithStatusCode.Error.Message
 		return
 	}
+
 	// Intentionally avoid global logger here; use context variant where possible.
 	err = resp.Body.Close()
 	if err != nil {
+		ErrorWithStatusCode.Error.Message = fmt.Sprintf("failed to close response body: %+v\n\n", err) + ErrorWithStatusCode.Error.Message
 		return
 	}
+
 	var errResponse GeneralErrorResponse
 	err = json.Unmarshal(responseBody, &errResponse)
 	if err != nil {
-		errResponse.Error.Message = string(responseBody)
+		ErrorWithStatusCode.Error.Message = fmt.Sprintf("failed to unmarshal response body: %+v\n\n", err) + ErrorWithStatusCode.Error.Message + string(responseBody)
 		return
 	}
 
@@ -105,6 +110,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	if ErrorWithStatusCode.Error.Message == "" {
 		ErrorWithStatusCode.Error.Message = fmt.Sprintf("bad response status code %d", resp.StatusCode)
 	}
+
 	return
 }
 

@@ -63,7 +63,10 @@
 }
 
 @layer base {
-	html, body, #root {
+
+	html,
+	body,
+	#root {
 		/* Ensure the app uses dynamic viewport height on mobile to prevent extra blank space */
 		min-height: 100dvh;
 		/* Fallback for older browsers */
@@ -71,6 +74,7 @@
 		height: auto;
 		margin: 0;
 	}
+
 	* {
 		@apply border-border;
 	}
@@ -133,10 +137,37 @@
 		@apply border-red-300 bg-red-50;
 	}
 
-		/* Prevent absolutely-positioned descendants (e.g., injected inputs) from stretching document height */
-		.bounded-abs *[style*="position: absolute"],
-		.bounded-abs input[type="checkbox"][style*="position: absolute"] {
-			position: absolute !important;
-			inset: auto auto auto auto; /* do not push layout */
+	/* Date picker icon fixes for dark theme */
+	.dark input[type="date"]::-webkit-calendar-picker-indicator {
+		filter: invert(1);
+		opacity: 0.8;
+	}
+
+	.dark input[type="time"]::-webkit-calendar-picker-indicator {
+		filter: invert(1);
+		opacity: 0.8;
+	}
+
+	.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+		filter: invert(1);
+		opacity: 0.8;
+	}
+
+	/* Firefox date picker icon fix for dark theme */
+	@supports (-moz-appearance: none) {
+
+		.dark input[type="date"],
+		.dark input[type="time"],
+		.dark input[type="datetime-local"] {
+			color-scheme: dark;
 		}
+	}
+
+	/* Prevent absolutely-positioned descendants (e.g., injected inputs) from stretching document height */
+	.bounded-abs *[style*="position: absolute"],
+	.bounded-abs input[type="checkbox"][style*="position: absolute"] {
+		position: absolute !important;
+		inset: auto auto auto auto;
+		/* do not push layout */
+	}
 }
