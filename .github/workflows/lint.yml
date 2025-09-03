@@ -53,13 +53,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: web/modern
-        run: npm install --no-audit --no-fund
+        run: yarn install --network-timeout 600000
 
       - name: Run tests
         working-directory: web/modern
         env:
           CI: true
-        run: npm run test -- --run --passWithNoTests
+        run: yarn test --run --passWithNoTests
 
   air_frontend_tests:
     name: Frontend tests (air)
@@ -77,13 +77,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: web/air
-        run: npm ci --no-audit --no-fund
+        run: yarn install --network-timeout 600000
 
       - name: Run tests
         working-directory: web/air
         env:
           CI: true
-        run: npm test -- --watchAll=false --passWithNoTests
+        run: yarn test --watchAll=false --passWithNoTests
 
   berry_frontend_tests:
     name: Frontend tests (berry)
@@ -101,13 +101,13 @@ jobs:
 
       - name: Install dependencies
         working-directory: web/berry
-        run: npm ci --no-audit --no-fund
+        run: yarn install --network-timeout 600000
 
       - name: Run tests
         working-directory: web/berry
         env:
           CI: true
-        run: npm test -- --watchAll=false --passWithNoTests
+        run: yarn test --watchAll=false --passWithNoTests
 
   code_coverage:
     name: "Code coverage report"
