@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -85,7 +86,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	req.Header.Set("Authorization", "Bearer "+meta.APIKey)
 	// Note: This may need to be modified for the identifier "openrouter".
 	req.Header.Set("HTTP-Referer", "https://github.com/Laisky/one-api")
-	req.Header.Set("X-Title", "One API Stable")
+	req.Header.Set("X-Title", config.SystemName) // use system name
 
 	// OpenRouter header setup never fails, so we always return nil
 	return nil
