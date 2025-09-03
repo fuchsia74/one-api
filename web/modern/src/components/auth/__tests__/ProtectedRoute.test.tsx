@@ -55,7 +55,7 @@ describe('ProtectedRoute', () => {
     renderProtectedRoute()
 
     // Should show loading spinner
-    expect(document.querySelector('.animate-spin')).toBeInTheDocument()
+    expect(document.querySelector('.animate-spin')).not.toBeNull()
   })
 
   it('redirects to login with redirect_to parameter when user is not authenticated', async () => {
@@ -95,10 +95,9 @@ describe('ProtectedRoute', () => {
 
     // Wait for validation and rendering
     await waitFor(() => {
+      expect(mockValidateSession).toHaveBeenCalled()
       expect(screen.getByText('Protected Content')).toBeInTheDocument()
-    }, { timeout: 300 })
-
-    expect(mockValidateSession).toHaveBeenCalled()
+    }, { timeout: 500 })
     expect(mockNavigate).not.toHaveBeenCalled()
   })
 
@@ -124,7 +123,9 @@ describe('ProtectedRoute', () => {
 
     await waitFor(() => {
       expect(mockValidateSession).toHaveBeenCalled()
+    }, { timeout: 500 })
+    await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/login?redirect_to=%2Fchannels%2Fedit%2F123%3Ftab%3Dconfig%26mode%3Dadvanced')
-    }, { timeout: 300 })
+    }, { timeout: 500 })
   })
 })

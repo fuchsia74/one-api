@@ -109,7 +109,13 @@ export function TopUpPage() {
       if (userData) {
         url.searchParams.append('username', userData.username)
         url.searchParams.append('user_id', userData.id.toString())
-        url.searchParams.append('transaction_id', crypto.randomUUID())
+        const uuid = (globalThis as any).crypto?.randomUUID?.() ??
+          'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+            const r = (Math.random() * 16) | 0
+            const v = c === 'x' ? r : (r & 0x3) | 0x8
+            return v.toString(16)
+          })
+        url.searchParams.append('transaction_id', uuid)
       }
       window.open(url.toString(), '_blank')
     } catch (error) {

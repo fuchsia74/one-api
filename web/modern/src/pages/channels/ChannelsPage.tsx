@@ -119,6 +119,7 @@ export function ChannelsPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [bulkTesting, setBulkTesting] = useState(false)
   const initializedRef = useRef(false)
+  const skipFirstSortEffect = useRef(true)
 
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
@@ -220,6 +221,12 @@ export function ChannelsPage() {
 
   // Handle sort changes (only after initialization)
   useEffect(() => {
+    // Skip the very first run to avoid duplicating the initial load
+    if (skipFirstSortEffect.current) {
+      skipFirstSortEffect.current = false
+      return
+    }
+
     if (!initializedRef.current) return
 
     if (searchKeyword.trim()) {
@@ -488,8 +495,8 @@ export function ChannelsPage() {
 
   const handlePageSizeChange = (newPageSize: number) => {
     setPageSize(newPageSize)
-    setPageIndex(0)
     // Don't call load here - let onPageChange handle it to avoid duplicate API calls
+    setPageIndex(0)
   }
 
   const handleSortChange = (newSortBy: string, newSortOrder: 'asc' | 'desc') => {

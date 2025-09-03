@@ -123,25 +123,32 @@ export function AdvancedPagination({
             "flex items-center gap-2",
             isMobile ? "order-3 justify-center" : ""
           )}>
-            <span className={cn(
-              "text-muted-foreground whitespace-nowrap",
-              isMobile ? "text-xs" : "text-sm"
-            )}>
+            <span
+              aria-hidden="true"
+              className={cn(
+                "text-muted-foreground whitespace-nowrap",
+                isMobile ? "text-xs" : "text-sm"
+              )}
+            >
               {isMobile ? "Per page:" : "Rows per page:"}
             </span>
             <Select
               value={pageSize.toString()}
               onValueChange={handlePageSizeChange}
               disabled={loading}
+              aria-label="Rows per page"
             >
-              <SelectTrigger className={cn(
+              <SelectTrigger
+                aria-label="Rows per page"
+                className={cn(
                 isMobile ? "h-8 w-14" : "h-8 w-16"
-              )}>
+                )}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {pageSizeOptions.map((size) => (
-                  <SelectItem key={size} value={size.toString()}>
+                  <SelectItem key={size} value={size.toString()} aria-label={`${size}`}>
                     {size}
                   </SelectItem>
                 ))}
@@ -202,6 +209,7 @@ export function AdvancedPagination({
                   size="sm"
                   onClick={() => handlePageChange(page)}
                   disabled={loading}
+                  aria-label={`Page ${page}`}
                   className={cn(
                     "h-8 p-0 touch-target",
                     isMobile ? "w-10 text-sm" : "w-8"

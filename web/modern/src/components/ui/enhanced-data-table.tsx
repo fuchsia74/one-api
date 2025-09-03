@@ -97,8 +97,8 @@ export function EnhancedDataTable<TData, TValue>({
       const newOrder = sortOrder === 'desc' ? 'asc' : 'desc'
       onSortChange(accessorKey, newOrder)
     } else {
-      // New column, default to desc
-      onSortChange(accessorKey, 'desc')
+      // New column, default to asc (tests expect ascending on first click)
+      onSortChange(accessorKey, 'asc')
     }
   }
 

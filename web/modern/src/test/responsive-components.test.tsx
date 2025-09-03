@@ -88,9 +88,11 @@ describe('Responsive Components', () => {
   })
 })
 
+import { useResponsive } from '@/hooks/useResponsive'
+import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
+
 describe('Responsive Hooks', () => {
   it('should provide responsive state', () => {
-    const { useResponsive } = require('@/hooks/useResponsive')
     const state = useResponsive()
 
     expect(state).toHaveProperty('isMobile')
@@ -105,7 +107,6 @@ describe('Responsive Hooks', () => {
 
 describe('Enhanced Data Table', () => {
   it('should handle responsive props', () => {
-    const { EnhancedDataTable } = require('@/components/ui/enhanced-data-table')
 
     const columns = [
       { header: 'Name', accessorKey: 'name' },

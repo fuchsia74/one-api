@@ -3,6 +3,9 @@ import { BrowserRouter } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { ChannelsPage } from '../ChannelsPage'
 import { api } from '@/lib/api'
+vi.mock('@/components/ui/notifications', () => ({
+  useNotifications: () => ({ notify: vi.fn() })
+}))
 
 // Mock the API
 vi.mock('@/lib/api', () => ({
@@ -66,7 +69,7 @@ describe('ChannelsPage Pagination', () => {
     renderChannelsPage()
 
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=0&size=20&sort=id&order=desc')
+      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=0&size=10&sort=id&order=desc')
     })
 
     // Allow for the initialization fix - may still have 2 calls during transition
@@ -88,13 +91,13 @@ describe('ChannelsPage Pagination', () => {
     const pageSizeSelect = screen.getByRole('combobox', { name: /rows per page/i })
     fireEvent.click(pageSizeSelect)
 
-    // Select 10 rows per page
-    const option10 = screen.getByRole('option', { name: '10' })
-    fireEvent.click(option10)
+    // Select 20 rows per page (different from default 10)
+    const option20 = screen.getByRole('option', { name: '20' })
+    fireEvent.click(option20)
 
     // Wait for the API call
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=0&size=10&sort=id&order=desc')
+      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=0&size=20&sort=id&order=desc')
     })
 
     // Should only make ONE API call, not multiple
@@ -113,12 +116,12 @@ describe('ChannelsPage Pagination', () => {
     mockApiGet.mockClear()
 
     // Find and click page 2
-    const page2Button = screen.getByRole('button', { name: '2' })
+    const page2Button = screen.getByRole('button', { name: 'Page 2' })
     fireEvent.click(page2Button)
 
     // Wait for the API call
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=1&size=20&sort=id&order=desc')
+      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=1&size=10&sort=id&order=desc')
     })
 
     expect(mockApiGet).toHaveBeenCalledTimes(1)
@@ -141,7 +144,7 @@ describe('ChannelsPage Pagination', () => {
 
     // Wait for the API call
     await waitFor(() => {
-      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=0&size=20&sort=name&order=asc')
+      expect(mockApiGet).toHaveBeenCalledWith('/api/channel/?p=0&size=10&sort=name&order=asc')
     })
 
     expect(mockApiGet).toHaveBeenCalledTimes(1)

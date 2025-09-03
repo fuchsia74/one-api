@@ -10,9 +10,6 @@ vi.mock('@/lib/api', () => {
   return { api: { get, post, defaults: { withCredentials: true }, interceptors: { request: { use: vi.fn() }, response: { use: vi.fn() } } } }
 })
 
-// Provide minimal global.crypto mock for randomUUID usage in test env
-;(globalThis as any).crypto = (globalThis as any).crypto || {}
-;(globalThis as any).crypto.randomUUID = (globalThis as any).crypto.randomUUID || (() => '00000000-0000-4000-8000-000000000000')
 
 describe('TopUpPage', () => {
   beforeEach(() => {
