@@ -66,8 +66,9 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	)
 	ctx := gmw.Ctx(c)
 	ctx = gmw.SetLogger(ctx, lg)
+
 	// Log upstream request for billing tracking
-	lg.Info("sending request to upstream channel")
+	lg.Debug("sending request to upstream channel")
 
 	// Optionally: Record when request is forwarded to upstream (non-standard event)
 	tracing.RecordTraceTimestamp(c, model.TimestampRequestForwarded)
@@ -86,6 +87,7 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 			zap.String("url", fullRequestURL),
 		)
 	}
+
 	return resp, nil
 }
 
