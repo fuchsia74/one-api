@@ -55,6 +55,10 @@ func TestChannelSpecificConversion(t *testing.T) {
 				RequestURLPath: "/v1/chat/completions",
 				BaseURL:        "https://api.openai.com",
 			}
+			// Azure requires a deployment/model name in the URL; set a dummy one for the test
+			if tc.channelType == channeltype.Azure {
+				testMeta.ActualModelName = "gpt-4o-mini"
+			}
 			c.Set("meta", testMeta)
 
 			// Create adaptor
