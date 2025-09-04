@@ -154,7 +154,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
 	}
-	awsModelName = utils.ConvertModelID2CrossRegionProfile(awsModelName, awsCli.Options().Region)
+	awsModelName = utils.ConvertModelID2CrossRegionProfile(gmw.Ctx(c), awsModelName, awsCli.Options().Region)
 
 	mistralReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {
@@ -336,7 +336,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "awsModelID")), nil
 	}
-	awsModelName = utils.ConvertModelID2CrossRegionProfile(awsModelName, awsCli.Options().Region)
+	awsModelName = utils.ConvertModelID2CrossRegionProfile(gmw.Ctx(c), awsModelName, awsCli.Options().Region)
 
 	mistralReq, ok := c.Get(ctxkey.ConvertedRequest)
 	if !ok {

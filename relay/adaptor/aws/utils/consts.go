@@ -2,12 +2,13 @@ package utils
 
 import (
 	"context"
-	"fmt"
 	"slices"
 	"strings"
 	"sync"
 	"time"
 
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 
@@ -200,7 +201,7 @@ func getRegionPrefix(region string) string {
 		// Canadian and South American regions typically use US inference profiles
 		return "us"
 	default:
-		logger.Logger.Debug(fmt.Sprintf("unknown region prefix for region: %s", region))
+		logger.Logger.Debug("unknown region prefix", zap.String("region", region))
 		return ""
 	}
 }
@@ -272,43 +273,46 @@ func testModelAvailability(ctx context.Context, client *bedrockruntime.Client, m
 
 // ConvertModelID2CrossRegionProfile converts the model ID to a cross-region profile ID.
 // Enhanced version that uses aws-sdk-go-v2 patterns and includes availability testing.
-func ConvertModelID2CrossRegionProfile(model, region string) string {
+func ConvertModelID2CrossRegionProfile(ctx context.Context, model, region string) string {
+	lg := gmw.GetLogger(ctx)
 
 	regionPrefix := getRegionPrefix(region)
 	if regionPrefix == "" {
-		logger.Logger.Debug(fmt.Sprintf("unsupported region for cross-region inference: %s", region))
+		lg.Debug("unsupported region for cross-region inference", zap.String("region", region))
 		return model
 	}
 
 	newModelID := regionPrefix + "." + model
 	if slices.Contains(CrossRegionInferences, newModelID) {
-		logger.Logger.Debug(fmt.Sprintf("convert model %s to cross-region profile %s", model, newModelID))
+		lg.Debug("convert model to cross-region profile", zap.String("model", model), zap.String("cross_region_profile", newModelID))
 		return newModelID
 	}
 
-	logger.Logger.Debug(fmt.Sprintf("no cross-region profile found for model %s in region %s", model, region))
+	lg.Debug("no cross-region profile found", zap.String("model", model), zap.String("region", region))
 	return model
 }
 
 // ConvertModelID2CrossRegionProfileWithFallback provides enhanced conversion with runtime availability testing
 func ConvertModelID2CrossRegionProfileWithFallback(ctx context.Context, model, region string, client *bedrockruntime.Client) string {
+	lg := gmw.GetLogger(ctx)
+
 	// Try cross-region profile first
-	crossRegionModel := ConvertModelID2CrossRegionProfile(model, region)
+	crossRegionModel := ConvertModelID2CrossRegionProfile(ctx, model, region)
 
 	// If we got a cross-region profile and have a client, test availability
 	if crossRegionModel != model && client != nil {
 		if TestInferenceProfileAvailability(ctx, client, crossRegionModel) {
-			logger.Logger.Debug(fmt.Sprintf("cross-region profile %s is available", crossRegionModel))
+			lg.Debug("cross-region profile available", zap.String("cross_region_profile", crossRegionModel))
 			return crossRegionModel
 		}
-		logger.Logger.Debug(fmt.Sprintf("cross-region profile %s not available, falling back to original model", crossRegionModel))
+		lg.Debug("cross-region profile not available, falling back", zap.String("cross_region_profile", crossRegionModel))
 		return model
 	}
 
 	// If no client provided, return the cross-region profile anyway (best effort)
 	// This allows the system to still attempt cross-region inference
 	if crossRegionModel != model {
-		logger.Logger.Debug(fmt.Sprintf("no client provided for availability testing, using cross-region profile %s", crossRegionModel))
+		lg.Debug("no client for availability testing, using cross-region profile", zap.String("cross_region_profile", crossRegionModel))
 		return crossRegionModel
 	}
 

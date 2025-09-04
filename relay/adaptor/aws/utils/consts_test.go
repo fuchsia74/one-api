@@ -39,6 +39,8 @@ func TestGetRegionPrefix(t *testing.T) {
 }
 
 func TestConvertModelID2CrossRegionProfile(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name     string
 		model    string
@@ -79,7 +81,7 @@ func TestConvertModelID2CrossRegionProfile(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := ConvertModelID2CrossRegionProfile(tt.model, tt.region)
+			result := ConvertModelID2CrossRegionProfile(ctx, tt.model, tt.region)
 			if result != tt.expected {
 				t.Errorf("ConvertModelID2CrossRegionProfile(%s, %s) = %s, want %s",
 					tt.model, tt.region, result, tt.expected)
@@ -142,7 +144,7 @@ func TestConvertModelID2CrossRegionProfileWithFallback(t *testing.T) {
 	}
 
 	// Test that static conversion works independently
-	staticResult := ConvertModelID2CrossRegionProfile(model, region)
+	staticResult := ConvertModelID2CrossRegionProfile(ctx, model, region)
 	if staticResult != expected {
 		t.Errorf("Static conversion = %s, want %s", staticResult, expected)
 	}
@@ -183,12 +185,13 @@ func TestCrossRegionInferencesValidation(t *testing.T) {
 }
 
 func BenchmarkConvertModelID2CrossRegionProfile(b *testing.B) {
+	ctx := context.Background()
 	model := "anthropic.claude-3-haiku-20240307-v1:0"
 	region := "us-east-1"
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		ConvertModelID2CrossRegionProfile(model, region)
+		ConvertModelID2CrossRegionProfile(ctx, model, region)
 	}
 }
 

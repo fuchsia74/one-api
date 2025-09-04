@@ -62,7 +62,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	for scanner.Scan() {
 		data := openai_compatible.NormalizeDataLine(scanner.Text())
 
-		// logger.Logger.Debug(fmt.Sprintf("stream response: %s", data))
+		lg.Debug("stream response", zap.String("event", data))
 
 		// Skip lines that don't match expected format
 		if len(data) < dataPrefixLength {

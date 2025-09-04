@@ -794,7 +794,7 @@ func ClaudeNativeStreamHandler(c *gin.Context, resp *http.Response) (*model.Erro
 		data = strings.TrimPrefix(data, "data:")
 		data = strings.TrimSpace(data)
 
-		logger.Debug(fmt.Sprintf("stream <- %q\n", data))
+		logger.Debug("stream received", zap.String("data", data))
 
 		// For Claude native streaming, we pass through the events directly
 		c.Writer.Write([]byte("data: " + data + "\n\n"))
@@ -861,7 +861,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		data = strings.TrimPrefix(data, "data:")
 		data = strings.TrimSpace(data)
 
-		logger.Debug(fmt.Sprintf("stream <- %q\n", data))
+		logger.Debug("stream received", zap.String("data", data))
 
 		var claudeResponse StreamResponse
 		err := json.Unmarshal([]byte(data), &claudeResponse)
