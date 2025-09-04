@@ -130,4 +130,7 @@ type StreamResponse struct {
 	ContentBlock *Content  `json:"content_block"`
 	Delta        *Delta    `json:"delta"`
 	Usage        *Usage    `json:"usage"`
+	// Error events are sent over SSE as {"type":"error","error":{...},"request_id":"..."}
+	Error     Error  `json:"error,omitempty"`
+	RequestId string `json:"request_id,omitempty"`
 }

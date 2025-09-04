@@ -643,6 +643,8 @@ func StreamResponseClaude2OpenAI(c *gin.Context, claudeResponse *StreamResponse)
 	case "ping",
 		"message_stop",
 		"content_block_stop":
+	case "error":
+		// handled by caller (StreamHandler)
 	default:
 		logger.Error("unknown stream response type", zap.String("type", claudeResponse.Type))
 	}
@@ -866,6 +868,28 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		if err != nil {
 			logger.Error("error unmarshalling stream response", zap.Error(err))
 			continue
+		}
+
+		// If upstream sends an error event, forward as OpenAI-style error chunk and terminate stream
+		if claudeResponse.Type == "error" && claudeResponse.Error.Type != "" {
+			// Build an OpenAI-style error object for consistency
+			openaiErr := struct {
+				Error struct {
+					Message string `json:"message"`
+					Type    string `json:"type"`
+					Code    string `json:"code"`
+				} `json:"error"`
+			}{}
+			openaiErr.Error.Message = claudeResponse.Error.Message
+			openaiErr.Error.Type = claudeResponse.Error.Type
+			openaiErr.Error.Code = claudeResponse.Error.Type
+			// Emit once and close the stream
+			if e := render.ObjectData(c, openaiErr); e != nil {
+				logger.Error("error rendering stream error response", zap.Error(e))
+			}
+			render.Done(c)
+			_ = resp.Body.Close()
+			return nil, &usage
 		}
 
 		response, meta := StreamResponseClaude2OpenAI(c, &claudeResponse)
