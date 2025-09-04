@@ -48,10 +48,13 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	// set beta headers for specific models
 	var betaHeaders []string
 
-	// https://x.com/alexalbert__/status/1812921642143900036
-	// claude-3-5-sonnet can support 8k context
+	// https://docs.anthropic.com/en/docs/about-claude/models/overview
+	// claude-3-7-sonnet can support 128k context
 	if strings.HasPrefix(meta.ActualModelName, "claude-3-7-sonnet") {
-		betaHeaders = append(betaHeaders, "output-128k-2024-11-06")
+		betaHeaders = append(betaHeaders, "output-128k-2025-02-19")
+	}
+	if strings.HasPrefix(meta.ActualModelName, "claude-4-sonnet") {
+		betaHeaders = append(betaHeaders, "context-1m-2025-08-07")
 	}
 
 	if strings.HasPrefix(meta.ActualModelName, "claude-4") {
