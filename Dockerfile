@@ -85,6 +85,35 @@ FROM --platform=$TARGETPLATFORM ubuntu:24.04
 ARG TARGETARCH=amd64
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Configure robust apt settings with aggressive retries and multiple mirrors
+RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::ftp::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'Acquire::Check-Valid-Until "false";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'APT::Get::Assume-Yes "true";' >> /etc/apt/apt.conf.d/80-retries && \
+    echo 'APT::Install-Recommends "false";' >> /etc/apt/apt.conf.d/80-retries
+
+# Use multiple CDN and geographic mirrors for better reliability
+RUN printf "deb http://us.archive.ubuntu.com/ubuntu noble main restricted universe multiverse\n\
+deb http://mirror.math.princeton.edu/pub/ubuntu noble main restricted universe multiverse\n\
+deb https://mirrors.kernel.org/ubuntu noble main restricted universe multiverse\n\
+deb http://us.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse\n\
+deb http://mirror.math.princeton.edu/pub/ubuntu noble-updates main restricted universe multiverse\n\
+deb https://mirrors.kernel.org/ubuntu noble-updates main restricted universe multiverse\n\
+deb http://us.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse\n\
+deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse\n\
+deb https://mirrors.kernel.org/ubuntu noble-security main restricted universe multiverse\n" > /etc/apt/sources.list
+
+# Install packages with retry mechanism and cleanup in single layer
+RUN for i in 1 2 3; do \
+        apt-get update && \
+        apt-get install -y --no-install-recommends ca-certificates tzdata bash haveged && \
+        apt-get clean && \
+        rm -rf /var/lib/apt/lists/* && \
+        break || \
+        (echo "Attempt $i failed, retrying..." && sleep 10); \
+    done
+
 # Install basic requirements without triggering libc-bin reconfiguration
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates tzdata bash haveged && \
