@@ -157,6 +157,15 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 }
 
 func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Reader) (*http.Response, error) {
+	// AWS Bedrock doesn't use HTTP requests - it uses the AWS SDK directly
+	// For Claude Messages API, we should return nil to indicate DoResponse should handle everything
+	// But we need to ensure the controller doesn't try to access a nil response
+	if a.awsAdapter == nil {
+		return nil, errors.New("AWS sub-adapter not initialized")
+	}
+
+	// For AWS Bedrock, we don't make HTTP requests - we use the AWS SDK directly
+	// Return nil response to indicate DoResponse should handle the entire flow
 	return nil, nil
 }
 
