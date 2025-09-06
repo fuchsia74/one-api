@@ -77,9 +77,10 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN set -e; \
         printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries; \
-        # Supplemental mirrors (keep defaults) for resilience
-        echo 'deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse' > /etc/apt/sources.list.d/99-extra.list; \
-        echo 'deb https://mirrors.kernel.org/ubuntu noble main restricted universe multiverse' >> /etc/apt/sources.list.d/99-extra.list; \
+        if [ "$TARGETARCH" = "amd64" ]; then \
+            echo 'deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse' > /etc/apt/sources.list.d/99-extra.list; \
+            echo 'deb https://mirrors.kernel.org/ubuntu noble main restricted universe multiverse' >> /etc/apt/sources.list.d/99-extra.list; \
+        fi; \
         apt-get update; \
         apt-get install -y --no-install-recommends \
                 ca-certificates tzdata curl libsqlite3-0; \
