@@ -5,7 +5,7 @@
 
 ARG NODE_IMAGE=node:24-bookworm
 ARG GO_IMAGE=golang:1.25.0-bookworm
-ARG FFMPEG_IMAGE=jrottenberg/ffmpeg:6.1.2-ubuntu2404
+ARG FFMPEG_IMAGE=linuxserver/ffmpeg:latest
 
 #############################
 # Stage 1: Frontend build   #
@@ -35,7 +35,7 @@ RUN set -e; export REACT_APP_VERSION=$(cat VERSION); \
 ############################
 # Stage 2: Go build        #
 ############################
-FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS go-builder
+FROM --platform=$TARGETPLATFORM ${GO_IMAGE} AS go-builder
 ARG TARGETOS
 ARG TARGETARCH
 ENV TZ=Etc/UTC \
