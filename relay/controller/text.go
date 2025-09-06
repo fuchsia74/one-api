@@ -96,7 +96,8 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// based on proprietary systems such as OpenAI, etc.
 		switch {
 		case strings.Contains(err.Error(), "validation failed"),
-			strings.Contains(err.Error(), "does not support embedding"):
+			strings.Contains(err.Error(), "does not support embedding"),
+			strings.Contains(err.Error(), "does not support the v1/messages endpoint"):
 			return openai.ErrorWrapper(err, "invalid_request_error", http.StatusBadRequest)
 		default:
 			return openai.ErrorWrapper(err, "convert_request_failed", http.StatusInternalServerError)
