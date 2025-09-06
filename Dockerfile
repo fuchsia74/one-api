@@ -1,135 +1,106 @@
-# * for amd64: docker build -t ppcelery/one-api:arm64-latest .
-# * for arm64: DOCKER_BUILDKIT=1 docker build --platform linux/arm64 --build-arg TARGETARCH=arm64 -t ppcelery/one-api:arm64-latest .
-FROM --platform=$TARGETPLATFORM node:24-bookworm AS builder
+## syntax=docker/dockerfile:1.7
+# Multi-stage build for one-api with web UI and ffmpeg support
+# Usage examples:
+#   docker buildx build --platform linux/amd64,linux/arm64 -t yourrepo/one-api:latest .
 
-RUN npm install -g npm react-scripts
+ARG NODE_IMAGE=node:24-bookworm
+ARG GO_IMAGE=golang:1.25.0-bookworm
+ARG FFMPEG_IMAGE=jrottenberg/ffmpeg:6.1.2-ubuntu2404
 
+############################
+# Stage 1: Frontend build   #
+############################
+FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS web-builder
 WORKDIR /web
-COPY ./VERSION .
-COPY ./web .
 
-# Install dependencies for each project
-# do not build parallel to avoid OOM on github actions
-RUN cd /web/default && yarn install --network-timeout 600000
-RUN cd /web/berry && yarn install --network-timeout 600000
-RUN cd /web/air && yarn install --network-timeout 600000
-RUN cd /web/modern && yarn install --network-timeout 600000
+# Copy version & sources (place themes directly under /web)
+COPY VERSION ./
+COPY web/ ./
 
-RUN mkdir -p /web/build
-
-# Build the web projects
-# do not build parallel to avoid OOM on github actions
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/default
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/berry
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/air
-RUN DISABLE_ESLINT_PLUGIN='true' REACT_APP_VERSION=$(cat ./VERSION) npm run build --prefix /web/modern
-
-FROM golang:1.25.0-bookworm AS builder2
-
-# Make sure to use ARG with a default value
-ARG TARGETARCH=amd64
-
-# Set proper environment variables based on TARGETARCH
-ENV GO111MODULE=on \
-    CGO_ENABLED=1 \
-    GOOS=linux \
-    GOARCH=${TARGETARCH}
-
-# Print architecture information for debugging
-RUN echo "Building for TARGETARCH=${TARGETARCH}" && \
-    echo "Current architecture: $(uname -m)"
-
-# For ARM64 builds
-RUN apt-get update && \
-    if [ "${TARGETARCH}" = "arm64" ]; then \
-        apt-get install -y gcc-aarch64-linux-gnu && \
-        export CC=aarch64-linux-gnu-gcc && \
-        export GOARCH=arm64 && \
-        export CGO_ENABLED=1 && \
-        # This is critical for ARM64 cross-compilation
-        export CGO_CFLAGS="-g -O2 -fPIC"; \
-    else \
-        apt-get install -y build-essential; \
-    fi
-
-# Common dependencies
-RUN apt-get install -y --no-install-recommends \
-    sqlite3 libsqlite3-dev && \
-    rm -rf /var/lib/apt/lists/*
-
-WORKDIR /build
-
-COPY go.mod go.sum ./
-RUN go mod download
-
-COPY . .
-COPY --from=builder /web/build ./web/build
-
-# Simplified build command that handles both architectures
-RUN if [ "${TARGETARCH}" = "arm64" ]; then \
-        CC=aarch64-linux-gnu-gcc \
-        CGO_ENABLED=1 \
-        GOARCH=arm64 \
-        CGO_CFLAGS="-g -O2 -fPIC" \
-        go build -trimpath -ldflags "-s -w -X github.com/songquanpeng/one-api/common.Version=$(cat VERSION)" -o one-api; \
-    else \
-        go build -trimpath -ldflags "-s -w -X github.com/songquanpeng/one-api/common.Version=$(cat VERSION)" -o one-api; \
-    fi
-
-# Use a pre-built image that already has ffmpeg for ARM64/AMD64
-FROM --platform=$TARGETPLATFORM jrottenberg/ffmpeg:6.1.2-ubuntu2404 AS ffmpeg
-
-# Use Ubuntu as the base image which has better ARM64 support
-FROM --platform=$TARGETPLATFORM ubuntu:24.04
-
-ARG TARGETARCH=amd64
-ENV DEBIAN_FRONTEND=noninteractive
-
-# Configure robust apt settings with aggressive retries and multiple mirrors
-RUN echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries && \
-    echo 'Acquire::http::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
-    echo 'Acquire::ftp::Timeout "30";' >> /etc/apt/apt.conf.d/80-retries && \
-    echo 'Acquire::Check-Valid-Until "false";' >> /etc/apt/apt.conf.d/80-retries && \
-    echo 'APT::Get::Assume-Yes "true";' >> /etc/apt/apt.conf.d/80-retries && \
-    echo 'APT::Install-Recommends "false";' >> /etc/apt/apt.conf.d/80-retries
-
-# Use multiple CDN and geographic mirrors for better reliability
-RUN printf "deb http://us.archive.ubuntu.com/ubuntu noble main restricted universe multiverse\n\
-deb http://mirror.math.princeton.edu/pub/ubuntu noble main restricted universe multiverse\n\
-deb https://mirrors.kernel.org/ubuntu noble main restricted universe multiverse\n\
-deb http://us.archive.ubuntu.com/ubuntu noble-updates main restricted universe multiverse\n\
-deb http://mirror.math.princeton.edu/pub/ubuntu noble-updates main restricted universe multiverse\n\
-deb https://mirrors.kernel.org/ubuntu noble-updates main restricted universe multiverse\n\
-deb http://us.archive.ubuntu.com/ubuntu noble-backports main restricted universe multiverse\n\
-deb http://security.ubuntu.com/ubuntu noble-security main restricted universe multiverse\n\
-deb https://mirrors.kernel.org/ubuntu noble-security main restricted universe multiverse\n" > /etc/apt/sources.list
-
-# Install packages with retry mechanism and cleanup in single layer
-RUN for i in 1 2 3; do \
-        apt-get update && \
-        apt-get install -y --no-install-recommends ca-certificates tzdata bash haveged && \
-        apt-get clean && \
-        rm -rf /var/lib/apt/lists/* && \
-        break || \
-        (echo "Attempt $i failed, retrying..." && sleep 10); \
+# Install & build each theme sequentially to avoid OOM in CI
+ENV YARN_ENABLE_IMMUTABLE_INSTALLS=0
+RUN set -e; for theme in default berry air modern; do \
+        echo "==> installing deps for $theme"; \
+        (cd /web/$theme && yarn install --network-timeout 600000); \
     done
 
-# Install basic requirements without triggering libc-bin reconfiguration
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ca-certificates tzdata bash haveged && \
-    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /web/build
+ENV DISABLE_ESLINT_PLUGIN=true
+RUN set -e; export REACT_APP_VERSION=$(cat VERSION); \
+        for theme in default berry air modern; do \
+                echo "==> building $theme (version=$REACT_APP_VERSION)"; \
+                npm run build --prefix /web/$theme; \
+        done
 
-# Copy ffmpeg binaries from the ffmpeg image
-COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/
-COPY --from=ffmpeg /usr/local/bin/ffprobe /usr/local/bin/
+############################
+# Stage 2: Go build         #
+############################
+FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS go-builder
+ARG TARGETOS
+ARG TARGETARCH
+ENV TZ=Etc/UTC \
+        CGO_ENABLED=1 \
+        GO111MODULE=on
 
-COPY --from=builder2 /build/one-api /
+RUN set -e; \
+        printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries; \
+        # Add an additional mirror file (keep base list intact for fallback)
+        echo 'deb http://deb.debian.org/debian bookworm main' > /etc/apt/sources.list.d/99-extra.list; \
+        apt-get update; \
+        apt-get install -y --no-install-recommends sqlite3 libsqlite3-dev ca-certificates; \
+        rm -rf /var/lib/apt/lists/*
 
-# RUN if [ "${TARGETARCH}" = "arm64" ]; then \
-#     else \
-#         rm -rf /web/build \
-#     fi
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod go mod download
+
+COPY . .
+COPY --from=web-builder /web/build ./web/build
+
+# Build (Version embedded). Reading from VERSION file copied above.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+        VERSION=$(cat VERSION) && \
+        echo "Building one-api for ${TARGETOS:-linux}/${TARGETARCH:-$(go env GOARCH)} version=$VERSION" && \
+        GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} \
+        go build -trimpath -buildvcs=false -ldflags "-s -w -X github.com/Laisky/one-api/common.Version=$VERSION" -o /out/one-api
+
+############################
+# Stage 3: Runtime image    #
+############################
+FROM ubuntu:24.04 AS runtime
+LABEL org.opencontainers.image.title="one-api" \
+            org.opencontainers.image.source="https://github.com/Laisky/one-api" \
+            org.opencontainers.image.licenses="MIT"
+
+ENV DEBIAN_FRONTEND=noninteractive \
+        TZ=Etc/UTC
+
+RUN set -e; \
+        printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' > /etc/apt/apt.conf.d/80-retries; \
+        # Supplemental mirrors (keep defaults) for resilience
+        echo 'deb http://archive.ubuntu.com/ubuntu noble main restricted universe multiverse' > /etc/apt/sources.list.d/99-extra.list; \
+        echo 'deb https://mirrors.kernel.org/ubuntu noble main restricted universe multiverse' >> /etc/apt/sources.list.d/99-extra.list; \
+        apt-get update; \
+        apt-get install -y --no-install-recommends \
+                ca-certificates tzdata curl libsqlite3-0; \
+        rm -rf /var/lib/apt/lists/*
+
+# Pull in ffmpeg & ffprobe
+FROM ${FFMPEG_IMAGE} AS ffmpeg
+
+FROM runtime AS final
+COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/ffprobe /usr/local/bin/
+COPY --from=go-builder /out/one-api /one-api
 
 EXPOSE 3000
+
+# Non-root user
+RUN groupadd --system oneapi && useradd --system --create-home --home-dir /data --shell /usr/sbin/nologin --gid oneapi oneapi && \
+        chown oneapi:oneapi /one-api
+
+USER oneapi
 WORKDIR /data
+
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://127.0.0.1:3000/api/status || exit 1
+
 ENTRYPOINT ["/one-api"]
