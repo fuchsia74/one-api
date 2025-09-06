@@ -87,7 +87,7 @@ RUN set -e; \
         rm -rf /var/lib/apt/lists/*
 
 # Pull in ffmpeg & ffprobe
-FROM ${FFMPEG_IMAGE} AS ffmpeg
+FROM --platform=$TARGETPLATFORM ${FFMPEG_IMAGE} AS ffmpeg
 
 FROM runtime AS final
 COPY --from=ffmpeg /usr/local/bin/ffmpeg /usr/local/bin/ffprobe /usr/local/bin/
