@@ -7,9 +7,9 @@ ARG NODE_IMAGE=node:24-bookworm
 ARG GO_IMAGE=golang:1.25.0-bookworm
 ARG FFMPEG_IMAGE=jrottenberg/ffmpeg:6.1.2-ubuntu2404
 
-############################
+#############################
 # Stage 1: Frontend build   #
-############################
+#############################
 FROM --platform=$BUILDPLATFORM ${NODE_IMAGE} AS web-builder
 WORKDIR /web
 
@@ -33,7 +33,7 @@ RUN set -e; export REACT_APP_VERSION=$(cat VERSION); \
         done
 
 ############################
-# Stage 2: Go build         #
+# Stage 2: Go build        #
 ############################
 FROM --platform=$BUILDPLATFORM ${GO_IMAGE} AS go-builder
 ARG TARGETOS
@@ -64,9 +64,9 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
         GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} \
         go build -trimpath -buildvcs=false -ldflags "-s -w -X github.com/Laisky/one-api/common.Version=$VERSION" -o /out/one-api
 
-############################
+#############################
 # Stage 3: Runtime image    #
-############################
+#############################
 FROM ubuntu:24.04 AS runtime
 LABEL org.opencontainers.image.title="one-api" \
             org.opencontainers.image.source="https://github.com/Laisky/one-api" \
@@ -94,13 +94,23 @@ COPY --from=go-builder /out/one-api /one-api
 
 EXPOSE 3000
 
-# Non-root user
-RUN groupadd --system oneapi && useradd --system --create-home --home-dir /data --shell /usr/sbin/nologin --gid oneapi oneapi && \
-        chown oneapi:oneapi /one-api
+ARG ONEAPI_UID=10001
+ARG ONEAPI_GID=10001
+# Create dedicated user with deterministic UID/GID so host can pre‑chown bind mount.
+RUN groupadd --system --gid ${ONEAPI_GID} oneapi && \
+        useradd  --system --no-create-home --home /data --uid ${ONEAPI_UID} --gid ${ONEAPI_GID} \
+                        --shell /usr/sbin/nologin oneapi && \
+        mkdir -p /data && chown oneapi:oneapi /one-api
 
-USER oneapi
+# Install gosu for privilege drop (tiny init not strictly needed; keeping minimal change)
+RUN set -e; apt-get update; apt-get install -y --no-install-recommends gosu; rm -rf /var/lib/apt/lists/*
+
+# Add entrypoint script
+COPY scripts/docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
 WORKDIR /data
 
 HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD curl -fsS http://127.0.0.1:3000/api/status || exit 1
 
-ENTRYPOINT ["/one-api"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]

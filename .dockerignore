@@ -1,0 +1,28 @@
+# Ignore database and log files
+/one-api.db
+/logs
+
+# Ignore build output and data directories
+/oneapi
+/patch
+
+# Ignore environment variable files
+.env
+.env.*
+
+# Ignore IDE and editor specific files
+/.vscode/
+/.idea/
+/__debug_bin*
+
+# Ingore frontend build output
+/web/dist/
+/web/**/node_modules/
+/web/**/dist/
+
+# Ignore OS generated files
+/.DS_Store
+/Thumbs.db
+/ehthumbs.db
+/Desktop.ini
+/$RECYCLE.BIN/
