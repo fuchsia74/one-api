@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
@@ -169,6 +171,18 @@ func (a *Adaptor) DoRequest(c *gin.Context, meta *meta.Meta, requestBody io.Read
 	if a.awsAdapter == nil {
 		return nil, errors.New("AWS sub-adapter not initialized")
 	}
+
+	// Add logging to match other adapters that use DoRequestHelper
+	// Since AWS uses SDK directly, we manually add the upstream request logging here
+	lg := gmw.GetLogger(c).With(
+		zap.String("url", "AWS Bedrock SDK"),
+		zap.Int("channelId", meta.ChannelId),
+		zap.Int("userId", meta.UserId),
+		zap.String("model", meta.ActualModelName),
+		zap.String("channelName", a.GetChannelName()),
+	)
+	// Log upstream request for billing tracking (matches common.go:70)
+	lg.Info("sending request to upstream channel")
 
 	// For AWS Bedrock, we don't make HTTP requests - we use the AWS SDK directly
 	// Return nil response to indicate DoResponse should handle the entire flow
