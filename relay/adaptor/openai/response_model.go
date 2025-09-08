@@ -393,11 +393,11 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 	}
 
 	// Map other fields
-	if request.MaxTokens > 0 {
-		responseReq.MaxOutputTokens = &request.MaxTokens
-	}
-	if request.MaxCompletionTokens != nil {
+	// Prefer MaxCompletionTokens; fall back to deprecated MaxTokens for compatibility
+	if request.MaxCompletionTokens != nil && *request.MaxCompletionTokens > 0 {
 		responseReq.MaxOutputTokens = request.MaxCompletionTokens
+	} else if request.MaxTokens > 0 {
+		responseReq.MaxOutputTokens = &request.MaxTokens
 	}
 
 	responseReq.Temperature = request.Temperature

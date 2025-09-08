@@ -101,14 +101,16 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 		return nil, errors.New("request is nil")
 	}
 
+	maxTokens := request.MaxTokens
+
 	// Convert Claude Messages API request to OpenAI format first
 	openaiRequest := &model.GeneralOpenAIRequest{
-		Model:       request.Model,
-		MaxTokens:   request.MaxTokens,
-		Temperature: request.Temperature,
-		TopP:        request.TopP,
-		Stream:      request.Stream != nil && *request.Stream,
-		Stop:        request.StopSequences,
+		Model:               request.Model,
+		MaxCompletionTokens: &maxTokens,
+		Temperature:         request.Temperature,
+		TopP:                request.TopP,
+		Stream:              request.Stream != nil && *request.Stream,
+		Stop:                request.StopSequences,
 	}
 
 	// Convert system prompt

@@ -111,7 +111,10 @@ func getPromptTokens(ctx context.Context, textRequest *relaymodel.GeneralOpenAIR
 
 func getPreConsumedQuota(textRequest *relaymodel.GeneralOpenAIRequest, promptTokens int, ratio float64) int64 {
 	preConsumedTokens := config.PreConsumedQuota + int64(promptTokens)
-	if textRequest.MaxTokens != 0 {
+	// Prefer max_completion_tokens; fall back to deprecated max_tokens
+	if textRequest.MaxCompletionTokens != nil && *textRequest.MaxCompletionTokens > 0 {
+		preConsumedTokens += int64(*textRequest.MaxCompletionTokens)
+	} else if textRequest.MaxTokens != 0 {
 		preConsumedTokens += int64(textRequest.MaxTokens)
 	}
 

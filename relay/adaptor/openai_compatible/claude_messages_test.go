@@ -52,7 +52,8 @@ func TestConvertClaudeRequest_ToOpenAI(t *testing.T) {
 	var goReq relaymodel.GeneralOpenAIRequest
 	require.NoError(t, json.Unmarshal(b, &goReq))
 	assert.Equal(t, "claude-3", goReq.Model)
-	assert.Equal(t, 128, goReq.MaxTokens)
+	require.NotNil(t, goReq.MaxCompletionTokens)
+	assert.Equal(t, 128, *goReq.MaxCompletionTokens)
 	assert.GreaterOrEqual(t, len(goReq.Messages), 2)
 	assert.NotNil(t, goReq.Tools)
 	assert.NotNil(t, goReq.ToolChoice)

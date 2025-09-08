@@ -69,6 +69,13 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return nil, errors.Errorf("validation failed: %s", validationErr.Error.Message)
 	}
 
+	// Prefer max_completion_tokens; for providers that do not support it, map to max_tokens
+	capabilities := GetModelCapabilities(request.Model)
+	if request.MaxCompletionTokens != nil && *request.MaxCompletionTokens > 0 && !capabilities.SupportsMaxCompletionTokens {
+		// Always prefer MaxCompletionTokens value
+		request.MaxTokens = *request.MaxCompletionTokens
+	}
+
 	a.awsAdapter = adaptor
 	return adaptor.ConvertRequest(c, relayMode, request)
 }
@@ -552,13 +559,7 @@ func ValidateUnsupportedParameters(request *model.GeneralOpenAIRequest, modelNam
 		})
 	}
 
-	// Check for max_completion_tokens support
-	if request.MaxCompletionTokens != nil && !capabilities.SupportsMaxCompletionTokens {
-		unsupportedParams = append(unsupportedParams, UnsupportedParameter{
-			Name:        "max_completion_tokens",
-			Description: "max_completion_tokens is not supported by this model. Use 'max_tokens' instead",
-		})
-	}
+	// Do not treat max_completion_tokens as unsupported; we'll map it to max_tokens if needed
 
 	// Check for stop support
 	if request.Stop != nil && !capabilities.SupportsStop {

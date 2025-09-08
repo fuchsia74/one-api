@@ -101,7 +101,9 @@ func TestPreConsumedQuotaWithStructuredOutput(t *testing.T) {
 
 			// Calculate what the quota would be without structured output
 			basePreConsumedTokens := config.PreConsumedQuota + int64(tt.promptTokens)
-			if tt.textRequest.MaxTokens != 0 {
+			if tt.textRequest.MaxCompletionTokens != nil && *tt.textRequest.MaxCompletionTokens > 0 {
+				basePreConsumedTokens += int64(*tt.textRequest.MaxCompletionTokens)
+			} else if tt.textRequest.MaxTokens != 0 {
 				basePreConsumedTokens += int64(tt.textRequest.MaxTokens)
 			}
 			baseQuota := int64(float64(basePreConsumedTokens) * tt.ratio)

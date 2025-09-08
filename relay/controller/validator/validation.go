@@ -10,6 +10,12 @@ import (
 )
 
 func ValidateTextRequest(textRequest *model.GeneralOpenAIRequest, relayMode int) error {
+	// Prefer max_completion_tokens; validate both for compatibility
+	if textRequest.MaxCompletionTokens != nil {
+		if *textRequest.MaxCompletionTokens < 0 || *textRequest.MaxCompletionTokens > math.MaxInt32/2 {
+			return errors.New("max_completion_tokens is invalid")
+		}
+	}
 	if textRequest.MaxTokens < 0 || textRequest.MaxTokens > math.MaxInt32/2 {
 		return errors.New("max_tokens is invalid")
 	}

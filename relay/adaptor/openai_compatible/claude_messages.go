@@ -22,12 +22,12 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 
 	// Convert Claude Messages API request to OpenAI format first
 	openaiRequest := &model.GeneralOpenAIRequest{
-		Model:       request.Model,
-		MaxTokens:   request.MaxTokens,
-		Temperature: request.Temperature,
-		TopP:        request.TopP,
-		Stream:      request.Stream != nil && *request.Stream,
-		Stop:        request.StopSequences,
+		Model:               request.Model,
+		MaxCompletionTokens: &request.MaxTokens,
+		Temperature:         request.Temperature,
+		TopP:                request.TopP,
+		Stream:              request.Stream != nil && *request.Stream,
+		Stop:                request.StopSequences,
 	}
 
 	// Convert system message if present
