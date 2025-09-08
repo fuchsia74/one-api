@@ -219,7 +219,7 @@ var UserContentRequestTimeout = env.Int("USER_CONTENT_REQUEST_TIMEOUT", 30)
 var TokenKeyPrefix = env.String("TOKEN_KEY_PREFIX", "sk-")
 
 // EnforceIncludeUsage is used to determine whether to include usage in the response
-var EnforceIncludeUsage = env.Bool("ENFORCE_INCLUDE_USAGE", false)
+var EnforceIncludeUsage = env.Bool("ENFORCE_INCLUDE_USAGE", true)
 var TestPrompt = env.String("TEST_PROMPT", "2 + 2 = ?")
 var TestMaxTokens = env.Int("TEST_MAX_TOKENS", 1024)
 

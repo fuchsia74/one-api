@@ -213,10 +213,6 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	default:
 	}
 
-	if request.Stream && !config.EnforceIncludeUsage {
-		// Stream mode without ENFORCE_INCLUDE_USAGE may cause under-billing; consider enabling it.
-	}
-
 	if config.EnforceIncludeUsage && request.Stream {
 		// always return usage in stream mode
 		if request.StreamOptions == nil {
@@ -225,30 +221,9 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		request.StreamOptions.IncludeUsage = true
 	}
 
-	// Set both max_tokens and max_completion_tokens for better compatibility
-	// For o-series models, max_tokens must be 0
 	if request.MaxTokens != 0 {
-		if meta.ChannelType == channeltype.Azure {
-			// Azure does not support setting both max_tokens and max_completion_tokens
-			request.MaxCompletionTokens = nil
-			// For o-series models, Azure still requires max_tokens=0
-			if strings.HasPrefix(meta.ActualModelName, "o") {
-				request.MaxTokens = 0
-			}
-		} else {
-			// Store the original value before potentially modifying MaxTokens
-			originalMaxTokens := request.MaxTokens
-			request.MaxCompletionTokens = &originalMaxTokens
-			// For o-series models, max_tokens must be set to 0
-			if strings.HasPrefix(meta.ActualModelName, "o") {
-				request.MaxTokens = 0
-			}
-		}
-	} else {
-		// Defensive: when Azure, ensure we never send max_completion_tokens by itself
-		if meta.ChannelType == channeltype.Azure {
-			request.MaxCompletionTokens = nil
-		}
+		request.MaxCompletionTokens = &request.MaxTokens
+		request.MaxTokens = 0
 	}
 
 	// o1/o3/o4/gpt-5 do not support system prompt/temperature variations
@@ -337,28 +312,11 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 		Thinking:    request.Thinking,
 	}
 
-	// Set both MaxTokens and MaxCompletionTokens for better compatibility
-	// For o-series models, MaxTokens must be 0
+	// Use MaxCompletionTokens instead of MaxTokens for ClaudeRequest conversion
 	if request.MaxTokens != 0 {
-		// Store the original value before potentially modifying MaxTokens
 		originalMaxTokens := request.MaxTokens
 		openaiRequest.MaxCompletionTokens = &originalMaxTokens
-		// For o-series models, max_tokens must be set to 0
-		if strings.HasPrefix(request.Model, "o") {
-			openaiRequest.MaxTokens = 0
-		} else {
-			openaiRequest.MaxTokens = request.MaxTokens
-		}
-	}
-
-	// If target channel is Azure, ensure we do not send both max tokens fields
-	m := meta.GetByContext(c)
-	if m.ChannelType == channeltype.Azure {
-		if openaiRequest.MaxTokens != 0 {
-			openaiRequest.MaxCompletionTokens = nil
-		} else {
-			openaiRequest.MaxCompletionTokens = nil
-		}
+		openaiRequest.MaxTokens = 0
 	}
 
 	// Convert system prompt
