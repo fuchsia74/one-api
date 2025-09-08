@@ -57,12 +57,15 @@ type GeneralOpenAIRequest struct {
 	// FrequencyPenalty is a number between -2.0 and 2.0 that penalizes
 	// new tokens based on their existing frequency in the text so far,
 	// default is 0.
-	FrequencyPenalty    *float64 `json:"frequency_penalty,omitempty" binding:"omitempty,min=-2,max=2"`
-	LogitBias           any      `json:"logit_bias,omitempty"`
-	Logprobs            *bool    `json:"logprobs,omitempty"`
-	TopLogprobs         *int     `json:"top_logprobs,omitempty"`
-	MaxTokens           int      `json:"max_tokens,omitempty"`
-	MaxCompletionTokens *int     `json:"max_completion_tokens,omitempty"`
+	FrequencyPenalty *float64 `json:"frequency_penalty,omitempty" binding:"omitempty,min=-2,max=2"`
+	LogitBias        any      `json:"logit_bias,omitempty"`
+	Logprobs         *bool    `json:"logprobs,omitempty"`
+	TopLogprobs      *int     `json:"top_logprobs,omitempty"`
+	// MaxTokens is the maximum number of tokens to generate in the chat completion.
+	//
+	// Deprecated: Use MaxCompletionTokens instead.
+	MaxTokens           int  `json:"max_tokens,omitempty"`
+	MaxCompletionTokens *int `json:"max_completion_tokens,omitempty"`
 	// N is how many chat completion choices to generate for each input message,
 	// default to 1.
 	N *int `json:"n,omitempty" binding:"omitempty,min=0"`

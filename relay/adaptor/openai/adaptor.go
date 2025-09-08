@@ -222,7 +222,11 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	}
 
 	if request.MaxTokens != 0 {
-		request.MaxCompletionTokens = &request.MaxTokens
+		// Copy value before zeroing MaxTokens. Previous code took the address of
+		// request.MaxTokens then set it to 0, so the pointer observed 0 and was
+		// replaced by the default (e.g. 2048). This preserved user intent.
+		tmpMaxTokens := request.MaxTokens
+		request.MaxCompletionTokens = &tmpMaxTokens
 		request.MaxTokens = 0
 	}
 
