@@ -85,7 +85,17 @@ export function SearchableDropdown({
     setApiLoading(true)
     try {
       // Use unified api wrapper - caller provides complete URL including /api prefix
-      const response = await api.get(`${searchEndpoint}?keyword=${encodeURIComponent(query)}`)
+      const response = await api.get(
+        `${searchEndpoint}?keyword=${encodeURIComponent(query)}`,
+        {
+          // Redundant safeguard: interceptor already adds these, but explicit for clarity
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+          }
+        }
+      )
       const result = response.data
 
       if (result.success && result.data) {
