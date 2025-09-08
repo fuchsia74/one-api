@@ -226,6 +226,12 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		request.MaxTokens = 0
 	}
 
+	// Set default max tokens if not set or invalid, since MaxCompletionTokens cannot be 0
+	if request.MaxCompletionTokens == nil || *request.MaxCompletionTokens <= 0 {
+		defaultMaxCompletionTokens := config.DefaultMaxToken
+		request.MaxCompletionTokens = &defaultMaxCompletionTokens
+	}
+
 	// o1/o3/o4/gpt-5 do not support system prompt/temperature variations
 	if isModelSupportedReasoning(meta.ActualModelName) {
 		temperature := float64(1)
