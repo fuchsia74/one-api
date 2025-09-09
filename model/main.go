@@ -250,8 +250,10 @@ func setDBConns(db *gorm.DB) *sql.DB {
 	sqlDB.SetConnMaxLifetime(time.Second * time.Duration(maxLifetime))
 
 	// Log connection pool settings for monitoring
-	logger.Logger.Info(fmt.Sprintf("Database connection pool configured: MaxIdle=%d, MaxOpen=%d, MaxLifetime=%ds",
-		maxIdleConns, maxOpenConns, maxLifetime))
+	logger.Logger.Info("Database connection pool configured",
+		zap.Int("max_idle_conns", maxIdleConns),
+		zap.Int("max_open_conns", maxOpenConns),
+		zap.Int("max_lifetime_secs", maxLifetime))
 
 	// Start connection pool monitoring goroutine
 	go monitorDBConnections(sqlDB)

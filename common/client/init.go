@@ -7,6 +7,8 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 )
@@ -28,7 +30,7 @@ func Init() {
 	}
 
 	if config.UserContentRequestProxy != "" {
-		logger.Logger.Info(fmt.Sprintf("using %s as proxy to fetch user content", config.UserContentRequestProxy))
+		logger.Logger.Info("using proxy to fetch user content", zap.String("proxy", config.UserContentRequestProxy))
 		proxyURL, err := url.Parse(config.UserContentRequestProxy)
 		if err != nil {
 			logger.Logger.Fatal(fmt.Sprintf("USER_CONTENT_REQUEST_PROXY set but invalid: %s", config.UserContentRequestProxy))
@@ -45,7 +47,7 @@ func Init() {
 	}
 	var transport http.RoundTripper
 	if config.RelayProxy != "" {
-		logger.Logger.Info(fmt.Sprintf("using %s as api relay proxy", config.RelayProxy))
+		logger.Logger.Info("using api relay proxy", zap.String("proxy", config.RelayProxy))
 		proxyURL, err := url.Parse(config.RelayProxy)
 		if err != nil {
 			logger.Logger.Fatal(fmt.Sprintf("RELAY_PROXY set but invalid: %s", config.RelayProxy))

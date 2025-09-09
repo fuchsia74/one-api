@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/apitype"
@@ -56,8 +58,7 @@ func InitializeGlobalPricingManager(getAdaptor func(apiType int) adaptor.Adaptor
 	if globalPricingManager.contributingAdapters == nil {
 		globalPricingManager.contributingAdapters = make([]int, len(DefaultGlobalPricingAdapters))
 		copy(globalPricingManager.contributingAdapters, DefaultGlobalPricingAdapters)
-		logger.Logger.Info(fmt.Sprintf("Loaded %d adapters for global pricing",
-			len(globalPricingManager.contributingAdapters)))
+		logger.Logger.Info("Loaded adapters for global pricing", zap.Int("adapter_count", len(globalPricingManager.contributingAdapters)))
 	}
 
 	globalPricingManager.initialized = false // Force re-initialization with new function
@@ -86,7 +87,7 @@ func ReloadDefaultConfiguration() {
 	copy(globalPricingManager.contributingAdapters, DefaultGlobalPricingAdapters)
 	globalPricingManager.initialized = false // Force re-initialization
 
-	logger.Logger.Info(fmt.Sprintf("Reloaded global pricing configuration: %d adapters", len(globalPricingManager.contributingAdapters)))
+	logger.Logger.Info("Reloaded global pricing configuration", zap.Int("adapter_count", len(globalPricingManager.contributingAdapters)))
 }
 
 // GetContributingAdapters returns the current list of contributing adapters
@@ -142,8 +143,10 @@ func (gpm *GlobalPricingManager) initializeUnsafe() {
 	}
 
 	gpm.initialized = true
-	logger.Logger.Info(fmt.Sprintf("Global model pricing initialized with %d models from %d/%d adapters",
-		len(gpm.globalModelPricing), successCount, len(gpm.contributingAdapters)))
+	logger.Logger.Info("Global model pricing initialized",
+		zap.Int("model_count", len(gpm.globalModelPricing)),
+		zap.Int("successful_adapters", successCount),
+		zap.Int("total_adapters", len(gpm.contributingAdapters)))
 }
 
 // mergeAdapterPricing merges pricing from a specific adapter
@@ -177,7 +180,10 @@ func (gpm *GlobalPricingManager) mergeAdapterPricing(apiType int) bool {
 		}
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Merged %d models from adapter %d (%d conflicts)", mergedCount, apiType, conflictCount))
+	logger.Logger.Info("Merged models from adapter",
+		zap.Int("merged_count", mergedCount),
+		zap.Int("api_type", apiType),
+		zap.Int("conflict_count", conflictCount))
 	return true
 }
 

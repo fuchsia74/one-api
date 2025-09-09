@@ -2,8 +2,6 @@ package model
 
 import (
 	"encoding/json"
-	"fmt"
-	"strings"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
@@ -27,23 +25,26 @@ func DebugChannelModelConfigs(channelId int) error {
 
 	// Check ModelConfigs
 	if channel.ModelConfigs != nil && *channel.ModelConfigs != "" && *channel.ModelConfigs != "{}" {
-		logger.Logger.Info(fmt.Sprintf("ModelConfigs (raw): %s", *channel.ModelConfigs))
+		logger.Logger.Info("ModelConfigs (raw)", zap.String("raw", *channel.ModelConfigs))
 
 		// Try to parse as new format
 		var newFormatConfigs map[string]ModelConfigLocal
 		if err := json.Unmarshal([]byte(*channel.ModelConfigs), &newFormatConfigs); err == nil {
-			logger.Logger.Info(fmt.Sprintf("ModelConfigs (new format) - %d models:", len(newFormatConfigs)))
+			logger.Logger.Info("ModelConfigs (new format)", zap.Int("model_count", len(newFormatConfigs)))
 			for modelName, config := range newFormatConfigs {
-				logger.Logger.Info(fmt.Sprintf("  %s: ratio=%.6f, completion_ratio=%.2f, max_tokens=%d",
-					modelName, config.Ratio, config.CompletionRatio, config.MaxTokens))
+				logger.Logger.Info("ModelConfig",
+					zap.String("model", modelName),
+					zap.Float64("ratio", config.Ratio),
+					zap.Float64("completion_ratio", config.CompletionRatio),
+					zap.Int("max_tokens", int(config.MaxTokens)))
 			}
 		} else {
 			// Try to parse as old format
 			var oldFormatConfigs map[string]ModelConfig
 			if err := json.Unmarshal([]byte(*channel.ModelConfigs), &oldFormatConfigs); err == nil {
-				logger.Logger.Info(fmt.Sprintf("ModelConfigs (old format) - %d models:", len(oldFormatConfigs)))
+				logger.Logger.Info("ModelConfigs (old format)", zap.Int("model_count", len(oldFormatConfigs)))
 				for modelName, config := range oldFormatConfigs {
-					logger.Logger.Info(fmt.Sprintf("  %s: max_tokens=%d", modelName, config.MaxTokens))
+					logger.Logger.Info("ModelConfig (legacy)", zap.String("model", modelName), zap.Int("max_tokens", int(config.MaxTokens)))
 				}
 			} else {
 				logger.Logger.Error("ModelConfigs parsing failed", zap.Error(err))
@@ -55,12 +56,14 @@ func DebugChannelModelConfigs(channelId int) error {
 
 	// Check ModelRatio
 	if channel.ModelRatio != nil && *channel.ModelRatio != "" && *channel.ModelRatio != "{}" {
-		logger.Logger.Info(fmt.Sprintf("ModelRatio (raw): %s", *channel.ModelRatio))
+		logger.Logger.Info("ModelRatio (raw)", zap.String("raw", *channel.ModelRatio))
 		var modelRatios map[string]float64
 		if err := json.Unmarshal([]byte(*channel.ModelRatio), &modelRatios); err == nil {
-			logger.Logger.Info(fmt.Sprintf("ModelRatio (parsed) - %d models:", len(modelRatios)))
+			logger.Logger.Info("ModelRatio (parsed)", zap.Int("model_count", len(modelRatios)))
 			for modelName, ratio := range modelRatios {
-				logger.Logger.Info(fmt.Sprintf("  %s: %.6f", modelName, ratio))
+				logger.Logger.Info("ModelRatio",
+					zap.String("model", modelName),
+					zap.Float64("ratio", ratio))
 			}
 		} else {
 			logger.Logger.Error("ModelRatio parsing failed", zap.Error(err))
@@ -71,12 +74,14 @@ func DebugChannelModelConfigs(channelId int) error {
 
 	// Check CompletionRatio
 	if channel.CompletionRatio != nil && *channel.CompletionRatio != "" && *channel.CompletionRatio != "{}" {
-		logger.Logger.Info(fmt.Sprintf("CompletionRatio (raw): %s", *channel.CompletionRatio))
+		logger.Logger.Info("CompletionRatio (raw)", zap.String("raw", *channel.CompletionRatio))
 		var completionRatios map[string]float64
 		if err := json.Unmarshal([]byte(*channel.CompletionRatio), &completionRatios); err == nil {
-			logger.Logger.Info(fmt.Sprintf("CompletionRatio (parsed) - %d models:", len(completionRatios)))
+			logger.Logger.Info("CompletionRatio (parsed)", zap.Int("model_count", len(completionRatios)))
 			for modelName, ratio := range completionRatios {
-				logger.Logger.Info(fmt.Sprintf("  %s: %.2f", modelName, ratio))
+				logger.Logger.Info("CompletionRatio",
+					zap.String("model", modelName),
+					zap.Float64("completion_ratio", ratio))
 			}
 		} else {
 			logger.Logger.Error("CompletionRatio parsing failed", zap.Error(err))
@@ -118,8 +123,11 @@ func DebugAllChannelModelConfigs() error {
 			status = "LEGACY"
 		}
 
-		logger.Logger.Info(fmt.Sprintf("Channel %d (%s) Type=%d Status=%s",
-			channel.Id, channel.Name, channel.Type, status))
+		logger.Logger.Info("Channel summary",
+			zap.Int("channel_id", channel.Id),
+			zap.String("name", channel.Name),
+			zap.Int("type", channel.Type),
+			zap.String("status", status))
 
 		if hasModelConfigs {
 			// Count models in unified format
@@ -129,7 +137,9 @@ func DebugAllChannelModelConfigs() error {
 				for modelName := range configs {
 					modelNames = append(modelNames, modelName)
 				}
-				logger.Logger.Info(fmt.Sprintf("  Unified models (%d): %s", len(configs), strings.Join(modelNames, ", ")))
+				logger.Logger.Info("Unified models",
+					zap.Int("model_count", len(configs)),
+					zap.Strings("models", modelNames))
 			}
 		}
 
@@ -141,7 +151,9 @@ func DebugAllChannelModelConfigs() error {
 				for modelName := range ratios {
 					modelNames = append(modelNames, modelName)
 				}
-				logger.Logger.Info(fmt.Sprintf("  Legacy models (%d): %s", len(ratios), strings.Join(modelNames, ", ")))
+				logger.Logger.Info("Legacy models",
+					zap.Int("model_count", len(ratios)),
+					zap.Strings("models", modelNames))
 			}
 		}
 	}
@@ -157,7 +169,7 @@ func FixChannelModelConfigs(channelId int) error {
 		return errors.Wrapf(err, "failed to find channel %d", channelId)
 	}
 
-	logger.Logger.Info(fmt.Sprintf("=== FIXING CHANNEL %d ===", channelId))
+	logger.Logger.Info("=== FIXING CHANNEL ===", zap.Int("channel_id", channelId))
 
 	// First, debug current state
 	DebugChannelModelConfigs(channelId)
@@ -174,11 +186,11 @@ func FixChannelModelConfigs(channelId int) error {
 	channel.CompletionRatio = &emptyConfigs
 
 	// Get default pricing for this channel type from adapter
-	logger.Logger.Info(fmt.Sprintf("Loading default pricing for channel type %d", channel.Type))
+	logger.Logger.Info("Loading default pricing", zap.Int("channel_type", channel.Type))
 	defaultPricing := getChannelDefaultPricing(channel.Type)
 
 	if defaultPricing != "" {
-		logger.Logger.Info(fmt.Sprintf("Setting default model configs: %s", defaultPricing))
+		logger.Logger.Info("Setting default model configs", zap.String("default_pricing", defaultPricing))
 		channel.ModelConfigs = &defaultPricing
 	} else {
 		logger.Logger.Info("No default pricing available for this channel type")
@@ -224,14 +236,17 @@ func CleanAllMixedModelData() error {
 
 				for modelName := range configs {
 					if !contains(channelTypeModels, modelName) {
-						logger.Logger.Info(fmt.Sprintf("Channel %d (type %d) has unexpected model: %s", channel.Id, channel.Type, modelName))
+						logger.Logger.Info("Channel has unexpected model",
+							zap.Int("channel_id", channel.Id),
+							zap.Int("channel_type", channel.Type),
+							zap.String("model", modelName))
 						hasMixedData = true
 						break
 					}
 				}
 
 				if hasMixedData {
-					logger.Logger.Info(fmt.Sprintf("Cleaning mixed data for channel %d", channel.Id))
+					logger.Logger.Info("Cleaning mixed data for channel", zap.Int("channel_id", channel.Id))
 					err := FixChannelModelConfigs(channel.Id)
 					if err != nil {
 						logger.Logger.Error("Failed to clean channel", zap.Int("channel_id", channel.Id), zap.Error(err))
@@ -243,7 +258,7 @@ func CleanAllMixedModelData() error {
 		}
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Cleaned %d channels with mixed model data", cleanedCount))
+	logger.Logger.Info("Cleaned channels with mixed model data", zap.Int("cleaned_count", cleanedCount))
 	logger.Logger.Info("=== CLEANING COMPLETED ===")
 	return nil
 }
@@ -378,13 +393,16 @@ func ValidateAllChannelModelConfigs() error {
 
 			validCount++
 		} else if hasLegacyData {
-			logger.Logger.Info(fmt.Sprintf("Channel %d: Has legacy data, needs migration", channel.Id))
+			logger.Logger.Info("Channel has legacy data, needs migration", zap.Int("channel_id", channel.Id))
 			issueCount++
 		}
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Validation Summary: %d valid, %d issues, %d empty, %d total",
-		validCount, issueCount, emptyCount, len(channels)))
+	logger.Logger.Info("Validation Summary",
+		zap.Int("valid", validCount),
+		zap.Int("issues", issueCount),
+		zap.Int("empty", emptyCount),
+		zap.Int("total", len(channels)))
 	logger.Logger.Info("=== END VALIDATION ===")
 
 	return nil

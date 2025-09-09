@@ -32,7 +32,7 @@ func notifyRootUser(subject string, content string) {
 // DisableChannel disable & notify
 func DisableChannel(channelId int, channelName string, reason string) {
 	model.UpdateChannelStatusById(channelId, model.ChannelStatusAutoDisabled)
-	logger.Logger.Info(fmt.Sprintf("channel #%d has been disabled: %s", channelId, reason))
+	logger.Logger.Info("channel has been disabled", zap.Int("id", channelId), zap.String("reason", reason))
 	subject := fmt.Sprintf("Channel Status Change Reminder")
 	content := message.EmailTemplate(
 		subject,
@@ -48,7 +48,7 @@ func DisableChannel(channelId int, channelName string, reason string) {
 
 func MetricDisableChannel(channelId int, successRate float64) {
 	model.UpdateChannelStatusById(channelId, model.ChannelStatusAutoDisabled)
-	logger.Logger.Info(fmt.Sprintf("channel #%d has been disabled due to low success rate: %.2f", channelId, successRate*100))
+	logger.Logger.Info("channel has been disabled due to low success rate", zap.Int("id", channelId), zap.Float64("success_rate", successRate*100))
 	subject := fmt.Sprintf("Channel Status Change Reminder")
 	content := message.EmailTemplate(
 		subject,
@@ -65,7 +65,7 @@ func MetricDisableChannel(channelId int, successRate float64) {
 // EnableChannel enable & notify
 func EnableChannel(channelId int, channelName string) {
 	model.UpdateChannelStatusById(channelId, model.ChannelStatusEnabled)
-	logger.Logger.Info(fmt.Sprintf("channel #%d has been enabled", channelId))
+	logger.Logger.Info("channel has been enabled", zap.Int("id", channelId))
 	subject := fmt.Sprintf("Channel Status Change Reminder")
 	content := message.EmailTemplate(
 		subject,

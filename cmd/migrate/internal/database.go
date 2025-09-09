@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm/logger"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common"
 	oneapilogger "github.com/songquanpeng/one-api/common/logger"
 )
@@ -101,7 +103,7 @@ func ConnectDatabase(dbType, dsn string) (*DatabaseConnection, error) {
 		return nil, errors.Wrapf(err, "failed to ping %s database", dbType)
 	}
 
-	oneapilogger.Logger.Info(fmt.Sprintf("Successfully connected to %s database", dbType))
+	oneapilogger.Logger.Info("Successfully connected to database", zap.String("type", dbType))
 
 	return &DatabaseConnection{
 		DB:     db,
@@ -136,7 +138,7 @@ func (dc *DatabaseConnection) Close() error {
 		return errors.Wrapf(err, "failed to close %s database connection", dc.Type)
 	}
 
-	oneapilogger.Logger.Info(fmt.Sprintf("Closed %s database connection", dc.Type))
+	oneapilogger.Logger.Info("Closed database connection", zap.String("type", dc.Type))
 	return nil
 }
 
@@ -208,6 +210,6 @@ func (dc *DatabaseConnection) ValidateConnection() error {
 		return errors.Wrapf(nil, "unexpected result from test query: got %d, expected 1", result)
 	}
 
-	oneapilogger.Logger.Info(fmt.Sprintf("%s database connection validated successfully", dc.Type))
+	oneapilogger.Logger.Info("Database connection validated successfully", zap.String("type", dc.Type))
 	return nil
 }

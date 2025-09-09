@@ -46,8 +46,12 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 	}
 
 	logger.Logger.Info("Starting database migration process")
-	logger.Logger.Info(fmt.Sprintf("Source: %s (%s)", m.SourceType, m.SourceDSN))
-	logger.Logger.Info(fmt.Sprintf("Target: %s (%s)", m.TargetType, m.TargetDSN))
+	logger.Logger.Info("Source database",
+		zap.String("type", m.SourceType),
+		zap.String("dsn", m.SourceDSN))
+	logger.Logger.Info("Target database",
+		zap.String("type", m.TargetType),
+		zap.String("dsn", m.TargetDSN))
 
 	if m.DryRun {
 		logger.Logger.Info("Running in DRY RUN mode - no changes will be made")
@@ -168,7 +172,7 @@ func (m *Migrator) analyzeSource(stats *MigrationStats) error {
 	}
 
 	stats.TablesTotal = len(tables)
-	logger.Logger.Info(fmt.Sprintf("Found %d tables in source database", len(tables)))
+	logger.Logger.Info("Found tables in source database", zap.Int("table_count", len(tables)))
 
 	// Count total records
 	var totalRecords int64
@@ -180,12 +184,14 @@ func (m *Migrator) analyzeSource(stats *MigrationStats) error {
 		}
 		totalRecords += count
 		if m.Verbose {
-			logger.Logger.Info(fmt.Sprintf("Table %s: %d records", table, count))
+			logger.Logger.Info("Table record count",
+				zap.String("table", table),
+				zap.Int64("count", count))
 		}
 	}
 
 	stats.RecordsTotal = totalRecords
-	logger.Logger.Info(fmt.Sprintf("Total records to migrate: %d", totalRecords))
+	logger.Logger.Info("Total records to migrate", zap.Int64("total_records", totalRecords))
 
 	return nil
 }
@@ -382,7 +388,7 @@ func (m *Migrator) fixPostgreSQLSequences() error {
 			// Continue with other tables instead of failing completely
 			continue
 		}
-		logger.Logger.Info(fmt.Sprintf("Fixed sequence for table: %s", tableName))
+		logger.Logger.Info("Fixed sequence for table", zap.String("table", tableName))
 	}
 
 	logger.Logger.Info("PostgreSQL sequence fixing completed")
@@ -398,7 +404,7 @@ func (m *Migrator) fixTableSequence(tableName string) error {
 	}
 
 	if count == 0 {
-		logger.Logger.Info(fmt.Sprintf("Table %s is empty, skipping sequence fix", tableName))
+		logger.Logger.Info("Table is empty, skipping sequence fix", zap.String("table", tableName))
 		return nil
 	}
 
@@ -409,7 +415,7 @@ func (m *Migrator) fixTableSequence(tableName string) error {
 	}
 
 	if maxID == 0 {
-		logger.Logger.Info(fmt.Sprintf("Table %s has no valid IDs, skipping sequence fix", tableName))
+		logger.Logger.Info("Table has no valid IDs, skipping sequence fix", zap.String("table", tableName))
 		return nil
 	}
 
@@ -421,6 +427,8 @@ func (m *Migrator) fixTableSequence(tableName string) error {
 		return errors.Wrapf(err, "failed to update sequence %s", sequenceName)
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Updated sequence %s to start from %d", sequenceName, maxID+1))
+	logger.Logger.Info("Updated sequence",
+		zap.String("sequence", sequenceName),
+		zap.Int64("start_from", maxID+1))
 	return nil
 }

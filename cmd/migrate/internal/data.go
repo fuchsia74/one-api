@@ -2,7 +2,6 @@ package internal
 
 import (
 	"context"
-	"fmt"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -69,7 +68,10 @@ func (m *Migrator) migrateData(ctx context.Context, stats *MigrationStats) error
 		}
 
 		stats.TablesDone++
-		logger.Logger.Info(fmt.Sprintf("Successfully migrated table %s (%d/%d)", tableInfo.Name, stats.TablesDone, stats.TablesTotal))
+		logger.Logger.Info("Successfully migrated table",
+			zap.String("table", tableInfo.Name),
+			zap.Int("tables_done", stats.TablesDone),
+			zap.Int("tables_total", stats.TablesTotal))
 	}
 
 	logger.Logger.Info("Data migration completed")
@@ -84,7 +86,7 @@ func (m *Migrator) migrateTable(ctx context.Context, tableInfo TableInfo, stats 
 		return errors.Wrapf(err, "failed to check if table exists")
 	}
 	if !exists {
-		logger.Logger.Warn(fmt.Sprintf("Table %s does not exist in source database, skipping", tableInfo.Name))
+		logger.Logger.Warn("Table does not exist in source database, skipping", zap.String("table", tableInfo.Name))
 		return nil
 	}
 
@@ -95,12 +97,15 @@ func (m *Migrator) migrateTable(ctx context.Context, tableInfo TableInfo, stats 
 	}
 
 	if totalCount == 0 {
-		logger.Logger.Info(fmt.Sprintf("Table %s is empty, skipping", tableInfo.Name))
+		logger.Logger.Info("Table is empty, skipping", zap.String("table", tableInfo.Name))
 		return nil
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Migrating table %s (%d records) with %d workers, batch size %d",
-		tableInfo.Name, totalCount, m.Workers, m.BatchSize))
+	logger.Logger.Info("Migrating table",
+		zap.String("table", tableInfo.Name),
+		zap.Int64("total_records", totalCount),
+		zap.Int("workers", m.Workers),
+		zap.Int("batch_size", m.BatchSize))
 
 	// Use concurrent processing for better performance
 	if m.Workers > 1 {
@@ -140,7 +145,11 @@ func (m *Migrator) migrateTableSequential(ctx context.Context, tableInfo TableIn
 
 		if m.Verbose && (migratedCount-lastProgressReport >= progressThreshold || migratedCount == totalCount) {
 			progress := float64(migratedCount) / float64(totalCount) * 100
-			logger.Logger.Info(fmt.Sprintf("Table %s: %d/%d records (%.1f%%)", tableInfo.Name, migratedCount, totalCount, progress))
+			logger.Logger.Info("Table migration progress",
+				zap.String("table", tableInfo.Name),
+				zap.Int64("migrated", migratedCount),
+				zap.Int64("total", totalCount),
+				zap.Float64("progress_percent", progress))
 			lastProgressReport = migratedCount
 		}
 
@@ -150,7 +159,9 @@ func (m *Migrator) migrateTableSequential(ctx context.Context, tableInfo TableIn
 		}
 	}
 
-	logger.Logger.Info(fmt.Sprintf("Table %s migration completed: %d records", tableInfo.Name, migratedCount))
+	logger.Logger.Info("Table migration completed",
+		zap.String("table", tableInfo.Name),
+		zap.Int64("migrated", migratedCount))
 	return nil
 }
 
@@ -194,7 +205,11 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 
 			if m.Verbose && (currentCount-lastProgressReport >= progressThreshold || currentCount >= totalCount) {
 				progress := float64(currentCount) / float64(totalCount) * 100
-				logger.Logger.Info(fmt.Sprintf("Table %s: %d/%d records (%.1f%%)", tableInfo.Name, currentCount, totalCount, progress))
+				logger.Logger.Info("Table migration progress",
+					zap.String("table", tableInfo.Name),
+					zap.Int64("migrated", currentCount),
+					zap.Int64("total", totalCount),
+					zap.Float64("progress_percent", progress))
 				lastProgressReport = currentCount
 			}
 		}
@@ -227,7 +242,9 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 	collectorWg.Wait()
 
 	finalCount := atomic.LoadInt64(&migratedCount)
-	logger.Logger.Info(fmt.Sprintf("Table %s migration completed: %d records", tableInfo.Name, finalCount))
+	logger.Logger.Info("Table migration completed",
+		zap.String("table", tableInfo.Name),
+		zap.Int64("migrated", finalCount))
 	return nil
 }
 
@@ -296,7 +313,7 @@ func (m *Migrator) insertBatchWithConflictResolution(batch interface{}, tableInf
 	// If we get a conflict error, use upsert approach
 	if m.isConflictError(err) {
 		if m.Verbose {
-			logger.Logger.Info(fmt.Sprintf("Conflict detected in table %s, switching to upsert mode", tableInfo.Name))
+			logger.Logger.Info("Conflict detected, switching to upsert mode", zap.String("table", tableInfo.Name))
 		}
 		return m.upsertBatch(batch, tableInfo)
 	}
@@ -351,7 +368,10 @@ func (m *Migrator) upsertBatch(batch interface{}, tableInfo TableInfo) error {
 		if result.Error != nil {
 			errorCount++
 			if m.Verbose {
-				logger.Logger.Warn(fmt.Sprintf("Failed to upsert record %d in table %s: %v", i+1, tableInfo.Name, result.Error))
+				logger.Logger.Warn("Failed to upsert record",
+					zap.Int("record_index", i+1),
+					zap.String("table", tableInfo.Name),
+					zap.Error(result.Error))
 			}
 			// Continue with other records instead of failing the entire batch
 		} else {
@@ -423,7 +443,9 @@ func (m *Migrator) validateResults(stats *MigrationStats) error {
 			validationErrors = append(validationErrors, errors.Wrapf(nil, "record count mismatch for table %s: source=%d, target=%d", tableInfo.Name, sourceCount, targetCount))
 		} else {
 			if m.Verbose {
-				logger.Logger.Info(fmt.Sprintf("Table %s validation passed: %d records", tableInfo.Name, sourceCount))
+				logger.Logger.Info("Table validation passed",
+					zap.String("table", tableInfo.Name),
+					zap.Int64("records", sourceCount))
 			}
 		}
 	}
@@ -460,7 +482,7 @@ func (m *Migrator) ExportData(ctx context.Context) (map[string]interface{}, erro
 		}
 
 		if !exists {
-			logger.Logger.Warn(fmt.Sprintf("Table %s does not exist in source database, skipping", tableInfo.Name))
+			logger.Logger.Warn("Table does not exist in source database, skipping", zap.String("table", tableInfo.Name))
 			continue
 		}
 
@@ -471,7 +493,7 @@ func (m *Migrator) ExportData(ctx context.Context) (map[string]interface{}, erro
 		}
 
 		exportData[tableInfo.Name] = tableData
-		logger.Logger.Info(fmt.Sprintf("Exported table %s", tableInfo.Name))
+		logger.Logger.Info("Exported table", zap.String("table", tableInfo.Name))
 	}
 
 	logger.Logger.Info("Data export completed")

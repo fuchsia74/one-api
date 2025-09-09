@@ -1,10 +1,10 @@
 package meta
 
 import (
-	"fmt"
 	"strings"
 	"time"
 
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -61,7 +61,7 @@ func GetByContext(c *gin.Context) *Meta {
 		currentChannelId := c.GetInt(ctxkey.ChannelId)
 		if existingMeta.ChannelId != currentChannelId && currentChannelId != 0 {
 			// Channel has changed, update the cached meta with new channel information
-			logger.Logger.Info(fmt.Sprintf("Channel changed during retry: %d -> %d, updating meta", existingMeta.ChannelId, currentChannelId))
+			logger.Logger.Info("Channel changed during retry", zap.Int("from", existingMeta.ChannelId), zap.Int("to", currentChannelId), zap.String("action", "updating meta"))
 			existingMeta.ChannelType = c.GetInt(ctxkey.Channel)
 			existingMeta.ChannelId = currentChannelId
 			existingMeta.BaseURL = c.GetString(ctxkey.BaseURL)

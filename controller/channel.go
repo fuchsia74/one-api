@@ -2,11 +2,11 @@ package controller
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -330,7 +330,7 @@ func GetChannelPricing(c *gin.Context) {
 		for modelName := range modelConfigs {
 			modelNames = append(modelNames, modelName)
 		}
-		logger.Logger.Info(fmt.Sprintf("Channel %d (type %d) returning model configs for models: %v", channel.Id, channel.Type, modelNames))
+		logger.Logger.Info("Channel returning model configs", zap.Int("id", channel.Id), zap.Int("type", channel.Type), zap.Any("models", modelNames))
 	}
 
 	c.JSON(http.StatusOK, gin.H{

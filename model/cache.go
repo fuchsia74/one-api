@@ -110,7 +110,7 @@ func CacheGetUserQuota(ctx context.Context, id int) (quota int64, err error) {
 		return 0, nil
 	}
 	if quota <= config.PreConsumedQuota { // when user's quota is less than pre-consumed quota, we need to fetch from db
-		logger.Logger.Info(fmt.Sprintf("user %d's cached quota is too low: %d, refreshing from db", quota, id))
+		logger.Logger.Info("user's cached quota is too low, refreshing from db", zap.Int64("quota", quota), zap.Int("user_id", id))
 		return fetchAndUpdateUserQuota(ctx, id)
 	}
 	return quota, nil
@@ -410,7 +410,7 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 		}
 	}
 	channel := candidateChannels[idx]
-	logger.Logger.Info(fmt.Sprintf("select channel %s#%d in cache", channel.Name, channel.Id))
+	logger.Logger.Info("select channel in cache", zap.String("channel_name", channel.Name), zap.Int("channel_id", channel.Id))
 	return channel, nil
 }
 
@@ -486,7 +486,7 @@ func CacheGetRandomSatisfiedChannelExcluding(group string, model string, ignoreF
 		if endIdx < len(candidateChannels) {
 			idx := random.RandRange(endIdx, len(candidateChannels))
 			channel := candidateChannels[idx]
-			logger.Logger.Info(fmt.Sprintf("select channel %s#%d in cache", channel.Name, channel.Id))
+			logger.Logger.Info("select channel in cache", zap.String("channel_name", channel.Name), zap.Int("channel_id", channel.Id))
 			return channel, nil
 		} else {
 			// No lower priority channels available, return error to indicate we should try a different approach
@@ -522,7 +522,7 @@ func CacheGetRandomSatisfiedChannelExcluding(group string, model string, ignoreF
 
 		idx := rand.Intn(len(maxPriorityChannels))
 		channel := maxPriorityChannels[idx]
-		logger.Logger.Info(fmt.Sprintf("select channel %s#%d in cache", channel.Name, channel.Id))
+		logger.Logger.Info("select channel in cache", zap.String("channel_name", channel.Name), zap.Int("channel_id", channel.Id))
 		return channel, nil
 	}
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 	"embed"
 	"encoding/base64"
-	"fmt"
 	"net/http"
 	"os"
 	"runtime"
@@ -55,7 +54,7 @@ func main() {
 	}
 
 	// check theme
-	logger.Logger.Info(fmt.Sprintf("using theme %s", config.Theme))
+	logger.Logger.Info("using theme", zap.String("theme", config.Theme))
 	if err := isThemeValid(); err != nil {
 		logger.Logger.Fatal("invalid theme", zap.Error(err))
 	}
@@ -89,8 +88,7 @@ func main() {
 		config.MemoryCacheEnabled = true
 	}
 	if config.MemoryCacheEnabled {
-		logger.Logger.Info("memory cache enabled")
-		logger.Logger.Info(fmt.Sprintf("sync frequency: %d seconds", config.SyncFrequency))
+		logger.Logger.Info("memory cache enabled", zap.Int("sync_frequency", config.SyncFrequency))
 		model.InitChannelCache()
 	}
 	if config.MemoryCacheEnabled {
