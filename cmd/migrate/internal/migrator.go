@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/logger"
@@ -54,43 +55,43 @@ func (m *Migrator) Migrate(ctx context.Context) error {
 
 	// Step 1: Connect to databases
 	if err := m.connectDatabases(); err != nil {
-		return fmt.Errorf("failed to connect to databases: %w", err)
+		return errors.Wrapf(err, "failed to connect to databases")
 	}
 	defer m.closeDatabases()
 
 	// Step 2: Validate connections and compatibility
 	if err := m.validateMigration(); err != nil {
-		return fmt.Errorf("migration validation failed: %w", err)
+		return errors.Wrapf(err, "migration validation failed")
 	}
 
 	// Step 3: Analyze source database
 	if err := m.analyzeSource(stats); err != nil {
-		return fmt.Errorf("source analysis failed: %w", err)
+		return errors.Wrapf(err, "source analysis failed")
 	}
 
 	// Step 4: Prepare target database
 	if !m.DryRun {
 		if err := m.prepareTarget(); err != nil {
-			return fmt.Errorf("target preparation failed: %w", err)
+			return errors.Wrapf(err, "target preparation failed")
 		}
 	}
 
 	// Step 5: Migrate data
 	if err := m.migrateData(ctx, stats); err != nil {
-		return fmt.Errorf("data migration failed: %w", err)
+		return errors.Wrapf(err, "data migration failed")
 	}
 
 	// Step 6: Fix PostgreSQL sequences (if target is PostgreSQL)
 	if !m.DryRun && m.targetConn.Type == "postgres" {
 		if err := m.fixPostgreSQLSequences(); err != nil {
-			return fmt.Errorf("PostgreSQL sequence fix failed: %w", err)
+			return errors.Wrapf(err, "PostgreSQL sequence fix failed")
 		}
 	}
 
 	// Step 7: Validate migration results
 	if !m.DryRun {
 		if err := m.validateResults(stats); err != nil {
-			return fmt.Errorf("migration validation failed: %w", err)
+			return errors.Wrapf(err, "migration validation failed")
 		}
 	}
 
@@ -107,13 +108,13 @@ func (m *Migrator) connectDatabases() error {
 	// Connect to source database
 	m.sourceConn, err = ConnectDatabaseFromDSN(m.SourceDSN)
 	if err != nil {
-		return fmt.Errorf("failed to connect to source database: %w", err)
+		return errors.Wrapf(err, "failed to connect to source database")
 	}
 
 	// Connect to target database
 	m.targetConn, err = ConnectDatabaseFromDSN(m.TargetDSN)
 	if err != nil {
-		return fmt.Errorf("failed to connect to target database: %w", err)
+		return errors.Wrapf(err, "failed to connect to target database")
 	}
 
 	return nil
@@ -139,17 +140,17 @@ func (m *Migrator) validateMigration() error {
 
 	// Validate source connection
 	if err := m.sourceConn.ValidateConnection(); err != nil {
-		return fmt.Errorf("source database validation failed: %w", err)
+		return errors.Wrapf(err, "source database validation failed")
 	}
 
 	// Validate target connection
 	if err := m.targetConn.ValidateConnection(); err != nil {
-		return fmt.Errorf("target database validation failed: %w", err)
+		return errors.Wrapf(err, "target database validation failed")
 	}
 
 	// Check if source and target are the same
 	if m.sourceConn.Type == m.targetConn.Type && m.sourceConn.DSN == m.targetConn.DSN {
-		return fmt.Errorf("source and target databases cannot be the same")
+		return errors.Wrapf(nil, "source and target databases cannot be the same")
 	}
 
 	logger.Logger.Info("Database connections validated successfully")
@@ -163,7 +164,7 @@ func (m *Migrator) analyzeSource(stats *MigrationStats) error {
 	// Get all tables
 	tables, err := m.sourceConn.GetTableNames()
 	if err != nil {
-		return fmt.Errorf("failed to get source table names: %w", err)
+		return errors.Wrapf(err, "failed to get source table names")
 	}
 
 	stats.TablesTotal = len(tables)
@@ -195,7 +196,7 @@ func (m *Migrator) prepareTarget() error {
 
 	// Run GORM auto-migration to create tables
 	if err := m.runAutoMigration(); err != nil {
-		return fmt.Errorf("failed to run auto-migration: %w", err)
+		return errors.Wrapf(err, "failed to run auto-migration")
 	}
 
 	logger.Logger.Info("Target database prepared successfully")
@@ -215,31 +216,31 @@ func (m *Migrator) runAutoMigration() error {
 
 	// Run migrations for all models
 	if err := model.DB.AutoMigrate(&model.Channel{}); err != nil {
-		return fmt.Errorf("failed to migrate Channel: %w", err)
+		return errors.Wrapf(err, "failed to migrate Channel")
 	}
 	if err := model.DB.AutoMigrate(&model.Token{}); err != nil {
-		return fmt.Errorf("failed to migrate Token: %w", err)
+		return errors.Wrapf(err, "failed to migrate Token")
 	}
 	if err := model.DB.AutoMigrate(&model.User{}); err != nil {
-		return fmt.Errorf("failed to migrate User: %w", err)
+		return errors.Wrapf(err, "failed to migrate User")
 	}
 	if err := model.DB.AutoMigrate(&model.Option{}); err != nil {
-		return fmt.Errorf("failed to migrate Option: %w", err)
+		return errors.Wrapf(err, "failed to migrate Option")
 	}
 	if err := model.DB.AutoMigrate(&model.Redemption{}); err != nil {
-		return fmt.Errorf("failed to migrate Redemption: %w", err)
+		return errors.Wrapf(err, "failed to migrate Redemption")
 	}
 	if err := model.DB.AutoMigrate(&model.Ability{}); err != nil {
-		return fmt.Errorf("failed to migrate Ability: %w", err)
+		return errors.Wrapf(err, "failed to migrate Ability")
 	}
 	if err := model.DB.AutoMigrate(&model.Log{}); err != nil {
-		return fmt.Errorf("failed to migrate Log: %w", err)
+		return errors.Wrapf(err, "failed to migrate Log")
 	}
 	if err := model.DB.AutoMigrate(&model.UserRequestCost{}); err != nil {
-		return fmt.Errorf("failed to migrate UserRequestCost: %w", err)
+		return errors.Wrapf(err, "failed to migrate UserRequestCost")
 	}
 	if err := model.DB.AutoMigrate(&model.Trace{}); err != nil {
-		return fmt.Errorf("failed to migrate Trace: %w", err)
+		return errors.Wrapf(err, "failed to migrate Trace")
 	}
 
 	logger.Logger.Info("GORM auto-migration completed successfully")
@@ -276,13 +277,13 @@ func (m *Migrator) ValidateOnly(ctx context.Context) error {
 
 	// Connect to databases
 	if err := m.connectDatabases(); err != nil {
-		return fmt.Errorf("failed to connect to databases: %w", err)
+		return errors.Wrapf(err, "failed to connect to databases")
 	}
 	defer m.closeDatabases()
 
 	// Validate connections
 	if err := m.validateMigration(); err != nil {
-		return fmt.Errorf("migration validation failed: %w", err)
+		return errors.Wrapf(err, "migration validation failed")
 	}
 
 	// Analyze source
@@ -292,7 +293,7 @@ func (m *Migrator) ValidateOnly(ctx context.Context) error {
 	}
 
 	if err := m.analyzeSource(stats); err != nil {
-		return fmt.Errorf("source analysis failed: %w", err)
+		return errors.Wrapf(err, "source analysis failed")
 	}
 
 	logger.Logger.Info("Validation completed successfully")
@@ -310,7 +311,7 @@ func (m *Migrator) GetMigrationPlan() (*MigrationPlan, error) {
 	// Connect to source database
 	sourceConn, err := ConnectDatabase(m.SourceType, m.SourceDSN)
 	if err != nil {
-		return nil, fmt.Errorf("failed to connect to source database: %w", err)
+		return nil, errors.Wrapf(err, "failed to connect to source database")
 	}
 	defer sourceConn.Close()
 
@@ -318,7 +319,7 @@ func (m *Migrator) GetMigrationPlan() (*MigrationPlan, error) {
 	for _, tableInfo := range TableMigrationOrder {
 		exists, err := sourceConn.TableExists(tableInfo.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check table %s: %w", tableInfo.Name, err)
+			return nil, errors.Wrapf(err, "failed to check table %s", tableInfo.Name)
 		}
 
 		if !exists {
@@ -327,7 +328,7 @@ func (m *Migrator) GetMigrationPlan() (*MigrationPlan, error) {
 
 		count, err := sourceConn.GetRowCount(tableInfo.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get row count for %s: %w", tableInfo.Name, err)
+			return nil, errors.Wrapf(err, "failed to get row count for %s", tableInfo.Name)
 		}
 
 		plan.Tables = append(plan.Tables, TablePlan{
@@ -393,7 +394,7 @@ func (m *Migrator) fixTableSequence(tableName string) error {
 	// First check if the table exists and has records
 	var count int64
 	if err := m.targetConn.DB.Table(tableName).Count(&count).Error; err != nil {
-		return fmt.Errorf("failed to count records in table %s: %w", tableName, err)
+		return errors.Wrapf(err, "failed to count records in table %s", tableName)
 	}
 
 	if count == 0 {
@@ -404,7 +405,7 @@ func (m *Migrator) fixTableSequence(tableName string) error {
 	// Get the maximum ID value from the table
 	var maxID int64
 	if err := m.targetConn.DB.Table(tableName).Select("COALESCE(MAX(id), 0)").Scan(&maxID).Error; err != nil {
-		return fmt.Errorf("failed to get max ID from table %s: %w", tableName, err)
+		return errors.Wrapf(err, "failed to get max ID from table %s", tableName)
 	}
 
 	if maxID == 0 {
@@ -417,7 +418,7 @@ func (m *Migrator) fixTableSequence(tableName string) error {
 	sql := fmt.Sprintf("SELECT setval('%s', %d, true)", sequenceName, maxID)
 
 	if err := m.targetConn.DB.Exec(sql).Error; err != nil {
-		return fmt.Errorf("failed to update sequence %s: %w", sequenceName, err)
+		return errors.Wrapf(err, "failed to update sequence %s", sequenceName)
 	}
 
 	logger.Logger.Info(fmt.Sprintf("Updated sequence %s to start from %d", sequenceName, maxID+1))

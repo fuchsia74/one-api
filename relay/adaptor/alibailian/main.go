@@ -3,6 +3,7 @@ package alibailian
 import (
 	"fmt"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
@@ -15,5 +16,5 @@ func GetRequestURL(meta *meta.Meta) (string, error) {
 		return fmt.Sprintf("%s/compatible-mode/v1/embeddings", meta.BaseURL), nil
 	default:
 	}
-	return "", fmt.Errorf("unsupported relay mode %d for ali bailian", meta.Mode)
+	return "", errors.Errorf("unsupported relay mode %d for ali bailian", meta.Mode)
 }

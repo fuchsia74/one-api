@@ -24,6 +24,7 @@ type response struct {
 	Message string `json:"message"`
 }
 
+// SendMessage sends a message to the message pusher service.
 func SendMessage(title string, description string, content string) error {
 	if config.MessagePusherAddress == "" {
 		return errors.New("message pusher address is not set")
@@ -36,20 +37,29 @@ func SendMessage(title string, description string, content string) error {
 	}
 	data, err := json.Marshal(req)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "marshal request")
 	}
+
 	resp, err := http.Post(config.MessagePusherAddress,
 		"application/json", bytes.NewBuffer(data))
 	if err != nil {
-		return err
+		return errors.Wrap(err, "send request")
 	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	var res response
 	err = json.NewDecoder(resp.Body).Decode(&res)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "decode response")
 	}
+
 	if !res.Success {
 		return errors.New(res.Message)
 	}
+
 	return nil
 }

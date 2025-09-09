@@ -16,7 +16,7 @@ func DebugChannelModelConfigs(channelId int) error {
 	var channel Channel
 	err := DB.Where("id = ?", channelId).First(&channel).Error
 	if err != nil {
-		return fmt.Errorf("failed to find channel %d: %w", channelId, err)
+		return errors.Wrapf(err, "failed to find channel %d", channelId)
 	}
 
 	logger.Logger.Info("=== DEBUG CHANNEL ===",
@@ -94,7 +94,7 @@ func DebugAllChannelModelConfigs() error {
 	var channels []Channel
 	err := DB.Select("id, name, type, status").Find(&channels).Error
 	if err != nil {
-		return fmt.Errorf("failed to fetch channels: %w", err)
+		return errors.Wrapf(err, "failed to fetch channels")
 	}
 
 	logger.Logger.Info("=== ALL CHANNELS SUMMARY ===")
@@ -154,7 +154,7 @@ func FixChannelModelConfigs(channelId int) error {
 	var channel Channel
 	err := DB.Where("id = ?", channelId).First(&channel).Error
 	if err != nil {
-		return fmt.Errorf("failed to find channel %d: %w", channelId, err)
+		return errors.Wrapf(err, "failed to find channel %d", channelId)
 	}
 
 	logger.Logger.Info(fmt.Sprintf("=== FIXING CHANNEL %d ===", channelId))
@@ -210,7 +210,7 @@ func CleanAllMixedModelData() error {
 	var channels []Channel
 	err := DB.Find(&channels).Error
 	if err != nil {
-		return fmt.Errorf("failed to fetch channels: %w", err)
+		return errors.Wrapf(err, "failed to fetch channels")
 	}
 
 	cleanedCount := 0
@@ -341,7 +341,7 @@ func ValidateAllChannelModelConfigs() error {
 	var channels []Channel
 	err := DB.Find(&channels).Error
 	if err != nil {
-		return fmt.Errorf("failed to fetch channels: %w", err)
+		return errors.Wrapf(err, "failed to fetch channels")
 	}
 
 	logger.Logger.Info("=== VALIDATION REPORT ===")

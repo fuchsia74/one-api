@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/logger"
@@ -60,7 +61,7 @@ func (m *Migrator) migrateData(ctx context.Context, stats *MigrationStats) error
 		}
 
 		if err := m.migrateTable(ctx, tableInfo, stats); err != nil {
-			stats.Errors = append(stats.Errors, fmt.Errorf("failed to migrate table %s: %w", tableInfo.Name, err))
+			stats.Errors = append(stats.Errors, errors.Wrapf(err, "failed to migrate table %s", tableInfo.Name))
 			logger.Logger.Error("Failed to migrate table",
 				zap.String("table", tableInfo.Name),
 				zap.Error(err))
@@ -80,7 +81,7 @@ func (m *Migrator) migrateTable(ctx context.Context, tableInfo TableInfo, stats 
 	// Check if table exists in source
 	exists, err := m.sourceConn.TableExists(tableInfo.Name)
 	if err != nil {
-		return fmt.Errorf("failed to check if table exists: %w", err)
+		return errors.Wrapf(err, "failed to check if table exists")
 	}
 	if !exists {
 		logger.Logger.Warn(fmt.Sprintf("Table %s does not exist in source database, skipping", tableInfo.Name))
@@ -90,7 +91,7 @@ func (m *Migrator) migrateTable(ctx context.Context, tableInfo TableInfo, stats 
 	// Get total count for progress tracking
 	totalCount, err := m.sourceConn.GetRowCount(tableInfo.Name)
 	if err != nil {
-		return fmt.Errorf("failed to get row count: %w", err)
+		return errors.Wrapf(err, "failed to get row count")
 	}
 
 	if totalCount == 0 {
@@ -124,7 +125,7 @@ func (m *Migrator) migrateTableSequential(ctx context.Context, tableInfo TableIn
 
 		batchCount, err := m.migrateBatch(tableInfo, offset, m.BatchSize)
 		if err != nil {
-			return fmt.Errorf("failed to migrate batch at offset %d: %w", offset, err)
+			return errors.Wrapf(err, "failed to migrate batch at offset %d", offset)
 		}
 
 		migratedCount += batchCount
@@ -260,7 +261,7 @@ func (m *Migrator) migrateBatch(tableInfo TableInfo, offset int64, limit int) (i
 	// Fetch batch from source database
 	query := m.sourceConn.DB.Limit(limit).Offset(int(offset))
 	if err := query.Find(batch).Error; err != nil {
-		return 0, fmt.Errorf("failed to fetch batch from source: %w", err)
+		return 0, errors.Wrapf(err, "failed to fetch batch from source")
 	}
 
 	// Get the actual slice value
@@ -278,7 +279,7 @@ func (m *Migrator) migrateBatch(tableInfo TableInfo, offset int64, limit int) (i
 
 	// Insert batch into target database with conflict resolution
 	if err := m.insertBatchWithConflictResolution(batch, tableInfo); err != nil {
-		return 0, fmt.Errorf("failed to insert batch into target: %w", err)
+		return 0, errors.Wrapf(err, "failed to insert batch into target")
 	}
 
 	return int64(batchLen), nil
@@ -395,7 +396,7 @@ func (m *Migrator) validateResults(stats *MigrationStats) error {
 		// Check if table exists in source
 		sourceExists, err := m.sourceConn.TableExists(tableInfo.Name)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("failed to check source table %s: %w", tableInfo.Name, err))
+			validationErrors = append(validationErrors, errors.Wrapf(err, "failed to check source table %s", tableInfo.Name))
 			continue
 		}
 
@@ -406,20 +407,20 @@ func (m *Migrator) validateResults(stats *MigrationStats) error {
 		// Get source count
 		sourceCount, err := m.sourceConn.GetRowCount(tableInfo.Name)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("failed to get source count for %s: %w", tableInfo.Name, err))
+			validationErrors = append(validationErrors, errors.Wrapf(err, "failed to get source count for %s", tableInfo.Name))
 			continue
 		}
 
 		// Get target count
 		targetCount, err := m.targetConn.GetRowCount(tableInfo.Name)
 		if err != nil {
-			validationErrors = append(validationErrors, fmt.Errorf("failed to get target count for %s: %w", tableInfo.Name, err))
+			validationErrors = append(validationErrors, errors.Wrapf(err, "failed to get target count for %s", tableInfo.Name))
 			continue
 		}
 
 		// Compare counts
 		if sourceCount != targetCount {
-			validationErrors = append(validationErrors, fmt.Errorf("record count mismatch for table %s: source=%d, target=%d", tableInfo.Name, sourceCount, targetCount))
+			validationErrors = append(validationErrors, errors.Wrapf(nil, "record count mismatch for table %s: source=%d, target=%d", tableInfo.Name, sourceCount, targetCount))
 		} else {
 			if m.Verbose {
 				logger.Logger.Info(fmt.Sprintf("Table %s validation passed: %d records", tableInfo.Name, sourceCount))
@@ -432,7 +433,7 @@ func (m *Migrator) validateResults(stats *MigrationStats) error {
 		for _, err := range validationErrors {
 			logger.Logger.Error("Migration validation error", zap.Error(err))
 		}
-		return fmt.Errorf("migration validation failed with %d errors", len(validationErrors))
+		return errors.Wrapf(nil, "migration validation failed with %d errors", len(validationErrors))
 	}
 
 	logger.Logger.Info("Migration validation completed successfully")
@@ -455,7 +456,7 @@ func (m *Migrator) ExportData(ctx context.Context) (map[string]interface{}, erro
 		// Check if table exists
 		exists, err := m.sourceConn.TableExists(tableInfo.Name)
 		if err != nil {
-			return nil, fmt.Errorf("failed to check if table %s exists: %w", tableInfo.Name, err)
+			return nil, errors.Wrapf(err, "failed to check if table %s exists", tableInfo.Name)
 		}
 
 		if !exists {
@@ -466,7 +467,7 @@ func (m *Migrator) ExportData(ctx context.Context) (map[string]interface{}, erro
 		// Export table data
 		tableData, err := m.exportTable(tableInfo)
 		if err != nil {
-			return nil, fmt.Errorf("failed to export table %s: %w", tableInfo.Name, err)
+			return nil, errors.Wrapf(err, "failed to export table %s", tableInfo.Name)
 		}
 
 		exportData[tableInfo.Name] = tableData
@@ -486,7 +487,7 @@ func (m *Migrator) exportTable(tableInfo TableInfo) (interface{}, error) {
 
 	// Fetch all data from the table
 	if err := m.sourceConn.DB.Find(tableData).Error; err != nil {
-		return nil, fmt.Errorf("failed to fetch data from table: %w", err)
+		return nil, errors.Wrapf(err, "failed to fetch data from table")
 	}
 
 	return tableData, nil

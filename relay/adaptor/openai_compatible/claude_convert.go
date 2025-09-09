@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
 
@@ -171,7 +172,7 @@ func chatResponseToClaude(r *chatTextResponse) relaymodel.ClaudeResponse {
 func marshalClaudeHTTPResponse(orig *http.Response, payload relaymodel.ClaudeResponse) (*http.Response, *relaymodel.ErrorWithStatusCode) {
 	b, err := json.Marshal(payload)
 	if err != nil {
-		return nil, ErrorWrapper(fmt.Errorf("marshal_claude_response: %w", err), "marshal_claude_response_failed", http.StatusInternalServerError)
+		return nil, ErrorWrapper(errors.Wrapf(err, "marshal_claude_response"), "marshal_claude_response_failed", http.StatusInternalServerError)
 	}
 	newResp := &http.Response{
 		StatusCode: orig.StatusCode,

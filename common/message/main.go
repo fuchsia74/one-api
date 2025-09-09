@@ -26,7 +26,7 @@ func Notify(by string, title string, description string, content string) error {
 		}
 
 		if len(errMsgs) > 0 {
-			return fmt.Errorf("multiple errors occurred: %v", errMsgs)
+			return errors.Errorf("multiple errors occurred: %v", errMsgs)
 		}
 		return nil
 	case ByEmail:

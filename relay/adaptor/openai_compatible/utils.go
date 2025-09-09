@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
@@ -125,7 +126,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		}
 
 		// Return generic error if parsing fails
-		return ErrorWrapper(fmt.Errorf("unexpected non-streaming response: %s", string(responseBody)),
+		return ErrorWrapper(errors.Errorf("unexpected non-streaming response: %s", string(responseBody)),
 			"unexpected_response_format", resp.StatusCode), nil
 	}
 
@@ -207,7 +208,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 		logger.Error("stream processing completed but no chunks were processed",
 			zap.String("model", modelName),
 			zap.String("content_type", resp.Header.Get("Content-Type")))
-		return ErrorWrapper(fmt.Errorf("no streaming data received from upstream"),
+		return ErrorWrapper(errors.Errorf("no streaming data received from upstream"),
 			"empty_stream_response", http.StatusInternalServerError), usage
 	}
 
@@ -274,7 +275,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		logger.Error("received empty response body from upstream",
 			zap.String("model", modelName),
 			zap.Int("status_code", resp.StatusCode))
-		return ErrorWrapper(fmt.Errorf("empty response body from upstream"),
+		return ErrorWrapper(errors.Errorf("empty response body from upstream"),
 			"empty_response_body", http.StatusInternalServerError), nil
 	}
 
@@ -301,7 +302,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		logger.Error("response has no choices, possible upstream error",
 			zap.String("model", modelName),
 			zap.ByteString("response_body", responseBody))
-		return ErrorWrapper(fmt.Errorf("no choices in response from upstream"),
+		return ErrorWrapper(errors.Errorf("no choices in response from upstream"),
 			"no_choices_in_response", http.StatusInternalServerError), nil
 	}
 

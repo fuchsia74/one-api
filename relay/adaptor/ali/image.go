@@ -137,7 +137,7 @@ func asyncTaskWait(taskID string, key string) (*TaskResponse, []byte, error) {
 		time.Sleep(time.Duration(waitSeconds) * time.Second)
 	}
 
-	return nil, nil, fmt.Errorf("aliAsyncTaskWait timeout")
+	return nil, nil, errors.Errorf("aliAsyncTaskWait timeout")
 }
 
 func responseAli2OpenAIImage(response *TaskResponse, responseFormat string) *openai.ImageResponse {

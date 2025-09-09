@@ -17,7 +17,7 @@ lint:
 	gofmt -s -w .
 	go vet
 	# nilaway ./...
-	golangci-lint run -c .golangci.lint.yml
+	golangci-lint run -c .golangci.yml
 	govulncheck ./...
 
 # Development targets - Template specific

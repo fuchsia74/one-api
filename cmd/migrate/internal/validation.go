@@ -48,22 +48,22 @@ func (v *PreMigrationValidator) ValidateAll() (*ValidationResult, error) {
 
 	// Validate database connections
 	if err := v.validateConnections(result); err != nil {
-		return result, fmt.Errorf("connection validation failed: %w", err)
+		return result, errors.Wrapf(err, "connection validation failed")
 	}
 
 	// Validate source database
 	if err := v.validateSourceDatabase(result); err != nil {
-		return result, fmt.Errorf("source database validation failed: %w", err)
+		return result, errors.Wrapf(err, "source database validation failed")
 	}
 
 	// Validate target database
 	if err := v.validateTargetDatabase(result); err != nil {
-		return result, fmt.Errorf("target database validation failed: %w", err)
+		return result, errors.Wrapf(err, "target database validation failed")
 	}
 
 	// Validate migration compatibility
 	if err := v.validateMigrationCompatibility(result); err != nil {
-		return result, fmt.Errorf("migration compatibility validation failed: %w", err)
+		return result, errors.Wrapf(err, "migration compatibility validation failed")
 	}
 
 	// Check for potential issues
@@ -280,7 +280,7 @@ func ExtractDatabaseTypeFromDSN(dsn string) (string, error) {
 		return "sqlite", nil
 	}
 
-	return "", errors.Wrapf(fmt.Errorf("unable to determine database type from DSN: %s", dsn), "invalid DSN")
+	return "", errors.Wrapf(nil, "unable to determine database type from DSN: %s", dsn)
 }
 
 // ValidateDSN validates a database connection string
@@ -298,7 +298,7 @@ func ValidateDSN(dsn string) error {
 	case "postgres", "postgresql":
 		return validatePostgresDSN(dsn)
 	default:
-		return fmt.Errorf("unsupported database type: %s", dbType)
+		return errors.Wrapf(nil, "unsupported database type: %s", dbType)
 	}
 }
 
@@ -334,14 +334,14 @@ func validateMySQLDSN(dsn string) error {
 	if strings.HasPrefix(dsn, "mysql://") {
 		// For mysql:// scheme, we expect: mysql://user:password@host:port/database
 		if !strings.Contains(dsn, "@") || !strings.Contains(dsn, "/") {
-			return errors.Wrapf(fmt.Errorf("invalid MySQL DSN format - expected format: mysql://user:password@host:port/database"), "invalid MySQL DSN")
+			return errors.Wrapf(nil, "invalid MySQL DSN format - expected format: mysql://user:password@host:port/database")
 		}
 		return nil
 	}
 
 	// Basic format check for traditional MySQL DSN
 	if !strings.Contains(dsn, "@tcp(") && !strings.Contains(dsn, "@unix(") {
-		return errors.Wrapf(fmt.Errorf("invalid MySQL DSN format - expected format: user:password@tcp(host:port)/database or mysql://user:password@host:port/database"), "invalid MySQL DSN")
+		return errors.Wrapf(nil, "invalid MySQL DSN format - expected format: user:password@tcp(host:port)/database or mysql://user:password@host:port/database")
 	}
 	return nil
 }
@@ -350,7 +350,7 @@ func validateMySQLDSN(dsn string) error {
 func validatePostgresDSN(dsn string) error {
 	// Basic format check for PostgreSQL DSN
 	if !strings.HasPrefix(dsn, "postgres://") && !strings.HasPrefix(dsn, "postgresql://") {
-		return errors.Wrapf(fmt.Errorf("invalid PostgreSQL DSN format - expected format: postgres://user:password@host:port/database"), "invalid PostgreSQL DSN")
+		return errors.Wrapf(nil, "invalid PostgreSQL DSN format - expected format: postgres://user:password@host:port/database")
 	}
 	return nil
 }

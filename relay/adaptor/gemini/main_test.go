@@ -958,13 +958,13 @@ func verifyNoAdditionalProperties(obj interface{}) error {
 		}
 		for key, value := range v {
 			if err := verifyNoAdditionalProperties(value); err != nil {
-				return fmt.Errorf("in field %s: %w", key, err)
+				return errors.Wrapf(err, "in field %s", key)
 			}
 		}
 	case []interface{}:
 		for i, item := range v {
 			if err := verifyNoAdditionalProperties(item); err != nil {
-				return fmt.Errorf("in array index %d: %w", i, err)
+				return errors.Wrapf(err, "in array index %d", i)
 			}
 		}
 	}

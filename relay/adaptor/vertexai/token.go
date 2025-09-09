@@ -8,6 +8,7 @@ import (
 
 	credentials "cloud.google.com/go/iam/credentials/apiv1"
 	"cloud.google.com/go/iam/credentials/apiv1/credentialspb"
+	"github.com/Laisky/errors/v2"
 	"github.com/patrickmn/go-cache"
 	"google.golang.org/api/option"
 )
@@ -37,12 +38,12 @@ func getToken(ctx context.Context, channelId int, adcJson string) (string, error
 	}
 	adc := &ApplicationDefaultCredentials{}
 	if err := json.Unmarshal([]byte(adcJson), adc); err != nil {
-		return "", fmt.Errorf("Failed to decode credentials file: %w", err)
+		return "", errors.Wrapf(err, "Failed to decode credentials file")
 	}
 
 	c, err := credentials.NewIamCredentialsClient(ctx, option.WithCredentialsJSON([]byte(adcJson)))
 	if err != nil {
-		return "", fmt.Errorf("Failed to create client: %w", err)
+		return "", errors.Wrapf(err, "Failed to create client")
 	}
 	defer c.Close()
 
@@ -53,7 +54,7 @@ func getToken(ctx context.Context, channelId int, adcJson string) (string, error
 	}
 	resp, err := c.GenerateAccessToken(ctx, req)
 	if err != nil {
-		return "", fmt.Errorf("Failed to generate access token: %w", err)
+		return "", errors.Wrapf(err, "Failed to generate access token")
 	}
 	_ = resp
 

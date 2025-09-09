@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
@@ -19,5 +20,5 @@ func GetRequestURL(meta *meta.Meta) (string, error) {
 		return fmt.Sprintf("%s/api/v3/embeddings", meta.BaseURL), nil
 	default:
 	}
-	return "", fmt.Errorf("unsupported relay mode %d for doubao", meta.Mode)
+	return "", errors.Errorf("unsupported relay mode %d for doubao", meta.Mode)
 }

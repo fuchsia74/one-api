@@ -243,6 +243,7 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 		// Return wrapped error; avoid duplicate logging here
 		return "", errors.Wrap(err, "failed to do request"), nil
 	}
+	defer resp.Body.Close()
 
 	if resp != nil && resp.StatusCode != http.StatusOK {
 		// Use context-aware error handler to capture and log upstream error response
@@ -436,7 +437,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 			tok := time.Now()
 			milliseconds := tok.Sub(tik).Milliseconds()
 			if isChannelEnabled && milliseconds > disableThreshold {
-				err = fmt.Errorf("Response time %.2fs exceeds threshold %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0)
+				err = errors.Errorf("Response time %.2fs exceeds threshold %.2fs", float64(milliseconds)/1000.0, float64(disableThreshold)/1000.0)
 				if config.AutomaticDisableChannelEnabled {
 					monitor.DisableChannel(channel.Id, channel.Name, err.Error())
 				} else {
