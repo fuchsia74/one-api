@@ -244,6 +244,11 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 		return "", errors.Wrap(err, "failed to do request"), nil
 	}
 
+	// Handle nil response (e.g., AWS Bedrock uses SDK directly, not HTTP)
+	if resp != nil {
+		defer resp.Body.Close()
+	}
+
 	if resp != nil && resp.StatusCode != http.StatusOK {
 		// Use context-aware error handler to capture and log upstream error response
 		wrappedErr := controller.RelayErrorHandlerWithContext(c, resp)
