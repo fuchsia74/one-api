@@ -8,6 +8,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
+// ShouldDisableChannel determines if a channel should be automatically disabled based on the error received.
 func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 	if !config.AutomaticDisableChannelEnabled {
 		return false
@@ -45,6 +46,7 @@ func ShouldDisableChannel(err *model.Error, statusCode int) bool {
 	return false
 }
 
+// ShouldEnableChannel determines if a channel should be automatically re-enabled based on the absence of errors.
 func ShouldEnableChannel(err error, openAIErr *model.Error) bool {
 	if !config.AutomaticEnableChannelEnabled {
 		return false

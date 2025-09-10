@@ -51,6 +51,12 @@ var DisplayTokenStatEnabled = true
 
 var ChannelSuspendSecondsFor429 = time.Second * time.Duration(env.Int("CHANNEL_SUSPEND_SECONDS_FOR_429", 60))
 
+// ChannelSuspendSecondsFor5XX controls the per-ability suspension window after transient server/network errors
+var ChannelSuspendSecondsFor5XX = time.Second * time.Duration(env.Int("CHANNEL_SUSPEND_SECONDS_FOR_5XX", 30))
+
+// ChannelSuspendSecondsForAuth controls the per-ability suspension window after auth/quota/permission errors
+var ChannelSuspendSecondsForAuth = time.Second * time.Duration(env.Int("CHANNEL_SUSPEND_SECONDS_FOR_AUTH", 60))
+
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 
 var SessionSecret = os.Getenv("SESSION_SECRET")

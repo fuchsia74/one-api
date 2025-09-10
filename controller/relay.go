@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/Laisky/errors/v2"
@@ -149,6 +150,9 @@ func Relay(c *gin.Context) {
 	// For 413 errors, we should try Larger MaxTokens channels
 	shouldTryLargerMaxTokensFirst := bizErr.StatusCode == http.StatusRequestEntityTooLarge
 
+	// For 5xx/server transient errors, avoid reusing the same ability first, probe within tier
+	isServerTransient := bizErr.StatusCode >= 500 && bizErr.StatusCode <= 599
+
 	for i := retryTimes; i > 0; i-- {
 		var channel *dbmodel.Channel
 		var err error
@@ -159,7 +163,8 @@ func Relay(c *gin.Context) {
 				zap.Int("retry_attempt", retryTimes-i+1),
 				zap.Ints("excluded_channels", getChannelIds(failedChannels)),
 				zap.Bool("try_lower_priority_first", shouldTryLowerPriorityFirst),
-				zap.Bool("try_larger_max_tokens_first", shouldTryLargerMaxTokensFirst))
+				zap.Bool("try_larger_max_tokens_first", shouldTryLargerMaxTokensFirst),
+				zap.Bool("server_transient", isServerTransient))
 		}
 
 		if shouldTryLargerMaxTokensFirst {
@@ -259,7 +264,48 @@ func shouldRetry(c *gin.Context, statusCode int) error {
 			specificChannelId)
 	}
 
+	// Do not retry on client-request errors except for rate limit (429) and capacity (413) and auth (401/403)
+	if statusCode >= 400 &&
+		statusCode < 500 &&
+		statusCode != http.StatusTooManyRequests &&
+		statusCode != http.StatusRequestEntityTooLarge &&
+		statusCode != http.StatusUnauthorized &&
+		statusCode != http.StatusNotFound &&
+		statusCode != http.StatusForbidden {
+		return errors.Errorf("client error %d, not retrying", statusCode)
+	}
+
 	return nil
+}
+
+// classifyAuthLike returns true if error appears to be auth/permission/quota related
+func classifyAuthLike(e *model.ErrorWithStatusCode) bool {
+	if e == nil {
+		return false
+	}
+	// Direct status codes
+	if e.StatusCode == http.StatusUnauthorized || e.StatusCode == http.StatusForbidden {
+		return true
+	}
+	// Check error type/code/message heuristics
+	t := e.Type
+	if t == "authentication_error" || t == "permission_error" || t == "insufficient_quota" || t == "forbidden" {
+		return true
+	}
+	switch v := e.Code.(type) {
+	case string:
+		if v == "invalid_api_key" || v == "account_deactivated" || v == "insufficient_quota" {
+			return true
+		}
+	}
+	msg := e.Message
+	if msg != "" {
+		lower := strings.ToLower(msg)
+		if strings.Contains(lower, "invalid api key") || strings.Contains(lower, "api key not valid") || strings.Contains(lower, "api key expired") || strings.Contains(lower, "insufficient quota") || strings.Contains(lower, "insufficient credit") || strings.Contains(lower, "已欠费") || strings.Contains(lower, "余额不足") || strings.Contains(lower, "organization restricted") {
+			return true
+		}
+	}
+	return false
 }
 
 // Helper function to get channel IDs from failed channels map for debugging
@@ -348,10 +394,43 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 				zap.String("group", group),
 				zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
 		}
+		monitor.Emit(channelId, false)
+		return
 	}
 
-	// Only disable channel for server errors (5xx) or specific client errors that indicate channel issues
-	// 400 errors are client request problems and should not disable channels
+	// 413 capacity issues: do not suspend; rely on retry selection to seek larger max_tokens
+	if err.StatusCode == http.StatusRequestEntityTooLarge {
+		monitor.Emit(channelId, false)
+		return
+	}
+
+	// 5xx or network-type server errors -> suspend ability briefly
+	if err.StatusCode >= 500 && err.StatusCode <= 599 {
+		gmw.GetLogger(ctx).Info(fmt.Sprintf("suspending model %s in group %s on channel %d (%s) due to server error %d", originalModel, group, channelId, channelName, err.StatusCode))
+		if suspendErr := dbmodel.SuspendAbility(ctx, group, originalModel, channelId, config.ChannelSuspendSecondsFor5XX); suspendErr != nil {
+			gmw.GetLogger(ctx).Error("failed to suspend ability for 5xx", zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
+		}
+		// Do not immediately auto-disable; transient
+		monitor.Emit(channelId, false)
+		return
+	}
+
+	// Auth/permission/quota errors (401/403 or vendor-indicated) -> suspend ability; escalate to auto-disable only if fatal
+	if err.StatusCode == http.StatusUnauthorized || err.StatusCode == http.StatusForbidden || classifyAuthLike(&err) {
+		gmw.GetLogger(ctx).Info(fmt.Sprintf("auth/permission issue for model %s group %s on channel %d (%s), suspending ability", originalModel, group, channelId, channelName))
+		if suspendErr := dbmodel.SuspendAbility(ctx, group, originalModel, channelId, config.ChannelSuspendSecondsForAuth); suspendErr != nil {
+			gmw.GetLogger(ctx).Error("failed to suspend ability for auth/permission", zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
+		}
+
+		if monitor.ShouldDisableChannel(&err.Error, err.StatusCode) {
+			monitor.DisableChannel(channelId, channelName, err.Message)
+		} else {
+			monitor.Emit(channelId, false)
+		}
+		return
+	}
+
+	// Default: not fatal -> record failure only. If fatal per policy, auto-disable.
 	if monitor.ShouldDisableChannel(&err.Error, err.StatusCode) {
 		monitor.DisableChannel(channelId, channelName, err.Message)
 	} else {
