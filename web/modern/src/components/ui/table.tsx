@@ -14,8 +14,16 @@ export function TableRow({ className, ...props }: React.HTMLAttributes<HTMLTable
   return <tr className={cn('border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted', className)} {...props} />
 }
 export function TableHead({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th className={cn('h-10 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap', className)} {...props} />
+  return <th className={cn(
+    // Default keep headers compact on desktop, but allow wrapping on mobile to avoid overflow
+    'h-10 px-4 text-left align-middle font-medium text-muted-foreground whitespace-nowrap mobile:whitespace-normal mobile:break-words',
+    className
+  )} {...props} />
 }
 export function TableCell({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('px-4 py-3 align-middle whitespace-nowrap', className)} {...props} />
+  return <td className={cn(
+    // Allow wrapping on mobile and break long codes/ids to stay within viewport
+    'px-4 py-3 align-middle whitespace-nowrap mobile:whitespace-normal mobile:break-words mobile:break-all',
+    className
+  )} {...props} />
 }

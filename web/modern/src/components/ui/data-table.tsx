@@ -115,7 +115,7 @@ export function DataTable<TData, TValue>({
 
   return (
     <div className="space-y-2">
-      <div className="relative rounded-md border">
+      <div className="relative rounded-md border overflow-x-auto">
         {/* Loading overlay to prevent repeated actions */}
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-background/60 backdrop-blur-sm">
@@ -127,7 +127,7 @@ export function DataTable<TData, TValue>({
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-left">
+                  <TableHead key={header.id} className="text-left mobile:whitespace-normal mobile:break-words">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -144,7 +144,7 @@ export function DataTable<TData, TValue>({
                     const headerDef = cell.column.columnDef.header
                     const label = typeof headerDef === 'string' ? headerDef : (cell.column.id || '')
                     return (
-                      <TableCell key={cell.id} data-label={label} className="mobile-table-cell">
+                      <TableCell key={cell.id} data-label={label} className="mobile-table-cell break-words break-all">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </TableCell>
                     )

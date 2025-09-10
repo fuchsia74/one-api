@@ -515,7 +515,7 @@ export function ChannelsPage() {
 
   const toolbarActions = (
     <div className={cn(
-      "flex gap-2",
+      "flex gap-2 flex-wrap max-w-full",
       isMobile ? "flex-col w-full" : "items-center"
     )}>
       <Button

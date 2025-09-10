@@ -82,14 +82,14 @@ export function Header() {
   }
 
   return (
-    <header className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50">
-      <div className="container mx-auto px-4">
+  <header className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50 w-full max-w-full">
+      <div className="mx-auto px-3 sm:px-4 w-full max-w-full">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Brand */}
           <div className="flex items-center space-x-4">
             <Link
               to="/"
-              className="text-xl font-bold hover:text-primary transition-colors"
+              className="text-xl font-bold hover:text-primary transition-colors truncate max-w-[55vw] sm:max-w-none"
             >
               {localStorage.getItem('system_name') || 'OneAPI'}
             </Link>
@@ -114,7 +114,7 @@ export function Header() {
           </div>
 
           {/* Actions and User Menu */}
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2 min-w-0">
             <ThemeToggle />
 
             {user ? (
@@ -183,7 +183,7 @@ export function Header() {
 
       {/* Mobile Logout Button in Drawer */}
       {user && mobileMenuOpen && (
-        <div className="fixed bottom-4 left-4 right-4 z-60 sm:hidden">
+  <div className="fixed bottom-4 left-4 right-4 z-60 sm:hidden">
           <Button
             variant="outline"
             onClick={handleLogout}

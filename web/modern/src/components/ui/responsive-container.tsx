@@ -46,7 +46,7 @@ export function ResponsiveContainer({
 
   return (
     <div className={cn(
-      'w-full',
+  'w-full max-w-[100vw]',
       !fluid && maxWidthClasses[maxWidth],
       center && 'mx-auto',
       paddingClasses[padding],
@@ -89,7 +89,7 @@ export function ResponsivePageContainer({
               {breadcrumbs}
             </div>
           )}
-          
+
           <div className={cn(
             'flex items-start justify-between',
             isMobile ? 'flex-col space-y-4' : 'flex-row items-center'
@@ -112,7 +112,7 @@ export function ResponsivePageContainer({
                 </p>
               )}
             </div>
-            
+
             {actions && (
               <div className={cn(
                 'flex items-center gap-2',
@@ -124,7 +124,7 @@ export function ResponsivePageContainer({
           </div>
         </div>
       )}
-      
+
       {/* Page Content */}
       <div className="space-y-6">
         {children}
@@ -185,7 +185,7 @@ export function ResponsiveSection({
                 </p>
               )}
             </div>
-            
+
             {actions && (
               <div className={cn(
                 'flex items-center gap-2',
@@ -197,7 +197,7 @@ export function ResponsiveSection({
           </div>
         </div>
       )}
-      
+
       {/* Section Content */}
       {children}
     </>

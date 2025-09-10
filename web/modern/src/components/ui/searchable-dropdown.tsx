@@ -204,7 +204,14 @@ export function SearchableDropdown({
           </div>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
+      <PopoverContent
+        className={cn(
+          // Avoid horizontal overflow on small screens: don't use w-full (which equals 100vw in portal)
+          // Instead, cap width to viewport with padding and allow it to size naturally on larger screens
+          "p-0 min-w-[12rem] max-w-[calc(100vw-2rem)] sm:w-auto"
+        )}
+        align="start"
+      >
         <Command shouldFilter={!searchEndpoint}>
           <CommandInput
             placeholder={searchPlaceholder}

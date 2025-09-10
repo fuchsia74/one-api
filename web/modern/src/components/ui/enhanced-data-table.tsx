@@ -183,11 +183,11 @@ export function EnhancedDataTable<TData, TValue>({
       {/* Search and Actions Toolbar */}
       {(onSearchChange || toolbarActions || onRefresh) && (
         <div className={cn(
-          'flex gap-4',
+          'flex gap-4 flex-wrap',
           isMobile ? 'flex-col space-y-4' : 'items-center justify-between'
         )}>
           <div className={cn(
-            'flex gap-2',
+            'flex gap-2 flex-wrap',
             isMobile ? 'flex-col space-y-2' : 'flex-1 items-center'
           )}>
             {onSearchChange && (
@@ -229,7 +229,7 @@ export function EnhancedDataTable<TData, TValue>({
           </div>
 
           <div className={cn(
-            'flex gap-2',
+            'flex gap-2 flex-wrap',
             isMobile ? 'w-full' : 'items-center'
           )}>
             {onRefresh && (
@@ -267,10 +267,10 @@ export function EnhancedDataTable<TData, TValue>({
 
         {/* Mobile Card Layout */}
         {isMobile && mobileCardLayout ? (
-          <div className="space-y-4">
+      <div className="space-y-4">
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <div key={row.id} className="bg-card border rounded-lg p-4 space-y-3">
+        <div key={row.id} className="bg-card border rounded-lg p-4 space-y-3">
                   {row.getVisibleCells().map((cell) => {
                     const headerDef = cell.column.columnDef.header
                     const label = typeof headerDef === 'string' ? headerDef :
@@ -289,7 +289,7 @@ export function EnhancedDataTable<TData, TValue>({
                         <span className="text-sm font-medium text-muted-foreground min-w-0 flex-shrink-0">
                           {label}:
                         </span>
-                        <div className="text-right min-w-0 flex-1">
+                        <div className="text-right min-w-0 flex-1 break-words break-all">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </div>
                       </div>

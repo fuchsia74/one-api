@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/ui/data-table'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
@@ -12,7 +14,7 @@ import { Input } from '@/components/ui/input'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { formatTimestamp } from '@/lib/utils'
+import { formatTimestamp, cn } from '@/lib/utils'
 
 interface RedemptionRow {
   id: number
@@ -35,6 +37,7 @@ const renderStatus = (status: number) => {
 
 export function RedemptionsPage() {
   const navigate = useNavigate()
+  const { isMobile } = useResponsive()
   const [data, setData] = useState<RedemptionRow[]>([])
   const [loading, setLoading] = useState(false)
   const [pageIndex, setPageIndex] = useState(0)
@@ -177,45 +180,57 @@ export function RedemptionsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <ResponsivePageContainer
+      title="Redemptions"
+      description="Manage recharge codes"
+      actions={(
+        <div className={cn(
+          'flex gap-2 flex-wrap',
+          isMobile ? 'w-full' : 'items-center'
+        )}>
+          <Button onClick={() => navigate('/redemptions/add')} className={cn(isMobile ? 'w-full touch-target' : '')}>Add Redemption</Button>
+          <select
+            className={cn('h-9 border rounded-md px-2 text-sm', isMobile ? 'w-full' : '')}
+            value={sortBy}
+            onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}
+          >
+            <option value="">Default</option>
+            <option value="id">ID</option>
+            <option value="name">Name</option>
+            <option value="status">Status</option>
+            <option value="quota">Quota</option>
+            <option value="created_time">Created Time</option>
+            <option value="redeemed_time">Redeemed Time</option>
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}
+            className={cn(isMobile ? 'w-full touch-target' : '')}
+          >
+            {sortOrder.toUpperCase()}
+          </Button>
+          <Button onClick={() => load(pageIndex, pageSize)} disabled={loading} variant="outline" className={cn(isMobile ? 'w-full touch-target' : '')}>Refresh</Button>
+        </div>
+      )}
+  >
       <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Redemptions</CardTitle>
-              <CardDescription>Manage recharge codes</CardDescription>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button onClick={() => navigate('/redemptions/add')}>Add Redemption</Button>
-              <select className="h-9 border rounded-md px-2 text-sm" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}>
-                <option value="">Default</option>
-                <option value="id">ID</option>
-                <option value="name">Name</option>
-                <option value="status">Status</option>
-                <option value="quota">Quota</option>
-                <option value="created_time">Created Time</option>
-                <option value="redeemed_time">Redeemed Time</option>
-              </select>
-              <Button variant="outline" size="sm" onClick={() => setSortOrder(o => o === 'asc' ? 'desc' : 'asc')}>{sortOrder.toUpperCase()}</Button>
-              <Button onClick={() => load(pageIndex, pageSize)} disabled={loading} variant="outline">Refresh</Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 mb-3">
+        <CardContent className={cn(isMobile ? 'p-4' : 'p-6')}>
+          <div className={cn('flex gap-2 mb-3 flex-wrap', isMobile ? 'w-full' : 'items-center')}>
             <SearchableDropdown
               value={searchKeyword}
               placeholder="Search redemptions by name..."
               searchPlaceholder="Type redemption name..."
               options={[]}
-              searchEndpoint="/api/redemption/search" // SearchableDropdown uses fetch() directly, needs /api prefix
+              searchEndpoint="/api/redemption/search"
               transformResponse={(data) => (
                 Array.isArray(data) ? data.map((r: any) => ({ key: String(r.id), value: r.name, text: r.name })) : []
               )}
               onChange={(value) => setSearchKeyword(value)}
               clearable
+              className={cn(isMobile ? 'w-full' : 'max-w-md')}
             />
-            <Button onClick={search} disabled={loading}>Search</Button>
+            <Button onClick={search} disabled={loading} className={cn(isMobile ? 'w-full touch-target' : '')}>Search</Button>
           </div>
           <DataTable
             columns={columns}
@@ -286,6 +301,6 @@ export function RedemptionsPage() {
           </Form>
         </DialogContent>
       </Dialog>
-    </div>
+  </ResponsivePageContainer>
   )
 }
