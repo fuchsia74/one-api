@@ -186,8 +186,8 @@ export function TopUpPage() {
 
                   {form.formState.errors.root && (
                     <div className={`text-sm ${form.formState.errors.root.type === 'success'
-                        ? 'text-green-600'
-                        : 'text-destructive'
+                      ? 'text-green-600'
+                      : 'text-destructive'
                       }`}>
                       {form.formState.errors.root.message}
                     </div>

@@ -12,7 +12,7 @@ export function Layout() {
       // Grid layout prevents any accidental extra space after footer
       "grid grid-rows-[auto_1fr_auto] bg-background",
       // Use dynamic viewport height to avoid iOS/Android 100vh bugs causing extra blank space
-  "min-h-screen-dvh",
+      "min-h-screen-dvh",
       // Full width root
       "w-full"
     )}>
@@ -26,7 +26,7 @@ export function Layout() {
         // Ensure proper spacing from header
         'mt-0'
       )}>
-  <div className="w-full max-w-full">
+        <div className="w-full max-w-full">
           <Outlet />
         </div>
       </main>

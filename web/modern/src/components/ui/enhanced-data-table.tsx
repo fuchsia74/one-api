@@ -267,19 +267,19 @@ export function EnhancedDataTable<TData, TValue>({
 
         {/* Mobile Card Layout */}
         {isMobile && mobileCardLayout ? (
-      <div className="space-y-4">
+          <div className="space-y-4">
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-        <div key={row.id} className="bg-card border rounded-lg p-4 space-y-3">
+                <div key={row.id} className="bg-card border rounded-lg p-4 space-y-3">
                   {row.getVisibleCells().map((cell) => {
                     const headerDef = cell.column.columnDef.header
                     const label = typeof headerDef === 'string' ? headerDef :
-                                 typeof headerDef === 'function' ? cell.column.id :
-                                 (cell.column.id || '')
+                      typeof headerDef === 'function' ? cell.column.id :
+                        (cell.column.id || '')
 
                     // Skip rendering if this column should be hidden on mobile
                     const accessorKey = 'accessorKey' in cell.column.columnDef ?
-                                       cell.column.columnDef.accessorKey as string : ''
+                      cell.column.columnDef.accessorKey as string : ''
                     if (hideColumnsOnMobile.includes(accessorKey)) {
                       return null
                     }
@@ -316,7 +316,7 @@ export function EnhancedDataTable<TData, TValue>({
                       {headerGroup.headers.map((header) => {
                         // Skip rendering if this column should be hidden on mobile/tablet
                         const accessorKey = 'accessorKey' in header.column.columnDef ?
-                                           header.column.columnDef.accessorKey as string : ''
+                          header.column.columnDef.accessorKey as string : ''
                         if (isTablet && hideColumnsOnMobile.includes(accessorKey)) {
                           return null
                         }
@@ -328,9 +328,9 @@ export function EnhancedDataTable<TData, TValue>({
                             {header.isPlaceholder
                               ? null
                               : flexRender(
-                                  header.column.columnDef.header,
-                                  header.getContext()
-                                )}
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
                           </TableHead>
                         )
                       })}
@@ -352,7 +352,7 @@ export function EnhancedDataTable<TData, TValue>({
                         {row.getVisibleCells().map((cell) => {
                           // Skip rendering if this column should be hidden on mobile/tablet
                           const accessorKey = 'accessorKey' in cell.column.columnDef ?
-                                             cell.column.columnDef.accessorKey as string : ''
+                            cell.column.columnDef.accessorKey as string : ''
                           if (isTablet && hideColumnsOnMobile.includes(accessorKey)) {
                             return null
                           }

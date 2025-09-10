@@ -59,11 +59,11 @@ export function HomePage() {
   // If custom content exists (HTML/Markdown), render it; Markdown is pre-rendered to HTML
   if (loaded && home) {
     return (
-  <div className="container mx-auto px-4 py-10">
+      <div className="container mx-auto px-4 py-10">
         <Card>
           <CardContent>
             <div
-      className="prose prose-lg prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary hover:prose-a:underline prose-pre:bg-muted/60 prose-code:before:content-[''] prose-code:after:content-[''] max-w-none dark:prose-invert"
+              className="prose prose-lg prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary hover:prose-a:underline prose-pre:bg-muted/60 prose-code:before:content-[''] prose-code:after:content-[''] max-w-none dark:prose-invert"
               dangerouslySetInnerHTML={{ __html: home }}
             />
           </CardContent>

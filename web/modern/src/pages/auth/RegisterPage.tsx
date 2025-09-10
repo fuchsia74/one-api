@@ -49,7 +49,7 @@ export function RegisterPage() {
   useEffect(() => {
     const status = localStorage.getItem('status')
     if (status) {
-      try { setSystemStatus(JSON.parse(status)) } catch {}
+      try { setSystemStatus(JSON.parse(status)) } catch { }
     }
   }, [])
 

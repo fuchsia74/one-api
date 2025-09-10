@@ -60,12 +60,12 @@ const DropdownMenuContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
   <DropdownMenuPrimitive.Portal>
-  <DropdownMenuPrimitive.Content
+    <DropdownMenuPrimitive.Content
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-    // When closed, take content out of document flow to avoid contributing to page width/height
-    "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:absolute data-[state=closed]:left-[-9999px] data-[state=closed]:top-[-9999px] data-[state=closed]:max-h-0 data-[state=closed]:overflow-hidden data-[state=closed]:p-0 data-[state=closed]:m-0 data-[state=closed]:opacity-0 data-[state=closed]:pointer-events-none data-[state=closed]:select-none data-[state=closed]:whitespace-nowrap data-[state=closed]:min-w-0 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
+        // When closed, take content out of document flow to avoid contributing to page width/height
+        "z-50 min-w-[8rem] overflow-hidden rounded-md border bg-popover p-1 text-popover-foreground shadow-md data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:absolute data-[state=closed]:left-[-9999px] data-[state=closed]:top-[-9999px] data-[state=closed]:max-h-0 data-[state=closed]:overflow-hidden data-[state=closed]:p-0 data-[state=closed]:m-0 data-[state=closed]:opacity-0 data-[state=closed]:pointer-events-none data-[state=closed]:select-none data-[state=closed]:whitespace-nowrap data-[state=closed]:min-w-0 data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2",
         className
       )}
       {...props}

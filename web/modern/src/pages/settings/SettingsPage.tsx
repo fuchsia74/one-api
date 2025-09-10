@@ -30,10 +30,10 @@ export function SettingsPage() {
             <TabsList className={cn(
               "grid w-full",
               isMobile ? "grid-cols-1 h-auto flex-col" :
-              tabCount === 1 ? "grid-cols-1" :
-              tabCount === 2 ? "grid-cols-2" :
-              tabCount === 3 ? "grid-cols-3" :
-              "grid-cols-2 lg:grid-cols-4"
+                tabCount === 1 ? "grid-cols-1" :
+                  tabCount === 2 ? "grid-cols-2" :
+                    tabCount === 3 ? "grid-cols-3" :
+                      "grid-cols-2 lg:grid-cols-4"
             )}>
               <TabsTrigger
                 value="personal"

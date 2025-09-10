@@ -669,9 +669,9 @@ export function EditChannelPage() {
         }
       }
 
-  // Note: 'other' is a plain string for many providers (e.g., Azure API version,
-  // iFlytek Spark version, plugin params, knowledge ID). Do not validate as JSON.
-  // If a future provider requires JSON in `other`, add a conditional check by type here.
+      // Note: 'other' is a plain string for many providers (e.g., Azure API version,
+      // iFlytek Spark version, plugin params, knowledge ID). Do not validate as JSON.
+      // If a future provider requires JSON in `other`, add a conditional check by type here.
 
       if (data.inference_profile_arn_map && !isValidJSON(data.inference_profile_arn_map)) {
         form.setError('inference_profile_arn_map', { message: 'Invalid JSON format in inference profile ARN map' })
@@ -734,8 +734,8 @@ export function EditChannelPage() {
         payload.other = '2024-03-01-preview'
       }
 
-  // Convert empty/whitespace-only strings to null for optional JSON fields (exclude `other`, it's plain text)
-  const jsonFields = ['model_mapping', 'model_configs', 'inference_profile_arn_map', 'system_prompt']
+      // Convert empty/whitespace-only strings to null for optional JSON fields (exclude `other`, it's plain text)
+      const jsonFields = ['model_mapping', 'model_configs', 'inference_profile_arn_map', 'system_prompt']
       jsonFields.forEach((field) => {
         const v = payload[field]
         if (typeof v === 'string' && v.trim() === '') {

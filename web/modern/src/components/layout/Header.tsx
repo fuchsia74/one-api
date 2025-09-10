@@ -82,7 +82,7 @@ export function Header() {
   }
 
   return (
-  <header className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50 w-full max-w-full">
+    <header className="border-b bg-background/95 backdrop-blur-sm sticky top-0 z-50 w-full max-w-full">
       <div className="mx-auto px-3 sm:px-4 w-full max-w-full">
         <div className="flex items-center justify-between h-16">
           {/* Logo and Brand */}
@@ -183,7 +183,7 @@ export function Header() {
 
       {/* Mobile Logout Button in Drawer */}
       {user && mobileMenuOpen && (
-  <div className="fixed bottom-4 left-4 right-4 z-60 sm:hidden">
+        <div className="fixed bottom-4 left-4 right-4 z-60 sm:hidden">
           <Button
             variant="outline"
             onClick={handleLogout}

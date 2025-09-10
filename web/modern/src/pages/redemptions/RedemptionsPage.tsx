@@ -213,7 +213,7 @@ export function RedemptionsPage() {
           <Button onClick={() => load(pageIndex, pageSize)} disabled={loading} variant="outline" className={cn(isMobile ? 'w-full touch-target' : '')}>Refresh</Button>
         </div>
       )}
-  >
+    >
       <Card>
         <CardContent className={cn(isMobile ? 'p-4' : 'p-6')}>
           <div className={cn('flex gap-2 mb-3 flex-wrap', isMobile ? 'w-full' : 'items-center')}>
@@ -301,6 +301,6 @@ export function RedemptionsPage() {
           </Form>
         </DialogContent>
       </Dialog>
-  </ResponsivePageContainer>
+    </ResponsivePageContainer>
   )
 }

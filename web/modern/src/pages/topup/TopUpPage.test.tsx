@@ -39,12 +39,12 @@ describe('TopUpPage', () => {
     // Mock system status with a payment link
     localStorage.setItem('status', JSON.stringify({ top_up_link: 'https://pay.example.com' }))
 
-    // Reset API mocks
-    ;(api.get as any).mockReset()
-    ;(api.post as any).mockReset()
+      // Reset API mocks
+      ; (api.get as any).mockReset()
+      ; (api.post as any).mockReset()
 
-    ;(api.get as any).mockResolvedValue({ data: { success: true, data: { id: 1, username: 'testuser', quota: 1000 } } })
-    ;(api.post as any).mockResolvedValue({ data: { success: true, data: 500 } })
+      ; (api.get as any).mockResolvedValue({ data: { success: true, data: { id: 1, username: 'testuser', quota: 1000 } } })
+      ; (api.post as any).mockResolvedValue({ data: { success: true, data: 500 } })
   })
 
   it('renders and redeems a code', async () => {

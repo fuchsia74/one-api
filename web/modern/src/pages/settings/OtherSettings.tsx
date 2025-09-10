@@ -129,280 +129,280 @@ export function OtherSettings() {
 
   return (
     <TooltipProvider>
-    <div className="space-y-6">
-      {/* System Branding */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Branding</CardTitle>
-          <CardDescription>Configure system name, logo, and visual appearance</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <div className="space-y-4">
-              <FormField
-                control={form.control}
-                name="SystemName"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      System Name
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About System Name">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.SystemName}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input placeholder="One API" {...field} />
-                      </FormControl>
-                      <Button onClick={() => submitField('SystemName')}>Save</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+      <div className="space-y-6">
+        {/* System Branding */}
+        <Card>
+          <CardHeader>
+            <CardTitle>System Branding</CardTitle>
+            <CardDescription>Configure system name, logo, and visual appearance</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="SystemName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        System Name
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About System Name">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.SystemName}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="One API" {...field} />
+                        </FormControl>
+                        <Button onClick={() => submitField('SystemName')}>Save</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="Logo"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Logo URL
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Logo URL">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.Logo}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input placeholder="https://..." {...field} />
-                      </FormControl>
-                      <Button onClick={() => submitField('Logo')}>Save</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="Logo"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Logo URL
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Logo URL">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.Logo}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="https://..." {...field} />
+                        </FormControl>
+                        <Button onClick={() => submitField('Logo')}>Save</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="Theme"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Theme
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Theme">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.Theme}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="flex gap-2">
-                      <FormControl>
-                        <Input placeholder="default" {...field} />
-                      </FormControl>
-                      <Button onClick={() => submitField('Theme')}>Save</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </Form>
-        </CardContent>
-      </Card>
-
-      {/* Content Management */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Content Management</CardTitle>
-          <CardDescription>Configure notices, about page, and home page content</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Form {...form}>
-            <div className="space-y-4">
-              <FormField
-                control={form.control}
-                name="Notice"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Notice (supports Markdown)
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Notice">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.Notice}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="space-y-2">
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter notice content..."
-                          className="min-h-[100px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <Button onClick={() => submitField('Notice')}>Save Notice</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="About"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      About Page Content (supports Markdown)
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About About Page Content">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.About}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="space-y-2">
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter about page content..."
-                          className="min-h-[100px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <Button onClick={() => submitField('About')}>Save About</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="HomePageContent"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Home Page Content (supports Markdown)
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Home Page Content">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.HomePageContent}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="space-y-2">
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter home page content..."
-                          className="min-h-[100px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <Button onClick={() => submitField('HomePageContent')}>Save Home Content</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="Footer"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="flex items-center gap-2">
-                      Footer Content (supports HTML)
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Footer Content">
-                            <Info className="h-4 w-4" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="top" align="start" className="max-w-[320px]">
-                          {descriptions.Footer}
-                        </TooltipContent>
-                      </Tooltip>
-                    </FormLabel>
-                    <div className="space-y-2">
-                      <FormControl>
-                        <Textarea
-                          placeholder="Enter footer content..."
-                          className="min-h-[80px]"
-                          {...field}
-                        />
-                      </FormControl>
-                      <Button onClick={() => submitField('Footer')}>Save Footer</Button>
-                    </div>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-          </Form>
-        </CardContent>
-      </Card>
-
-      {/* System Updates */}
-      <Card>
-        <CardHeader>
-          <CardTitle>System Updates</CardTitle>
-          <CardDescription>Check for updates and manage system version</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div className="flex gap-2">
-              <Button onClick={checkUpdate}>Check for Updates</Button>
-              <Button variant="outline" onClick={openGitHubRelease}>
-                View GitHub Releases
-              </Button>
-            </div>
-
-            {updateData && (
-              <div className="p-4 bg-muted rounded-lg">
-                <h4 className="font-medium mb-2">Update Available: {updateData.tag_name}</h4>
-                <div className="text-sm text-muted-foreground">
-                  {updateData.content}
-                </div>
+                <FormField
+                  control={form.control}
+                  name="Theme"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Theme
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Theme">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.Theme}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="flex gap-2">
+                        <FormControl>
+                          <Input placeholder="default" {...field} />
+                        </FormControl>
+                        <Button onClick={() => submitField('Theme')}>Save</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-  </div>
-  </TooltipProvider>
+            </Form>
+          </CardContent>
+        </Card>
+
+        {/* Content Management */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Content Management</CardTitle>
+            <CardDescription>Configure notices, about page, and home page content</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...form}>
+              <div className="space-y-4">
+                <FormField
+                  control={form.control}
+                  name="Notice"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Notice (supports Markdown)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Notice">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.Notice}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="space-y-2">
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter notice content..."
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <Button onClick={() => submitField('Notice')}>Save Notice</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="About"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        About Page Content (supports Markdown)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About About Page Content">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.About}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="space-y-2">
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter about page content..."
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <Button onClick={() => submitField('About')}>Save About</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="HomePageContent"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Home Page Content (supports Markdown)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Home Page Content">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.HomePageContent}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="space-y-2">
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter home page content..."
+                            className="min-h-[100px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <Button onClick={() => submitField('HomePageContent')}>Save Home Content</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="Footer"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="flex items-center gap-2">
+                        Footer Content (supports HTML)
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button type="button" className="text-muted-foreground hover:text-foreground" aria-label="About Footer Content">
+                              <Info className="h-4 w-4" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" align="start" className="max-w-[320px]">
+                            {descriptions.Footer}
+                          </TooltipContent>
+                        </Tooltip>
+                      </FormLabel>
+                      <div className="space-y-2">
+                        <FormControl>
+                          <Textarea
+                            placeholder="Enter footer content..."
+                            className="min-h-[80px]"
+                            {...field}
+                          />
+                        </FormControl>
+                        <Button onClick={() => submitField('Footer')}>Save Footer</Button>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </Form>
+          </CardContent>
+        </Card>
+
+        {/* System Updates */}
+        <Card>
+          <CardHeader>
+            <CardTitle>System Updates</CardTitle>
+            <CardDescription>Check for updates and manage system version</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex gap-2">
+                <Button onClick={checkUpdate}>Check for Updates</Button>
+                <Button variant="outline" onClick={openGitHubRelease}>
+                  View GitHub Releases
+                </Button>
+              </div>
+
+              {updateData && (
+                <div className="p-4 bg-muted rounded-lg">
+                  <h4 className="font-medium mb-2">Update Available: {updateData.tag_name}</h4>
+                  <div className="text-sm text-muted-foreground">
+                    {updateData.content}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   )
 }
 

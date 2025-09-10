@@ -269,9 +269,9 @@ export function ChannelsPage() {
         return
       }
 
-  // Enable/disable - send status_only to avoid overwriting other fields
-  const payload = { id, status: action === 'enable' ? 1 : 2 }
-  const res = await api.put('/api/channel/?status_only=1', payload)
+      // Enable/disable - send status_only to avoid overwriting other fields
+      const payload = { id, status: action === 'enable' ? 1 : 2 }
+      const res = await api.put('/api/channel/?status_only=1', payload)
       if (res.data?.success) {
         if (searchKeyword.trim()) {
           performSearch()
@@ -314,12 +314,12 @@ export function ChannelsPage() {
     setBulkTesting(true)
     try {
       // Unified API call - complete URL with /api prefix
-  await api.get('/api/channel/test')
+      await api.get('/api/channel/test')
       load(pageIndex, pageSize)
-  notify({ type: 'info', message: 'Bulk channel test started.' })
+      notify({ type: 'info', message: 'Bulk channel test started.' })
     } catch (error) {
       console.error('Bulk test failed:', error)
-  notify({ type: 'error', title: 'Bulk test failed', message: error instanceof Error ? error.message : 'Unknown error' })
+      notify({ type: 'error', title: 'Bulk test failed', message: error instanceof Error ? error.message : 'Unknown error' })
     } finally {
       setBulkTesting(false)
     }
@@ -330,12 +330,12 @@ export function ChannelsPage() {
 
     try {
       // Unified API call - complete URL with /api prefix
-  await api.delete('/api/channel/disabled')
+      await api.delete('/api/channel/disabled')
       load(pageIndex, pageSize)
-  notify({ type: 'success', message: 'Disabled channels deleted.' })
+      notify({ type: 'success', message: 'Disabled channels deleted.' })
     } catch (error) {
       console.error('Failed to delete disabled channels:', error)
-  notify({ type: 'error', title: 'Delete failed', message: error instanceof Error ? error.message : 'Unknown error' })
+      notify({ type: 'error', title: 'Delete failed', message: error instanceof Error ? error.message : 'Unknown error' })
     }
   }
 

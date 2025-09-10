@@ -30,7 +30,7 @@ export function SystemSettings() {
       GitHubOAuthEnabled: 'Enable GitHub OAuth login. Requires GitHub Client ID and Secret.',
       GitHubClientId: 'GitHub OAuth Client ID used for login.',
       OidcEnabled: 'Enable OpenID Connect (OIDC) login. Requires OIDC endpoints and credentials.',
-  OidcClientId: 'OIDC Client ID used when initiating the OIDC login flow.',
+      OidcClientId: 'OIDC Client ID used when initiating the OIDC login flow.',
       OidcWellKnown: 'OIDC well-known discovery URL (e.g., https://issuer/.well-known/openid-configuration).',
       OidcAuthorizationEndpoint: 'OIDC authorization endpoint URL.',
       OidcTokenEndpoint: 'OIDC token endpoint URL.',
@@ -43,7 +43,7 @@ export function SystemSettings() {
       // Anti-bot / Security
       TurnstileCheckEnabled: 'Enable Cloudflare Turnstile on critical actions (registration/reset).',
       TurnstileSiteKey: 'Cloudflare Turnstile site key used by the frontend.',
-  TurnstileSecretKey: 'Cloudflare Turnstile secret key used by the server. Keep this confidential.',
+      TurnstileSecretKey: 'Cloudflare Turnstile secret key used by the server. Keep this confidential.',
 
       // Email (SMTP)
       SMTPServer: 'SMTP server hostname for sending emails.',
@@ -75,7 +75,7 @@ export function SystemSettings() {
       QuotaPerUnit: 'Conversion ratio for currency display. Higher value makes each $ represent more quota.',
       DisplayInCurrencyEnabled: 'Show usage and quotas as currency in the UI, based on the configured conversion.',
       DisplayTokenStatEnabled: 'Display token statistics in logs and dashboards when available.',
-  ApproximateTokenEnabled: 'Use a faster approximation for token counting to improve performance (may be slightly less accurate).',
+      ApproximateTokenEnabled: 'Use a faster approximation for token counting to improve performance (may be slightly less accurate).',
 
       // Channels & Reliability
       AutomaticDisableChannelEnabled: 'Automatically disable channels that show sustained failures.',
@@ -86,7 +86,7 @@ export function SystemSettings() {
       // Logging / Metrics / Integrations
       LogConsumeEnabled: 'Record usage/consumption logs. Turn off to reduce storage overhead.',
       MessagePusherAddress: 'Endpoint of the alert/notification pusher service for log events.',
-  MessagePusherToken: 'Authentication token for the alert/notification pusher. Keep this confidential.',
+      MessagePusherToken: 'Authentication token for the alert/notification pusher. Keep this confidential.',
     }),
     []
   )
@@ -132,50 +132,50 @@ export function SystemSettings() {
       </CardHeader>
       <CardContent>
         <TooltipProvider>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {options.map((opt, idx) => (
-            <div key={idx} className="border rounded-lg p-4">
-              <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                <span>{opt.key}</span>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button
-                      type="button"
-                      className="inline-flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
-                      aria-label={`Info about ${opt.key}`}
-                    >
-                      <Info className="h-4 w-4" />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent side="top" align="start" className="max-w-[320px]">
-                    {descriptions[opt.key] || 'No description available for this setting yet.'}
-                  </TooltipContent>
-                </Tooltip>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {options.map((opt, idx) => (
+              <div key={idx} className="border rounded-lg p-4">
+                <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
+                  <span>{opt.key}</span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="inline-flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
+                        aria-label={`Info about ${opt.key}`}
+                      >
+                        <Info className="h-4 w-4" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" align="start" className="max-w-[320px]">
+                      {descriptions[opt.key] || 'No description available for this setting yet.'}
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    defaultValue={opt.value}
+                    onBlur={(e) => save(opt.key, e.target.value)}
+                    className="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    onClick={(e) => {
+                      const target = (e.currentTarget.previousSibling as HTMLInputElement)
+                      save(opt.key, target.value)
+                    }}
+                  >
+                    Save
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-2">
-                <Input
-                  defaultValue={opt.value}
-                  onBlur={(e) => save(opt.key, e.target.value)}
-                  className="flex-1"
-                />
-                <Button
-                  variant="outline"
-                  onClick={(e) => {
-                    const target = (e.currentTarget.previousSibling as HTMLInputElement)
-                    save(opt.key, target.value)
-                  }}
-                >
-                  Save
-                </Button>
+            ))}
+            {!options.length && (
+              <div className="col-span-full text-center text-sm text-muted-foreground py-8">
+                No options available or insufficient permissions.
               </div>
-            </div>
-          ))}
-          {!options.length && (
-            <div className="col-span-full text-center text-sm text-muted-foreground py-8">
-              No options available or insufficient permissions.
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </TooltipProvider>
       </CardContent>
     </Card>

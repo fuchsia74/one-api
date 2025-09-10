@@ -137,14 +137,14 @@ export function TokensPage() {
       const res = await api.get(url)
       const { success, data: responseData } = res.data
 
-    if (success && Array.isArray(responseData)) {
+      if (success && Array.isArray(responseData)) {
         const options: SearchOption[] = responseData.map((token: Token) => ({
           key: token.id.toString(),
-      value: token.name || `(ID ${token.id})`,
-      text: token.name || `(ID ${token.id})`,
+          value: token.name || `(ID ${token.id})`,
+          text: token.name || `(ID ${token.id})`,
           content: (
             <div className="flex flex-col">
-        <div className="font-medium">{token.name || `(ID ${token.id})`}</div>
+              <div className="font-medium">{token.name || `(ID ${token.id})`}</div>
               <div className="text-sm text-muted-foreground">
                 ID: {token.id} • {getStatusBadge(token.status)} • Quota: {formatQuota(token.remain_quota, token.unlimited_quota)}
               </div>
@@ -195,8 +195,8 @@ export function TokensPage() {
         // Unified API call - complete URL with /api prefix
         res = await api.delete(`/api/token/${id}`)
       } else {
-  // Use status_only to avoid overwriting other fields like name/models when toggling status
-  res = await api.put('/api/token/?status_only=1', {
+        // Use status_only to avoid overwriting other fields like name/models when toggling status
+        res = await api.put('/api/token/?status_only=1', {
           id,
           status: action === 'enable' ? TOKEN_STATUS.ENABLED : TOKEN_STATUS.DISABLED
         })
@@ -246,7 +246,7 @@ export function TokensPage() {
       accessorKey: 'name',
       header: 'Name',
       cell: ({ row }) => (
-  <div className="font-medium">{row.original.name || `(ID ${row.original.id})`}</div>
+        <div className="font-medium">{row.original.name || `(ID ${row.original.id})`}</div>
       ),
     },
     {
@@ -321,7 +321,7 @@ export function TokensPage() {
       accessorKey: 'expired_time',
       header: 'Expires',
       cell: ({ row }) => (
-  <span className="text-sm">{formatTimestampLocal(row.original.expired_time === 0 ? -1 : row.original.expired_time)}</span>
+        <span className="text-sm">{formatTimestampLocal(row.original.expired_time === 0 ? -1 : row.original.expired_time)}</span>
       ),
     },
     {

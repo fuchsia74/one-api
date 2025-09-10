@@ -147,8 +147,8 @@ export function LogsPage() {
       if (filters.type !== '0') params.set('type', filters.type)
       if (filters.model_name) params.set('model_name', filters.model_name)
       if (filters.token_name) params.set('token_name', filters.token_name)
-  if (isAdminOrRoot && filters.username) params.set('username', filters.username)
-  if (filters.channel && isAdminOrRoot) params.set('channel', filters.channel)
+      if (isAdminOrRoot && filters.username) params.set('username', filters.username)
+      if (filters.channel && isAdminOrRoot) params.set('channel', filters.channel)
       if (filters.start_timestamp) params.set('start_timestamp', String(fromDateTimeLocal(filters.start_timestamp)))
       if (filters.end_timestamp) params.set('end_timestamp', String(fromDateTimeLocal(filters.end_timestamp)))
       if (sortBy) {
@@ -157,7 +157,7 @@ export function LogsPage() {
       }
 
       // Unified API call - complete URL with /api prefix
-  const path = isAdminOrRoot ? `/api/log/?${params}` : `/api/log/self?${params}`
+      const path = isAdminOrRoot ? `/api/log/?${params}` : `/api/log/self?${params}`
       const res = await api.get(path)
       const { success, data: responseData, total: responseTotal } = res.data
 
@@ -183,13 +183,13 @@ export function LogsPage() {
       if (filters.type !== '0') params.set('type', filters.type)
       if (filters.model_name) params.set('model_name', filters.model_name)
       if (filters.token_name) params.set('token_name', filters.token_name)
-  if (isAdminOrRoot && filters.username) params.set('username', filters.username)
-  if (filters.channel && isAdminOrRoot) params.set('channel', filters.channel)
+      if (isAdminOrRoot && filters.username) params.set('username', filters.username)
+      if (filters.channel && isAdminOrRoot) params.set('channel', filters.channel)
       if (filters.start_timestamp) params.set('start_timestamp', String(fromDateTimeLocal(filters.start_timestamp)))
       if (filters.end_timestamp) params.set('end_timestamp', String(fromDateTimeLocal(filters.end_timestamp)))
 
       // Unified API call - complete URL with /api prefix
-  const statPath = isAdminOrRoot ? '/api/log/stat' : '/api/log/self/stat'
+      const statPath = isAdminOrRoot ? '/api/log/stat' : '/api/log/self/stat'
       const res = await api.get(statPath + '?' + params.toString())
 
       if (res.data?.success) {
@@ -212,7 +212,7 @@ export function LogsPage() {
     setSearchLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
-  const url = isAdminOrRoot ? '/api/log/search' : '/api/log/self/search'
+      const url = isAdminOrRoot ? '/api/log/search' : '/api/log/self/search'
       const res = await api.get(url + '?keyword=' + encodeURIComponent(query))
       const { success, data: responseData } = res.data
 
@@ -248,7 +248,7 @@ export function LogsPage() {
     setLoading(true)
     try {
       // Unified API call - complete URL with /api prefix
-  const url = isAdminOrRoot ? '/api/log/search' : '/api/log/self/search'
+      const url = isAdminOrRoot ? '/api/log/search' : '/api/log/self/search'
       const res = await api.get(url + '?keyword=' + encodeURIComponent(searchKeyword))
       const { success, data: responseData } = res.data
 
@@ -388,7 +388,7 @@ export function LogsPage() {
         </div>
       ),
     },
-  ...(isAdminOrRoot ? [{
+    ...(isAdminOrRoot ? [{
       accessorKey: 'channel',
       header: 'Channel',
       cell: ({ row }: { row: any }) => (

@@ -74,64 +74,64 @@ function App() {
     <ThemeProvider defaultTheme="system" storageKey="one-api-theme">
       <QueryClientProvider client={queryClient}>
         <NotificationsProvider>
-        <Router>
-          <div className="bg-background">
-            <Routes>
-              {/* Public auth routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/reset" element={<PasswordResetPage />} />
-              <Route path="/user/reset" element={<PasswordResetConfirmPage />} />
-              <Route path="/oauth/github" element={<GitHubOAuthPage />} />
-              <Route path="/oauth/lark" element={<LarkOAuthPage />} />
+          <Router>
+            <div className="bg-background">
+              <Routes>
+                {/* Public auth routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/reset" element={<PasswordResetPage />} />
+                <Route path="/user/reset" element={<PasswordResetConfirmPage />} />
+                <Route path="/oauth/github" element={<GitHubOAuthPage />} />
+                <Route path="/oauth/lark" element={<LarkOAuthPage />} />
 
-              {/* Public route(s) with layout */}
-              <Route path="/" element={<Layout />}>
-                <Route path="models" element={<ModelsPage />} />
-              </Route>
-
-              {/* Protected routes */}
-              <Route element={<ProtectedRoute />}>
+                {/* Public route(s) with layout */}
                 <Route path="/" element={<Layout />}>
-                  <Route index element={<HomePage />} />
-                  <Route path="dashboard" element={<DashboardPage />} />
-                  <Route path="tokens" element={<TokensPage />} />
-                  <Route path="tokens/add" element={<EditTokenPage />} />
-                  <Route path="tokens/edit/:id" element={<EditTokenPage />} />
-                  <Route path="logs" element={<LogsPage />} />
-                  <Route path="users" element={<UsersPage />} />
-                  <Route path="users/add" element={<EditUserPage />} />
-                  <Route path="users/edit/:id" element={<EditUserPage />} />
-                  <Route path="users/edit" element={<EditUserPage />} />
-                  <Route path="channels" element={<ChannelsPage />} />
-                  <Route path="channels/add" element={<EditChannelPage />} />
-                  <Route path="channels/edit/:id" element={<EditChannelPage />} />
-                  <Route path="redemptions" element={<RedemptionsPage />} />
-                  <Route path="redemptions/add" element={<EditRedemptionPage />} />
-                  <Route path="redemptions/edit/:id" element={<EditRedemptionPage />} />
-                  <Route path="about" element={<AboutPage />} />
-                  <Route path="settings" element={<SettingsPage />} />
-                  <Route path="topup" element={<TopUpPage />} />
-                  <Route path="chat" element={<ChatPage />} />
+                  <Route path="models" element={<ModelsPage />} />
                 </Route>
-              </Route>
 
-              {/* Fallback 404 route within layout */}
-              <Route path="/" element={<Layout />}>
-                <Route path="*" element={<NotFoundPage />} />
-              </Route>
-            </Routes>
-          </div>
+                {/* Protected routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<HomePage />} />
+                    <Route path="dashboard" element={<DashboardPage />} />
+                    <Route path="tokens" element={<TokensPage />} />
+                    <Route path="tokens/add" element={<EditTokenPage />} />
+                    <Route path="tokens/edit/:id" element={<EditTokenPage />} />
+                    <Route path="logs" element={<LogsPage />} />
+                    <Route path="users" element={<UsersPage />} />
+                    <Route path="users/add" element={<EditUserPage />} />
+                    <Route path="users/edit/:id" element={<EditUserPage />} />
+                    <Route path="users/edit" element={<EditUserPage />} />
+                    <Route path="channels" element={<ChannelsPage />} />
+                    <Route path="channels/add" element={<EditChannelPage />} />
+                    <Route path="channels/edit/:id" element={<EditChannelPage />} />
+                    <Route path="redemptions" element={<RedemptionsPage />} />
+                    <Route path="redemptions/add" element={<EditRedemptionPage />} />
+                    <Route path="redemptions/edit/:id" element={<EditRedemptionPage />} />
+                    <Route path="about" element={<AboutPage />} />
+                    <Route path="settings" element={<SettingsPage />} />
+                    <Route path="topup" element={<TopUpPage />} />
+                    <Route path="chat" element={<ChatPage />} />
+                  </Route>
+                </Route>
 
-          {/* Development tools */}
-          {process.env.NODE_ENV === 'development' && (
-            <>
-              <ResponsiveDebugger />
-              <ResponsiveValidator />
-            </>
-          )}
-  </Router>
-  </NotificationsProvider>
+                {/* Fallback 404 route within layout */}
+                <Route path="/" element={<Layout />}>
+                  <Route path="*" element={<NotFoundPage />} />
+                </Route>
+              </Routes>
+            </div>
+
+            {/* Development tools */}
+            {process.env.NODE_ENV === 'development' && (
+              <>
+                <ResponsiveDebugger />
+                <ResponsiveValidator />
+              </>
+            )}
+          </Router>
+        </NotificationsProvider>
       </QueryClientProvider>
     </ThemeProvider>
   )
