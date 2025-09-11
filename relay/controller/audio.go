@@ -343,6 +343,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			Content:          logContent,
 			RequestId:        c.GetString(ctxkey.RequestId),
 			TraceId:          traceID,
+			ElapsedTime:      helper.CalcElapsedTime(meta.StartTime), // capture request latency in ms
 		}
 		go billing.PostConsumeQuotaWithLog(bgctx, tokenId, quotaDelta, quota, entry)
 	}()

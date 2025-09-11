@@ -1,6 +1,7 @@
 package openai
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/url"
@@ -13,6 +14,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/tracing"
+	"github.com/songquanpeng/one-api/model"
 	rmeta "github.com/songquanpeng/one-api/relay/meta"
 	rmodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -110,6 +115,40 @@ func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusC
 	if usage != nil && usage.TotalTokens == 0 {
 		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	}
+
+	// Record a zero-quota realtime session log for observability.
+	// Realtime currently does not perform quota billing, but we still want latency & usage visibility.
+	go func() {
+		ctx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), time.Minute)
+		defer cancel()
+
+		requestId := c.GetString(ctxkey.RequestId)
+		traceId := tracing.GetTraceID(c)
+		model.RecordConsumeLog(ctx, &model.Log{
+			UserId:    meta.UserId,
+			ChannelId: meta.ChannelId,
+			PromptTokens: func() int {
+				if usage != nil {
+					return usage.PromptTokens
+				}
+				return 0
+			}(),
+			CompletionTokens: func() int {
+				if usage != nil {
+					return usage.CompletionTokens
+				}
+				return 0
+			}(),
+			ModelName:   meta.ActualModelName,
+			TokenName:   meta.TokenName,
+			Quota:       0,
+			Content:     "realtime session, no quota consumption",
+			IsStream:    true,
+			ElapsedTime: helper.CalcElapsedTime(meta.StartTime),
+			RequestId:   requestId,
+			TraceId:     traceId,
+		})
+	}()
 
 	return nil, usage
 }
