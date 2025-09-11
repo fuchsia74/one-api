@@ -70,18 +70,21 @@ func PostConsumeQuotaWithLog(ctx context.Context, tokenId int, quotaDelta int64,
 	logEntry.Quota = int(totalQuota)
 	model.RecordConsumeLog(ctx, logEntry)
 
+	// Update aggregates only when there is actual consumption.
+	// Zero totalQuota is allowed (e.g., free groups or zero ratios) and should not be treated as an error.
 	if totalQuota > 0 {
 		model.UpdateUserUsedQuotaAndRequestCount(logEntry.UserId, totalQuota)
 		model.UpdateChannelUsedQuota(logEntry.ChannelId, totalQuota)
-	} else {
-		logger.Logger.Error("invalid totalQuota consumed - something is wrong",
+	} else if totalQuota < 0 {
+		// Negative consumption should never happen; flag as error for diagnostics.
+		logger.Logger.Error("invalid negative totalQuota consumed",
 			zap.Int64("total_quota", totalQuota),
 			zap.Int("user_id", logEntry.UserId),
 			zap.Int("channel_id", logEntry.ChannelId),
 			zap.String("model_name", logEntry.ModelName))
 		metrics.GlobalRecorder.RecordBillingError("calculation_error", "post_consume_with_log", logEntry.UserId, logEntry.ChannelId, logEntry.ModelName)
 		billingSuccess = false
-	}
+	} // totalQuota == 0: do nothing (free request)
 
 	metrics.GlobalRecorder.RecordBillingOperation(billingStartTime, "post_consume_with_log", billingSuccess, logEntry.UserId, logEntry.ChannelId, logEntry.ModelName, float64(totalQuota))
 }

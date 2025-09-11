@@ -285,9 +285,11 @@ func GetModelRatioWithThreeLayers(modelName string, channelOverrides map[string]
 	}
 
 	// Layer 3: Global model pricing (merged from selected adapters)
-	globalRatio := GetGlobalModelRatio(modelName)
-	if globalRatio > 0 {
-		return globalRatio
+	// Respect explicit zero pricing by checking existence, not value.
+	if globalPricing := GetGlobalModelPricing(); globalPricing != nil {
+		if cfg, exists := globalPricing[modelName]; exists {
+			return cfg.Ratio
+		}
 	}
 
 	// Layer 4: Final fallback - reasonable default
@@ -314,9 +316,11 @@ func GetCompletionRatioWithThreeLayers(modelName string, channelOverrides map[st
 	}
 
 	// Layer 3: Global model pricing (merged from selected adapters)
-	globalRatio := GetGlobalCompletionRatio(modelName)
-	if globalRatio > 0 {
-		return globalRatio
+	// Respect explicit zero pricing by checking existence, not value.
+	if globalPricing := GetGlobalModelPricing(); globalPricing != nil {
+		if cfg, exists := globalPricing[modelName]; exists {
+			return cfg.CompletionRatio
+		}
 	}
 
 	// Layer 4: Final fallback - reasonable default
@@ -411,9 +415,7 @@ func ResolveEffectivePricing(modelName string, inputTokens int, adaptor adaptor.
 	}
 
 	eff.InputRatio = in
-	if comp == 0 {
-		comp = 1.0
-	}
+	// Allow completion ratio to be zero if explicitly configured (means free completion tokens)
 	eff.OutputRatio = in * comp
 	eff.CachedInputRatio = cachedIn
 	eff.CacheWrite5mRatio = cw5
