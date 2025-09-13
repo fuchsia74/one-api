@@ -7,7 +7,6 @@
 //   - Support for both streaming and non-streaming requests
 //   - Reasoning content capabilities similar to DeepSeek-R1
 //   - Proper token usage tracking for billing
-//   - Support for batch processing with cost-effective pricing
 //
 // The adaptor handles the complete request-response lifecycle by converting
 // OpenAI-compatible requests to AWS Bedrock Converse API format and back,
