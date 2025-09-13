@@ -8,6 +8,10 @@ applyTo: "**/*"
 
 Always use UTC for time handling in servers, databases, and APIs.
 
+### Date Range
+
+For any date‑range query, the handling of the ending date must encompass the entire final day. That means the database query should terminate **just before** 00:00 on the next day, ensuring that all hours of the last day are included.
+
 ### Testing
 
 Please create suitable unit tests based on the current project circumstances. Whenever a new issue arises, update the unit tests during the fix to ensure thorough coverage of the problem by the test cases. Avoid creating temporary, one-off test scripts, and focus on continuously enhancing the unit test cases.

@@ -14,6 +14,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common/utils"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
@@ -357,6 +358,16 @@ func GetUser(c *gin.Context) {
 	return
 }
 
+// GetUserDashboard returns per-day per-model usage statistics and quota info.
+// Date Range Semantics:
+//
+//	The API accepts `from_date` and `to_date` in YYYY-MM-DD format (UTC) and
+//	interprets them as an inclusive range of whole days. Internally this is
+//	converted into a half-open Unix second interval: [from_date 00:00:00 UTC, to_date+1 00:00:00 UTC).
+//	This guarantees that the entire final day is included without relying on
+//	second-based inclusivity or adding 24h-1s hacks, eliminating off-by-one
+//	errors and DST complications.
+//	Maximum range: regular users 7 days, root users 365 days.
 func GetUserDashboard(c *gin.Context) {
 	id := c.GetInt(ctxkey.Id)
 	role := c.GetInt(ctxkey.Role)
@@ -366,62 +377,27 @@ func GetUserDashboard(c *gin.Context) {
 	fromDateStr := c.Query("from_date")
 	toDateStr := c.Query("to_date")
 
-	var startOfDay, endOfDay int64
+	// We will use half-open interval: [startTs, endTsExclusive)
+	// to avoid off-by-one second issues and ensure full-day coverage.
+	var startTs, endTsExclusive int64
 
 	if fromDateStr != "" && toDateStr != "" {
-		// Parse custom date range
-
-		fromDate, err := time.Parse("2006-01-02", fromDateStr)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "Invalid from_date format, expected YYYY-MM-DD",
-				"data":    nil,
-			})
-			return
-		}
-
-		toDate, err := time.Parse("2006-01-02", toDateStr)
-		if err != nil {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "Invalid to_date format, expected YYYY-MM-DD",
-				"data":    nil,
-			})
-			return
-		}
-
-		// Validate date range limits based on user role
-		daysDiff := int(toDate.Sub(fromDate).Hours() / 24)
-		maxDays := 7 // Default for regular users
+		maxDays := 7
 		if role == model.RoleRootUser {
-			maxDays = 365 // Root users can query up to 1 year
+			maxDays = 365
 		}
-
-		if daysDiff > maxDays {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": fmt.Sprintf("Date range too large. Maximum allowed: %d days", maxDays),
-				"data":    nil,
-			})
+		s, e, err := utils.NormalizeDateRange(fromDateStr, toDateStr, maxDays)
+		if err != nil {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error(), "data": nil})
 			return
 		}
-
-		if daysDiff < 0 {
-			c.JSON(http.StatusOK, gin.H{
-				"success": false,
-				"message": "from_date must be before to_date",
-				"data":    nil,
-			})
-			return
-		}
-
-		startOfDay = fromDate.Truncate(24 * time.Hour).Unix()
-		endOfDay = toDate.Truncate(24 * time.Hour).Add(24*time.Hour - time.Second).Unix()
+		startTs = s
+		endTsExclusive = e
 	} else {
-		// Default to last 7 days
-		startOfDay = now.Truncate(24*time.Hour).AddDate(0, 0, -6).Unix()
-		endOfDay = now.Truncate(24 * time.Hour).Add(24*time.Hour - time.Second).Unix()
+		// Default last 7 days including today: [today-6, today]
+		today := now.UTC().Truncate(24 * time.Hour)
+		startTs = today.AddDate(0, 0, -6).Unix()
+		endTsExclusive = today.Add(24 * time.Hour).Unix()
 	}
 
 	// Check if user wants to view specific user's data (root users only)
@@ -459,7 +435,8 @@ func GetUserDashboard(c *gin.Context) {
 	}
 
 	// Get log statistics
-	dashboards, err := model.SearchLogsByDayAndModel(targetUserId, int(startOfDay), int(endOfDay))
+	// Using half-open interval [startTs, endTsExclusive)
+	dashboards, err := model.SearchLogsByDayAndModel(targetUserId, int(startTs), int(endTsExclusive))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

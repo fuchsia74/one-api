@@ -940,14 +940,19 @@ export function DashboardPage() {
                       }
                     }
 
+                    // Determine theme (light/dark) to set an opaque background for readability
+                    const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+                    const tooltipBg = isDark ? 'rgba(17,24,39,1)' : 'rgba(255,255,255,1)' // gray-900 or white
+                    const tooltipText = isDark ? 'rgba(255,255,255,0.95)' : 'rgba(17,24,39,0.9)'
+
                     return (
                       <div style={{
-                        backgroundColor: 'var(--background)',
+                        backgroundColor: tooltipBg,
                         border: '1px solid var(--border)',
                         borderRadius: '8px',
                         padding: '12px 16px',
                         fontSize: '12px',
-                        color: 'var(--foreground)',
+                        color: tooltipText,
                         boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)'
                       }}>
                         <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--foreground)' }}>
