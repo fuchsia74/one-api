@@ -205,10 +205,11 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if baiduResponse.ErrorMsg != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: baiduResponse.ErrorMsg,
-				Type:    "baidu_error",
-				Param:   "",
-				Code:    baiduResponse.ErrorCode,
+				Message:  baiduResponse.ErrorMsg,
+				Type:     "baidu_error",
+				Param:    "",
+				Code:     baiduResponse.ErrorCode,
+				RawError: errors.New(baiduResponse.ErrorMsg),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
@@ -242,10 +243,11 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 	if baiduResponse.ErrorMsg != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: baiduResponse.ErrorMsg,
-				Type:    "baidu_error",
-				Param:   "",
-				Code:    baiduResponse.ErrorCode,
+				Message:  baiduResponse.ErrorMsg,
+				Type:     "baidu_error",
+				Param:    "",
+				Code:     baiduResponse.ErrorCode,
+				RawError: errors.New(baiduResponse.ErrorMsg),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
