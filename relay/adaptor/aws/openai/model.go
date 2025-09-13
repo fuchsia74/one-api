@@ -3,10 +3,13 @@ package aws
 // Request represents a chat completion request to AWS Bedrock OpenAI OSS models.
 //
 // This structure defines all the parameters needed to send a chat completion
-// request to OpenAI OSS models (gpt-oss-20b, gpt-oss-120b) via AWS Bedrock.
+// request to OpenAI OSS models ([gpt-oss-20b], [gpt-oss-120b]) via AWS Bedrock.
 // These models support reasoning capabilities similar to DeepSeek-R1.
 //
 // Based on AWS Bedrock OpenAI OSS documentation.
+//
+// [gpt-oss-20b]: https://openai.com/index/introducing-gpt-oss/
+// [gpt-oss-120b]: https://openai.com/index/introducing-gpt-oss/
 type Request struct {
 	// Messages contains the conversation history including system, user, and assistant messages.
 	// This field is required and must contain at least one message.
