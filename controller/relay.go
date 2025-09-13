@@ -104,7 +104,7 @@ func Relay(c *gin.Context) {
 
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
-	if err := shouldRetry(c, bizErr.StatusCode); err != nil {
+	if err := shouldRetry(c, bizErr.StatusCode, bizErr.RawError); err != nil {
 		lg.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
 		retryTimes = 0
 	}
@@ -257,11 +257,20 @@ func Relay(c *gin.Context) {
 }
 
 // shouldRetry returns nil if should retry, otherwise returns error
-func shouldRetry(c *gin.Context, statusCode int) error {
+func shouldRetry(c *gin.Context, statusCode int, rawErr error) error {
 	if specificChannelId := c.GetInt(ctxkey.SpecificChannelId); specificChannelId != 0 {
 		return errors.Errorf(
 			"specific channel ID (%d) was provided, retry is unvailable",
 			specificChannelId)
+	}
+
+	// If we received a server error (5xx) but the underlying raw error is due to the caller's
+	// context being cancelled or its deadline exceeded, we should NOT retry. Retrying would
+	// waste quota and may incorrectly penalize the channel because the user aborted.
+	if rawErr != nil {
+		if errors.Is(rawErr, context.Canceled) || errors.Is(rawErr, context.DeadlineExceeded) {
+			return errors.Wrap(rawErr, "do not retry: context cancelled or deadline exceeded")
+		}
 	}
 
 	// Do not retry on client-request errors except for rate limit (429), capacity (413), and auth (401/403)

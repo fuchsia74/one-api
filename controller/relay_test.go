@@ -64,7 +64,7 @@ func TestShouldRetry(t *testing.T) {
 			c, _ := gin.CreateTestContext(nil)
 			c.Set(ctxkey.SpecificChannelId, tt.specificChannel)
 
-			err := shouldRetry(c, tt.statusCode)
+			err := shouldRetry(c, tt.statusCode, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)
