@@ -19,7 +19,7 @@ var _ utils.AwsAdapter = new(Adaptor)
 // Adaptor implements the AWS Bedrock adapter for OpenAI OSS language models.
 //
 // This struct provides the core functionality for integrating with AWS Bedrock's
-// OpenAI OSS models (gpt-oss-20b, gpt-oss-120b), implementing the AwsAdapter interface
+// OpenAI OSS models ([gpt-oss-20b], [gpt-oss-120b]), implementing the AwsAdapter interface
 // to ensure consistent behavior across all AWS Bedrock integrations in the One API system.
 //
 // The adapter handles the complete request-response lifecycle:
@@ -28,6 +28,9 @@ var _ utils.AwsAdapter = new(Adaptor)
 //   - Managing both streaming and non-streaming response modes
 //   - Handling OpenAI OSS models' reasoning content capabilities (similar to DeepSeek-R1)
 //   - Managing error conditions and usage tracking
+//
+// [gpt-oss-20b]: https://openai.com/index/introducing-gpt-oss/
+// [gpt-oss-120b]: https://openai.com/index/introducing-gpt-oss/
 type Adaptor struct {
 	// No additional fields required - stateless adapter design
 }
