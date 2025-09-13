@@ -428,7 +428,7 @@ func convertConverseResponseToOpenAI(c *gin.Context, awsResp *bedrockruntime.Con
 	// Similar to DeepSeek implementation but for OpenAI OSS models
 
 	var content string
-	var finishReason = "stop"
+	var finishReason string
 
 	// Extract response content from Converse API response
 	if awsResp.Output != nil {
