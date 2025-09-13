@@ -255,20 +255,25 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	return nil, &usage
 }
 
-func convertStopReason(cohereReason string) *string {
-	if cohereReason == "" {
+// convertStopReason converts AWS converse stop reason to OpenAI format
+func convertStopReason(awsReason string) *string {
+	if awsReason == "" {
 		return nil
 	}
 
 	var result string
-	switch cohereReason {
-	case "stop", "end_turn":
-		result = "stop"
-	case "length", "max_tokens":
+	switch awsReason {
+	case "max_tokens":
 		result = "length"
-	default:
+	case "end_turn", "stop_sequence":
 		result = "stop"
+	case "content_filtered":
+		result = "content_filter"
+	default:
+		// Return the actual AWS response instead of hardcoded "stop"
+		result = awsReason
 	}
+
 	return &result
 }
 
