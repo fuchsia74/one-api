@@ -27,6 +27,10 @@ type Ability struct {
 }
 
 func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority bool) (*Channel, error) {
+	if DB == nil {
+		return nil, errors.New("database not initialized")
+	}
+
 	ability := Ability{}
 	groupCol := "`group`"
 	trueVal := "1"
@@ -188,6 +192,9 @@ func SuspendAbility(ctx context.Context, group string, modelName string, channel
 }
 
 func GetRandomSatisfiedChannelExcluding(group string, model string, ignoreFirstPriority bool, excludeChannelIds map[int]bool) (*Channel, error) {
+	if DB == nil {
+		return nil, errors.New("database not initialized")
+	}
 	ability := Ability{}
 	groupCol := "`group`"
 	trueVal := "1"

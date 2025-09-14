@@ -68,8 +68,9 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 	if tencentResponse.Error.Code != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: tencentResponse.Error.Message,
-				Code:    tencentResponse.Error.Code,
+				Message:  tencentResponse.Error.Message,
+				Code:     tencentResponse.Error.Code,
+				RawError: errors.New(tencentResponse.Error.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
@@ -213,8 +214,9 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if TencentResponse.Error.Code != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: TencentResponse.Error.Message,
-				Code:    TencentResponse.Error.Code,
+				Message:  TencentResponse.Error.Message,
+				Code:     TencentResponse.Error.Code,
+				RawError: errors.New(TencentResponse.Error.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

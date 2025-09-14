@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
@@ -195,10 +196,11 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 	if ollamaResponse.Error != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: ollamaResponse.Error,
-				Type:    "ollama_error",
-				Param:   "",
-				Code:    "ollama_error",
+				Message:  ollamaResponse.Error,
+				Type:     "ollama_error",
+				Param:    "",
+				Code:     "ollama_error",
+				RawError: errors.New(ollamaResponse.Error),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
@@ -251,10 +253,11 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if ollamaResponse.Error != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: ollamaResponse.Error,
-				Type:    "ollama_error",
-				Param:   "",
-				Code:    "ollama_error",
+				Message:  ollamaResponse.Error,
+				Type:     "ollama_error",
+				Param:    "",
+				Code:     "ollama_error",
+				RawError: errors.New(ollamaResponse.Error),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
@@ -64,9 +65,10 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 		return &model.ErrorWithStatusCode{
 			StatusCode: 500,
 			Error: model.Error{
-				Message: "resp is nil",
-				Type:    "upstream_error",
-				Code:    "bad_response",
+				Message:  "resp is nil",
+				Type:     "upstream_error",
+				Code:     "bad_response",
+				RawError: errors.New("resp is nil"),
 			},
 		}
 	}
@@ -74,15 +76,17 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	ErrorWithStatusCode = &model.ErrorWithStatusCode{
 		StatusCode: resp.StatusCode,
 		Error: model.Error{
-			Message: "",
-			Type:    "upstream_error",
-			Code:    "bad_response_status_code",
-			Param:   strconv.Itoa(resp.StatusCode),
+			Message:  "",
+			Type:     "upstream_error",
+			Code:     "bad_response_status_code",
+			Param:    strconv.Itoa(resp.StatusCode),
+			RawError: errors.New("bad response status code" + strconv.Itoa(resp.StatusCode)),
 		},
 	}
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		ErrorWithStatusCode.Error.Message = fmt.Sprintf("failed to read response body: %+v\n\n", err) + ErrorWithStatusCode.Error.Message
+		ErrorWithStatusCode.Error.RawError = err
 		return
 	}
 
@@ -90,6 +94,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	err = resp.Body.Close()
 	if err != nil {
 		ErrorWithStatusCode.Error.Message = fmt.Sprintf("failed to close response body: %+v\n\n", err) + ErrorWithStatusCode.Error.Message
+		ErrorWithStatusCode.Error.RawError = err
 		return
 	}
 
@@ -97,6 +102,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	err = json.Unmarshal(responseBody, &errResponse)
 	if err != nil {
 		ErrorWithStatusCode.Error.Message = fmt.Sprintf("failed to unmarshal response body: %+v\n\n", err) + ErrorWithStatusCode.Error.Message + string(responseBody)
+		ErrorWithStatusCode.Error.RawError = err
 		return
 	}
 

@@ -419,7 +419,10 @@ type LogStatistic struct {
 	CompletionTokens int    `gorm:"column:completion_tokens"`
 }
 
-func SearchLogsByDayAndModel(userId, start, end int) (LogStatistics []*LogStatistic, err error) {
+// SearchLogsByDayAndModel returns per-day, per-model aggregates for logs in the
+// half-open timestamp range [start, endExclusive). `start` and `endExclusive`
+// are Unix seconds.
+func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*LogStatistic, err error) {
 	groupSelect := "DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-%d') as day"
 
 	if common.UsingPostgreSQL {
@@ -434,6 +437,7 @@ func SearchLogsByDayAndModel(userId, start, end int) (LogStatistics []*LogStatis
 	var query string
 	var args []interface{}
 
+	// We switch to explicit >= start AND < endExclusive to avoid relying on BETWEEN inclusive semantics.
 	if userId == 0 {
 		query = `
 			SELECT ` + groupSelect + `,
@@ -443,11 +447,11 @@ func SearchLogsByDayAndModel(userId, start, end int) (LogStatistics []*LogStatis
 			sum(completion_tokens) as completion_tokens
 			FROM logs
 			WHERE type=2
-			AND created_at BETWEEN ? AND ?
+			AND created_at >= ? AND created_at < ?
 			GROUP BY day, model_name
 			ORDER BY day, model_name
 		`
-		args = []interface{}{start, end}
+		args = []interface{}{start, endExclusive}
 	} else {
 		query = `
 			SELECT ` + groupSelect + `,
@@ -458,11 +462,11 @@ func SearchLogsByDayAndModel(userId, start, end int) (LogStatistics []*LogStatis
 			FROM logs
 			WHERE type=2
 			AND user_id= ?
-			AND created_at BETWEEN ? AND ?
+			AND created_at >= ? AND created_at < ?
 			GROUP BY day, model_name
 			ORDER BY day, model_name
 		`
-		args = []interface{}{userId, start, end}
+		args = []interface{}{userId, start, endExclusive}
 	}
 
 	err = LOG_DB.Raw(query, args...).Scan(&LogStatistics).Error

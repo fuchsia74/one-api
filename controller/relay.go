@@ -104,7 +104,7 @@ func Relay(c *gin.Context) {
 
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
-	if err := shouldRetry(c, bizErr.StatusCode); err != nil {
+	if err := shouldRetry(c, bizErr.StatusCode, bizErr.RawError); err != nil {
 		lg.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
 		retryTimes = 0
 	}
@@ -257,20 +257,29 @@ func Relay(c *gin.Context) {
 }
 
 // shouldRetry returns nil if should retry, otherwise returns error
-func shouldRetry(c *gin.Context, statusCode int) error {
+func shouldRetry(c *gin.Context, statusCode int, rawErr error) error {
 	if specificChannelId := c.GetInt(ctxkey.SpecificChannelId); specificChannelId != 0 {
 		return errors.Errorf(
 			"specific channel ID (%d) was provided, retry is unvailable",
 			specificChannelId)
 	}
 
-	// Do not retry on client-request errors except for rate limit (429) and capacity (413) and auth (401/403)
+	// If we received a server error (5xx) but the underlying raw error is due to the caller's
+	// context being cancelled or its deadline exceeded, we should NOT retry. Retrying would
+	// waste quota and may incorrectly penalize the channel because the user aborted.
+	if rawErr != nil {
+		if errors.Is(rawErr, context.Canceled) || errors.Is(rawErr, context.DeadlineExceeded) {
+			return errors.Wrap(rawErr, "do not retry: context cancelled or deadline exceeded")
+		}
+	}
+
+	// Do not retry on client-request errors except for rate limit (429), capacity (413), and auth (401/403)
+	// 404 should NOT retry, so it must not be excluded here.
 	if statusCode >= 400 &&
 		statusCode < 500 &&
 		statusCode != http.StatusTooManyRequests &&
 		statusCode != http.StatusRequestEntityTooLarge &&
 		statusCode != http.StatusUnauthorized &&
-		statusCode != http.StatusNotFound &&
 		statusCode != http.StatusForbidden {
 		return errors.Errorf("client error %d, not retrying", statusCode)
 	}
@@ -398,6 +407,13 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 		return
 	}
 
+	// context cancel or deadline exceeded - likely user aborted or timeout.
+	// Detect via status or RawError classification; avoid suspending/disabling.
+	if err.StatusCode == http.StatusRequestTimeout || (err.RawError != nil && (errors.Is(err.RawError, context.Canceled) || errors.Is(err.RawError, context.DeadlineExceeded))) {
+		monitor.Emit(channelId, false)
+		return
+	}
+
 	// 413 capacity issues: do not suspend; rely on retry selection to seek larger max_tokens
 	if err.StatusCode == http.StatusRequestEntityTooLarge {
 		monitor.Emit(channelId, false)
@@ -439,25 +455,29 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 }
 
 func RelayNotImplemented(c *gin.Context) {
-	err := model.Error{
-		Message: "API not implemented",
-		Type:    "one_api_error",
-		Param:   "",
-		Code:    "api_not_implemented",
+	msg := "API not implemented"
+	errObj := model.Error{
+		Message:  msg,
+		Type:     "one_api_error",
+		Param:    "",
+		Code:     "api_not_implemented",
+		RawError: errors.New(msg),
 	}
 	c.JSON(http.StatusNotImplemented, gin.H{
-		"error": err,
+		"error": errObj,
 	})
 }
 
 func RelayNotFound(c *gin.Context) {
-	err := model.Error{
-		Message: fmt.Sprintf("Invalid URL (%s %s)", c.Request.Method, c.Request.URL.Path),
-		Type:    "invalid_request_error",
-		Param:   "",
-		Code:    "",
+	msg := fmt.Sprintf("Invalid URL (%s %s)", c.Request.Method, c.Request.URL.Path)
+	errObj := model.Error{
+		Message:  msg,
+		Type:     "invalid_request_error",
+		Param:    "",
+		Code:     "",
+		RawError: errors.New(msg),
 	}
 	c.JSON(http.StatusNotFound, gin.H{
-		"error": err,
+		"error": errObj,
 	})
 }

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
@@ -229,10 +230,11 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if !zhipuResponse.Success {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: zhipuResponse.Msg,
-				Type:    "zhipu_error",
-				Param:   "",
-				Code:    zhipuResponse.Code,
+				Message:  zhipuResponse.Msg,
+				Type:     "zhipu_error",
+				Param:    "",
+				Code:     zhipuResponse.Code,
+				RawError: errors.New(zhipuResponse.Msg),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
