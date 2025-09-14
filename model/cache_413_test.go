@@ -1,8 +1,9 @@
 package model
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // This test ensures the 413 path's tryLargerMaxTokens filtering logic does not panic and
