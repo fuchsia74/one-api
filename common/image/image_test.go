@@ -579,3 +579,63 @@ func TestGenerateTextImageEdgeCases(t *testing.T) {
 		require.Equal(t, "png", format)
 	})
 }
+
+func TestGenerateTextImageSizeLimit(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Text exceeds maximum image size limit", func(t *testing.T) {
+		t.Parallel()
+
+		// Calculate text length that would exceed MaxInlineImageSizeMB (30MB default)
+		// Formula: imageWidth * imageHeight * 4 * 1.2 > MaxInlineImageSizeMB * 1024 * 1024
+		// With 50 chars per line, charWidth=8, charHeight=16, padding=20:
+		// For very long text, we need enough lines to create a large image
+		// Approximate calculation: we need ~3000+ lines to exceed 30MB
+
+		// Create text with enough content to exceed the size limit
+		// Each line will be ~50 characters, we need many lines
+		longText := strings.Repeat(strings.Repeat("A", 50)+"\n", 4000) // 4000 lines of 50 chars each
+
+		imageData, mimeType, err := img.GenerateTextImage(longText)
+
+		// Should return an error about exceeding size limit
+		require.Error(t, err)
+		require.Empty(t, imageData)
+		require.Empty(t, mimeType)
+
+		// Verify the error message contains the expected text
+		require.Contains(t, err.Error(), "generated image size would exceed")
+		require.Contains(t, err.Error(), "MB limit")
+		require.Contains(t, err.Error(), "estimated")
+		require.Contains(t, err.Error(), "bytes for text length")
+
+		t.Logf("Expected error received: %v", err)
+	})
+
+	t.Run("Text just under size limit should succeed", func(t *testing.T) {
+		t.Parallel()
+
+		// Create text that should be large but still within limits
+		// Based on the previous test failure, 1000 lines exceeded 30MB (~33.8MB)
+		// Let's use 500 lines to stay comfortably under the limit
+		mediumText := strings.Repeat(strings.Repeat("B", 50)+"\n", 500) // 500 lines should be under limit
+
+		imageData, mimeType, err := img.GenerateTextImage(mediumText)
+
+		// Should succeed without error
+		require.NoError(t, err)
+		require.NotEmpty(t, imageData)
+		require.Equal(t, "image/png", mimeType)
+
+		// Verify the image can be decoded
+		reader := bytes.NewReader(imageData)
+		config, format, err := image.DecodeConfig(reader)
+		require.NoError(t, err)
+		require.Equal(t, "png", format)
+		require.Greater(t, config.Width, 200)
+		require.Greater(t, config.Height, 100)
+
+		t.Logf("Medium text succeeded: %dx%d image, %d bytes",
+			config.Width, config.Height, len(imageData))
+	})
+}

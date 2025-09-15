@@ -200,6 +200,17 @@ func GenerateTextImage(text string) (imageData []byte, mimeType string, err erro
 		imageHeight = 100
 	}
 
+	// Check if the estimated image size would exceed the configured limit
+	// Estimate PNG size: RGBA (4 bytes per pixel) + PNG overhead (~20% compression ratio)
+	estimatedSizeBytes := int64(imageWidth * imageHeight * 4)          // RGBA pixels
+	estimatedSizeBytes = estimatedSizeBytes + (estimatedSizeBytes / 5) // Add ~20% for PNG overhead
+	maxSizeBytes := int64(config.MaxInlineImageSizeMB) * 1024 * 1024
+
+	if estimatedSizeBytes > maxSizeBytes {
+		return nil, "", errors.Errorf("generated image size would exceed %dMB limit: estimated %d bytes for text length %d",
+			config.MaxInlineImageSizeMB, estimatedSizeBytes, len(text))
+	}
+
 	// Create image
 	img := image.NewRGBA(image.Rect(0, 0, imageWidth, imageHeight))
 
