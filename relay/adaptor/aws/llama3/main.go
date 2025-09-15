@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/tracing"
 
 	"github.com/Laisky/errors/v2"
@@ -145,15 +146,31 @@ func convertLlamaToConverseRequest(c *gin.Context, llamaReq *Request, modelID st
 							// Use the existing downloadImageFromURL function from utils
 							imageData, imageFormat, err := utils.DownloadImageFromURL(gmw.Ctx(c), content.ImageURL.Url)
 							if err != nil {
-								// If image download fails, add error as text content to maintain functionality
+								// If image download fails, generate a fallback image with error text
+								// This improves the response for vision-capable models as they can "see" the error message
 								lg := gmw.GetLogger(c)
 								lg.Warn("image download failed", zap.Error(err))
-								contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
-									// TODO: Consider enhancing this by utilizing a fallback image containing the text "Image download failed",
-									// thereby improving the response for vision-capable models.
-									// For instance, if the fallback image displays the text "Image download failed", the vision model is likely to respond by acknowledging the image download failure.
-									Value: fmt.Sprintf("[Image download failed: %s]", err),
-								})
+
+								// Generate fallback image with error message
+								fallbackText := fmt.Sprintf("Image download failed: %s", err)
+								fallbackImageData, _, imgErr := image.GenerateTextImage(fallbackText)
+								if imgErr != nil {
+									// If fallback image generation also fails, use text content as last resort
+									contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
+										Value: fallbackText,
+									})
+								} else {
+									// Create ImageBlock with fallback image
+									imageBlock := &types.ContentBlockMemberImage{
+										Value: types.ImageBlock{
+											Format: types.ImageFormatPng,
+											Source: &types.ImageSourceMemberBytes{
+												Value: fallbackImageData,
+											},
+										},
+									}
+									contentBlocks = append(contentBlocks, imageBlock)
+								}
 							} else {
 								// Create ImageBlock with actual image data
 								imageBlock := &types.ContentBlockMemberImage{

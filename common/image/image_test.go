@@ -306,3 +306,276 @@ func TestGetImageFromUrl(t *testing.T) {
 		})
 	}
 }
+
+func TestGenerateTextImage(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		text            string
+		expectedMime    string
+		minWidth        int
+		minHeight       int
+		expectDefault   bool
+		validateContent bool
+	}{
+		{
+			name:            "Basic text",
+			text:            "Hello, World!",
+			expectedMime:    "image/png",
+			minWidth:        200, // Minimum enforced width
+			minHeight:       100, // Minimum enforced height
+			expectDefault:   false,
+			validateContent: true,
+		},
+		{
+			name:            "Empty text should use default",
+			text:            "",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   true,
+			validateContent: true,
+		},
+		{
+			name:            "Long text with word wrapping",
+			text:            "This is a very long text that should demonstrate the word wrapping functionality of the text-to-image generator. The text should automatically wrap to multiple lines for better readability and create a taller image.",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   false,
+			validateContent: true,
+		},
+		{
+			name:            "Text with special characters",
+			text:            "Special chars: @#$%^&*()_+-={}[]|\\:;\"'<>,.?/~`",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   false,
+			validateContent: true,
+		},
+		{
+			name:            "Multiline text with explicit breaks",
+			text:            "Line 1: System Status\nLine 2: Connection Error\nLine 3: Retry in 5 seconds",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   false,
+			validateContent: true,
+		},
+		{
+			name:            "Error message simulation",
+			text:            "Image download failed: connection timeout after 30 seconds",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   false,
+			validateContent: true,
+		},
+		{
+			name:            "Single character",
+			text:            "X",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   false,
+			validateContent: true,
+		},
+		{
+			name:            "Numbers and mixed content",
+			text:            "Processing: 1234567890 tokens, 42 images, 3.14159 seconds",
+			expectedMime:    "image/png",
+			minWidth:        200,
+			minHeight:       100,
+			expectDefault:   false,
+			validateContent: true,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt // capture range variable
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			imageData, mimeType, err := img.GenerateTextImage(tt.text)
+
+			// Should never error
+			require.NoError(t, err)
+			require.NotEmpty(t, imageData)
+			require.Equal(t, tt.expectedMime, mimeType)
+
+			// Verify the image data is valid PNG
+			reader := bytes.NewReader(imageData)
+			config, format, err := image.DecodeConfig(reader)
+			require.NoError(t, err)
+			require.Equal(t, "png", format)
+
+			// Check minimum dimensions
+			require.GreaterOrEqual(t, config.Width, tt.minWidth)
+			require.GreaterOrEqual(t, config.Height, tt.minHeight)
+
+			// For non-empty text, dimensions should be reasonable based on content
+			if !tt.expectDefault && tt.text != "" {
+				// Longer text should generally create wider or taller images
+				if len(tt.text) > 50 {
+					require.Greater(t, config.Width+config.Height, 300)
+				}
+			}
+
+			if tt.validateContent {
+				// Verify we can decode the full image (not just config)
+				reader.Reset(imageData)
+				decodedImg, _, err := image.Decode(reader)
+				require.NoError(t, err)
+				require.NotNil(t, decodedImg)
+
+				// Verify image bounds match config
+				bounds := decodedImg.Bounds()
+				require.Equal(t, config.Width, bounds.Dx())
+				require.Equal(t, config.Height, bounds.Dy())
+			}
+
+			// Log dimensions for debugging
+			t.Logf("Text: %q -> Image: %dx%d (%d bytes)",
+				tt.text, config.Width, config.Height, len(imageData))
+		})
+	}
+}
+
+func TestGenerateTextImageBase64(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name         string
+		text         string
+		expectedMime string
+	}{
+		{
+			name:         "Basic text to base64",
+			text:         "Hello, Base64!",
+			expectedMime: "image/png",
+		},
+		{
+			name:         "Empty text to base64",
+			text:         "",
+			expectedMime: "image/png",
+		},
+		{
+			name:         "Special characters to base64",
+			text:         "Test: @#$%^&*()",
+			expectedMime: "image/png",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt // capture range variable
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			base64Data, mimeType, err := img.GenerateTextImageBase64(tt.text)
+
+			// Should never error
+			require.NoError(t, err)
+			require.NotEmpty(t, base64Data)
+			require.Equal(t, tt.expectedMime, mimeType)
+
+			// Verify the base64 data is valid
+			decoded, err := base64.StdEncoding.DecodeString(base64Data)
+			require.NoError(t, err)
+			require.NotEmpty(t, decoded)
+
+			// Verify the decoded data is a valid PNG image
+			reader := bytes.NewReader(decoded)
+			config, format, err := image.DecodeConfig(reader)
+			require.NoError(t, err)
+			require.Equal(t, "png", format)
+			require.Greater(t, config.Width, 0)
+			require.Greater(t, config.Height, 0)
+
+			// Verify consistency with GenerateTextImage
+			directImageData, directMimeType, err := img.GenerateTextImage(tt.text)
+			require.NoError(t, err)
+			require.Equal(t, directMimeType, mimeType)
+
+			// The base64 encoded version should match the direct version
+			expectedBase64 := base64.StdEncoding.EncodeToString(directImageData)
+			require.Equal(t, expectedBase64, base64Data)
+
+			t.Logf("Text: %q -> Base64 length: %d", tt.text, len(base64Data))
+		})
+	}
+}
+
+func TestGenerateTextImageEdgeCases(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Very long single word", func(t *testing.T) {
+		t.Parallel()
+
+		longWord := strings.Repeat("a", 100)
+		imageData, mimeType, err := img.GenerateTextImage(longWord)
+
+		require.NoError(t, err)
+		require.NotEmpty(t, imageData)
+		require.Equal(t, "image/png", mimeType)
+
+		// Verify image can be decoded
+		reader := bytes.NewReader(imageData)
+		config, format, err := image.DecodeConfig(reader)
+		require.NoError(t, err)
+		require.Equal(t, "png", format)
+		require.Greater(t, config.Width, 200) // Should be wider than minimum
+	})
+
+	t.Run("Text with only whitespace", func(t *testing.T) {
+		t.Parallel()
+
+		whitespaceText := "   \t\n   "
+		imageData, mimeType, err := img.GenerateTextImage(whitespaceText)
+
+		require.NoError(t, err)
+		require.NotEmpty(t, imageData)
+		require.Equal(t, "image/png", mimeType)
+
+		// Should still create a valid image
+		reader := bytes.NewReader(imageData)
+		_, format, err := image.DecodeConfig(reader)
+		require.NoError(t, err)
+		require.Equal(t, "png", format)
+	})
+
+	t.Run("Unicode characters", func(t *testing.T) {
+		t.Parallel()
+
+		unicodeText := "Hello 世界 🌍 Unicode text with émojis 🎉"
+		imageData, mimeType, err := img.GenerateTextImage(unicodeText)
+
+		require.NoError(t, err)
+		require.NotEmpty(t, imageData)
+		require.Equal(t, "image/png", mimeType)
+
+		// Verify image can be decoded
+		reader := bytes.NewReader(imageData)
+		_, format, err := image.DecodeConfig(reader)
+		require.NoError(t, err)
+		require.Equal(t, "png", format)
+	})
+
+	t.Run("Multiple consecutive spaces", func(t *testing.T) {
+		t.Parallel()
+
+		spacedText := "Word1     Word2     Word3"
+		imageData, mimeType, err := img.GenerateTextImage(spacedText)
+
+		require.NoError(t, err)
+		require.NotEmpty(t, imageData)
+		require.Equal(t, "image/png", mimeType)
+
+		// Verify image can be decoded
+		reader := bytes.NewReader(imageData)
+		_, format, err := image.DecodeConfig(reader)
+		require.NoError(t, err)
+		require.Equal(t, "png", format)
+	})
+}
