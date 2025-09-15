@@ -146,7 +146,12 @@ func convertLlamaToConverseRequest(c *gin.Context, llamaReq *Request, modelID st
 							imageData, imageFormat, err := utils.DownloadImageFromURL(gmw.Ctx(c), content.ImageURL.Url)
 							if err != nil {
 								// If image download fails, add error as text content to maintain functionality
+								lg := gmw.GetLogger(c)
+								lg.Warn("image download failed", zap.Error(err))
 								contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
+									// TODO: Consider enhancing this by utilizing a fallback image containing the text "Image download failed",
+									// thereby improving the response for vision-capable models.
+									// For instance, if the fallback image displays the text "Image download failed", the vision model is likely to respond by acknowledging the image download failure.
 									Value: fmt.Sprintf("[Image download failed: %s]", err),
 								})
 							} else {
