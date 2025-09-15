@@ -14,12 +14,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
 const (
-	// Maximum image download size (10MB)
-	maxImageDownloadSize = 10 * 1024 * 1024
 	// HTTP timeout for image downloads
 	imageDownloadTimeout = 30 * time.Second
 )
@@ -91,9 +90,10 @@ func handleDataURI(dataURI string) ([]byte, types.ImageFormat, error) {
 		return nil, "", errors.New("decoded image data is empty")
 	}
 
-	// Check size limit
-	if len(imageData) > maxImageDownloadSize {
-		return nil, "", errors.Errorf("decoded image data too large: %d bytes (max: %d)", len(imageData), maxImageDownloadSize)
+	// Check size limit using configurable MaxInlineImageSizeMB
+	maxSizeBytes := int64(config.MaxInlineImageSizeMB) * 1024 * 1024
+	if int64(len(imageData)) > maxSizeBytes {
+		return nil, "", errors.Errorf("decoded image data too large: %d bytes (max: %dMB)", len(imageData), config.MaxInlineImageSizeMB)
 	}
 
 	// Additional validation: check magic bytes to confirm format
@@ -142,8 +142,9 @@ func downloadImageFromHTTPURL(ctx context.Context, imageURL string) ([]byte, typ
 		return nil, "", err
 	}
 
-	// Read image data with size limit
-	imageData, err := io.ReadAll(io.LimitReader(resp.Body, maxImageDownloadSize))
+	// Read image data with size limit using configurable MaxInlineImageSizeMB
+	maxSizeBytes := int64(config.MaxInlineImageSizeMB) * 1024 * 1024
+	imageData, err := io.ReadAll(io.LimitReader(resp.Body, maxSizeBytes))
 	if err != nil {
 		return nil, "", errors.Wrap(err, "failed to read image data")
 	}
