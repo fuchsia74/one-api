@@ -241,16 +241,15 @@ func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.
 	var requestBody io.Reader
 	convertedRequest, err := adaptor.ConvertRequest(c, meta.Mode, textRequest)
 	if err != nil {
-		gmw.GetLogger(c).Debug("converted request failed", zap.Error(err))
-		return nil, err
+		return nil, errors.Wrap(err, "convert request failed")
 	}
 	c.Set(ctxkey.ConvertedRequest, convertedRequest)
 
 	jsonData, err := json.Marshal(convertedRequest)
 	if err != nil {
-		gmw.GetLogger(c).Debug("converted request json_marshal_failed", zap.Error(err))
-		return nil, err
+		return nil, errors.Wrap(err, "marshal converted request failed")
 	}
+
 	gmw.GetLogger(c).Debug("converted request", zap.ByteString("json", jsonData))
 	requestBody = bytes.NewBuffer(jsonData)
 	return requestBody, nil

@@ -222,6 +222,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			ResponseModalities: geminiOpenaiCompatible.GetModelModalities(textRequest.Model),
 		},
 	}
+
 	if geminiRequest.GenerationConfig.MaxOutputTokens == 0 {
 		geminiRequest.GenerationConfig.MaxOutputTokens = config.DefaultMaxToken
 	}
@@ -235,6 +236,13 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			geminiRequest.GenerationConfig.ResponseSchema = cleanedSchema
 			geminiRequest.GenerationConfig.ResponseMimeType = mimeTypeMap["json_object"]
 		}
+	}
+
+	// remove temperature & top_p for some models
+	if strings.Contains(textRequest.Model, "-image") {
+		geminiRequest.GenerationConfig.Temperature = nil
+		geminiRequest.GenerationConfig.TopP = nil
+		geminiRequest.GenerationConfig.ResponseModalities = []string{"TEXT", "IMAGE"}
 	}
 
 	// FIX(https://github.com/Laisky/one-api/issues/60):
