@@ -24,6 +24,13 @@ const (
 	imageDownloadTimeout = 30 * time.Second
 )
 
+// DownloadImageFromURL downloads an image from a URL and returns the image data and format
+// Supports both HTTP/HTTPS URLs and data URIs with base64-encoded images
+// This is a public wrapper for the image downloading functionality used by adapters
+func DownloadImageFromURL(ctx context.Context, imageURL string) ([]byte, types.ImageFormat, error) {
+	return downloadImageFromURL(ctx, imageURL)
+}
+
 // downloadImageFromURL downloads an image from a URL and returns the image data and format
 // Supports both HTTP/HTTPS URLs and data URIs with base64-encoded images
 func downloadImageFromURL(ctx context.Context, imageURL string) ([]byte, types.ImageFormat, error) {
@@ -114,7 +121,7 @@ func downloadImageFromHTTPURL(ctx context.Context, imageURL string) ([]byte, typ
 	}
 
 	// Set user agent to avoid blocking
-	req.Header.Set("User-Agent", "OneAPI-AWS-TokenCounter/1.0")
+	req.Header.Set("User-Agent", "OneAPI-AWS-Image-Downloader/1.0")
 
 	// Make the request
 	resp, err := client.Do(req)
