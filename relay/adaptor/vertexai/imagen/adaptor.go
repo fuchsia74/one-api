@@ -22,18 +22,34 @@ import (
 // Based on VertexAI Imagen pricing: https://cloud.google.com/vertex-ai/generative-ai/pricing
 var ModelRatios = map[string]adaptor.ModelConfig{
 	// -------------------------------------
-	// Image Generation Models
-	// -------------------------------------
-	"imagen-3.0-generate-001":      {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // $0.04 per image
-	"imagen-3.0-generate-002":      {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // $0.04 per image
-	"imagen-3.0-fast-generate-001": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // $0.02 per image
-	// -------------------------------------
-	// Image Editing Models
-	// -------------------------------------
-	"imagen-3.0-capability-001": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.05}, // $0.05 per image
+	// Imagen Pricing (source: official Vertex AI pricing doc, 2025-08)
+
+	// Imagen 4.0 GA (2025-08-14)
+	"imagen-4.0-generate-001":       {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // Imagen 4
+	"imagen-4.0-ultra-generate-001": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.06}, // Imagen 4 Ultra
+	"imagen-4.0-fast-generate-001":  {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // Imagen 4 Fast
+
+	// Imagen 4.0 Public Preview (retained for backward compatibility)
+	"imagen-4.0-generate-preview-06-06":       {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04},
+	"imagen-4.0-ultra-generate-preview-06-06": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.06},
+	"imagen-4.0-fast-generate-preview-06-06":  {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02},
+	"imagen-4.0-generate-preview-05-20":       {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04},
+	"imagen-4.0-ultra-generate-preview-05-20": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.06},
+	"imagen-4.0-fast-generate-preview-05-20":  {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02},
+
+	// Imagen 3.0 (GA)
+	"imagen-3.0-generate-001":      {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // Imagen 3
+	"imagen-3.0-generate-002":      {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // Imagen 3
+	"imagen-3.0-fast-generate-001": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // Imagen 3 Fast
+	"imagen-3.0-capability-001":    {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.04}, // Imagen 3 edit/customize
+
+	// Imagen 2.x & 1.x (legacy imagegeneration@ versions)
+	"imagegeneration@006": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // Imagen 2 (gen + edit)
+	"imagegeneration@005": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // Imagen 2 early GA
+	"imagegeneration@002": {Ratio: 0, CompletionRatio: 1.0, ImagePriceUsd: 0.02}, // Imagen 1 (gen + edit)
 }
 
-// ModelList derived from ModelRatios for backward compatibility
+// ModelList derived from ModelRatios for backward compatibility.
 var ModelList = adaptor.GetModelListFromPricing(ModelRatios)
 
 type Adaptor struct {

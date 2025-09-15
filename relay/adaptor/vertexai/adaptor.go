@@ -286,11 +286,15 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 	// Determine the endpoint suffix based on model type and streaming
 	var suffix string
 
-	// Check if this is a non-Gemini model (like Claude) that uses rawPredict
-	if strings.Contains(meta.ActualModelName, "claude") {
+	// Imagen models use the :predict endpoint (not generateContent / rawPredict)
+	// Docs: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/imagen-api
+	if isImagenModel(meta.ActualModelName) {
+		suffix = "predict"
+	} else if strings.Contains(meta.ActualModelName, "claude") {
+		// Claude models use rawPredict
 		suffix = "rawPredict"
 	} else {
-		// Gemini models use generateContent/streamGenerateContent
+		// Gemini (and other text models) use generateContent / streamGenerateContent
 		if meta.IsStream {
 			suffix = "streamGenerateContent?alt=sse"
 		} else {
@@ -325,6 +329,15 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		meta.ActualModelName,
 		suffix,
 	), nil
+}
+
+// isImagenModel returns true if the model name belongs to Vertex AI Imagen family.
+// Imagen models require the :predict endpoint and reject generateContent.
+func isImagenModel(model string) bool {
+	if model == "" {
+		return false
+	}
+	return strings.HasPrefix(model, "imagen-") || strings.HasPrefix(model, "imagegeneration@")
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {

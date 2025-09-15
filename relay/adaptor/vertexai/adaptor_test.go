@@ -13,6 +13,36 @@ func TestAdaptor_GetRequestURL(t *testing.T) {
 	Convey("GetRequestURL", t, func() {
 		adaptor := &Adaptor{}
 
+		Convey("imagen models should use predict endpoint", func() {
+			imagenTests := []struct {
+				model  string
+				region string
+			}{
+				{"imagen-4.0-fast-generate-001", "us-central1"},
+				{"imagen-4.0-generate-001", "us-central1"},
+				{"imagen-3.0-fast-generate-001", "europe-west4"},
+				{"imagegeneration@006", "asia-southeast1"},
+			}
+
+			for _, tc := range imagenTests {
+				Convey(tc.model+" predict", func() {
+					meta := &meta.Meta{
+						ActualModelName: tc.model,
+						IsStream:        false,
+						Config: model.ChannelConfig{
+							Region:            tc.region,
+							VertexAIProjectID: "test-project",
+						},
+					}
+
+					url, err := adaptor.GetRequestURL(meta)
+					So(err, ShouldBeNil)
+					expectedURL := "https://" + tc.region + "-aiplatform.googleapis.com/v1/projects/test-project/locations/" + tc.region + "/publishers/google/models/" + tc.model + ":predict"
+					So(url, ShouldEqual, expectedURL)
+				})
+			}
+		})
+
 		Convey("gemini-2.5-pro-preview models should use global endpoint", func() {
 			testCases := []struct {
 				name           string
@@ -209,6 +239,27 @@ func TestIsRequireGlobalEndpoint(t *testing.T) {
 			Convey("model "+tc.model, func() {
 				result := IsRequireGlobalEndpoint(tc.model)
 				So(result, ShouldEqual, tc.expected)
+			})
+		}
+	})
+}
+
+func TestIsImagenModel(t *testing.T) {
+	Convey("isImagenModel", t, func() {
+		cases := []struct {
+			model    string
+			expected bool
+		}{
+			{"imagen-4.0-fast-generate-001", true},
+			{"imagen-3.0-generate-002", true},
+			{"imagegeneration@006", true},
+			{"gemini-1.5-pro", false},
+			{"claude-3-sonnet", false},
+			{"", false},
+		}
+		for _, c := range cases {
+			Convey("model "+c.model, func() {
+				So(isImagenModel(c.model), ShouldEqual, c.expected)
 			})
 		}
 	})
