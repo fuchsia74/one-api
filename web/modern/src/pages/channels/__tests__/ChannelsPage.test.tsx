@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { BrowserRouter } from 'react-router-dom'
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 import { ChannelsPage } from '../ChannelsPage'
@@ -85,6 +86,8 @@ describe('ChannelsPage Pagination', () => {
   it('should not make duplicate API calls when changing page size', async () => {
     renderChannelsPage()
 
+    const user = userEvent.setup()
+
     // Wait for initial load
     await waitFor(() => {
       expect(mockApiGet).toHaveBeenCalledTimes(1)
@@ -93,13 +96,13 @@ describe('ChannelsPage Pagination', () => {
     // Clear the mock to track new calls
     mockApiGet.mockClear()
 
-    // Find and click the page size selector
+    // Find and click the page size selector (Radix Select opens on pointer/keyboard)
     const pageSizeSelect = screen.getByRole('combobox', { name: /rows per page/i })
-    fireEvent.click(pageSizeSelect)
+    await user.click(pageSizeSelect)
 
-    // Select 20 rows per page (different from default 10)
-    const option20 = screen.getByRole('option', { name: '20' })
-    fireEvent.click(option20)
+    // Wait for the options portal to render, then choose 20
+    const option20 = await screen.findByRole('option', { name: '20' })
+    await user.click(option20)
 
     // Wait for the API call
     await waitFor(() => {
@@ -123,7 +126,7 @@ describe('ChannelsPage Pagination', () => {
 
     // Find and click page 2
     const page2Button = screen.getByRole('button', { name: 'Page 2' })
-    fireEvent.click(page2Button)
+    await userEvent.click(page2Button)
 
     // Wait for the API call
     await waitFor(() => {
@@ -146,7 +149,7 @@ describe('ChannelsPage Pagination', () => {
 
     // Find and click a sortable column header
     const nameHeader = screen.getByRole('button', { name: /name/i })
-    fireEvent.click(nameHeader)
+    await userEvent.click(nameHeader)
 
     // Wait for the API call
     await waitFor(() => {
