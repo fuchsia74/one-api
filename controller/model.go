@@ -466,7 +466,6 @@ func GetUserAvailableModels(c *gin.Context) {
 		"message": "",
 		"data":    modelNames,
 	})
-	return
 }
 
 // GetAvailableModelsByToken get available models by API token
@@ -476,7 +475,7 @@ func GetAvailableModelsByToken(c *gin.Context) {
 	userID := c.GetInt(ctxkey.Id)
 	token, err := model.GetTokenByIds(tokenID, userID)
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
 			"message": err.Error(),
 			"data": gin.H{
