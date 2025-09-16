@@ -466,5 +466,57 @@ func GetUserAvailableModels(c *gin.Context) {
 		"message": "",
 		"data":    modelNames,
 	})
-	return
+}
+
+// GetAvailableModelsByToken get available models by API token
+func GetAvailableModelsByToken(c *gin.Context) {
+	// Get token information to determine status
+	tokenID := c.GetInt(ctxkey.TokenId)
+	userID := c.GetInt(ctxkey.Id)
+	token, err := model.GetTokenByIds(tokenID, userID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"success": false,
+			"message": err.Error(),
+			"data": gin.H{
+				"available": nil,
+				"enabled":   false,
+			},
+		})
+		return
+	}
+
+	// Determine if token is enabled
+	statusToken := token.Status == model.TokenStatusEnabled
+
+	// Check if the token has specific model restrictions
+	if availableModels, exists := c.Get(ctxkey.AvailableModels); exists {
+		// Token has model restrictions, use those models
+		modelsString := availableModels.(string)
+		if modelsString != "" {
+			modelNames := strings.Split(modelsString, ",")
+			// Trim whitespace from each model name
+			for i := range modelNames {
+				modelNames[i] = strings.TrimSpace(modelNames[i])
+			}
+			c.JSON(http.StatusOK, gin.H{
+				"success": true,
+				"data": gin.H{
+					"available": modelNames,
+					"enabled":   statusToken,
+				},
+			})
+			return
+		}
+	}
+
+	// Token has no model restrictions, return error instead of fallback
+	c.JSON(http.StatusOK, gin.H{
+		"success": false,
+		"message": "the token has no available models",
+		"data": gin.H{
+			"available": nil,
+			"enabled":   statusToken,
+		},
+	})
 }
