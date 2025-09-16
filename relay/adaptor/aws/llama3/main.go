@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/tracing"
 
 	"github.com/Laisky/errors/v2"
@@ -106,7 +107,7 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 }
 
 // convertLlamaToConverseRequest converts Llama request to Converse API format
-func convertLlamaToConverseRequest(llamaReq *Request, modelID string) (*bedrockruntime.ConverseInput, error) {
+func convertLlamaToConverseRequest(c *gin.Context, llamaReq *Request, modelID string) (*bedrockruntime.ConverseInput, error) {
 	var converseMessages []types.Message
 	var systemMessages []types.SystemContentBlock
 
@@ -119,11 +120,77 @@ func convertLlamaToConverseRequest(llamaReq *Request, modelID string) (*bedrockr
 				Value: msg.StringContent(),
 			})
 		case "user":
-			// User messages use standard Converse API format
-			contentBlocks := []types.ContentBlock{
-				&types.ContentBlockMemberText{
+			// User messages use standard Converse API format with support for images
+			var contentBlocks []types.ContentBlock
+
+			// Handle different content types using ParseContent
+			contents := msg.ParseContent()
+			if len(contents) == 0 {
+				// Simple text content
+				contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
 					Value: msg.StringContent(),
-				},
+				})
+			} else {
+				// Structured content - handle text and images
+				for _, content := range contents {
+					switch content.Type {
+					case relaymodel.ContentTypeText:
+						if content.Text != nil {
+							contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
+								Value: *content.Text,
+							})
+						}
+					case relaymodel.ContentTypeImageURL:
+						// Handle image content for vision models
+						if content.ImageURL != nil {
+							// Use the existing downloadImageFromURL function from utils
+							imageData, imageFormat, err := utils.DownloadImageFromURL(gmw.Ctx(c), content.ImageURL.Url)
+							if err != nil {
+								// If image download fails, generate a fallback image with error text
+								// This improves the response for vision-capable models as they can "see" the error message
+								lg := gmw.GetLogger(c)
+								lg.Warn("image download failed", zap.Error(err))
+
+								// Generate fallback image with error message
+								fallbackText := fmt.Sprintf("Image download failed: %s", err)
+								fallbackImageData, _, imgErr := image.GenerateTextImage(fallbackText)
+								if imgErr != nil {
+									// If fallback image generation also fails, use text content as last resort
+									contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
+										Value: fallbackText,
+									})
+								} else {
+									// Create ImageBlock with fallback image
+									imageBlock := &types.ContentBlockMemberImage{
+										Value: types.ImageBlock{
+											Format: types.ImageFormatPng,
+											Source: &types.ImageSourceMemberBytes{
+												Value: fallbackImageData,
+											},
+										},
+									}
+									contentBlocks = append(contentBlocks, imageBlock)
+								}
+							} else {
+								// Create ImageBlock with actual image data
+								imageBlock := &types.ContentBlockMemberImage{
+									Value: types.ImageBlock{
+										Format: imageFormat,
+										Source: &types.ImageSourceMemberBytes{
+											Value: imageData,
+										},
+									},
+								}
+								contentBlocks = append(contentBlocks, imageBlock)
+							}
+						}
+					default:
+						// For unknown content types, convert to text representation
+						contentBlocks = append(contentBlocks, &types.ContentBlockMemberText{
+							Value: msg.StringContent(),
+						})
+					}
+				}
 			}
 
 			converseMessages = append(converseMessages, types.Message{
@@ -178,8 +245,8 @@ func convertLlamaToConverseRequest(llamaReq *Request, modelID string) (*bedrockr
 }
 
 // convertLlamaToConverseStreamRequest converts Llama request to Converse Stream API format
-func convertLlamaToConverseStreamRequest(llamaReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
-	converseReq, err := convertLlamaToConverseRequest(llamaReq, modelID)
+func convertLlamaToConverseStreamRequest(c *gin.Context, llamaReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
+	converseReq, err := convertLlamaToConverseRequest(c, llamaReq, modelID)
 	if err != nil {
 		return nil, err
 	}
@@ -282,7 +349,7 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	}
 
 	// Convert Llama request to Converse API format
-	converseReq, err := convertLlamaToConverseRequest(llamaReq.(*Request), awsModelName)
+	converseReq, err := convertLlamaToConverseRequest(c, llamaReq.(*Request), awsModelName)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
@@ -333,7 +400,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 	}
 
 	// Convert Llama request to Converse API format
-	converseReq, err := convertLlamaToConverseStreamRequest(llamaReq.(*Request), awsModelName)
+	converseReq, err := convertLlamaToConverseStreamRequest(c, llamaReq.(*Request), awsModelName)
 	if err != nil {
 		return utils.WrapErr(errors.Wrap(err, "convert to converse request")), nil
 	}
