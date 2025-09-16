@@ -19,46 +19,59 @@ Also welcome to register and use my deployed one-api gateway, which supports var
   - [Turtorial](#turtorial)
   - [Contributors](#contributors)
   - [New Features](#new-features)
-    - [(Merged) Support gpt-vision](#merged-support-gpt-vision)
-    - [Support update user's remained quota](#support-update-users-remained-quota)
-    - [(Merged) Support aws claude](#merged-support-aws-claude)
-    - [Support openai images edits](#support-openai-images-edits)
-    - [Support gemini-2.0-flash-exp](#support-gemini-20-flash-exp)
-    - [Support replicate flux \& remix](#support-replicate-flux--remix)
-    - [Support replicate chat models](#support-replicate-chat-models)
-    - [Support OpenAI o1/o1-mini/o1-preview](#support-openai-o1o1-minio1-preview)
-    - [Get request's cost](#get-requests-cost)
-    - [Support Vertex Imagen3](#support-vertex-imagen3)
-    - [Support gpt-4o-audio](#support-gpt-4o-audio)
-    - [Support deepseek-reasoner \& gemini-2.0-flash-thinking-exp-01-21](#support-deepseek-reasoner--gemini-20-flash-thinking-exp-01-21)
-    - [Support o3-mini](#support-o3-mini)
-    - [Support gemini-2.0-flash](#support-gemini-20-flash)
-    - [Support OpenRouter's reasoning content](#support-openrouters-reasoning-content)
-    - [Support claude-3-7-sonnet \& thinking](#support-claude-3-7-sonnet--thinking)
-      - [Stream](#stream)
-      - [Non-Stream](#non-stream)
-    - [Automatically Enable Thinking and Customize Reasoning Format via URL Parameters](#automatically-enable-thinking-and-customize-reasoning-format-via-url-parameters)
-      - [Reasoning Format - reasoning-content](#reasoning-format---reasoning-content)
-      - [Reasoning Format - reasoning](#reasoning-format---reasoning)
-      - [Reasoning Format - thinking](#reasoning-format---thinking)
-    - [Support AWS cross-region inferences](#support-aws-cross-region-inferences)
-    - [Support OpenAI web search models](#support-openai-web-search-models)
-    - [Support gemini multimodal output #2197](#support-gemini-multimodal-output-2197)
-    - [Support coze oauth authentication](#support-coze-oauth-authentication)
-    - [Support gemini-2.5-pro](#support-gemini-25-pro)
-    - [Support o3 \& o4-mini \& gpt-4.1](#support-o3--o4-mini--gpt-41)
-    - [Support gpt-image-1's image generation \& edits](#support-gpt-image-1s-image-generation--edits)
-    - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
-    - [Support o3-pro \& reasoning content](#support-o3-pro--reasoning-content)
-    - [Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05](#support-gcp-vertex-gloabl-region-and-gemini-25-pro-preview-06-05)
-    - [Support OpenAI Response API](#support-openai-response-api)
-    - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
-    - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
-      - [Support Claude Code](#support-claude-code)
-    - [Support Tracing info in logs](#support-tracing-info-in-logs)
-    - [Support Cached Input](#support-cached-input)
-      - [Support Anthropic Prompt caching](#support-anthropic-prompt-caching)
-    - [Support XAI/Grok Text \& Image Models](#support-xaigrok-text--image-models)
+    - [Universal Features](#universal-features)
+      - [Support update user's remained quota](#support-update-users-remained-quota)
+      - [Get request's cost](#get-requests-cost)
+      - [Support Tracing info in logs](#support-tracing-info-in-logs)
+      - [Support Cached Input](#support-cached-input)
+        - [Support Anthropic Prompt caching](#support-anthropic-prompt-caching)
+      - [Automatically Enable Thinking and Customize Reasoning Format via URL Parameters](#automatically-enable-thinking-and-customize-reasoning-format-via-url-parameters)
+        - [Reasoning Format - reasoning-content](#reasoning-format---reasoning-content)
+        - [Reasoning Format - reasoning](#reasoning-format---reasoning)
+        - [Reasoning Format - thinking](#reasoning-format---thinking)
+    - [OpenAI Features](#openai-features)
+      - [(Merged) Support gpt-vision](#merged-support-gpt-vision)
+      - [Support openai images edits](#support-openai-images-edits)
+      - [Support OpenAI o1/o1-mini/o1-preview](#support-openai-o1o1-minio1-preview)
+      - [Support gpt-4o-audio](#support-gpt-4o-audio)
+      - [Support OpenAI web search models](#support-openai-web-search-models)
+      - [Support gpt-image-1's image generation \& edits](#support-gpt-image-1s-image-generation--edits)
+      - [Support o3-mini](#support-o3-mini)
+      - [Support o3 \& o4-mini \& gpt-4.1](#support-o3--o4-mini--gpt-41)
+      - [Support o3-pro \& reasoning content](#support-o3-pro--reasoning-content)
+      - [Support OpenAI Response API](#support-openai-response-api)
+    - [Anthropic (Claude) Features](#anthropic-claude-features)
+      - [(Merged) Support aws claude](#merged-support-aws-claude)
+      - [Support claude-3-7-sonnet \& thinking](#support-claude-3-7-sonnet--thinking)
+        - [Stream](#stream)
+        - [Non-Stream](#non-stream)
+      - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
+        - [Support Claude Code](#support-claude-code)
+    - [Google (Gemini \& Vertex) Features](#google-gemini--vertex-features)
+      - [Support gemini-2.0-flash-exp](#support-gemini-20-flash-exp)
+      - [Support gemini-2.0-flash](#support-gemini-20-flash)
+      - [Support gemini-2.0-flash-thinking-exp-01-21](#support-gemini-20-flash-thinking-exp-01-21)
+      - [Support Vertex Imagen3](#support-vertex-imagen3)
+      - [Support gemini multimodal output #2197](#support-gemini-multimodal-output-2197)
+      - [Support gemini-2.5-pro](#support-gemini-25-pro)
+      - [Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05](#support-gcp-vertex-gloabl-region-and-gemini-25-pro-preview-06-05)
+      - [Support gemini-2.5-flash-image-preview \& imagen-4 series](#support-gemini-25-flash-image-preview--imagen-4-series)
+    - [AWS Features](#aws-features)
+      - [Support AWS cross-region inferences](#support-aws-cross-region-inferences)
+      - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
+    - [Replicate Features](#replicate-features)
+      - [Support replicate flux \& remix](#support-replicate-flux--remix)
+      - [Support replicate chat models](#support-replicate-chat-models)
+    - [DeepSeek Features](#deepseek-features)
+      - [Support deepseek-reasoner](#support-deepseek-reasoner)
+    - [OpenRouter Features](#openrouter-features)
+      - [Support OpenRouter's reasoning content](#support-openrouters-reasoning-content)
+    - [Coze Features](#coze-features)
+      - [Support coze oauth authentication](#support-coze-oauth-authentication)
+    - [XAI / Grok Features](#xai--grok-features)
+      - [Support XAI/Grok Text \& Image Models](#support-xaigrok-text--image-models)
+    - [Black Forest Labs Features](#black-forest-labs-features)
+      - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
   - [Bug fix](#bug-fix)
 
 ## Turtorial
@@ -141,53 +154,15 @@ The initial default account and password are `root` / `123456`.
 
 ## New Features
 
-### (Merged) Support gpt-vision
+### Universal Features
 
-### Support update user's remained quota
+#### Support update user's remained quota
 
 You can update the used quota using the API key of any token, allowing other consumption to be aggregated into the one-api for centralized management.
 
 ![](https://s3.laisky.com/uploads/2024/12/oneapi-update-quota.png)
 
-### (Merged) Support aws claude
-
-- [feat: support aws bedrockruntime claude3 #1328](https://github.com/songquanpeng/one-api/pull/1328)
-- [feat: add new claude models #1910](https://github.com/songquanpeng/one-api/pull/1910)
-
-![](https://s3.laisky.com/uploads/2024/12/oneapi-claude.png)
-
-### Support openai images edits
-
-- [feat: support openai images edits api #1369](https://github.com/songquanpeng/one-api/pull/1369)
-
-![](https://s3.laisky.com/uploads/2024/12/oneapi-image-edit.png)
-
-### Support gemini-2.0-flash-exp
-
-- [feat: add gemini-2.0-flash-exp #1983](https://github.com/songquanpeng/one-api/pull/1983)
-
-![](https://s3.laisky.com/uploads/2024/12/oneapi-gemini-flash.png)
-
-### Support replicate flux & remix
-
-- [feature: 支持 replicate 的绘图 #1954](https://github.com/songquanpeng/one-api/pull/1954)
-- [feat: image edits/inpaiting 支持 replicate 的 flux remix #1986](https://github.com/songquanpeng/one-api/pull/1986)
-
-![](https://s3.laisky.com/uploads/2024/12/oneapi-replicate-1.png)
-
-![](https://s3.laisky.com/uploads/2024/12/oneapi-replicate-2.png)
-
-![](https://s3.laisky.com/uploads/2024/12/oneapi-replicate-3.png)
-
-### Support replicate chat models
-
-- [feat: 支持 replicate chat models #1989](https://github.com/songquanpeng/one-api/pull/1989)
-
-### Support OpenAI o1/o1-mini/o1-preview
-
-- [feat: add openai o1 #1990](https://github.com/songquanpeng/one-api/pull/1990)
-
-### Get request's cost
+#### Get request's cost
 
 Each chat completion request will include a `X-Oneapi-Request-Id` in the returned headers. You can use this request id to request `GET /api/cost/request/:request_id` to get the cost of this request.
 
@@ -204,56 +179,21 @@ type UserRequestCost struct {
 }
 ```
 
-### Support Vertex Imagen3
+#### Support Tracing info in logs
 
-- [feat: support vertex imagen3 #2030](https://github.com/songquanpeng/one-api/pull/2030)
+![](https://s3.laisky.com/uploads/2025/08/tracing.png)
 
-![](https://s3.laisky.com/uploads/2025/01/oneapi-imagen3.png)
+#### Support Cached Input
 
-### Support gpt-4o-audio
+Now supports cached input, which can significantly reduce the cost.
 
-- [feat: support gpt-4o-audio #2032](https://github.com/songquanpeng/one-api/pull/2032)
+![](https://s3.laisky.com/uploads/2025/08/cached_input.png)
 
-![](https://s3.laisky.com/uploads/2025/01/oneapi-audio-1.png)
+##### Support Anthropic Prompt caching
 
-![](https://s3.laisky.com/uploads/2025/01/oneapi-audio-2.png)
+- <https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching>
 
-### Support deepseek-reasoner & gemini-2.0-flash-thinking-exp-01-21
-
-- [feature: add deepseek-reasoner & gemini-2.0-flash-thinking-exp-01-21 #2045](https://github.com/songquanpeng/one-api/pull/2045)
-
-### Support o3-mini
-
-- [feat: extend support for o3 models and update model ratios #2048](https://github.com/songquanpeng/one-api/pull/2048)
-
-### Support gemini-2.0-flash
-
-- [feat: support gemini-2.0-flash #2055](https://github.com/songquanpeng/one-api/pull/2055)
-
-### Support OpenRouter's reasoning content
-
-- [feat: support OpenRouter reasoning #2108](https://github.com/songquanpeng/one-api/pull/2108)
-
-By default, the thinking mode is automatically enabled for the deepseek-r1 model, and the response is returned in the open-router format.
-
-![](https://s3.laisky.com/uploads/2025/02/openrouter-reasoning.png)
-
-### Support claude-3-7-sonnet & thinking
-
-- [feat: support claude-3-7-sonnet #2143](https://github.com/songquanpeng/one-api/pull/2143/files)
-- [feat: support claude thinking #2144](https://github.com/songquanpeng/one-api/pull/2144)
-
-By default, the thinking mode is not enabled. You need to manually pass the `thinking` field in the request body to enable it.
-
-#### Stream
-
-![](https://s3.laisky.com/uploads/2025/02/claude-thinking.png)
-
-#### Non-Stream
-
-![](https://s3.laisky.com/uploads/2025/02/claude-thinking-non-stream.png)
-
-### Automatically Enable Thinking and Customize Reasoning Format via URL Parameters
+#### Automatically Enable Thinking and Customize Reasoning Format via URL Parameters
 
 Supports two URL parameters: `thinking` and `reasoning_format`.
 
@@ -263,23 +203,41 @@ Supports two URL parameters: `thinking` and `reasoning_format`.
   - `reasoning`: OpenRouter format, returned in the `reasoning` field.
   - `thinking`: Claude format, returned in the `thinking` field.
 
-#### Reasoning Format - reasoning-content
+##### Reasoning Format - reasoning-content
 
 ![](https://s3.laisky.com/uploads/2025/02/reasoning_format-reasoning_content.png)
 
-#### Reasoning Format - reasoning
+##### Reasoning Format - reasoning
 
 ![](https://s3.laisky.com/uploads/2025/02/reasoning_format-reasoning.png)
 
-#### Reasoning Format - thinking
+##### Reasoning Format - thinking
 
 ![](https://s3.laisky.com/uploads/2025/02/reasoning_format-thinking.png)
 
-### Support AWS cross-region inferences
+### OpenAI Features
 
-- [fix: support aws cross region inferences #2182](https://github.com/songquanpeng/one-api/pull/2182)
+#### (Merged) Support gpt-vision
 
-### Support OpenAI web search models
+#### Support openai images edits
+
+- [feat: support openai images edits api #1369](https://github.com/songquanpeng/one-api/pull/1369)
+
+![](https://s3.laisky.com/uploads/2024/12/oneapi-image-edit.png)
+
+#### Support OpenAI o1/o1-mini/o1-preview
+
+- [feat: add openai o1 #1990](https://github.com/songquanpeng/one-api/pull/1990)
+
+#### Support gpt-4o-audio
+
+- [feat: support gpt-4o-audio #2032](https://github.com/songquanpeng/one-api/pull/2032)
+
+![](https://s3.laisky.com/uploads/2025/01/oneapi-audio-1.png)
+
+![](https://s3.laisky.com/uploads/2025/01/oneapi-audio-2.png)
+
+#### Support OpenAI web search models
 
 - [feature: support openai web search models #2189](https://github.com/songquanpeng/one-api/pull/2189)
 
@@ -289,21 +247,7 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 
 ![](https://s3.laisky.com/uploads/2025/03/openai-websearch-models-2.png)
 
-### Support gemini multimodal output #2197
-
-- [feature: support gemini multimodal output #2197](https://github.com/songquanpeng/one-api/pull/2197)
-
-![](https://s3.laisky.com/uploads/2025/03/gemini-multimodal.png)
-
-### Support coze oauth authentication
-
-- [feat: support coze oauth authentication](https://github.com/Laisky/one-api/pull/52)
-
-### Support gemini-2.5-pro
-
-### Support o3 & o4-mini & gpt-4.1
-
-### Support gpt-image-1's image generation & edits
+#### Support gpt-image-1's image generation & edits
 
 ![](https://s3.laisky.com/uploads/2025/04/gpt-image-1-2.png)
 
@@ -311,33 +255,51 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 
 ![](https://s3.laisky.com/uploads/2025/04/gpt-image-1-1.png)
 
-### Support black-forest-labs/flux-kontext-pro
+#### Support o3-mini
 
-![](https://s3.laisky.com/uploads/2025/05/flux-kontext-pro.png)
+- [feat: extend support for o3 models and update model ratios #2048](https://github.com/songquanpeng/one-api/pull/2048)
 
-### Support o3-pro & reasoning content
+#### Support o3 & o4-mini & gpt-4.1
+
+#### Support o3-pro & reasoning content
 
 ![](https://s3.laisky.com/uploads/2025/06/o3-pro.png)
 
-### Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05
-
-![](https://s3.laisky.com/uploads/2025/06/gemini-2.5-pro-preview-06-05.png)
-
-### Support OpenAI Response API
+#### Support OpenAI Response API
 
 **Partially supported, still in development.**
 
 ![](https://s3.laisky.com/uploads/2025/07/response-api.png)
 
-### Support AWS BedRock Inference Profile
+### Anthropic (Claude) Features
 
-![](https://s3.laisky.com/uploads/2025/07/aws-inference-profile.png)
+#### (Merged) Support aws claude
 
-### Support /v1/messages Claude Messages API
+- [feat: support aws bedrockruntime claude3 #1328](https://github.com/songquanpeng/one-api/pull/1328)
+- [feat: add new claude models #1910](https://github.com/songquanpeng/one-api/pull/1910)
+
+![](https://s3.laisky.com/uploads/2024/12/oneapi-claude.png)
+
+#### Support claude-3-7-sonnet & thinking
+
+- [feat: support claude-3-7-sonnet #2143](https://github.com/songquanpeng/one-api/pull/2143/files)
+- [feat: support claude thinking #2144](https://github.com/songquanpeng/one-api/pull/2144)
+
+By default, the thinking mode is not enabled. You need to manually pass the `thinking` field in the request body to enable it.
+
+##### Stream
+
+![](https://s3.laisky.com/uploads/2025/02/claude-thinking.png)
+
+##### Non-Stream
+
+![](https://s3.laisky.com/uploads/2025/02/claude-thinking-non-stream.png)
+
+#### Support /v1/messages Claude Messages API
 
 ![](https://s3.laisky.com/uploads/2025/07/claude_messages.png)
 
-#### Support Claude Code
+##### Support Claude Code
 
 ```sh
 export ANTHROPIC_MODEL="openai/gpt-oss-120b"
@@ -347,23 +309,104 @@ export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
 
 You can use any model you like for Claude Code, even if the model doesn’t natively support the Claude Messages API.
 
-### Support Tracing info in logs
+### Google (Gemini & Vertex) Features
 
-![](https://s3.laisky.com/uploads/2025/08/tracing.png)
+#### Support gemini-2.0-flash-exp
 
-### Support Cached Input
+- [feat: add gemini-2.0-flash-exp #1983](https://github.com/songquanpeng/one-api/pull/1983)
 
-Now supports cached input, which can significantly reduce the cost.
+![](https://s3.laisky.com/uploads/2024/12/oneapi-gemini-flash.png)
 
-![](https://s3.laisky.com/uploads/2025/08/cached_input.png)
+#### Support gemini-2.0-flash
 
-#### Support Anthropic Prompt caching
+- [feat: support gemini-2.0-flash #2055](https://github.com/songquanpeng/one-api/pull/2055)
 
-- <https://docs.anthropic.com/en/docs/build-with-claude/prompt-caching>
+#### Support gemini-2.0-flash-thinking-exp-01-21
 
-### Support XAI/Grok Text & Image Models
+- [feature: add deepseek-reasoner & gemini-2.0-flash-thinking-exp-01-21 #2045](https://github.com/songquanpeng/one-api/pull/2045)
+
+#### Support Vertex Imagen3
+
+- [feat: support vertex imagen3 #2030](https://github.com/songquanpeng/one-api/pull/2030)
+
+![](https://s3.laisky.com/uploads/2025/01/oneapi-imagen3.png)
+
+#### Support gemini multimodal output #2197
+
+- [feature: support gemini multimodal output #2197](https://github.com/songquanpeng/one-api/pull/2197)
+
+![](https://s3.laisky.com/uploads/2025/03/gemini-multimodal.png)
+
+#### Support gemini-2.5-pro
+
+#### Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05
+
+![](https://s3.laisky.com/uploads/2025/06/gemini-2.5-pro-preview-06-05.png)
+
+#### Support gemini-2.5-flash-image-preview & imagen-4 series
+
+![](https://s3.laisky.com/uploads/2025/09/gemini-banana.png)
+
+### AWS Features
+
+#### Support AWS cross-region inferences
+
+- [fix: support aws cross region inferences #2182](https://github.com/songquanpeng/one-api/pull/2182)
+
+#### Support AWS BedRock Inference Profile
+
+![](https://s3.laisky.com/uploads/2025/07/aws-inference-profile.png)
+
+### Replicate Features
+
+#### Support replicate flux & remix
+
+- [feature: 支持 replicate 的绘图 #1954](https://github.com/songquanpeng/one-api/pull/1954)
+- [feat: image edits/inpaiting 支持 replicate 的 flux remix #1986](https://github.com/songquanpeng/one-api/pull/1986)
+
+![](https://s3.laisky.com/uploads/2024/12/oneapi-replicate-1.png)
+
+![](https://s3.laisky.com/uploads/2024/12/oneapi-replicate-2.png)
+
+![](https://s3.laisky.com/uploads/2024/12/oneapi-replicate-3.png)
+
+#### Support replicate chat models
+
+- [feat: 支持 replicate chat models #1989](https://github.com/songquanpeng/one-api/pull/1989)
+
+### DeepSeek Features
+
+#### Support deepseek-reasoner
+
+- [feature: add deepseek-reasoner & gemini-2.0-flash-thinking-exp-01-21 #2045](https://github.com/songquanpeng/one-api/pull/2045)
+
+### OpenRouter Features
+
+#### Support OpenRouter's reasoning content
+
+- [feat: support OpenRouter reasoning #2108](https://github.com/songquanpeng/one-api/pull/2108)
+
+By default, the thinking mode is automatically enabled for the deepseek-r1 model, and the response is returned in the open-router format.
+
+![](https://s3.laisky.com/uploads/2025/02/openrouter-reasoning.png)
+
+### Coze Features
+
+#### Support coze oauth authentication
+
+- [feat: support coze oauth authentication](https://github.com/Laisky/one-api/pull/52)
+
+### XAI / Grok Features
+
+#### Support XAI/Grok Text & Image Models
 
 ![](https://s3.laisky.com/uploads/2025/08/groq.png)
+
+### Black Forest Labs Features
+
+#### Support black-forest-labs/flux-kontext-pro
+
+![](https://s3.laisky.com/uploads/2025/05/flux-kontext-pro.png)
 
 ## Bug fix
 
