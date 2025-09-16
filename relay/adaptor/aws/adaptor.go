@@ -460,8 +460,8 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 		}
 	case AwsWriter:
 		baseCapabilities = ProviderCapabilities{
-			SupportsTools:               false, // Writer models don't support tool calling
-			SupportsFunctions:           false, // Writer models don't support OpenAI functions
+			SupportsTools:               false, // Writer models don't support tool calling yet - only chat conversation is supported for now
+			SupportsFunctions:           false, // Writer models don't support OpenAI functions - only chat conversation is supported for now
 			SupportsLogprobs:            false,
 			SupportsResponseFormat:      false,
 			SupportsReasoningEffort:     false, // Writer models don't support reasoning content
