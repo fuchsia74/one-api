@@ -12,6 +12,7 @@ import (
 	mistral "github.com/songquanpeng/one-api/relay/adaptor/aws/mistral"
 	openai "github.com/songquanpeng/one-api/relay/adaptor/aws/openai"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
+	writer "github.com/songquanpeng/one-api/relay/adaptor/aws/writer"
 )
 
 type AwsModelType int
@@ -23,6 +24,7 @@ const (
 	AwsLlama3
 	AwsMistral
 	AwsOpenAI
+	AwsWriter
 )
 
 var (
@@ -49,6 +51,9 @@ func init() {
 	}
 	for model := range openai.AwsModelIDMap {
 		adaptors[model] = AwsOpenAI
+	}
+	for model := range writer.AwsModelIDMap {
+		adaptors[model] = AwsWriter
 	}
 
 	match, err := regexp.Compile("arn:aws:bedrock.+claude")
@@ -88,6 +93,8 @@ func GetAdaptor(model string) utils.AwsAdapter {
 		return &mistral.Adaptor{}
 	case AwsOpenAI:
 		return &openai.Adaptor{}
+	case AwsWriter:
+		return &writer.Adaptor{}
 	default:
 		return nil
 	}
