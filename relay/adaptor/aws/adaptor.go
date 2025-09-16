@@ -280,6 +280,11 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 		// These models work similarly to DeepSeek-R1 with reasoning content and use converse method
 		"gpt-oss-20b":  {Ratio: 0.07 * ratio.MilliTokensUsd, CompletionRatio: 4.29}, // $0.00007/$0.0003 per 1K tokens = $0.07/$0.3 per 1M tokens
 		"gpt-oss-120b": {Ratio: 0.15 * ratio.MilliTokensUsd, CompletionRatio: 4},    // $0.00015/$0.0006 per 1K tokens = $0.15/$0.6 per 1M tokens
+
+		// Writer Models (Supported) - Updated pricing as of 2025-09-17 - Note: These are per 1K tokens, converted to 1M tokens using MilliTokensUsd
+		// Simple text/chat models without reasoning content support.
+		"palmyra-x4": {Ratio: 2.5 * ratio.MilliTokensUsd, CompletionRatio: 4},  // $0.0025/$0.010 per 1K tokens = $2.5/$10 per 1M tokens
+		"palmyra-x5": {Ratio: 0.6 * ratio.MilliTokensUsd, CompletionRatio: 10}, // $0.0006/$0.006 per 1K tokens = $0.6/$6 per 1M tokens
 	}
 }
 
@@ -452,6 +457,27 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsStop:                false, // OpenAI OSS models don't support stop parameter
 			SupportsImageGeneration:     false, // OpenAI OSS models don't support image generation
 			SupportsEmbedding:           false, // OpenAI OSS models don't support embedding
+		}
+	case AwsWriter:
+		baseCapabilities = ProviderCapabilities{
+			SupportsTools:               false, // Writer models don't support tool calling yet - only chat conversation is supported for now
+			SupportsFunctions:           false, // Writer models don't support OpenAI functions - only chat conversation is supported for now
+			SupportsLogprobs:            false,
+			SupportsResponseFormat:      false,
+			SupportsReasoningEffort:     false, // Writer models don't support reasoning content
+			SupportsModalities:          false,
+			SupportsAudio:               false,
+			SupportsWebSearch:           false,
+			SupportsThinking:            false,
+			SupportsLogitBias:           false,
+			SupportsServiceTier:         false,
+			SupportsParallelToolCalls:   false,
+			SupportsTopLogprobs:         false,
+			SupportsPrediction:          false,
+			SupportsMaxCompletionTokens: false,
+			SupportsStop:                true,  // Writer models support stop sequences
+			SupportsImageGeneration:     false, // Writer models don't support image generation
+			SupportsEmbedding:           false, // Writer models don't support embedding
 		}
 	default:
 		// Default to minimal capabilities for unknown models
