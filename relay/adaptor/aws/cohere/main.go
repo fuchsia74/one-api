@@ -131,11 +131,8 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 	// Convert Converse response to custom Cohere format
 	cohereResp := convertConverseResponseToCohere(c, awsResp, modelName)
 
-	// Convert Cohere usage to relaymodel.Usage for billing
-	var usage relaymodel.Usage
-	usage.PromptTokens = cohereResp.Usage.InputTokens
-	usage.CompletionTokens = cohereResp.Usage.OutputTokens
-	usage.TotalTokens = cohereResp.Usage.TotalTokens
+	// Extract usage directly from response (already relaymodel.Usage)
+	usage := cohereResp.Usage
 
 	c.JSON(http.StatusOK, cohereResp)
 	return nil, &usage
@@ -566,31 +563,41 @@ func convertConverseResponseToCohere(c *gin.Context, converseResp *bedrockruntim
 		FinishReason: finishReason,
 	}
 
-	// Convert usage to Cohere format
-	var usage CohereUsage
+	// Map usage to project-unified Usage (OpenAI-compatible fields)
+	var usage relaymodel.Usage
 	if converseResp.Usage != nil {
 		if converseResp.Usage.InputTokens != nil {
-			usage.InputTokens = int(*converseResp.Usage.InputTokens)
+			usage.PromptTokens = int(*converseResp.Usage.InputTokens)
 		}
 		if converseResp.Usage.OutputTokens != nil {
-			usage.OutputTokens = int(*converseResp.Usage.OutputTokens)
+			usage.CompletionTokens = int(*converseResp.Usage.OutputTokens)
 		}
 		if converseResp.Usage.TotalTokens != nil {
 			usage.TotalTokens = int(*converseResp.Usage.TotalTokens)
 		} else {
 			// Calculate total if not provided
-			usage.TotalTokens = usage.InputTokens + usage.OutputTokens
+			usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 		}
 	}
 
 	return &CohereResponse{
-		ID:      fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c)),
+		ID:      fmt.Sprintf("chatcmpl-oneapi-%s", getTraceIDSafe(c)),
 		Object:  "chat.completion",
 		Created: helper.GetTimestamp(),
 		Model:   modelName,
 		Choices: []CohereResponseChoice{choice},
 		Usage:   usage,
 	}
+}
+
+// getTraceIDSafe retrieves trace ID and never panics even if gin-middlewares tracing is not initialized.
+func getTraceIDSafe(c *gin.Context) (traceID string) {
+	defer func() {
+		if r := recover(); r != nil {
+			traceID = ""
+		}
+	}()
+	return tracing.GetTraceIDFromContext(c)
 }
 
 // convertCohereToConverseStreamRequest converts Cohere request to Converse API format for streaming

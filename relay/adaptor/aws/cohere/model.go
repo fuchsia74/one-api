@@ -1,5 +1,9 @@
 package aws
 
+import (
+	relaymodel "github.com/songquanpeng/one-api/relay/model"
+)
+
 // Request represents a chat completion request to AWS Bedrock Cohere Command R models.
 //
 // This structure defines all the parameters needed to send a chat completion
@@ -803,9 +807,7 @@ type CohereResponse struct {
 	// while maintaining full compatibility with existing OpenAI-based applications.
 	Choices []CohereResponseChoice `json:"choices"`
 
-	// Usage contains detailed token consumption statistics in OpenAI-compatible format.
-	// Provides comprehensive usage tracking for cost management and performance monitoring
-	// while maintaining OpenAI API compatibility for existing billing and analytics
-	// systems integrated with Cohere Command R enterprise conversations.
-	Usage CohereUsage `json:"usage"`
+	// Usage contains detailed token consumption statistics in OpenAI-compatible format (prompt_tokens, completion_tokens, total_tokens).
+	// Matches the project's unified Usage struct to ensure consistent billing, logging, and client compatibility.
+	Usage relaymodel.Usage `json:"usage"`
 }
