@@ -257,6 +257,85 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 	return nil, usage
 }
 
+// EmbeddingHandler processes embedding responses from OpenAI-compatible APIs
+func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *model.Usage) {
+	logger := gmw.GetLogger(c)
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
+	}
+
+	logger.Debug("receive embedding response from upstream channel", zap.ByteString("response_body", responseBody))
+	if err = resp.Body.Close(); err != nil {
+		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
+	}
+
+	// Check if response body is empty
+	if len(responseBody) == 0 {
+		logger.Error("received empty embedding response body from upstream",
+			zap.Int("status_code", resp.StatusCode))
+		return ErrorWrapper(errors.Errorf("empty response body from upstream"),
+			"empty_response_body", http.StatusInternalServerError), nil
+	}
+
+	// Parse the embedding response to validate structure and extract usage
+	var embeddingResponse struct {
+		Object string `json:"object"`
+		Data   []struct {
+			Object    string    `json:"object"`
+			Index     int       `json:"index"`
+			Embedding []float64 `json:"embedding"`
+		} `json:"data"`
+		Model string      `json:"model"`
+		Usage model.Usage `json:"usage"`
+		Error model.Error `json:"error"`
+	}
+
+	if err = json.Unmarshal(responseBody, &embeddingResponse); err != nil {
+		logger.Error("failed to unmarshal embedding response body",
+			zap.ByteString("response_body", responseBody),
+			zap.Error(err))
+		return ErrorWrapper(err, "unmarshal_embedding_response_failed", http.StatusInternalServerError), nil
+	}
+
+	// Check for API error in response
+	if embeddingResponse.Error.Type != "" {
+		logger.Debug("upstream returned embedding error response",
+			zap.String("error_type", embeddingResponse.Error.Type),
+			zap.String("error_message", embeddingResponse.Error.Message))
+		return &model.ErrorWithStatusCode{
+			Error:      embeddingResponse.Error,
+			StatusCode: resp.StatusCode,
+		}, nil
+	}
+
+	// Check if response has data - empty data might indicate an error
+	if len(embeddingResponse.Data) == 0 {
+		logger.Error("embedding response has no data, possible upstream error",
+			zap.ByteString("response_body", responseBody))
+		return ErrorWrapper(errors.Errorf("no embedding data in response from upstream"),
+			"no_embedding_data", http.StatusInternalServerError), nil
+	}
+
+	// Forward the response to client
+	c.Header("Content-Type", "application/json")
+	c.Status(resp.StatusCode)
+	c.Writer.Write(responseBody)
+
+	// Return usage information
+	usage := embeddingResponse.Usage
+	if usage.TotalTokens == 0 && usage.PromptTokens > 0 {
+		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+	}
+
+	logger.Debug("finalized usage for embedding (openai-compatible)",
+		zap.Int("prompt_tokens", usage.PromptTokens),
+		zap.Int("completion_tokens", usage.CompletionTokens),
+		zap.Int("total_tokens", usage.TotalTokens))
+
+	return nil, &usage
+}
+
 // Handler processes non-streaming responses from OpenAI-compatible APIs
 func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
 	logger := gmw.GetLogger(c)
