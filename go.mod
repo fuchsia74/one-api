@@ -5,7 +5,7 @@ go 1.25.0
 require (
 	cloud.google.com/go/iam v1.5.2
 	github.com/Laisky/errors/v2 v2.0.1
-	github.com/Laisky/gin-middlewares/v6 v6.1.1-0.20250828201657-4992ce2267e9
+	github.com/Laisky/gin-middlewares/v6 v6.1.1
 	github.com/Laisky/go-utils/v5 v5.1.2-0.20250801145933-70d7400d39dc
 	github.com/Laisky/zap v1.27.1-0.20241010063010-3154c45f2a1f
 	github.com/aws/aws-sdk-go-v2 v1.38.1
@@ -30,7 +30,7 @@ require (
 	github.com/pkoukk/tiktoken-go v0.1.7
 	github.com/prometheus/client_golang v1.23.0
 	github.com/smartystreets/goconvey v1.8.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.41.0
 	golang.org/x/image v0.30.0
 	golang.org/x/sync v0.16.0
