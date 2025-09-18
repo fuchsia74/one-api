@@ -55,6 +55,7 @@ export function Header() {
     { name: 'Redemptions', to: '/redemptions', show: isAdmin },
     { name: 'Top Up', to: '/topup', show: true },
     { name: 'Models', to: '/models', show: true },
+    { name: 'Status', to: '/status', show: true },
     { name: 'Chat', to: '/chat', show: !!chatLink },
     { name: 'About', to: '/about', show: true },
     { name: 'Settings', to: '/settings', show: isAdmin },

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -229,4 +230,81 @@ func ResetPassword(c *gin.Context) {
 		"data":    password,
 	})
 	return
+}
+
+func GetChannelStatus(c *gin.Context) {
+	// Parse pagination parameters
+	p, _ := strconv.Atoi(c.Query("p"))
+	if p < 0 {
+		p = 0
+	}
+
+	// Get page size from query parameter, default to 6 as requested
+	size, _ := strconv.Atoi(c.Query("size"))
+	if size <= 0 {
+		size = 6 // Default to 6 channels per page as requested
+	}
+	if size > config.MaxItemsPerPage {
+		size = config.MaxItemsPerPage
+	}
+
+	// Get channels with pagination for monitoring
+	channels, err := model.GetAllChannels(p*size, size, "all", "", "")
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Get total count for pagination
+	totalCount, err := model.GetChannelCount()
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": err.Error(),
+		})
+		return
+	}
+
+	// Format channels for monitoring
+	var channelStatuses []gin.H
+	for _, channel := range channels {
+		var status string
+		var enabled bool
+
+		switch channel.Status {
+		case 1: // ChannelStatusEnabled
+			status = "enabled"
+			enabled = true
+		case 2: // ChannelStatusManuallyDisabled
+			status = "manually_disabled"
+			enabled = false
+		case 3: // ChannelStatusAutoDisabled
+			status = "auto_disabled"
+			enabled = false
+		default: // ChannelStatusUnknown
+			status = "unknown"
+			enabled = false
+		}
+
+		channelStatus := gin.H{
+			"name":    channel.Name,
+			"status":  status,
+			"enabled": enabled,
+			"response": gin.H{
+				"response_time_ms": channel.ResponseTime,
+				"test_time":        channel.TestTime,
+				"created_time":     channel.CreatedTime,
+			},
+		}
+		channelStatuses = append(channelStatuses, channelStatus)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"data":    channelStatuses,
+		"total":   totalCount,
+	})
 }
