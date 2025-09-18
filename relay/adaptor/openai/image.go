@@ -8,7 +8,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -60,19 +59,5 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 	if err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
-
-	// Convert ImageUsage to common.ImageUsage format for the utility function
-	//
-	// Note: This function is now compatible with other providers that support OpenAI-compatible image generation APIs.
-	commonImageUsage := &common.ImageUsage{
-		TotalTokens:  imageResponse.Usage.TotalTokens,
-		InputTokens:  imageResponse.Usage.InputTokens,
-		OutputTokens: imageResponse.Usage.OutputTokens,
-		InputTokensDetails: common.ImageUsageInputTokensDetails{
-			TextTokens:  imageResponse.Usage.InputTokensDetails.TextTokens,
-			ImageTokens: imageResponse.Usage.InputTokensDetails.ImageTokens,
-		},
-	}
-
-	return nil, common.ConvertImageUsageToGeneralUsage(commonImageUsage)
+	return nil, imageResponse.Usage.Convert2GeneralUsage()
 }
