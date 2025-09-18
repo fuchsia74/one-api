@@ -4,6 +4,8 @@ package model
 type Usage struct {
 	// Omitting this field using 'omitempty' is crucial to avoid returning zero values
 	// when conversion mechanisms are not employed, particularly in scenarios like image generation.
+	//
+	// TODO: With Go 1.24 ~ latest potentially supporting 'omitzero', do we need to use both 'omitempty' and 'omitzero' here?
 	PromptTokens     int `json:"prompt_tokens,omitempty"`
 	CompletionTokens int `json:"completion_tokens,omitempty"`
 	TotalTokens      int `json:"total_tokens,omitempty"`
