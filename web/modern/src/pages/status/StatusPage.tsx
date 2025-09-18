@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useResponsive } from '@/hooks/useResponsive'
+import { useNotifications } from '@/components/ui/notifications'
 import { RefreshCw, Activity, Clock, Calendar, Zap, AlertCircle, CheckCircle, XCircle, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface ChannelStatus {
@@ -27,6 +28,7 @@ interface StatusResponse {
 
 function StatusPageImpl() {
   const { isMobile, isTablet } = useResponsive()
+  const { notify } = useNotifications()
   const [channelsData, setChannelsData] = useState<ChannelStatus[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -52,10 +54,10 @@ function StatusPageImpl() {
         setTotalCount(total || 0)
         setTotalPages(Math.ceil((total || 0) / size))
       } else {
-        console.error('Failed to fetch channel status:', message)
+        notify({ message: `Failed to fetch channel status: ${message}`, type: 'error' })
       }
     } catch (error) {
-      console.error('Error fetching channel status:', error)
+      notify({ message: `Error fetching channel status: ${error}`, type: 'error' })
     } finally {
       setLoading(false)
     }
@@ -146,9 +148,20 @@ function StatusPageImpl() {
     }
   }
 
-  const enabledChannels = channelsData.filter(channel => channel.enabled).length
-  const disabledChannels = channelsData.filter(channel => !channel.enabled).length
-  const displayedChannels = channelsData.length
+  // Filter channels based on search term
+  const filteredChannels = channelsData.filter(channel => {
+    if (!searchTerm) return true
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      channel.name.toLowerCase().includes(searchLower) ||
+      channel.status.toLowerCase().includes(searchLower) ||
+      (channel.enabled ? 'enabled' : 'disabled').includes(searchLower)
+    )
+  })
+
+  const enabledChannels = filteredChannels.filter(channel => channel.enabled).length
+  const disabledChannels = filteredChannels.filter(channel => !channel.enabled).length
+  const displayedChannels = filteredChannels.length
 
   if (loading) {
     return (
@@ -217,8 +230,8 @@ function StatusPageImpl() {
               <div className="flex items-center space-x-2">
                 <Activity className="w-5 h-5 text-blue-600" />
                 <div>
-                  <p className="text-2xl font-bold text-blue-600">{totalCount}</p>
-                  <p className="text-sm text-muted-foreground">Total Channels</p>
+                  <p className="text-2xl font-bold text-blue-600">{searchTerm ? displayedChannels : totalCount}</p>
+                  <p className="text-sm text-muted-foreground">{searchTerm ? 'Found' : 'Total Channels'}</p>
                 </div>
               </div>
             </CardContent>
@@ -248,7 +261,7 @@ function StatusPageImpl() {
 
         {/* Channel Status Cards */}
         <div className="space-y-4">
-          {channelsData.length === 0 ? (
+          {filteredChannels.length === 0 ? (
             <Card>
               <CardContent className="p-8 text-center">
                 <Activity className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
@@ -263,7 +276,7 @@ function StatusPageImpl() {
             </Card>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-              {channelsData.map((channel, index) => (
+              {filteredChannels.map((channel, index) => (
                 <Card key={index} className="hover:shadow-md transition-shadow">
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
@@ -309,7 +322,7 @@ function StatusPageImpl() {
         </div>
 
         {/* Pagination Controls */}
-        {totalPages > 1 && (
+        {totalPages > 1 && !searchTerm && (
           <div className="flex items-center justify-center space-x-4 mt-6">
             <Button
               variant="outline"
@@ -363,10 +376,13 @@ function StatusPageImpl() {
         )}
 
         {/* Footer Info */}
-        {channelsData.length > 0 && (
+        {filteredChannels.length > 0 && (
           <div className="text-center text-sm text-muted-foreground">
-            Showing {channelsData.length} of {totalCount} channels
-            {totalPages > 1 && ` (Page ${currentPage + 1} of ${totalPages})`}
+            {searchTerm ? (
+              `Showing ${filteredChannels.length} of ${totalCount} channels (filtered)`
+            ) : (
+              `Showing ${channelsData.length} of ${totalCount} channels${totalPages > 1 ? ` (Page ${currentPage + 1} of ${totalPages})` : ''}`
+            )}
           </div>
         )}
       </div>
