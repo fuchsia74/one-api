@@ -251,7 +251,9 @@ func GetChannelStatus(c *gin.Context) {
 	// Get channels with pagination for monitoring
 	channels, err := model.GetAllChannels(p*size, size, "all", "", "")
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		// Return a generic "Internal Server Error" as per best practices,
+		// since database errors are rare and typically indicate an internal issue.
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": err.Error(),
 		})
@@ -261,7 +263,9 @@ func GetChannelStatus(c *gin.Context) {
 	// Get total count for pagination
 	totalCount, err := model.GetChannelCount()
 	if err != nil {
-		c.JSON(http.StatusOK, gin.H{
+		// Return a generic "Internal Server Error" as per best practices,
+		// since database errors are rare and typically indicate an internal issue.
+		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
 			"message": err.Error(),
 		})
