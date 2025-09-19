@@ -860,7 +860,7 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 	if usage.TotalTokens == 0 {
 		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 	}
-	logger.Debug("finalized usage for non-stream (deepinfra with thinking)",
+	logger.Debug("finalized usage for non-stream with thinking",
 		zap.Int("prompt_tokens", usage.PromptTokens),
 		zap.Int("completion_tokens", usage.CompletionTokens),
 		zap.Int("total_tokens", usage.TotalTokens))
