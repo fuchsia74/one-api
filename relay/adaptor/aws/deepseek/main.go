@@ -583,5 +583,17 @@ func convertDeepSeekToConverseStreamRequest(deepseekReq *Request, modelID string
 		converseReq.System = systemMessages
 	}
 
+	// Add additional model request fields for reasoning_effort
+	if deepseekReq.ReasoningEffort != nil {
+		// Convert reasoning_effort to AWS Bedrock's additional-model-request-fields
+		// with reasoning_config based on the value of reasoning_effort (low, medium, high)
+		reasoningConfig := map[string]interface{}{
+			"reasoning_config": *deepseekReq.ReasoningEffort,
+		}
+		// Convert to document.Interface using bedrockruntime document package
+		docInput := document.NewLazyDocument(reasoningConfig)
+		converseReq.AdditionalModelRequestFields = docInput
+	}
+
 	return converseReq, nil
 }
