@@ -223,6 +223,10 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 	// Calculate or fix usage when missing or incomplete
 	if usage == nil {
 		// No usage provided by upstream: compute from text
+		logger.Warn("no usage provided by upstream, computing token count using CountTokenText fallback",
+			zap.String("model", modelName),
+			zap.Int("response_text_len", len(responseText)),
+			zap.Int("tool_args_len", len(toolArgsText)))
 		computed := CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 		usage = &model.Usage{
 			PromptTokens:     promptTokens,
@@ -241,6 +245,10 @@ func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelN
 			usage.PromptTokens = promptTokens
 		}
 		if usage.CompletionTokens == 0 {
+			logger.Warn("no completion tokens provided by upstream, computing using CountTokenText fallback",
+				zap.String("model", modelName),
+				zap.Int("response_text_len", len(responseText)),
+				zap.Int("tool_args_len", len(toolArgsText)))
 			usage.CompletionTokens = CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 		}
 		if usage.TotalTokens == 0 {
@@ -414,6 +422,10 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 				}
 			}
 		}
+		logger.Warn("no completion tokens provided by upstream, computing using CountTokenText fallback",
+			zap.String("model", modelName),
+			zap.Int("response_text_len", len(responseText)),
+			zap.Int("tool_args_len", len(toolArgsText)))
 		usage.CompletionTokens = CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 	}
 	if usage.TotalTokens == 0 {
@@ -706,6 +718,10 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 	// Calculate or fix usage when missing or incomplete
 	if usage == nil {
 		// No usage provided by upstream: compute from text
+		logger.Warn("no usage provided by upstream in thinking stream, computing token count using CountTokenText fallback",
+			zap.String("model", modelName),
+			zap.Int("response_text_len", len(responseText)),
+			zap.Int("tool_args_len", len(toolArgsText)))
 		computed := CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 		usage = &model.Usage{
 			PromptTokens:     promptTokens,
@@ -724,6 +740,10 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 			usage.PromptTokens = promptTokens
 		}
 		if usage.CompletionTokens == 0 {
+			logger.Warn("no completion tokens provided by upstream in thinking stream, computing using CountTokenText fallback",
+				zap.String("model", modelName),
+				zap.Int("response_text_len", len(responseText)),
+				zap.Int("tool_args_len", len(toolArgsText)))
 			usage.CompletionTokens = CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 		}
 		if usage.TotalTokens == 0 {
@@ -839,6 +859,10 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 				}
 			}
 		}
+		logger.Warn("no completion tokens provided by upstream in thinking handler, computing using CountTokenText fallback",
+			zap.String("model", modelName),
+			zap.Int("response_text_len", len(responseText)),
+			zap.Int("tool_args_len", len(toolArgsText)))
 		usage.CompletionTokens = CountTokenText(responseText, modelName) + CountTokenText(toolArgsText, modelName)
 	}
 	if usage.TotalTokens == 0 {
