@@ -28,6 +28,7 @@ import (
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html
 var AwsModelIDMap = map[string]string{
 	"deepseek-r1": "deepseek.r1-v1:0",
+	"deepseek-v3": "deepseek.v3-v1:0",
 }
 
 func awsModelID(requestModel string) (string, error) {
