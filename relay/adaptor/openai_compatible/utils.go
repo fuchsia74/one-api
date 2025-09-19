@@ -618,7 +618,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 
 								// Stream thinking content immediately
 								if thinkingContent != "" {
-									streamResponse.Choices[i].Delta.Reasoning = &thinkingContent
+									// Now, it is explicitly assigned to the ReasoningContent field.
+									streamResponse.Choices[i].Delta.ReasoningContent = &thinkingContent
 								}
 
 								// Append regular content after </think>
@@ -632,7 +633,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 						} else {
 							// Partial thinking content - stream immediately
 							if afterThink != "" {
-								streamResponse.Choices[i].Delta.Reasoning = &afterThink
+								// Now, it is explicitly assigned to the ReasoningContent field.
+								streamResponse.Choices[i].Delta.ReasoningContent = &afterThink
 							}
 						}
 					}
@@ -646,7 +648,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 
 							// Stream remaining thinking content
 							if beforeEndThink != "" {
-								streamResponse.Choices[i].Delta.Reasoning = &beforeEndThink
+								// Now, it is explicitly assigned to the ReasoningContent field.
+								streamResponse.Choices[i].Delta.ReasoningContent = &beforeEndThink
 							}
 
 							// Set regular content after </think>
@@ -656,7 +659,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 						}
 					} else {
 						// Pure thinking content - stream as reasoning immediately
-						streamResponse.Choices[i].Delta.Reasoning = &deltaContent
+						// Now, it is explicitly assigned to the ReasoningContent field.
+						streamResponse.Choices[i].Delta.ReasoningContent = &deltaContent
 						streamResponse.Choices[i].Delta.Content = ""
 						modifiedChunk = true
 					}
@@ -816,8 +820,9 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 
 			if thinkingContent != "" {
 				// Set the reasoning field if thinking content was found
-				if textResponse.Choices[i].Message.Reasoning == nil {
-					textResponse.Choices[i].Message.Reasoning = &thinkingContent
+				// Now, it is explicitly assigned to the ReasoningContent field.
+				if textResponse.Choices[i].Message.ReasoningContent == nil {
+					textResponse.Choices[i].Message.ReasoningContent = &thinkingContent
 				}
 
 				// Update the message content to be clean content (without <think> tags)
