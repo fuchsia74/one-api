@@ -25,7 +25,7 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-// AwsModelIDMap provides mapping for DeepSeek-R1 models via Converse API
+// AwsModelIDMap provides mapping for DeepSeek models via Converse API
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html
 var AwsModelIDMap = map[string]string{
 	"deepseek-r1":   "deepseek.r1-v1:0",
