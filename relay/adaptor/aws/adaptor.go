@@ -412,6 +412,27 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsImageGeneration:     false, // Cohere Command R models don't support image generation
 			SupportsEmbedding:           false, // Cohere Command R models don't support embedding
 		}
+	case AwsDeepSeek:
+		baseCapabilities = ProviderCapabilities{
+			SupportsTools:               false,
+			SupportsFunctions:           false,
+			SupportsLogprobs:            false,
+			SupportsResponseFormat:      false,
+			SupportsReasoningEffort:     true, // DeepSeek V3 supports reasoning
+			SupportsModalities:          false,
+			SupportsAudio:               false,
+			SupportsWebSearch:           false,
+			SupportsThinking:            false,
+			SupportsLogitBias:           false,
+			SupportsServiceTier:         false,
+			SupportsParallelToolCalls:   false,
+			SupportsTopLogprobs:         false,
+			SupportsPrediction:          false,
+			SupportsMaxCompletionTokens: false,
+			SupportsStop:                true,  // DeepSeek models support stop parameter
+			SupportsImageGeneration:     false, // DeepSeek models don't support image generation
+			SupportsEmbedding:           false, // DeepSeek models don't support embedding
+		}
 	case AwsLlama3:
 		baseCapabilities = ProviderCapabilities{
 			SupportsTools:               false, // Currently unsupported. May be implemented in the future.
