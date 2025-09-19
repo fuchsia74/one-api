@@ -11,6 +11,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	"github.com/gin-gonic/gin"
 
@@ -399,6 +400,18 @@ func convertDeepSeekToConverseRequest(deepseekReq *Request, modelID string) (*be
 	// Add system messages if any
 	if len(systemMessages) > 0 {
 		converseReq.System = systemMessages
+	}
+
+	// Add additional model request fields for reasoning_effort
+	if deepseekReq.ReasoningEffort != nil {
+		// Convert reasoning_effort to AWS Bedrock's additional-model-request-fields
+		// with reasoning_config based on the value of reasoning_effort (low, medium, high)
+		reasoningConfig := map[string]interface{}{
+			"reasoning_config": *deepseekReq.ReasoningEffort,
+		}
+		// Convert to document.Interface using bedrockruntime document package
+		docInput := document.NewLazyDocument(reasoningConfig)
+		converseReq.AdditionalModelRequestFields = docInput
 	}
 
 	return converseReq, nil

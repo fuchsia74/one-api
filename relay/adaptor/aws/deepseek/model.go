@@ -32,6 +32,11 @@ type Request struct {
 	// Optional field that allows fine-grained control over response termination.
 	// Useful for controlling when DeepSeek-R1 stops generating reasoning or response content.
 	Stop []string `json:"stop,omitempty"`
+
+	// ReasoningEffort controls the reasoning capabilities for supported models.
+	// Optional field that enables enhanced reasoning for models like DeepSeek-V3.
+	// When present, it's converted to additional-model-request-fields for AWS Bedrock.
+	ReasoningEffort *string `json:"reasoning_effort,omitempty"`
 }
 
 // Message represents a single message in the conversation history.
