@@ -261,8 +261,8 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 		"ai21-jamba-1.5": {Ratio: 2 * ratio.MilliTokensUsd, CompletionRatio: 4},    // $2/$8 per 1M tokens
 
 		// DeepSeek Models (Supported) - Updated pricing as of 2025-09-19 - Note: These are per 1K tokens, converted to 1M tokens using MilliTokensUsd
-		"deepseek-r1": {Ratio: 1.35 * ratio.MilliTokensUsd, CompletionRatio: 4},   // $0.00135/$0.0054 per 1K tokens = $1.35/$5.4 per 1M tokens
-		"deepseek-v3": {Ratio: 0.58 * ratio.MilliTokensUsd, CompletionRatio: 2.9}, // $0.00058/$0.00168 per 1K tokens = $0.58/$1.68 per 1M tokens
+		"deepseek-r1":   {Ratio: 1.35 * ratio.MilliTokensUsd, CompletionRatio: 4},   // $0.00135/$0.0054 per 1K tokens = $1.35/$5.4 per 1M tokens
+		"deepseek-v3.1": {Ratio: 0.58 * ratio.MilliTokensUsd, CompletionRatio: 2.9}, // $0.00058/$0.00168 per 1K tokens = $0.58/$1.68 per 1M tokens
 
 		// Mistral Models (Supported) - Updated pricing as of 2025-08-27 - Note: These are per 1K tokens, converted to 1M tokens using ratio.MilliTokensUsd
 		//
@@ -418,7 +418,7 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsFunctions:           false,
 			SupportsLogprobs:            false,
 			SupportsResponseFormat:      false,
-			SupportsReasoningEffort:     true, // DeepSeek V3 supports reasoning
+			SupportsReasoningEffort:     true, // DeepSeek V3.1 supports reasoning
 			SupportsModalities:          false,
 			SupportsAudio:               false,
 			SupportsWebSearch:           false,

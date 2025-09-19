@@ -34,7 +34,7 @@ type Request struct {
 	Stop []string `json:"stop,omitempty"`
 
 	// ReasoningEffort controls the reasoning capabilities for supported models.
-	// Optional field that enables enhanced reasoning for models like DeepSeek-V3.
+	// Optional field that enables enhanced reasoning for models like DeepSeek-V3.1.
 	// When present, it's converted to additional-model-request-fields for AWS Bedrock.
 	ReasoningEffort *string `json:"reasoning_effort,omitempty"`
 }
