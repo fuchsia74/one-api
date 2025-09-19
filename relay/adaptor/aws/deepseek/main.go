@@ -411,6 +411,11 @@ func convertDeepSeekToConverseRequest(deepseekReq *Request, modelID string) (*be
 	if deepseekReq.ReasoningEffort != nil {
 		// Convert reasoning_effort to AWS Bedrock's additional-model-request-fields
 		// with reasoning_config based on the value of reasoning_effort (low, medium, high)
+		//
+		// Note: The current known reasoning_config in DeepSeek V3 is associated with the reasoning_effort.
+		// When set to "high", it displays the reasoning content.
+		// This implementation supports the reasoning_effort parameter and converts it into the reasoning_config design
+		// for non-explicit cases (e.g., setting hardcoded it to "high").
 		reasoningConfig := map[string]interface{}{
 			"reasoning_config": *deepseekReq.ReasoningEffort,
 		}
