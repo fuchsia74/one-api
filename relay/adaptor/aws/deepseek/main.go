@@ -91,6 +91,11 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 		}
 	}
 
+	// Handle reasoning_effort parameter for DeepSeek models
+	if textRequest.ReasoningEffort != nil {
+		deepseekReq.ReasoningEffort = textRequest.ReasoningEffort
+	}
+
 	return deepseekReq
 }
 
