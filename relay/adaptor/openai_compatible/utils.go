@@ -427,70 +427,46 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	return nil, &usage
 }
 
-// ExtractThinkingContent extracts content within <think></think> tags and returns
+// ExtractThinkingContent extracts content within the FIRST <think></think> tag only and returns
 // both the extracted thinking content and the remaining regular content
 // This high-performance implementation uses fast string scanning instead of regex for optimal latency
+//
+// NOTE: Only processes the first think tag encountered; subsequent think tags are treated as regular content
 func ExtractThinkingContent(content string) (thinkingContent, regularContent string) {
 	if content == "" {
 		return "", ""
 	}
 
 	// Fast string-based parsing - no regex for maximum performance
-	var thinkingParts []string
-	var regularParts []string
+	// Only handle the FIRST think tag, treat subsequent ones as regular content
 
-	i := 0
-	contentLen := len(content)
-
-	for i < contentLen {
-		// Look for <think> tag
-		thinkStart := strings.Index(content[i:], "<think>")
-		if thinkStart == -1 {
-			// No more <think> tags, append rest as regular content
-			if i < contentLen {
-				regularParts = append(regularParts, content[i:])
-			}
-			break
-		}
-
-		// Adjust thinkStart to absolute position
-		thinkStart += i
-
-		// Append content before <think> as regular content
-		if thinkStart > i {
-			regularParts = append(regularParts, content[i:thinkStart])
-		}
-
-		// Look for closing </think> tag
-		thinkEnd := strings.Index(content[thinkStart:], "</think>")
-		if thinkEnd == -1 {
-			// No closing tag found, treat rest as regular content
-			regularParts = append(regularParts, content[thinkStart:])
-			break
-		}
-
-		// Adjust thinkEnd to absolute position
-		thinkEnd += thinkStart
-
-		// Extract thinking content (between <think> and </think>)
-		thinkingStart := thinkStart + 7 // len("<think>")
-		if thinkingStart < thinkEnd {
-			thinkingParts = append(thinkingParts, content[thinkingStart:thinkEnd])
-		}
-
-		// Move past </think> tag
-		i = thinkEnd + 8 // len("</think>")
+	// Look for the first <think> tag
+	thinkStart := strings.Index(content, "<think>")
+	if thinkStart == -1 {
+		// No <think> tag found, return all content as regular
+		return "", strings.TrimSpace(content)
 	}
 
-	// Join thinking parts with newlines
-	if len(thinkingParts) > 0 {
-		thinkingContent = strings.Join(thinkingParts, "\n")
+	// Look for the first closing </think> tag after the opening tag
+	thinkEnd := strings.Index(content[thinkStart:], "</think>")
+	if thinkEnd == -1 {
+		// No closing tag found, treat all as regular content
+		return "", strings.TrimSpace(content)
 	}
 
-	// Join regular parts
-	if len(regularParts) > 0 {
-		regularContent = strings.Join(regularParts, "")
+	// Adjust thinkEnd to absolute position
+	thinkEnd += thinkStart
+
+	// Extract thinking content (between <think> and </think>)
+	thinkingStart := thinkStart + 7 // len("<think>")
+	if thinkingStart < thinkEnd {
+		thinkingContent = content[thinkingStart:thinkEnd]
 	}
+
+	// Build regular content: before first <think> + after first </think>
+	beforeThink := content[:thinkStart]
+	afterThink := content[thinkEnd+8:] // 8 is len("</think>")
+	regularContent = beforeThink + afterThink
 
 	// Clean up whitespace
 	thinkingContent = strings.TrimSpace(thinkingContent)
@@ -508,7 +484,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 	var usage *model.Usage
 
 	// Ultra-low-latency streaming state - minimal variables for maximum performance
-	isInThinkingBlock := false // Track if we're currently inside a <think> block
+	isInThinkingBlock := false    // Track if we're currently inside a <think> block
+	hasProcessedThinkTag := false // Track if we've already processed the first (and only) think tag
 
 	logger := gmw.GetLogger(c).With(
 		zap.String("model", modelName),
@@ -597,8 +574,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 
 			// Process content immediately without accumulation
 			if deltaContent != "" {
-				// Ultra-fast thinking block detection and processing
-				if !isInThinkingBlock && strings.Contains(deltaContent, "<think>") {
+				// Ultra-fast thinking block detection and processing - only process FIRST think tag
+				if !isInThinkingBlock && !hasProcessedThinkTag && strings.Contains(deltaContent, "<think>") {
 					// Entering thinking block
 					isInThinkingBlock = true
 					if idx := strings.Index(deltaContent, "<think>"); idx >= 0 {
@@ -629,6 +606,7 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 								}
 
 								isInThinkingBlock = false
+								hasProcessedThinkTag = true // Mark that we've processed the first (and only) think tag
 							}
 						} else {
 							// Partial thinking content - stream immediately
@@ -656,6 +634,7 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 							streamResponse.Choices[i].Delta.Content = afterEndThink
 							modifiedChunk = true
 							isInThinkingBlock = false
+							hasProcessedThinkTag = true // Mark that we've processed the first (and only) think tag
 						}
 					} else {
 						// Pure thinking content - stream as reasoning immediately
