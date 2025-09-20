@@ -15,6 +15,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/render"
+	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -490,9 +491,12 @@ func ExtractThinkingContent(content string) (thinkingContent, regularContent str
 // StreamHandlerWithThinking processes streaming responses with ultra-low-latency <think></think> block processing
 // This specialized handler is designed for Other provider sequential thinking format where thinking content
 // comes first, followed by the actual response content.
+//
+// Note: This now Optimized for efficiency with large streams using [strings.Builder] to avoid O(n²) string concatenation.
 func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
-	responseText := ""
-	toolArgsText := ""
+	// Use strings.Builder for efficient text accumulation to avoid O(n²) complexity with large streams
+	var responseTextBuilder strings.Builder
+	var toolArgsTextBuilder strings.Builder
 	var usage *model.Usage
 
 	// Ultra-low-latency streaming state - minimal variables for maximum performance
@@ -575,22 +579,25 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 
 		chunksProcessed++
 
+		// Replace upstream ID with our trace ID
+		streamResponse.Id = fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceID(c))
+
 		// Ultra-low-latency content processing - no buffering approach
 		originalData := data
-		modifiedChunk := false
+		modifiedChunk := true // Always mark as modified since we changed the ID
 
 		// Process each choice with immediate streaming
 		for i, choice := range streamResponse.Choices {
 			deltaContent := choice.Delta.StringContent()
-			responseText += deltaContent
+			responseTextBuilder.WriteString(deltaContent)
 
 			// Process content immediately without accumulation
 			if deltaContent != "" {
 				// Ultra-fast thinking block detection and processing - only process FIRST think tag
-				if !isInThinkingBlock && !hasProcessedThinkTag && strings.Contains(deltaContent, "<think>") {
-					// Entering thinking block
-					isInThinkingBlock = true
+				if !isInThinkingBlock && !hasProcessedThinkTag {
 					if idx := strings.Index(deltaContent, "<think>"); idx >= 0 {
+						// Entering thinking block
+						isInThinkingBlock = true
 						beforeThink := deltaContent[:idx]
 						afterThink := deltaContent[idx+7:] // 7 is len("<think>")
 
@@ -664,10 +671,10 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 					if tc.Function != nil && tc.Function.Arguments != nil {
 						switch v := tc.Function.Arguments.(type) {
 						case string:
-							toolArgsText += v
+							toolArgsTextBuilder.WriteString(v)
 						default:
 							if b, e := json.Marshal(v); e == nil {
-								toolArgsText += string(b)
+								toolArgsTextBuilder.Write(b)
 							}
 						}
 					}
@@ -699,7 +706,7 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 	}
 
 	// Check if we processed any chunks - if not, this might indicate an error
-	if chunksProcessed == 0 && responseText == "" {
+	if chunksProcessed == 0 && responseTextBuilder.Len() == 0 {
 		logger.Error("stream processing completed but no chunks were processed",
 			zap.String("model", modelName),
 			zap.String("content_type", resp.Header.Get("Content-Type")))
@@ -716,6 +723,8 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 	}
 
 	// Calculate or fix usage when missing or incomplete
+	responseText := responseTextBuilder.String()
+	toolArgsText := toolArgsTextBuilder.String()
 	if usage == nil {
 		// No usage provided by upstream: compute from text
 		logger.Warn("no usage provided by upstream in thinking stream, computing token count using CountTokenText fallback",
