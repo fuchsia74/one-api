@@ -127,7 +127,13 @@ func GetAllChannels(startIdx int, num int, scope string, sortBy string, sortOrde
 
 	switch scope {
 	case "all":
-		err = DB.Order(orderClause).Find(&channels).Error
+		if num > 0 {
+			// Apply pagination when num > 0
+			err = DB.Order(orderClause).Limit(num).Offset(startIdx).Find(&channels).Error
+		} else {
+			// Return all channels when num = 0 (backward compatibility)
+			err = DB.Order(orderClause).Find(&channels).Error
+		}
 	case "disabled":
 		err = DB.Order(orderClause).Where("status = ? or status = ?", ChannelStatusAutoDisabled, ChannelStatusManuallyDisabled).Find(&channels).Error
 	default:
