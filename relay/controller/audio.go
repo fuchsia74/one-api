@@ -262,6 +262,15 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		return openai.ErrorWrapper(errors.Wrapf(err, "upstream audio request failed for channel %d", channelId), "do_request_failed", http.StatusInternalServerError)
 	}
 
+	// Immediately record a provisional request cost using the estimated quota, even if we skipped physical pre-consume
+	// (trusted path). This ensures cancellation cases are still tracked and later reconciled.
+	{
+		requestId := c.GetString(ctxkey.RequestId)
+		if err := model.UpdateUserRequestCostQuotaByRequestID(userId, requestId, quota); err != nil {
+			gmw.GetLogger(c).Warn("record provisional user request cost failed", zap.Error(err))
+		}
+	}
+
 	err = req.Body.Close()
 	if err != nil {
 		return openai.ErrorWrapper(err, "close_request_body_failed", http.StatusInternalServerError)
@@ -315,6 +324,10 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// }
 
 	if resp.StatusCode != http.StatusOK {
+		// Reconcile provisional record to 0 since upstream returned error
+		if err := model.UpdateUserRequestCostQuotaByRequestID(userId, c.GetString(ctxkey.RequestId), 0); err != nil {
+			gmw.GetLogger(c).Warn("update user request cost to zero failed", zap.Error(err))
+		}
 		return RelayErrorHandler(resp)
 	}
 
@@ -346,6 +359,11 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			ElapsedTime:      helper.CalcElapsedTime(meta.StartTime), // capture request latency in ms
 		}
 		go billing.PostConsumeQuotaWithLog(bgctx, tokenId, quotaDelta, quota, entry)
+
+		// Reconcile user request cost to final quota (override provisional value)
+		if err := model.UpdateUserRequestCostQuotaByRequestID(userId, c.GetString(ctxkey.RequestId), quota); err != nil {
+			gmw.GetLogger(c).Error("update user request cost failed", zap.Error(err))
+		}
 	}()
 
 	for k, v := range resp.Header {

@@ -139,10 +139,17 @@ func InitDB() {
 
 	logger.Logger.Info("database migration started")
 
-	// STEP 1: Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
+	// STEP 1: Pre-migrations
+	// 1a) Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
 	// This must run BEFORE AutoMigrate to ensure schema compatibility
 	if err = MigrateChannelFieldsToText(); err != nil {
 		logger.Logger.Fatal("failed to migrate channel field types", zap.Error(err))
+		return
+	}
+
+	// 1b) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
+	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
+		logger.Logger.Fatal("failed to migrate user_request_costs unique index", zap.Error(err))
 		return
 	}
 

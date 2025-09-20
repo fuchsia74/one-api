@@ -108,19 +108,49 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	// Immediately record a provisional request cost even if pre-consume was skipped (trusted path)
+	// using the estimated base quota; reconcile when usage arrives.
+	{
+		quotaId := c.GetInt(ctxkey.Id)
+		requestId := c.GetString(ctxkey.RequestId)
+		estimatedTokens := int64(promptTokens)
+		if responseAPIRequest.MaxOutputTokens != nil {
+			estimatedTokens += int64(*responseAPIRequest.MaxOutputTokens)
+		}
+		estimated := int64(float64(estimatedTokens) * ratio)
+		if estimated <= 0 {
+			estimated = preConsumedQuota
+		}
+		if estimated > 0 {
+			if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, estimated); err != nil {
+				lg.Warn("record provisional user request cost failed", zap.Error(err))
+			}
+		}
+	}
 
 	// Check for HTTP errors
 	if resp.StatusCode != http.StatusOK {
 		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+		// Reconcile provisional record to 0 since upstream returned error
+		quotaId := c.GetInt(ctxkey.Id)
+		requestId := c.GetString(ctxkey.RequestId)
+		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
+			lg.Warn("update user request cost to zero failed", zap.Error(err))
+		}
 		return RelayErrorHandler(resp)
 	}
 
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
 	if respErr != nil {
-		// DoResponse already logs errors internally, so we don't need to log it here
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
-		return respErr
+		// If usage is available even though writing to client failed (e.g., client cancelled),
+		// proceed to billing to ensure forwarded requests are charged; do not refund pre-consumed quota.
+		// Otherwise, refund pre-consumed quota and return error.
+		if usage == nil {
+			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+			return respErr
+		}
+		// Fall through to billing with available usage
 	}
 
 	// post-consume quota
@@ -144,15 +174,10 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 			// we keep postConsumeResponseAPIQuota signature and rely on it to read IDs from outer scope.
 			quota = postConsumeResponseAPIQuota(ctx, usage, meta, responseAPIRequest, ratio, preConsumedQuota, modelRatio, groupRatio, channelCompletionRatio)
 
-			// also update user request cost
+			// Reconcile request cost with final quota (override provisional pre-consumed value)
 			if quota != 0 {
-				docu := model.NewUserRequestCost(
-					quotaId,
-					requestId,
-					quota,
-				)
-				if err = docu.Insert(); err != nil {
-					lg.Error("insert user request cost failed", zap.Error(err))
+				if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, quota); err != nil {
+					lg.Error("update user request cost failed", zap.Error(err))
 				}
 			}
 			done <- true
