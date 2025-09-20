@@ -613,7 +613,12 @@ func StreamHandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens
 
 								// Append regular content after </think>
 								if afterEndThink != "" {
-									currentContent := streamResponse.Choices[i].Delta.Content.(string)
+									var currentContent string
+									if cc, ok := streamResponse.Choices[i].Delta.Content.(string); ok {
+										currentContent = cc
+									} else {
+										currentContent = ""
+									}
 									streamResponse.Choices[i].Delta.Content = currentContent + afterEndThink
 								}
 
