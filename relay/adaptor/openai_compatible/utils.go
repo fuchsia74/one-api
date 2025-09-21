@@ -1,7 +1,6 @@
 package openai_compatible
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,9 +12,6 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
-	"github.com/songquanpeng/one-api/common"
-	"github.com/songquanpeng/one-api/common/render"
-	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -442,124 +438,4 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 		zap.Int("total_tokens", usage.TotalTokens))
 
 	return nil, &usage
-}
-
-// UnifiedStreamProcessing handles the core streaming logic shared between handlers
-func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens int, modelName string, enableThinking bool) (*model.ErrorWithStatusCode, *model.Usage) {
-	logger := gmw.GetLogger(c).With(
-		zap.String("model", modelName),
-	)
-
-	// Check if response content type indicates an error (non-streaming response)
-	contentType := resp.Header.Get("Content-Type")
-	if strings.Contains(contentType, "application/json") &&
-		!strings.Contains(contentType, "text/event-stream") {
-		logger.Error("unexpected content type for streaming request, possible error response",
-			zap.String("content_type", contentType),
-			zap.Int("status_code", resp.StatusCode))
-
-		// Read response as potential error
-		responseBody, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return ErrorWrapper(err, "read_error_response_failed", http.StatusInternalServerError), nil
-		}
-
-		logger.Error("received error response in stream handler",
-			zap.ByteString("response_body", responseBody))
-
-		// Try to parse as error response
-		var errorResponse SlimTextResponse
-		if err := json.Unmarshal(responseBody, &errorResponse); err == nil && errorResponse.Error.Type != "" {
-			return &model.ErrorWithStatusCode{
-				Error:      errorResponse.Error,
-				StatusCode: resp.StatusCode,
-			}, nil
-		}
-
-		// Return generic error if parsing fails
-		return ErrorWrapper(errors.Errorf("unexpected non-streaming response: %s", string(responseBody)),
-			"unexpected_response_format", resp.StatusCode), nil
-	}
-
-	scanner := bufio.NewScanner(resp.Body)
-	buffer := make([]byte, 1024*1024) // 1MB buffer
-	scanner.Buffer(buffer, len(buffer))
-	scanner.Split(bufio.ScanLines)
-
-	common.SetEventStreamHeaders(c)
-
-	// Initialize unified streaming context
-	streamCtx := NewStreamingContext(logger, enableThinking)
-
-	for scanner.Scan() {
-		data := NormalizeDataLine(scanner.Text())
-		logger.Debug("processing streaming chunk",
-			zap.String("chunk_data", data),
-			zap.Int("chunks_processed", streamCtx.chunksProcessed))
-
-		if len(data) < DataPrefixLength {
-			continue
-		}
-
-		if data[:DataPrefixLength] != DataPrefix && data[:DataPrefixLength] != Done {
-			continue
-		}
-
-		if strings.HasPrefix(data[DataPrefixLength:], Done) {
-			render.StringData(c, data)
-			streamCtx.doneRendered = true
-			continue
-		}
-
-		// Parse the streaming chunk
-		var streamResponse ChatCompletionsStreamResponse
-		jsonData := data[DataPrefixLength:]
-		if err := json.Unmarshal([]byte(jsonData), &streamResponse); err != nil {
-			logger.Warn("failed to parse streaming chunk, skipping",
-				zap.String("chunk_data", jsonData),
-				zap.Error(err))
-			continue // Skip malformed chunks
-		}
-
-		// Replace upstream ID with our trace ID
-		streamResponse.Id = fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceID(c))
-
-		// Process chunk using unified logic
-		modifiedChunk := streamCtx.ProcessStreamChunk(&streamResponse)
-
-		// Forward the chunk to client (modified or original)
-		if modifiedChunk {
-			// Re-serialize the modified response
-			if modifiedJSON, err := json.Marshal(streamResponse); err == nil {
-				render.StringData(c, "data: "+string(modifiedJSON))
-			} else {
-				// Fallback to original data if serialization fails
-				render.StringData(c, data)
-			}
-		} else {
-			render.StringData(c, data)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return ErrorWrapper(err, "read_stream_failed", http.StatusInternalServerError), streamCtx.usage
-	}
-
-	// Validate stream completion
-	if errResp, ok := streamCtx.ValidateStreamCompletion(modelName, contentType); !ok {
-		return errResp, streamCtx.usage
-	}
-
-	if !streamCtx.doneRendered {
-		render.StringData(c, "data: "+Done)
-	}
-
-	if err := resp.Body.Close(); err != nil {
-		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), streamCtx.usage
-	}
-
-	// Calculate final usage with unified logic
-	finalUsage := streamCtx.CalculateUsage(promptTokens, modelName)
-
-	return nil, finalUsage
 }
