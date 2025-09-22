@@ -74,6 +74,10 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
   - [Bug fix](#bug-fix)
 
+## Multi Agent Framework Compatible
+
+This repository is fully compatible with multi-agent frameworks and is recommended for use with chat completion OpenAI compatible APIs. The unified interface provided by One API makes it an ideal choice for integrating multiple AI services into multi-agent systems, allowing agents to seamlessly interact with various AI models through a standardized OpenAI-compatible endpoint.
+
 ## Turtorial
 
 Run one-api using docker-compose:
