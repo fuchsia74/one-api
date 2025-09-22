@@ -175,7 +175,12 @@ func TestCreatedAtUpdatedAtFields(t *testing.T) {
 // setupTestDatabase ensures a clean test database is available for testing
 func setupTestDatabase(t *testing.T) {
 	if DB == nil {
-		t.Fatal("Database connection not available for testing")
+		// Initialize primary and log databases for tests
+		InitDB()
+		InitLogDB()
+	}
+	if DB == nil {
+		t.Fatal("Database connection not available for testing after InitDB")
 	}
 
 	// Clean up test data

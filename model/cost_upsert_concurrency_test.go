@@ -19,16 +19,20 @@ func TestUpdateUserRequestCostQuotaByRequestID_Concurrency(t *testing.T) {
 
 	const goroutines = 10
 	var wg sync.WaitGroup
-	wg.Add(goroutines)
-	for i := 0; i < goroutines; i++ {
+
+	// Start N-1 concurrent updates first to exercise contention
+	wg.Add(goroutines - 1)
+	for i := 0; i < goroutines-1; i++ {
 		i := i
 		go func() {
 			defer wg.Done()
-			// Interleaved quotas, last write wins
 			_ = UpdateUserRequestCostQuotaByRequestID(userID, reqID, int64(i))
 		}()
 	}
 	wg.Wait()
+
+	// Perform a final update deterministically so the expected value is known
+	require.NoError(t, UpdateUserRequestCostQuotaByRequestID(userID, reqID, int64(goroutines-1)))
 
 	rec, err := GetCostByRequestId(reqID)
 	require.NoError(t, err)
@@ -36,4 +40,9 @@ func TestUpdateUserRequestCostQuotaByRequestID_Concurrency(t *testing.T) {
 
 	// Expect a single row and the latest quota value (goroutines-1)
 	require.EqualValues(t, int64(goroutines-1), rec.Quota)
+
+	// Verify no duplicates created for the same request_id
+	var cnt int64
+	require.NoError(t, DB.Model(&UserRequestCost{}).Where("request_id = ?", reqID).Count(&cnt).Error)
+	require.EqualValues(t, 1, cnt, "should have exactly one row for the request_id")
 }
