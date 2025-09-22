@@ -16,7 +16,8 @@ Fully compatible with the upstream version, can be used directly by replacing th
 Also welcome to register and use my deployed one-api gateway, which supports various mainstream models. For usage instructions, please refer to <https://wiki.laisky.com/projects/gpt/pay/cn/#page_gpt_pay_cn>.
 
 - [One API](#one-api)
-  - [Turtorial](#turtorial)
+  - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
+  - [Tutorial](#tutorial)
   - [Contributors](#contributors)
   - [New Features](#new-features)
     - [Universal Features](#universal-features)
@@ -72,7 +73,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support XAI/Grok Text \& Image Models](#support-xaigrok-text--image-models)
     - [Black Forest Labs Features](#black-forest-labs-features)
       - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
-  - [Bug fix](#bug-fix)
+  - [Bug Fixes \& Enterprise-Grade Improvements (Including Security Enhancements)](#bug-fixes--enterprise-grade-improvements-including-security-enhancements)
 
 ## Multi Agent Framework Compatible
 
@@ -81,7 +82,7 @@ This repository is fully compatible with multi-agent frameworks and is recommend
 > [!TIP]
 > For optimal performance in multi-agent environments, it's recommended to use models that already have automated cached prompt capabilities, such as `grok-code-fast-1`. These models can significantly reduce latency and improve response times by leveraging cached prompts, which is especially beneficial when multiple agents are making frequent requests with similar contexts.
 
-## Turtorial
+## Tutorial
 
 Run one-api using docker-compose:
 
@@ -429,6 +430,6 @@ By default, the thinking mode is automatically enabled for the deepseek-r1 model
 - [fix: send ByAll](https://github.com/Laisky/one-api/pull/35)
 - [fix: oidc token endpoint request body #2106 #36](https://github.com/Laisky/one-api/pull/36)
 
->[!NOTE]
->
+> [!NOTE]
+
 > For additional enterprise-grade improvements, including security enhancements (e.g., [vulnerability fixes](https://github.com/Laisky/one-api/pull/126)), you can also view these pull requests [here](https://github.com/Laisky/one-api/pulls?q=is%3Apr+is%3Aclosed).
