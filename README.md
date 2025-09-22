@@ -408,7 +408,7 @@ By default, the thinking mode is automatically enabled for the deepseek-r1 model
 
 ![](https://s3.laisky.com/uploads/2025/05/flux-kontext-pro.png)
 
-## Bug fix
+## Bug Fixes & Enterprise-Grade Improvements (Including Security Enhancements)
 
 - [BUGFIX: Several issues when updating tokens #1933](https://github.com/songquanpeng/one-api/pull/1933)
 - [feat(audio): count whisper-1 quota by audio duration #2022](https://github.com/songquanpeng/one-api/pull/2022)
@@ -421,3 +421,7 @@ By default, the thinking mode is automatically enabled for the deepseek-r1 model
 - [fix: update EmailDomainWhitelist submission logic #33](https://github.com/Laisky/one-api/pull/33)
 - [fix: send ByAll](https://github.com/Laisky/one-api/pull/35)
 - [fix: oidc token endpoint request body #2106 #36](https://github.com/Laisky/one-api/pull/36)
+
+>[!NOTE]
+>
+> For additional enterprise-grade improvements, including security enhancements (e.g., [vulnerability fixes](https://github.com/Laisky/one-api/pull/126)), you can also view these pull requests [here](https://github.com/Laisky/one-api/pulls?q=is%3Apr+is%3Aclosed).
