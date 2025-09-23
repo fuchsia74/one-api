@@ -249,7 +249,7 @@ metadata:
   labels:
     app: one-api
 spec:
-  replicas: 2
+  replicas: 1
   selector:
     matchLabels:
       app: one-api
