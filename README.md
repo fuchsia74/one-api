@@ -154,6 +154,16 @@ oneapi:
     # (optional) LOG_PUSH_API set the API address for pushing error logs to telegram.
     # More information about log push can be found at: https://github.com/Laisky/laisky-blog-graphql/tree/master/internal/web/telegram
     LOG_PUSH_API: "https://gq.laisky.com/query/"
+    LOG_PUSH_TYPE: "oneapi"
+    LOG_PUSH_TOKEN: "xxxxxxx"
+
+  volumes:
+    - /var/lib/oneapi:/data
+  ports:
+    - 3000:3000
+```
+
+The initial default account and password are `root` / `123456`.
 ```
 
 ### Kubernetes Deployment
@@ -535,8 +545,6 @@ data:
 ```
 
 
-> [!NOTE]
-> **MySQL Version**: The example above uses MySQL version `8.0`. Check the [MySQL Docker Hub page](https://hub.docker.com/_/mysql) for available versions and update accordingly. Consider using specific minor versions like `mysql:8.0.39` for production environments to ensure consistency.
 ```bash
 kubectl apply -f mysql.yaml
 ```
@@ -642,8 +650,6 @@ data:
 ```
 
 
-> [!NOTE]
-> **Redis Version**: The example above uses Redis version `7-alpine`. Check the [Redis Docker Hub page](https://hub.docker.com/_/redis) for available versions and update accordingly. Consider using specific minor versions like `redis:7.4-alpine` for production environments to ensure consistency.
 ```bash
 kubectl apply -f redis.yaml
 ```
@@ -1352,17 +1358,6 @@ kubectl exec -it deployment/mysql -n one-api -- mysqldump -u oneapi -p oneapi > 
 > - Use cert-manager for automated SSL certificate management
 > - Configure resource quotas and limits appropriately
 > - Regularly update container images and apply security patches
-
-    LOG_PUSH_TYPE: "oneapi"
-    LOG_PUSH_TOKEN: "xxxxxxx"
-
-  volumes:
-    - /var/lib/oneapi:/data
-  ports:
-    - 3000:3000
-```
-
-The initial default account and password are `root` / `123456`.
 
 ## Contributors
 
