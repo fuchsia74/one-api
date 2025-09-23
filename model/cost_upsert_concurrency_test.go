@@ -24,7 +24,6 @@ func TestUpdateUserRequestCostQuotaByRequestID_Concurrency(t *testing.T) {
 	for i := 0; i < goroutines-1; i++ {
 		i := i
 		wg.Go(func() {
-			defer wg.Done()
 			_ = UpdateUserRequestCostQuotaByRequestID(userID, reqID, int64(i))
 		})
 	}
