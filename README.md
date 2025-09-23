@@ -18,6 +18,14 @@ Also welcome to register and use my deployed one-api gateway, which supports var
 - [One API](#one-api)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
+    - [Docker Compose Deployment](#docker-compose-deployment)
+    - [Kubernetes Deployment](#kubernetes-deployment)
+      - [Prerequisites](#prerequisites)
+      - [Basic Deployment](#basic-deployment)
+      - [Database Setup](#database-setup)
+      - [Redis Setup](#redis-setup)
+      - [Ingress Configuration](#ingress-configuration)
+      - [Production Considerations](#production-considerations)
   - [Contributors](#contributors)
   - [New Features](#new-features)
     - [Universal Features](#universal-features)
@@ -145,6 +153,815 @@ oneapi:
     # (optional) LOG_PUSH_API set the API address for pushing error logs to telegram.
     # More information about log push can be found at: https://github.com/Laisky/laisky-blog-graphql/tree/master/internal/web/telegram
     LOG_PUSH_API: "https://gq.laisky.com/query/"
+```
+
+### Kubernetes Deployment
+
+This section provides comprehensive instructions for deploying One API on Kubernetes with various configurations.
+
+#### Prerequisites
+
+- Kubernetes cluster (v1.20+)
+- [`kubectl`](https://kubernetes.io/docs/tasks/tools/) configured to communicate with your cluster
+- [`helm`](https://helm.sh/docs/intro/install/) (optional, for package management)
+
+#### Basic Deployment
+
+##### Namespace
+
+First, create a dedicated namespace for One API:
+
+```yaml
+# namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: one-api
+  labels:
+    name: one-api
+```
+
+```bash
+kubectl apply -f namespace.yaml
+```
+
+##### ConfigMap
+
+Create a ConfigMap for One API configuration:
+
+```yaml
+# configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: one-api-config
+  namespace: one-api
+data:
+  # Basic configuration
+  SESSION_SECRET: "your-session-secret-here"
+  DEBUG: "false"
+  DEBUG_SQL: "false"
+  
+  # Rate limiting
+  GLOBAL_API_RATE_LIMIT: "1000"
+  GLOBAL_WEB_RATE_LIMIT: "1000"
+  GLOBAL_RELAY_RATE_LIMIT: "1000"
+  GLOBAL_CHANNEL_RATE_LIMIT: "1"
+  
+  # Token settings
+  DEFAULT_MAX_TOKEN: "2048"
+  MAX_INLINE_IMAGE_SIZE_MB: "30"
+  MAX_ITEMS_PER_PAGE: "10"
+  
+  # Channel settings
+  CHANNEL_SUSPEND_SECONDS_FOR_429: "60"
+  OPENROUTER_PROVIDER_SORT: "throughput"
+  
+  # Usage enforcement
+  ENFORCE_INCLUDE_USAGE: "true"
+```
+
+```bash
+kubectl apply -f configmap.yaml
+```
+
+##### Deployment
+
+Create the main One API deployment:
+
+```yaml
+# deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: one-api
+  namespace: one-api
+  labels:
+    app: one-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: one-api
+  template:
+    metadata:
+      labels:
+        app: one-api
+    spec:
+      containers:
+      - name: one-api
+        image: ppcelery/one-api:latest
+        ports:
+        - containerPort: 3000
+          name: http
+        envFrom:
+        - configMapRef:
+            name: one-api-config
+        - secretRef:
+            name: one-api-secrets
+            optional: true
+        env:
+        - name: SQL_DSN
+          valueFrom:
+            secretKeyRef:
+              name: one-api-database
+              key: dsn
+        - name: REDIS_CONN_STRING
+          valueFrom:
+            secretKeyRef:
+              name: one-api-redis
+              key: connection-string
+              optional: true
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/status
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /api/status
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: one-api-service
+  namespace: one-api
+  labels:
+    app: one-api
+spec:
+  selector:
+    app: one-api
+  ports:
+  - port: 80
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  type: ClusterIP
+```
+
+```bash
+kubectl apply -f deployment.yaml
+```
+
+#### Database Setup
+
+One API supports multiple database backends. Here are examples for PostgreSQL and MySQL:
+
+##### PostgreSQL Setup
+
+```yaml
+# postgresql.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  namespace: one-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:15
+        env:
+        - name: POSTGRES_DB
+          value: "oneapi"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: username
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgresql-secret
+              key: password
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - containerPort: 5432
+        volumeMounts:
+        - name: postgresql-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: postgresql-storage
+        persistentVolumeClaim:
+          claimName: postgresql-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-pvc
+  namespace: one-api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql-service
+  namespace: one-api
+spec:
+  selector:
+    app: postgresql
+  ports:
+  - port: 5432
+    targetPort: 5432
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: postgresql-secret
+  namespace: one-api
+type: Opaque
+data:
+  username: b25lYXBp  # oneapi (base64)
+  password: cGFzc3dvcmQ=  # password (base64) - Change this!
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: one-api-database
+  namespace: one-api
+type: Opaque
+data:
+  dsn: cG9zdGdyZXM6Ly9vbmVhcGk6cGFzc3dvcmRAcG9zdGdyZXNxbC1zZXJ2aWNlOjU0MzIvb25lYXBpP3NzbG1vZGU9ZGlzYWJsZQ==
+  # postgres://oneapi:password@postgresql-service:5432/oneapi?sslmode=disable (base64)
+```
+
+```bash
+kubectl apply -f postgresql.yaml
+```
+
+##### MySQL Setup
+
+```yaml
+# mysql.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: one-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_DATABASE
+          value: "oneapi"
+        - name: MYSQL_USER
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: username
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: password
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: mysql-secret
+              key: root-password
+        ports:
+        - containerPort: 3306
+        volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: mysql-storage
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: one-api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+  namespace: one-api
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: one-api
+type: Opaque
+data:
+  username: b25lYXBp  # oneapi (base64)
+  password: cGFzc3dvcmQ=  # password (base64) - Change this!
+  root-password: cm9vdHBhc3N3b3Jk  # rootpassword (base64) - Change this!
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: one-api-database
+  namespace: one-api
+type: Opaque
+data:
+  dsn: b25lYXBpOnBhc3N3b3JkQG15c3FsLXNlcnZpY2U6MzMwNi9vbmVhcGk/Y2hhcnNldD11dGY4bWI0JnBhcnNlVGltZT1UcnVlJmxvYz1Mb2NhbA==
+  # oneapi:password@mysql-service:3306/oneapi?charset=utf8mb4&parseTime=True&loc=Local (base64)
+```
+
+```bash
+kubectl apply -f mysql.yaml
+```
+
+#### Redis Setup
+
+For caching and improved performance, deploy Redis:
+
+```yaml
+# redis.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: one-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        args:
+        - redis-server
+        - --appendonly
+        - "yes"
+        - --requirepass
+        - "$(REDIS_PASSWORD)"
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: redis-secret
+              key: password
+        volumeMounts:
+        - name: redis-storage
+          mountPath: /data
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: one-api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: one-api
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: redis-secret
+  namespace: one-api
+type: Opaque
+data:
+  password: cmVkaXNwYXNzd29yZA==  # redispassword (base64) - Change this!
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: one-api-redis
+  namespace: one-api
+type: Opaque
+data:
+  connection-string: cmVkaXM6Ly86cmVkaXNwYXNzd29yZEByZWRpcy1zZXJ2aWNlOjYzNzkvMA==
+  # redis://:redispassword@redis-service:6379/0 (base64)
+```
+
+```bash
+kubectl apply -f redis.yaml
+```
+
+#### Ingress Configuration
+
+To expose One API to the internet, configure an Ingress:
+
+##### NGINX Ingress
+
+```yaml
+# ingress-nginx.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: one-api-ingress
+  namespace: one-api
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using cert-manager
+spec:
+  tls:
+  - hosts:
+    - oneapi.yourdomain.com
+    secretName: one-api-tls
+  rules:
+  - host: oneapi.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: one-api-service
+            port:
+              number: 80
+```
+
+##### Traefik Ingress
+
+```yaml
+# ingress-traefik.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: one-api-ingress
+  namespace: one-api
+  annotations:
+    kubernetes.io/ingress.class: traefik
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
+spec:
+  tls:
+  - hosts:
+    - oneapi.yourdomain.com
+    secretName: one-api-tls
+  rules:
+  - host: oneapi.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: one-api-service
+            port:
+              number: 80
+```
+
+```bash
+kubectl apply -f ingress-nginx.yaml  # or ingress-traefik.yaml
+```
+
+#### Production Considerations
+
+##### Security
+
+1. **Network Policies**: Restrict network traffic between pods:
+
+```yaml
+# network-policy.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: one-api-network-policy
+  namespace: one-api
+spec:
+  podSelector:
+    matchLabels:
+      app: one-api
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx  # Adjust based on your ingress controller
+    ports:
+    - protocol: TCP
+      port: 3000
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgresql  # or mysql
+    ports:
+    - protocol: TCP
+      port: 5432  # or 3306 for MySQL
+  - to:
+    - podSelector:
+        matchLabels:
+          app: redis
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to: []  # Allow outbound internet access for AI APIs
+    ports:
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+```
+
+2. **Pod Security Standards**: Add security context to deployments:
+
+```yaml
+# Add to deployment.yaml under spec.template.spec
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+containers:
+- name: one-api
+  # ... other config
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop:
+      - ALL
+```
+
+3. **Secrets Management**: Use external secret management systems like:
+   - [External Secrets Operator](https://external-secrets.io/)
+   - [Sealed Secrets](https://sealed-secrets.netlify.app/)
+   - [Vault](https://www.vaultproject.io/)
+
+##### Scaling
+
+1. **Horizontal Pod Autoscaler (HPA)**:
+
+```yaml
+# hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: one-api-hpa
+  namespace: one-api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: one-api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+```
+
+2. **Pod Disruption Budget**:
+
+```yaml
+# pdb.yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: one-api-pdb
+  namespace: one-api
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: one-api
+```
+
+##### Monitoring and Logging
+
+1. **ServiceMonitor** for Prometheus (if using Prometheus Operator):
+
+```yaml
+# servicemonitor.yaml
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: one-api-metrics
+  namespace: one-api
+  labels:
+    app: one-api
+spec:
+  selector:
+    matchLabels:
+      app: one-api
+  endpoints:
+  - port: http
+    path: /api/metrics
+```
+
+2. **Persistent Volumes** for production databases:
+
+```yaml
+# For cloud providers, use appropriate storage classes
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgresql-pvc
+  namespace: one-api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: fast-ssd  # Adjust based on your cluster
+  resources:
+    requests:
+      storage: 50Gi
+```
+
+##### Deployment Commands
+
+Deploy everything in the correct order:
+
+```bash
+# 1. Create namespace
+kubectl apply -f namespace.yaml
+
+# 2. Deploy database (PostgreSQL or MySQL)
+kubectl apply -f postgresql.yaml  # or mysql.yaml
+
+# 3. Deploy Redis (optional but recommended)
+kubectl apply -f redis.yaml
+
+# 4. Deploy One API
+kubectl apply -f configmap.yaml
+kubectl apply -f deployment.yaml
+
+# 5. Deploy Ingress
+kubectl apply -f ingress-nginx.yaml  # or ingress-traefik.yaml
+
+# 6. Production configurations
+kubectl apply -f hpa.yaml
+kubectl apply -f pdb.yaml
+kubectl apply -f network-policy.yaml
+
+# Check deployment status
+kubectl get pods -n one-api
+kubectl get services -n one-api
+kubectl get ingress -n one-api
+```
+
+##### Health Checks
+
+Monitor your deployment:
+
+```bash
+# Check pod status
+kubectl get pods -n one-api -w
+
+# View logs
+kubectl logs -f deployment/one-api -n one-api
+
+# Check service endpoints
+kubectl get endpoints -n one-api
+
+# Test database connectivity
+kubectl exec -it deployment/one-api -n one-api -- /bin/sh
+# Inside container: test database connection
+```
+
+##### Backup Strategy
+
+For production environments, implement regular backups:
+
+```bash
+# PostgreSQL backup example
+kubectl exec -it deployment/postgresql -n one-api -- pg_dump -U oneapi oneapi > backup-$(date +%Y%m%d).sql
+
+# MySQL backup example
+kubectl exec -it deployment/mysql -n one-api -- mysqldump -u oneapi -p oneapi > backup-$(date +%Y%m%d).sql
+```
+
+> [!NOTE]
+> **Production Recommendations:**
+> - Use managed database services (RDS, Cloud SQL, etc.) for better reliability
+> - Implement proper backup and disaster recovery procedures
+> - Use monitoring solutions like Prometheus + Grafana
+> - Consider using Helm charts for easier management
+> - Implement CI/CD pipelines for automated deployments
+> - Use cert-manager for automated SSL certificate management
+> - Configure resource quotas and limits appropriately
+> - Regularly update container images and apply security patches
+
     LOG_PUSH_TYPE: "oneapi"
     LOG_PUSH_TOKEN: "xxxxxxx"
 
@@ -433,5 +1250,5 @@ By default, the thinking mode is automatically enabled for the deepseek-r1 model
 - [fix: oidc token endpoint request body #2106 #36](https://github.com/Laisky/one-api/pull/36)
 
 > [!NOTE]
-
+>
 > For additional enterprise-grade improvements, including security enhancements (e.g., [vulnerability fixes](https://github.com/Laisky/one-api/pull/126)), you can also view these pull requests [here](https://github.com/Laisky/one-api/pulls?q=is%3Apr+is%3Aclosed).
