@@ -543,7 +543,6 @@ data:
   # oneapi:password@mysql-service:3306/oneapi?charset=utf8mb4&parseTime=True&loc=Local (base64)
 ```
 
-
 ```bash
 kubectl apply -f mysql.yaml
 ```
