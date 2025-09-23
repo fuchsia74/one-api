@@ -164,7 +164,6 @@ oneapi:
 ```
 
 The initial default account and password are `root` / `123456`.
-```
 
 ### Kubernetes Deployment
 
