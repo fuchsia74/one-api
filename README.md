@@ -167,6 +167,13 @@ oneapi:
 
 The initial default account and password are `root` / `123456`.
 
+> [!TIP]
+> **Secret Management**: For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables:
+> - [1Password Secrets Automation](https://developer.1password.com/docs/connect/) for enterprise environments
+> - [External Secrets Operator](https://external-secrets.io/) for Kubernetes deployments
+> - Docker secrets for Docker Swarm mode
+> - Environment files with restricted permissions for simple deployments
+
 ### Kubernetes Deployment
 
 This section provides comprehensive instructions for deploying One API on Kubernetes with various configurations.
@@ -1179,9 +1186,52 @@ containers:
 ```
 
 3. **Secrets Management**: Use external secret management systems like:
-   - [External Secrets Operator](https://external-secrets.io/)
+   - [External Secrets Operator](https://external-secrets.io/) - Integrates with various secret backends including 1Password
+   - [1Password Secrets Automation](https://developer.1password.com/docs/connect/) - Enterprise secret management with Connect API
    - [Sealed Secrets](https://sealed-secrets.netlify.app/)
    - [Vault](https://www.vaultproject.io/)
+
+**Example: Using 1Password with External Secrets Operator**
+
+```yaml
+# 1password-secret-store.yaml
+apiVersion: external-secrets.io/v1beta1
+kind: SecretStore
+metadata:
+  name: onepassword-secret-store
+  namespace: one-api
+spec:
+  provider:
+    onepassword:
+      connectHost: "https://your-connect-host"
+      vaults:
+        Production: 1
+      auth:
+        secretRef:
+          connectToken:
+            name: onepassword-token
+            key: token
+---
+# External secret for database credentials
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: one-api-database-external
+  namespace: one-api
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    name: onepassword-secret-store
+    kind: SecretStore
+  target:
+    name: one-api-database
+    creationPolicy: Owner
+  data:
+  - secretKey: dsn
+    remoteRef:
+      key: "One API Database"
+      property: dsn
+```
 
 ##### Scaling
 
