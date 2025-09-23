@@ -1026,8 +1026,6 @@ Common issues and solutions:
 
 Now your cluster is ready for the One API Ingress configuration!
 
-```
-
 #### Ingress Configuration
 
 To expose One API to the internet, configure an Ingress:
