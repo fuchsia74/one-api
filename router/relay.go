@@ -1,10 +1,11 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/controller"
 	"github.com/songquanpeng/one-api/middleware"
-
-	"github.com/gin-gonic/gin"
 )
 
 func SetRelayRouter(router *gin.Engine) {
@@ -27,6 +28,8 @@ func SetRelayRouter(router *gin.Engine) {
 	}
 
 	relayMws := []gin.HandlerFunc{
+		// Track in-flight requests for graceful shutdown/drain
+		func(c *gin.Context) { done := graceful.BeginRequest(); defer done(); c.Next() },
 		middleware.RelayPanicRecover(), middleware.TokenAuth(),
 		middleware.Distribute(),
 		middleware.GlobalRelayRateLimit(),

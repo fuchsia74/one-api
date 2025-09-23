@@ -71,14 +71,9 @@ func RelayProxyHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		model.UpdateUserUsedQuotaAndRequestCount(meta.UserId, 0)
 		model.UpdateChannelUsedQuota(meta.ChannelId, 0)
 
-		// also update user request cost
-		docu := model.NewUserRequestCost(
-			quotaId,
-			requestId,
-			0,
-		)
-		if err = docu.Insert(); err != nil {
-			gmw.GetLogger(ctx).Error("insert user request cost failed", zap.Error(err))
+		// Reconcile user request cost (proxy does not consume quota)
+		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
+			gmw.GetLogger(ctx).Error("update user request cost failed", zap.Error(err))
 		}
 	}()
 

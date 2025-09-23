@@ -17,6 +17,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -113,24 +114,50 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	// Immediately record a provisional request cost using the estimated base quota
+	// even if we decided not to pre-consume physically (trusted user/token path).
+	// This ensures user-cancelled requests are still tracked and later reconciled.
+	{
+		quotaId := c.GetInt(ctxkey.Id)
+		requestId := c.GetString(ctxkey.RequestId)
+		estimated := getPreConsumedQuota(textRequest, promptTokens, ratio)
+		if estimated > 0 {
+			if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, estimated); err != nil {
+				lg.Warn("record provisional user request cost failed", zap.Error(err))
+			}
+		}
+	}
 	if isErrorHappened(meta, resp) {
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+		// refund pre-consumed quota under lifecycle management so shutdown waits for it
+		graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
+			billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, meta.TokenId)
+		})
+		// Reconcile provisional record to 0 since upstream returned error
+		quotaId := c.GetInt(ctxkey.Id)
+		requestId := c.GetString(ctxkey.RequestId)
+		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
+			lg.Warn("update user request cost to zero failed", zap.Error(err))
+		}
 		return RelayErrorHandler(resp)
 	}
 
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
 	if respErr != nil {
-		// DoResponse already logs errors internally, so we don't need to log it here
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
-		return respErr
+		// If usage is available even though writing to client failed (e.g., client cancelled),
+		// proceed to billing to ensure forwarded requests are charged; do not refund pre-consumed quota.
+		// Otherwise, refund pre-consumed quota and return error.
+		if usage == nil {
+			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+			return respErr
+		}
+		// Fall through to billing with available usage
 	}
 
 	// post-consume quota
 	quotaId := c.GetInt(ctxkey.Id)
-	requestId := c.GetString(ctxkey.RequestId)
-
-	// Record detailed Prometheus metrics
+	// refund pre-consumed quota immediately
+	billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
 	if usage != nil {
 		// Get user information for metrics
 		userId := strconv.Itoa(meta.UserId)
@@ -172,7 +199,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		metrics.GlobalRecorder.RecordModelUsage(meta.ActualModelName, channeltype.IdToName(meta.ChannelType), time.Since(meta.StartTime))
 	}
 
-	go func() {
+	graceful.GoCritical(gmw.BackgroundCtx(c), "postBilling", func(ctx context.Context) {
 		// Use configurable billing timeout with model-specific adjustments
 		baseBillingTimeout := time.Duration(config.BillingTimeoutSec) * time.Second
 		billingTimeout := baseBillingTimeout
@@ -184,18 +211,14 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		done := make(chan bool, 1)
 		var quota int64
 
+		requestId := c.GetString(ctxkey.RequestId)
 		go func() {
 			quota = postConsumeQuota(ctx, usage, meta, textRequest, ratio, preConsumedQuota, modelRatio, groupRatio, systemPromptReset, channelCompletionRatio)
 
-			// also update user request cost
+			// Reconcile request cost with final quota (override provisional pre-consumed value)
 			if quota != 0 {
-				docu := model.NewUserRequestCost(
-					quotaId,
-					requestId,
-					quota,
-				)
-				if err = docu.Insert(); err != nil {
-					lg.Error("insert user request cost failed", zap.Error(err))
+				if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, quota); err != nil {
+					lg.Error("update user request cost failed", zap.Error(err))
 				}
 			}
 			done <- true
@@ -216,13 +239,11 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 					zap.Int64("estimatedQuota", int64(estimatedQuota)),
 					zap.Duration("elapsedTime", elapsedTime))
 
-				// Record billing timeout in metrics
 				metrics.GlobalRecorder.RecordBillingTimeout(meta.UserId, meta.ChannelId, textRequest.Model, estimatedQuota, elapsedTime)
-
 				// TODO: Implement dead letter queue or retry mechanism for failed billing
 			}
 		}
-	}()
+	})
 
 	return nil
 }

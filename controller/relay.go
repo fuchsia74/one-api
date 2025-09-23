@@ -17,11 +17,12 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/middleware"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
-	"github.com/songquanpeng/one-api/relay/controller"
+	rcontroller "github.com/songquanpeng/one-api/relay/controller"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -35,24 +36,24 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 	case relaymode.Realtime:
 		// For Phase 1, route through text helper which will delegate to adaptor based on meta.Mode
 		// Realtime adaptor code will handle websocket upgrade and upstream pass-through.
-		err = controller.RelayTextHelper(c)
+		err = rcontroller.RelayTextHelper(c)
 	case relaymode.ImagesGenerations,
 		relaymode.ImagesEdits:
-		err = controller.RelayImageHelper(c, relayMode)
+		err = rcontroller.RelayImageHelper(c, relayMode)
 	case relaymode.AudioSpeech:
 		fallthrough
 	case relaymode.AudioTranslation:
 		fallthrough
 	case relaymode.AudioTranscription:
-		err = controller.RelayAudioHelper(c, relayMode)
+		err = rcontroller.RelayAudioHelper(c, relayMode)
 	case relaymode.Proxy:
-		err = controller.RelayProxyHelper(c, relayMode)
+		err = rcontroller.RelayProxyHelper(c, relayMode)
 	case relaymode.ResponseAPI:
-		err = controller.RelayResponseAPIHelper(c)
+		err = rcontroller.RelayResponseAPIHelper(c)
 	case relaymode.ClaudeMessages:
-		err = controller.RelayClaudeMessagesHelper(c)
+		err = rcontroller.RelayClaudeMessagesHelper(c)
 	default:
-		err = controller.RelayTextHelper(c)
+		err = rcontroller.RelayTextHelper(c)
 	}
 	return err
 }
@@ -97,7 +98,10 @@ func Relay(c *gin.Context) {
 	channelName := c.GetString(ctxkey.ChannelName)
 	group := c.GetString(ctxkey.Group)
 	originalModel := c.GetString(ctxkey.RequestModel)
-	go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+	// Ensure channel error processing is completed during graceful drain
+	graceful.GoCritical(ctx, "processChannelRelayError", func(ctx context.Context) {
+		processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+	})
 
 	// Record failed relay request metrics
 	PrometheusMonitor.RecordRelayRequest(c, relayMeta, startTime, false, 0, 0, 0)
@@ -105,7 +109,12 @@ func Relay(c *gin.Context) {
 	requestId := c.GetString(helper.RequestIdKey)
 	retryTimes := config.RetryTimes
 	if err := shouldRetry(c, bizErr.StatusCode, bizErr.RawError); err != nil {
-		lg.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
+		// Downgrade to WARN if the failure is caused by caller's context cancellation/deadline exceeded
+		if isClientContextCancel(bizErr.StatusCode, bizErr.RawError) || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			lg.Warn("relay aborted by client (context canceled/deadline), won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
+		} else {
+			lg.Error("relay error happen, won't retry", zap.Int("status_code", bizErr.StatusCode), zap.Error(err))
+		}
 		retryTimes = 0
 	}
 
@@ -235,7 +244,9 @@ func Relay(c *gin.Context) {
 		// Update group and originalModel potentially if changed by middleware, though unlikely for these.
 		group = c.GetString(ctxkey.Group)
 		originalModel = c.GetString(ctxkey.RequestModel)
-		go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+		graceful.GoCritical(ctx, "processChannelRelayError", func(ctx context.Context) {
+			processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+		})
 	}
 
 	if bizErr != nil {
@@ -285,6 +296,22 @@ func shouldRetry(c *gin.Context, statusCode int, rawErr error) error {
 	}
 
 	return nil
+}
+
+// isClientContextCancel returns true if the error is caused by the caller's context
+// cancellation or deadline exceeded conditions. These are typically user-originated
+// and should be logged at WARN instead of ERROR to avoid false alerts.
+func isClientContextCancel(statusCode int, rawErr error) bool {
+	if rawErr != nil {
+		if errors.Is(rawErr, context.Canceled) || errors.Is(rawErr, context.DeadlineExceeded) {
+			return true
+		}
+	}
+	// Also treat explicit 408 (Request Timeout) as client-side timeout in our pipeline
+	if statusCode == http.StatusRequestTimeout {
+		return true
+	}
+	return false
 }
 
 // classifyAuthLike returns true if error appears to be auth/permission/quota related
@@ -373,13 +400,24 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 }
 
 func processChannelRelayError(ctx context.Context, userId int, channelId int, channelName string, group string, originalModel string, err model.ErrorWithStatusCode) {
-	gmw.GetLogger(ctx).Error("relay error",
-		zap.Int("channel_id", channelId),
-		zap.String("channel_name", channelName),
-		zap.Int("user_id", userId),
-		zap.String("group", group),
-		zap.String("model", originalModel),
-		zap.String("error_message", err.Message))
+	// Downgrade to WARN for client-side cancellations/timeouts to avoid noisy alerts
+	if isClientContextCancel(err.StatusCode, err.RawError) {
+		gmw.GetLogger(ctx).Warn("relay aborted by client (context canceled/deadline)",
+			zap.Int("channel_id", channelId),
+			zap.String("channel_name", channelName),
+			zap.Int("user_id", userId),
+			zap.String("group", group),
+			zap.String("model", originalModel),
+			zap.String("error_message", err.Message))
+	} else {
+		gmw.GetLogger(ctx).Error("relay error",
+			zap.Int("channel_id", channelId),
+			zap.String("channel_name", channelName),
+			zap.Int("user_id", userId),
+			zap.String("group", group),
+			zap.String("model", originalModel),
+			zap.String("error_message", err.Message))
+	}
 
 	// Handle 400 errors differently - they are client request issues, not channel problems
 	if err.StatusCode == http.StatusBadRequest {

@@ -599,6 +599,28 @@ After request completion, final billing is calculated:
 - `PostConsumeQuota()` in `relay/billing/billing.go`
 - Usage logging and metrics recording
 
+### Provisional Request Cost Reconciliation (2025-09)
+
+To prevent lost billing in early client disconnect scenarios, controllers now record a provisional per-request cost at dispatch and reconcile to the final cost when usage becomes available.
+
+Flow:
+
+1) After `DoRequest` succeeds, write a provisional `UserRequestCost` for the `request_id` using the estimated pre-consumed quota (prompt tokens + max output tokens × pricing), even if physical pre-consume is skipped for trusted users/tokens.
+2) If upstream responds with a non-success HTTP status, refund pre-consumed quota (if any) and set the provisional `UserRequestCost` to `0`.
+3) When usage arrives, compute the final quota using the detailed pricing formula and reconcile the record by overwriting the provisional value. Token/user/channel updates use the delta between pre- and post-consumption.
+
+Controllers:
+
+- Text/Chat (`relay/controller/text.go`)
+- Response API (`relay/controller/response.go`)
+- Claude Messages (`relay/controller/claude_messages.go`)
+- Images (`relay/controller/image.go`) — per-image pre-consume + usage override (e.g., `gpt-image-1`)
+- Audio (`relay/controller/audio.go`)
+
+Helper:
+
+- `model.UpdateUserRequestCostQuotaByRequestID(userID, requestID, quota)` creates or updates the `user_request_costs` row keyed by `request_id`.
+
 ### Quota Calculation
 
 Different request types use different calculation methods:

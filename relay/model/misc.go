@@ -2,9 +2,13 @@ package model
 
 // Usage is the token usage information returned by OpenAI API.
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	// Omitting this field using 'omitempty' is crucial to avoid returning zero values
+	// when conversion mechanisms are not employed, particularly in scenarios like image generation.
+	//
+	// TODO: With Go 1.24 ~ latest potentially supporting 'omitzero', do we need to use both 'omitempty' and 'omitzero' here?
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
 	// PromptTokensDetails may be empty for some models
 	PromptTokensDetails *UsagePromptTokensDetails `json:"prompt_tokens_details,omitempty"`
 	// CompletionTokensDetails may be empty for some models

@@ -53,7 +53,8 @@ func ImageHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCo
 
 	_, err = io.Copy(c.Writer, resp.Body)
 	if err != nil {
-		return ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), nil
+		// Return usage even on write failure so billing can proceed for forwarded requests
+		return ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), imageResponse.Usage.Convert2GeneralUsage()
 	}
 	err = resp.Body.Close()
 	if err != nil {

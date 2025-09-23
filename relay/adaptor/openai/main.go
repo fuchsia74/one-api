@@ -235,6 +235,10 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return nil, &textResponse.Usage
 	}
 
+	// Calculate token usage BEFORE writing to client so we can still return usage
+	// even if client disconnects causes a write error.
+	calculateTokenUsage(&textResponse, promptTokens, modelName)
+
 	// Forward all response headers (not just first value of each)
 	for k, values := range resp.Header {
 		for _, v := range values {
@@ -245,7 +249,8 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	// Set response status and copy body to client
 	c.Writer.WriteHeader(resp.StatusCode)
 	if _, err = io.Copy(c.Writer, resp.Body); err != nil {
-		return ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), nil
+		// Return usage even on write failure so billing can proceed for forwarded requests
+		return ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), &textResponse.Usage
 	}
 
 	// Close the reset body
@@ -253,9 +258,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	// Calculate token usage if not provided by API
-	calculateTokenUsage(&textResponse, promptTokens, modelName)
-
+	// Usage was already calculated above
 	return nil, &textResponse.Usage
 }
 
@@ -438,7 +441,8 @@ func ResponseAPIHandler(c *gin.Context, resp *http.Response, promptTokens int, m
 	c.Writer.Header().Set("Content-Type", "application/json")
 	c.Writer.WriteHeader(resp.StatusCode)
 	if _, err = c.Writer.Write(jsonResponse); err != nil {
-		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), nil
+		// Return usage even on write failure so billing can proceed for forwarded requests
+		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), &chatCompletionResp.Usage
 	}
 
 	return nil, &chatCompletionResp.Usage
@@ -681,7 +685,8 @@ func ResponseAPIDirectHandler(c *gin.Context, resp *http.Response, promptTokens 
 	c.Writer.Header().Set("Content-Type", "application/json")
 	c.Writer.WriteHeader(resp.StatusCode)
 	if _, err = c.Writer.Write(responseBody); err != nil {
-		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), nil
+		// Return usage even on write failure so billing can proceed for forwarded requests
+		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), finalUsage
 	}
 
 	return nil, finalUsage

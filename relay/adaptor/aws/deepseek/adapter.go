@@ -16,44 +16,44 @@ import (
 // Compile-time verification that Adaptor implements the AwsAdapter interface.
 var _ utils.AwsAdapter = new(Adaptor)
 
-// Adaptor implements the AWS Bedrock adapter for DeepSeek-R1 language model.
+// Adaptor implements the AWS Bedrock adapter for DeepSeek language model.
 //
 // This struct provides the core functionality for integrating with AWS Bedrock's
-// DeepSeek-R1 model, implementing the AwsAdapter interface to ensure consistent
+// DeepSeek model, implementing the AwsAdapter interface to ensure consistent
 // behavior across all AWS Bedrock integrations in the One API system.
 //
 // The adapter handles the complete request-response lifecycle:
-//   - Converting OpenAI-compatible requests to AWS Bedrock DeepSeek-R1 format
+//   - Converting OpenAI-compatible requests to AWS Bedrock DeepSeek format
 //   - Processing responses from AWS Bedrock back to OpenAI-compatible format
 //   - Managing both streaming and non-streaming response modes
-//   - Handling DeepSeek-R1's unique reasoning content capabilities
+//   - Handling DeepSeek's unique reasoning content capabilities
 //   - Managing error conditions and usage tracking
 type Adaptor struct {
 	// No additional fields required - stateless adapter design
 }
 
-// ConvertRequest transforms an OpenAI-compatible request into AWS Bedrock DeepSeek-R1 format.
+// ConvertRequest transforms an OpenAI-compatible request into AWS Bedrock DeepSeek format.
 //
 // This method performs the critical translation between the One API's unified request format
-// and the specific format expected by AWS Bedrock's DeepSeek-R1 model. It handles:
+// and the specific format expected by AWS Bedrock's DeepSeek model. It handles:
 //
-//   - Message format conversion from OpenAI to DeepSeek-R1 structure
-//   - Parameter mapping and validation for DeepSeek-R1 specific features
+//   - Message format conversion from OpenAI to DeepSeek structure
+//   - Parameter mapping and validation for DeepSeek specific features
 //   - Stop sequence processing for proper generation control
 //   - Context storage for downstream processing including reasoning content support
 //
 // Parameters:
 //   - c: Gin context for the HTTP request, used for storing converted data
 //   - relayMode: Processing mode indicator (currently unused but maintained for interface compliance)
-//   - request: OpenAI-compatible request to be converted to DeepSeek-R1 format
+//   - request: OpenAI-compatible request to be converted to DeepSeek format
 //
 // Returns:
-//   - any: Converted request in AWS Bedrock DeepSeek-R1 format, ready for API submission
+//   - any: Converted request in AWS Bedrock DeepSeek format, ready for API submission
 //   - error: Error if the request is invalid or conversion fails
 //
 // The method stores both the original model name and converted request in the context
 // for use by downstream handlers and response processors, enabling proper reasoning
-// content handling in DeepSeek-R1 responses.
+// content handling in DeepSeek responses.
 func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
@@ -65,21 +65,21 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	return deepseekReq, nil
 }
 
-// DoResponse processes the response from AWS Bedrock DeepSeek-R1 and converts it back to OpenAI format.
+// DoResponse processes the response from AWS Bedrock DeepSeek and converts it back to OpenAI format.
 //
 // This method handles the complete response processing pipeline, supporting both streaming
 // and non-streaming modes. It coordinates with specialized handlers to:
 //
-//   - Process AWS Bedrock DeepSeek-R1 responses in their native format
+//   - Process AWS Bedrock DeepSeek responses in their native format
 //   - Convert responses back to OpenAI-compatible structure
-//   - Handle DeepSeek-R1's unique reasoning content blocks and structured responses
+//   - Handle DeepSeek's unique reasoning content blocks and structured responses
 //   - Track token usage for billing and quota management
 //   - Manage reasoning-specific metadata and usage statistics
 //   - Handle errors and edge cases appropriately
 //
 // The method automatically detects the response mode (streaming vs non-streaming) based
 // on metadata and delegates to the appropriate specialized handler that understands
-// DeepSeek-R1's reasoning content format.
+// DeepSeek's reasoning content format.
 //
 // Parameters:
 //   - c: Gin context containing request data and used for response writing

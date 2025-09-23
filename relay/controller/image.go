@@ -378,6 +378,12 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		if err := model.PreConsumeTokenQuota(meta.TokenId, preConsumedQuota); err != nil {
 			return openai.ErrorWrapper(err, "pre_consume_failed", http.StatusInternalServerError)
 		}
+		// Record provisional request cost so user-cancel before upstream usage still gets tracked
+		quotaId := c.GetInt(ctxkey.Id)
+		requestId := c.GetString(ctxkey.RequestId)
+		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, preConsumedQuota); err != nil {
+			gmw.GetLogger(c).Warn("record provisional user request cost failed", zap.Error(err))
+		}
 	}
 
 	// do request
@@ -405,6 +411,14 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			// Refund pre-consumed quota when upstream not successful
 			if preConsumedQuota > 0 {
 				_ = model.PostConsumeTokenQuota(meta.TokenId, -preConsumedQuota)
+			}
+			// Reconcile provisional record to 0
+			if err := model.UpdateUserRequestCostQuotaByRequestID(
+				c.GetInt(ctxkey.Id),
+				c.GetString(ctxkey.RequestId),
+				0,
+			); err != nil {
+				lg.Warn("update user request cost to zero failed", zap.Error(err))
 			}
 			return
 		}
@@ -449,14 +463,13 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			channelId := c.GetInt(ctxkey.ChannelId)
 			model.UpdateChannelUsedQuota(channelId, usedQuota)
 
-			// also update user request cost
-			docu := model.NewUserRequestCost(
+			// Reconcile request cost with final usedQuota (override provisional value if any)
+			if err := model.UpdateUserRequestCostQuotaByRequestID(
 				c.GetInt(ctxkey.Id),
 				c.GetString(ctxkey.RequestId),
 				usedQuota,
-			)
-			if err = docu.Insert(); err != nil {
-				lg.Error("insert user request cost failed", zap.Error(err))
+			); err != nil {
+				lg.Error("update user request cost failed", zap.Error(err))
 			}
 		}
 	}()
@@ -464,7 +477,26 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
 	if respErr != nil {
-		// Return error without logging - respErr is already an ErrorWithStatusCode that will be handled by the caller
+		// If upstream already responded and usage is available but the client canceled (write failed),
+		// compute usedQuota here so the logging goroutine can record requestId and cost.
+		if usage != nil {
+			promptTokens = usage.PromptTokens
+			completionTokens = usage.CompletionTokens
+			if imagePriceUsd > 0 {
+				if final := computeImageUsageQuota(imageModel, usage, groupRatio); final > 0 {
+					usedQuota = int64(math.Ceil(final))
+				}
+			} else {
+				switch meta.ActualModelName {
+				case "gpt-image-1":
+					if usage.PromptTokensDetails != nil {
+						textQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.TextTokens) * 5 * billingratio.MilliTokensUsd))
+						imageQuota := int64(math.Ceil(float64(usage.PromptTokensDetails.ImageTokens) * 10 * billingratio.MilliTokensUsd))
+						usedQuota += textQuota + imageQuota
+					}
+				}
+			}
+		}
 		return respErr
 	}
 

@@ -25,6 +25,7 @@ import { EditRedemptionPage } from '@/pages/redemptions/EditRedemptionPage'
 import { AboutPage } from '@/pages/about/AboutPage'
 import { SettingsPage } from '@/pages/settings/SettingsPage'
 import { ModelsPage } from '@/pages/models/ModelsPage'
+import { StatusPage } from '@/pages/status/StatusPage'
 import { TopUpPage } from '@/pages/topup/TopUpPage'
 import { ChatPage } from '@/pages/chat/ChatPage'
 import { NotFoundPage } from '@/pages/NotFoundPage'
@@ -88,6 +89,7 @@ function App() {
                 {/* Public route(s) with layout */}
                 <Route path="/" element={<Layout />}>
                   <Route path="models" element={<ModelsPage />} />
+                  <Route path="status" element={<StatusPage />} />
                 </Route>
 
                 {/* Protected routes */}

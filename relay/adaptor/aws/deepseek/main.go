@@ -11,6 +11,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
+	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/document"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	"github.com/gin-gonic/gin"
 
@@ -24,10 +25,11 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 )
 
-// AwsModelIDMap provides mapping for DeepSeek-R1 models via Converse API
+// AwsModelIDMap provides mapping for DeepSeek models via Converse API
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html
 var AwsModelIDMap = map[string]string{
-	"deepseek-r1": "deepseek.r1-v1:0",
+	"deepseek-r1":   "deepseek.r1-v1:0",
+	"deepseek-v3.1": "deepseek.v3-v1:0",
 }
 
 func awsModelID(requestModel string) (string, error) {
@@ -87,6 +89,11 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 		} else if stopSlice, ok := textRequest.Stop.([]string); ok {
 			deepseekReq.Stop = stopSlice
 		}
+	}
+
+	// Handle reasoning_effort parameter for DeepSeek models
+	if textRequest.ReasoningEffort != nil {
+		deepseekReq.ReasoningEffort = textRequest.ReasoningEffort
 	}
 
 	return deepseekReq
@@ -400,6 +407,23 @@ func convertDeepSeekToConverseRequest(deepseekReq *Request, modelID string) (*be
 		converseReq.System = systemMessages
 	}
 
+	// Add additional model request fields for reasoning_effort
+	if deepseekReq.ReasoningEffort != nil {
+		// Convert reasoning_effort to AWS Bedrock's additional-model-request-fields
+		// with reasoning_config based on the value of reasoning_effort (low, medium, high)
+		//
+		// Note: The current known reasoning_config in DeepSeek V3 is associated with the reasoning_effort.
+		// When set to "high", it displays the reasoning content.
+		// This implementation supports the reasoning_effort parameter and converts it into the reasoning_config design
+		// for non-explicit cases (e.g., setting hardcoded it to "high").
+		reasoningConfig := map[string]interface{}{
+			"reasoning_config": *deepseekReq.ReasoningEffort,
+		}
+		// Convert to document.Interface using bedrockruntime document package
+		docInput := document.NewLazyDocument(reasoningConfig)
+		converseReq.AdditionalModelRequestFields = docInput
+	}
+
 	return converseReq, nil
 }
 
@@ -557,6 +581,23 @@ func convertDeepSeekToConverseStreamRequest(deepseekReq *Request, modelID string
 	// Add system messages if any
 	if len(systemMessages) > 0 {
 		converseReq.System = systemMessages
+	}
+
+	// Add additional model request fields for reasoning_effort
+	if deepseekReq.ReasoningEffort != nil {
+		// Convert reasoning_effort to AWS Bedrock's additional-model-request-fields
+		// with reasoning_config based on the value of reasoning_effort (low, medium, high)
+		//
+		// Note: The current known reasoning_config in DeepSeek V3 is associated with the reasoning_effort.
+		// When set to "high", it displays the reasoning content.
+		// This implementation supports the reasoning_effort parameter and converts it into the reasoning_config design
+		// for non-explicit cases (e.g., setting hardcoded it to "high").
+		reasoningConfig := map[string]interface{}{
+			"reasoning_config": *deepseekReq.ReasoningEffort,
+		}
+		// Convert to document.Interface using bedrockruntime document package
+		docInput := document.NewLazyDocument(reasoningConfig)
+		converseReq.AdditionalModelRequestFields = docInput
 	}
 
 	return converseReq, nil
