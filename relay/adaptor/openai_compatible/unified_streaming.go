@@ -13,6 +13,7 @@ import (
 	"github.com/Laisky/go-utils/v5/log"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
+
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/common/tracing"
@@ -1009,6 +1010,22 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 
 		// Process chunk using unified logic
 		modifiedChunk := streamCtx.ProcessStreamChunk(&streamResponse)
+
+		// Respect reasoning_format mapping when thinking is enabled by moving extracted
+		// reasoning content to the requested field and clearing the source to avoid duplication
+		if enableThinking {
+			reasoningFormat := c.Query("reasoning_format")
+			for i := range streamResponse.Choices {
+				if streamResponse.Choices[i].Delta.ReasoningContent != nil {
+					rc := *streamResponse.Choices[i].Delta.ReasoningContent
+					streamResponse.Choices[i].Delta.SetReasoningContent(reasoningFormat, rc)
+					// If the requested format is not reasoning_content, clear ReasoningContent to avoid duplicate fields
+					if strings.ToLower(strings.TrimSpace(reasoningFormat)) != string(model.ReasoningFormatReasoningContent) {
+						streamResponse.Choices[i].Delta.ReasoningContent = nil
+					}
+				}
+			}
+		}
 
 		// Forward the chunk to client (modified or original)
 		if modifiedChunk {

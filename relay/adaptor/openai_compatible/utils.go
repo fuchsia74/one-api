@@ -90,7 +90,9 @@ func GetFullRequestURL(baseURL string, requestURL string, channelType int) strin
 //
 // Now uses the unified architecture for consistent performance and memory allocation patterns
 func StreamHandler(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
-	return UnifiedStreamProcessing(c, resp, promptTokens, modelName, false)
+	// Respect URL param `thinking` to enable <think></think> extraction for compatible providers
+	enableThinking := isThinkingEnabled(c.Query("thinking"))
+	return UnifiedStreamProcessing(c, resp, promptTokens, modelName, enableThinking)
 }
 
 // EmbeddingHandler processes embedding responses from OpenAI-compatible APIs
@@ -221,7 +223,23 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 			"no_choices_in_response", http.StatusInternalServerError), nil
 	}
 
-	// Forward the response to client
+	// Optionally extract <think> blocks when enabled via URL param and map to requested field
+	if isThinkingEnabled(c.Query("thinking")) {
+		for i := range textResponse.Choices {
+			msg := &textResponse.Choices[i].Message
+			content := msg.StringContent()
+			if content == "" {
+				continue
+			}
+			thinkingContent, clean := ExtractThinkingContent(content)
+			if thinkingContent != "" {
+				msg.SetReasoningContent(c.Query("reasoning_format"), thinkingContent)
+				msg.Content = clean
+			}
+		}
+	}
+
+	// Forward the (possibly modified) response to client
 	c.JSON(resp.StatusCode, textResponse)
 
 	// Calculate usage if not provided
@@ -382,11 +400,8 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 			thinkingContent, cleanContent := ExtractThinkingContent(messageContent)
 
 			if thinkingContent != "" {
-				// Set the reasoning field if thinking content was found
-				// Now, it is explicitly assigned to the ReasoningContent field.
-				if textResponse.Choices[i].Message.ReasoningContent == nil {
-					textResponse.Choices[i].Message.ReasoningContent = &thinkingContent
-				}
+				// Map reasoning to the requested format field and clear source tag from content
+				textResponse.Choices[i].Message.SetReasoningContent(c.Query("reasoning_format"), thinkingContent)
 
 				// Update the message content to be clean content (without <think> tags)
 				textResponse.Choices[i].Message.Content = cleanContent
@@ -438,4 +453,15 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 		zap.Int("total_tokens", usage.TotalTokens))
 
 	return nil, &usage
+}
+
+// isThinkingEnabled returns true when the `thinking` query param is a truthy value.
+// Accepts: "1", "true", "yes", "on" (case-insensitive)
+func isThinkingEnabled(val string) bool {
+	switch strings.ToLower(strings.TrimSpace(val)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
 }

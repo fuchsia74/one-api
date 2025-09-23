@@ -1,10 +1,16 @@
 package openai_compatible
 
 import (
+	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/Laisky/go-utils/v5/log"
+	"github.com/gin-gonic/gin"
+
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -627,4 +633,77 @@ func TestBufferCapacityConstants(t *testing.T) {
 // Helper function to create string pointer
 func stringPtr(s string) *string {
 	return &s
+}
+
+// TestUnifiedStreamProcessing_ThinkingMapping verifies that when thinking is enabled and reasoning_format
+// is set, the streamed chunks contain the reasoning in the requested field and avoid duplicates.
+func TestUnifiedStreamProcessing_ThinkingMapping(t *testing.T) {
+	// Prepare a gin test context with query params
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest("POST", "/v1/chat/completions?thinking=true&reasoning_format=thinking", nil)
+	c.Request = req
+
+	// Build a single SSE chunk where delta content includes a think block
+	chunk := ChatCompletionsStreamResponse{
+		Id:      "test-id",
+		Object:  "chat.completion.chunk",
+		Created: 123,
+		Model:   testModelName,
+		Choices: []ChatCompletionsStreamResponseChoice{
+			{
+				Index: 0,
+				Delta: model.Message{Content: "hello <think>abc</think> world"},
+			},
+		},
+	}
+	b, _ := json.Marshal(chunk)
+	sse := "data: " + string(b) + "\n\n" + "data: [DONE]\n"
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       io.NopCloser(strings.NewReader(sse)),
+	}
+
+	// Run unified processing with thinking enabled
+	if err, _ := UnifiedStreamProcessing(c, resp, 0, testModelName, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Parse the first emitted chunk from the recorder
+	body := w.Body.String()
+	// Extract the JSON after "data: "
+	lines := strings.Split(body, "\n")
+	var jsonLine string
+	for _, ln := range lines {
+		if strings.HasPrefix(ln, "data: {") {
+			jsonLine = strings.TrimPrefix(ln, "data: ")
+			break
+		}
+	}
+	if jsonLine == "" {
+		t.Fatalf("no JSON chunk found in response body: %q", body)
+	}
+
+	var out ChatCompletionsStreamResponse
+	if err := json.Unmarshal([]byte(jsonLine), &out); err != nil {
+		t.Fatalf("failed to unmarshal emitted chunk: %v", err)
+	}
+	if len(out.Choices) == 0 {
+		t.Fatalf("no choices in emitted chunk: %v", out)
+	}
+	got := out.Choices[0].Delta
+	// Expect content without think tags
+	if got.StringContent() != "hello  world" {
+		t.Fatalf("unexpected content: %q", got.StringContent())
+	}
+	// Expect thinking field to be set as per reasoning_format=thinking
+	if got.Thinking == nil || *got.Thinking != "abc" {
+		t.Fatalf("expected thinking=abc, got %#v", got.Thinking)
+	}
+	// And ReasoningContent should be cleared to avoid duplicates
+	if got.ReasoningContent != nil {
+		t.Fatalf("expected ReasoningContent to be nil when reasoning_format=thinking; got %#v", *got.ReasoningContent)
+	}
 }
