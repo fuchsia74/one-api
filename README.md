@@ -1186,7 +1186,16 @@ containers:
 
 ##### Scaling
 
-1. **Horizontal Pod Autoscaler (HPA)**:
+> [!IMPORTANT]
+> **Scaling Strategy for Components with Attached Storage**:
+> For deployments with attached persistent storage (such as PostgreSQL, MySQL, Redis, or **One API with persistent volumes**), **vertical scaling** (increasing CPU/memory resources) is recommended rather than horizontal scaling. This is because:
+> - PersistentVolumeClaims with `ReadWriteOnce` access mode cannot be shared across multiple pods
+> - Database clustering/replication requires specific configuration and coordination
+> - Horizontal scaling of stateful services can lead to data consistency issues
+>
+> **Horizontal scaling** (HPA) should only be used for **completely stateless components** (One API without persistent storage).
+
+1. **Horizontal Pod Autoscaler (HPA)** (for stateless components):
 
 ```yaml
 # hpa.yaml
