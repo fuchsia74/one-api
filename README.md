@@ -171,7 +171,7 @@ This section provides comprehensive instructions for deploying One API on Kubern
 
 #### Prerequisites
 
-- Kubernetes cluster (v1.20+)
+- Kubernetes cluster (v1.20+ or later)
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/) configured to communicate with your cluster
 - [`helm`](https://helm.sh/docs/intro/install/) (optional, for package management)
 
