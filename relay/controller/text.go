@@ -17,6 +17,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -127,7 +128,10 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		}
 	}
 	if isErrorHappened(meta, resp) {
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+		// refund pre-consumed quota under lifecycle management so shutdown waits for it
+		graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
+			billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, meta.TokenId)
+		})
 		// Reconcile provisional record to 0 since upstream returned error
 		quotaId := c.GetInt(ctxkey.Id)
 		requestId := c.GetString(ctxkey.RequestId)
@@ -152,9 +156,8 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 	// post-consume quota
 	quotaId := c.GetInt(ctxkey.Id)
-	requestId := c.GetString(ctxkey.RequestId)
-
-	// Record detailed Prometheus metrics
+	// refund pre-consumed quota immediately
+	billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
 	if usage != nil {
 		// Get user information for metrics
 		userId := strconv.Itoa(meta.UserId)
@@ -196,7 +199,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		metrics.GlobalRecorder.RecordModelUsage(meta.ActualModelName, channeltype.IdToName(meta.ChannelType), time.Since(meta.StartTime))
 	}
 
-	go func() {
+	graceful.GoCritical(gmw.BackgroundCtx(c), "postBilling", func(ctx context.Context) {
 		// Use configurable billing timeout with model-specific adjustments
 		baseBillingTimeout := time.Duration(config.BillingTimeoutSec) * time.Second
 		billingTimeout := baseBillingTimeout
@@ -208,6 +211,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		done := make(chan bool, 1)
 		var quota int64
 
+		requestId := c.GetString(ctxkey.RequestId)
 		go func() {
 			quota = postConsumeQuota(ctx, usage, meta, textRequest, ratio, preConsumedQuota, modelRatio, groupRatio, systemPromptReset, channelCompletionRatio)
 
@@ -235,13 +239,11 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 					zap.Int64("estimatedQuota", int64(estimatedQuota)),
 					zap.Duration("elapsedTime", elapsedTime))
 
-				// Record billing timeout in metrics
 				metrics.GlobalRecorder.RecordBillingTimeout(meta.UserId, meta.ChannelId, textRequest.Model, estimatedQuota, elapsedTime)
-
 				// TODO: Implement dead letter queue or retry mechanism for failed billing
 			}
 		}
-	}()
+	})
 
 	return nil
 }

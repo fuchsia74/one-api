@@ -125,6 +125,8 @@ oneapi:
     GLOBAL_RELAY_RATE_LIMIT: 1000
     # (optional) Whether to ratelimit for channel, 0 is unlimited, 1 is to enable the ratelimit
     GLOBAL_CHANNEL_RATE_LIMIT: 1
+    # (optional) ShutdownTimeoutSec controls how long to wait for graceful shutdown and drains (seconds)
+    SHUTDOWN_TIMEOUT_SEC: 360
 
     # (optional) FRONTEND_BASE_URL redirect page requests to specified address, server-side setting only
     FRONTEND_BASE_URL: https://oneapi.laisky.com

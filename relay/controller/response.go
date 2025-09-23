@@ -16,6 +16,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
@@ -57,7 +58,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	metalib.Set2Context(c, meta)
 
 	// get channel model ratio
-	channelModelRatio, channelCompletionRatio := getChannelRatios(c, meta.ChannelId)
+	channelModelRatio, channelCompletionRatio := getChannelRatios(c)
 
 	// get model ratio using three-layer pricing system
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
@@ -130,7 +131,9 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 	// Check for HTTP errors
 	if resp.StatusCode != http.StatusOK {
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+		graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
+			billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+		})
 		// Reconcile provisional record to 0 since upstream returned error
 		quotaId := c.GetInt(ctxkey.Id)
 		requestId := c.GetString(ctxkey.RequestId)
@@ -147,7 +150,9 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// proceed to billing to ensure forwarded requests are charged; do not refund pre-consumed quota.
 		// Otherwise, refund pre-consumed quota and return error.
 		if usage == nil {
-			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+			graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
+				billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+			})
 			return respErr
 		}
 		// Fall through to billing with available usage
@@ -157,7 +162,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	quotaId := c.GetInt(ctxkey.Id)
 	requestId := c.GetString(ctxkey.RequestId)
 
-	go func() {
+	graceful.GoCritical(gmw.BackgroundCtx(c), "postBilling", func(ctx context.Context) {
 		// Use configurable billing timeout with model-specific adjustments
 		baseBillingTimeout := time.Duration(config.BillingTimeoutSec) * time.Second
 		billingTimeout := baseBillingTimeout
@@ -204,13 +209,13 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 				// TODO: Implement dead letter queue or retry mechanism for failed billing
 			}
 		}
-	}()
+	})
 
 	return nil
 }
 
 // getChannelRatios gets channel model and completion ratios from unified ModelConfigs
-func getChannelRatios(c *gin.Context, channelId int) (map[string]float64, map[string]float64) {
+func getChannelRatios(c *gin.Context) (map[string]float64, map[string]float64) {
 	channel := c.MustGet(ctxkey.ChannelModel).(*model.Channel)
 
 	// Only use unified ModelConfigs after migration

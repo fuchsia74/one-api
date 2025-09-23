@@ -174,16 +174,16 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 	// Start workers
 	var wg sync.WaitGroup
 	for i := 0; i < m.Workers; i++ {
-		wg.Add(1)
-		go m.batchWorker(ctx, jobs, results, &wg)
+		wg.Go(func() {
+			m.batchWorker(ctx, jobs, results)
+		})
 	}
 
 	// Start result collector
 	var collectorWg sync.WaitGroup
-	collectorWg.Add(1)
 	var migratedCount int64
 	var lastProgressReport int64
-	go func() {
+	collectorWg.Go(func() {
 		defer collectorWg.Done()
 		for result := range results {
 			if result.Error != nil {
@@ -213,7 +213,7 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 				lastProgressReport = currentCount
 			}
 		}
-	}()
+	})
 
 	// Generate jobs
 	jobID := 0
@@ -249,9 +249,7 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 }
 
 // batchWorker processes batch jobs concurrently
-func (m *Migrator) batchWorker(ctx context.Context, jobs <-chan BatchJob, results chan<- BatchResult, wg *sync.WaitGroup) {
-	defer wg.Done()
-
+func (m *Migrator) batchWorker(ctx context.Context, jobs <-chan BatchJob, results chan<- BatchResult) {
 	for job := range jobs {
 		select {
 		case <-ctx.Done():
