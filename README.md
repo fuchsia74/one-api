@@ -692,6 +692,30 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/do/deploy.yaml
 ```
 
+###### Oracle Cloud Infrastructure (OCI)
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/cloud/deploy.yaml
+```
+
+###### Scaleway
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/scw/deploy.yaml
+```
+
+###### Exoscale
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/exoscale/deploy.yaml
+```
+
+###### OVHcloud
+
+```bash
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/ovhcloud/deploy.yaml
+```
+
 > [!NOTE]
 > **NGINX Ingress Controller Version**: The examples above use version `v1.8.4`. Always check the [NGINX Ingress Controller releases page](https://github.com/kubernetes/ingress-nginx/releases) for the latest stable version and update the URLs accordingly. Replace `controller-v1.8.4` with the latest version tag (e.g., `controller-v1.11.2` or newer).
 
