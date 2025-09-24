@@ -19,14 +19,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
-    - [Kubernetes Deployment](docs/manuals/k8s.md)
-      - [Prerequisites](docs/manuals/k8s.md#prerequisites)
-      - [Basic Deployment](docs/manuals/k8s.md#basic-deployment)
-      - [Database Setup](docs/manuals/k8s.md#database-setup)
-      - [Redis Setup](docs/manuals/k8s.md#redis-setup)
-      - [NGINX Ingress Controller Installation](docs/manuals/k8s.md#nginx-ingress-controller-installation)
-      - [Ingress Configuration](docs/manuals/k8s.md#ingress-configuration)
-      - [Production Considerations](docs/manuals/k8s.md#production-considerations)
+    - [Kubernetes Deployment Guide](docs/manuals/k8s.md)
   - [Contributors](#contributors)
   - [New Features](#new-features)
     - [Universal Features](#universal-features)
@@ -173,6 +166,11 @@ The initial default account and password are `root` / `123456`.
 > - [External Secrets Operator](https://external-secrets.io/) for Kubernetes deployments
 > - Docker secrets for Docker Swarm mode
 > - Environment files with restricted permissions for simple deployments
+
+### Kubernetes Deployment
+
+The Kubernetes deployment guide has been moved into a dedicated document:
+- [docs/manuals/k8s.md](docs/manuals/k8s.md)
 
 ## Contributors
 
