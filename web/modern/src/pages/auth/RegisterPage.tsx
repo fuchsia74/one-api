@@ -232,7 +232,7 @@ export function RegisterPage() {
                 name="aff_code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Invitation Code (Optional)</FormLabel>
+                    <FormLabel>Invitation/Affiliate Code (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter invitation code" {...field} />
                     </FormControl>
