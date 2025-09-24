@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -16,7 +16,7 @@ const registerSchema = z.object({
   password2: z.string().min(8, 'Password confirmation is required'),
   email: z.string().email('Valid email is required'),
   verification_code: z.string().min(1, 'Verification code is required'),
-  invitation_code: z.string().optional(),
+  aff_code: z.string().optional(),
 }).refine((data) => data.password === data.password2, {
   message: "Passwords don't match",
   path: ["password2"],
@@ -29,6 +29,10 @@ export function RegisterPage() {
   const [isEmailSent, setIsEmailSent] = useState(false)
   const [systemStatus, setSystemStatus] = useState<any>({})
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // Extract affiliate code from URL parameter
+  const affCodeFromUrl = searchParams.get('aff') || ''
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -38,7 +42,7 @@ export function RegisterPage() {
       password2: '',
       email: '',
       verification_code: '',
-      invitation_code: '',
+      aff_code: affCodeFromUrl,
     },
   })
 
@@ -105,7 +109,7 @@ export function RegisterPage() {
         password: data.password,
         email: data.email,
         verification_code: data.verification_code,
-        ...(data.invitation_code && { invitation_code: data.invitation_code }),
+        ...(data.aff_code && { aff_code: data.aff_code }),
       }
 
       // Unified API call - complete URL with /api prefix
@@ -225,7 +229,7 @@ export function RegisterPage() {
 
               <FormField
                 control={form.control}
-                name="invitation_code"
+                name="aff_code"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Invitation Code (Optional)</FormLabel>
