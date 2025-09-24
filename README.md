@@ -19,7 +19,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
-    - [Kubernetes Deployment Guide](docs/manuals/k8s.md)
+    - [Kubernetes Deployment](#kubernetes-deployment)
   - [Contributors](#contributors)
   - [New Features](#new-features)
     - [Universal Features](#universal-features)
@@ -160,16 +160,12 @@ oneapi:
 
 The initial default account and password are `root` / `123456`.
 
-> [!TIP]
-> **Secret Management**: For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables:
-> - [1Password Secrets Automation](https://developer.1password.com/docs/connect/) for enterprise environments
-> - [External Secrets Operator](https://external-secrets.io/) for Kubernetes deployments
-> - Docker secrets for Docker Swarm mode
-> - Environment files with restricted permissions for simple deployments
+> [!TIP] > **Secret Management**: For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables:
 
 ### Kubernetes Deployment
 
 The Kubernetes deployment guide has been moved into a dedicated document:
+
 - [docs/manuals/k8s.md](docs/manuals/k8s.md)
 
 ## Contributors
