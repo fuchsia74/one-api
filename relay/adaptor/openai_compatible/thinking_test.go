@@ -306,3 +306,75 @@ func TestStreamHandlerWithThinking_SingleTagBehavior(t *testing.T) {
 		}
 	})
 }
+
+func TestExtractThinkingContent_UnicodeThinkTags(t *testing.T) {
+	tests := []struct {
+		name             string
+		input            string
+		expectedThinking string
+		expectedRegular  string
+		description      string
+	}{
+		{
+			name:             "Unicode escaped complete think tag",
+			input:            "Hello \\u003cthink\\u003ereasoning content\\u003c/think\\u003e world",
+			expectedThinking: "reasoning content",
+			expectedRegular:  "Hello  world",
+			description:      "Should extract content from Unicode-escaped thinking tags",
+		},
+		{
+			name:             "Unicode escaped empty think tag",
+			input:            "Before \\u003cthink\\u003e\\u003c/think\\u003e After",
+			expectedThinking: "",
+			expectedRegular:  "Before  After",
+			description:      "Should handle empty Unicode-escaped thinking tags",
+		},
+		{
+			name:             "Mixed normal and Unicode tags - normal first",
+			input:            "Start <think>normal first</think> middle \\u003cthink\\u003eunicode second\\u003c/think\\u003e end",
+			expectedThinking: "normal first",
+			expectedRegular:  "Start  middle \\u003cthink\\u003eunicode second\\u003c/think\\u003e end",
+			description:      "Should process first tag (normal) and treat Unicode as regular content",
+		},
+		{
+			name:             "Mixed normal and Unicode tags - Unicode first",
+			input:            "Start \\u003cthink\\u003eunicode first\\u003c/think\\u003e middle <think>normal second</think> end",
+			expectedThinking: "unicode first",
+			expectedRegular:  "Start  middle <think>normal second</think> end",
+			description:      "Should process first tag (Unicode) and treat normal as regular content",
+		},
+		{
+			name:             "Unicode tag at beginning",
+			input:            "\\u003cthink\\u003eInitial Unicode thought\\u003c/think\\u003eRest of content",
+			expectedThinking: "Initial Unicode thought",
+			expectedRegular:  "Rest of content",
+			description:      "Should handle Unicode thinking tag at the beginning",
+		},
+		{
+			name:             "Unicode tag at end",
+			input:            "Content before \\u003cthink\\u003eFinal Unicode thought\\u003c/think\\u003e",
+			expectedThinking: "Final Unicode thought",
+			expectedRegular:  "Content before",
+			description:      "Should handle Unicode thinking tag at the end",
+		},
+		{
+			name:             "Multiple Unicode tags - only first processed",
+			input:            "\\u003cthink\\u003eFirst Unicode\\u003c/think\\u003e middle \\u003cthink\\u003eSecond Unicode\\u003c/think\\u003e end",
+			expectedThinking: "First Unicode",
+			expectedRegular:  "middle \\u003cthink\\u003eSecond Unicode\\u003c/think\\u003e end",
+			description:      "Should process only first Unicode tag, subsequent ones treated as regular content",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			thinking, regular := ExtractThinkingContent(tt.input)
+			if thinking != tt.expectedThinking {
+				t.Errorf("ExtractThinkingContent() thinking = %q, want %q\nDescription: %s", thinking, tt.expectedThinking, tt.description)
+			}
+			if regular != tt.expectedRegular {
+				t.Errorf("ExtractThinkingContent() regular = %q, want %q\nDescription: %s", regular, tt.expectedRegular, tt.description)
+			}
+		})
+	}
+}

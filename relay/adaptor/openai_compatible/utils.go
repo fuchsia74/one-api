@@ -288,6 +288,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 // ExtractThinkingContent extracts content within the FIRST <think></think> tag only and returns
 // both the extracted thinking content and the remaining regular content
 // This high-performance implementation uses fast string scanning instead of regex for optimal latency
+// and supports both normal tags (<think></think>) and Unicode-escaped tags (\u003cthink\u003e)
 //
 // NOTE: Only processes the first think tag encountered; subsequent think tags are treated as regular content
 func ExtractThinkingContent(content string) (thinkingContent, regularContent string) {
@@ -297,33 +298,23 @@ func ExtractThinkingContent(content string) (thinkingContent, regularContent str
 
 	// Fast string-based parsing - no regex for maximum performance
 	// Only handle the FIRST think tag, treat subsequent ones as regular content
+	// Support both normal and Unicode-escaped tags
 
-	// Look for the first <think> tag
-	thinkStart := strings.Index(content, "<think>")
+	thinkStart, thinkEnd, openTagLen, closeTagLen := findFirstThinkTag(content)
 	if thinkStart == -1 {
-		// No <think> tag found, return all content as regular
+		// No think tag found, return all content as regular
 		return "", strings.TrimSpace(content)
 	}
 
-	// Look for the first closing </think> tag after the opening tag
-	thinkEnd := strings.Index(content[thinkStart:], "</think>")
-	if thinkEnd == -1 {
-		// No closing tag found, treat all as regular content
-		return "", strings.TrimSpace(content)
-	}
-
-	// Adjust thinkEnd to absolute position
-	thinkEnd += thinkStart
-
-	// Extract thinking content (between <think> and </think>)
-	thinkingStart := thinkStart + 7 // len("<think>")
+	// Extract thinking content (between opening and closing tags)
+	thinkingStart := thinkStart + openTagLen
 	if thinkingStart < thinkEnd {
 		thinkingContent = content[thinkingStart:thinkEnd]
 	}
 
-	// Build regular content: before first <think> + after first </think>
+	// Build regular content: before first tag + after first tag
 	beforeThink := content[:thinkStart]
-	afterThink := content[thinkEnd+8:] // 8 is len("</think>")
+	afterThink := content[thinkEnd+closeTagLen:]
 	regularContent = beforeThink + afterThink
 
 	// Clean up whitespace
@@ -464,4 +455,70 @@ func isThinkingEnabled(val string) bool {
 	default:
 		return false
 	}
+}
+
+// findFirstThinkTag finds the first occurrence of either normal or Unicode-escaped thinking tags
+// Returns the start position, end position (exclusive), and tag lengths for optimal processing
+func findFirstThinkTag(content string) (startPos, endPos, openTagLen, closeTagLen int) {
+	// Check for normal tags first
+	normalStart := strings.Index(content, "<think>")
+	normalEnd := -1
+	if normalStart != -1 {
+		normalEnd = strings.Index(content[normalStart:], "</think>")
+		if normalEnd != -1 {
+			normalEnd += normalStart
+		}
+	}
+
+	// Check for Unicode-escaped tags
+	unicodeStart := strings.Index(content, "\\u003cthink\\u003e")
+	unicodeEnd := -1
+	if unicodeStart != -1 {
+		unicodeEnd = strings.Index(content[unicodeStart:], "\\u003c/think\\u003e")
+		if unicodeEnd != -1 {
+			unicodeEnd += unicodeStart
+		}
+	}
+
+	// Determine which tag comes first (if any)
+	if normalStart != -1 && normalEnd != -1 && (unicodeStart == -1 || normalStart < unicodeStart) {
+		// Normal tag comes first (or only normal tag exists)
+		return normalStart, normalEnd, 7, 8 // len("<think>"), len("</think>")
+	} else if unicodeStart != -1 && unicodeEnd != -1 {
+		// Unicode tag comes first (or only Unicode tag exists)
+		return unicodeStart, unicodeEnd, 17, 18 // len("\\u003cthink\\u003e"), len("\\u003c/think\\u003e")
+	}
+
+	// No valid tag pair found
+	return -1, -1, 0, 0
+}
+
+// findOpeningThinkTag finds the first occurrence of either normal or Unicode-escaped opening tag
+// Returns position and tag length, or -1 if not found
+func findOpeningThinkTag(content string) (pos, tagLen int) {
+	normalPos := strings.Index(content, "<think>")
+	unicodePos := strings.Index(content, "\\u003cthink\\u003e")
+
+	if normalPos >= 0 && (unicodePos < 0 || normalPos < unicodePos) {
+		return normalPos, 7 // len("<think>")
+	} else if unicodePos >= 0 {
+		return unicodePos, 17 // len("\\u003cthink\\u003e")
+	}
+
+	return -1, 0
+}
+
+// findClosingThinkTag finds the first occurrence of either normal or Unicode-escaped closing tag
+// Returns position and tag length, or -1 if not found
+func findClosingThinkTag(content string) (pos, tagLen int) {
+	normalPos := strings.Index(content, "</think>")
+	unicodePos := strings.Index(content, "\\u003c/think\\u003e")
+
+	if normalPos >= 0 && (unicodePos < 0 || normalPos < unicodePos) {
+		return normalPos, 8 // len("</think>")
+	} else if unicodePos >= 0 {
+		return unicodePos, 18 // len("\\u003c/think\\u003e")
+	}
+
+	return -1, 0
 }

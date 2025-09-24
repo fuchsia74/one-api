@@ -164,6 +164,27 @@ func TestThinkingProcessor_ProcessThinkingContent(t *testing.T) {
 			expectedReasoning: stringPtr("first"),
 			expectedModified:  true,
 		},
+		{
+			name:              "JSON-escaped Unicode thinking block (complete)",
+			input:             "Hello \\u003cthink\\u003ereasoning\\u003c/think\\u003e world",
+			expectedContent:   "Hello  world",
+			expectedReasoning: stringPtr("reasoning"),
+			expectedModified:  true,
+		},
+		{
+			name:              "JSON-escaped Unicode thinking block (opening only)",
+			input:             "Hello \\u003cthink\\u003epartial reasoning",
+			expectedContent:   "Hello ",
+			expectedReasoning: stringPtr("partial reasoning"),
+			expectedModified:  true,
+		},
+		{
+			name:              "Mixed normal and Unicode thinking blocks",
+			input:             "Hello \\u003cthink\\u003eunicode first\\u003c/think\\u003e <think>normal second</think>",
+			expectedContent:   "Hello  <think>normal second</think>",
+			expectedReasoning: stringPtr("unicode first"),
+			expectedModified:  true,
+		},
 	}
 
 	for _, tt := range tests {
