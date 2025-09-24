@@ -1,16 +1,20 @@
-### Kubernetes Deployment
+# Kubernetes Deployment
+
+<p align="center">
+   <img src="https://kubernetes.io/images/kubernetes.png" alt="sailing-with-k8s" width="80">
+</p>
 
 This section provides comprehensive instructions for deploying One API on Kubernetes with various configurations.
 
-#### Prerequisites
+## Prerequisites
 
 - Kubernetes cluster (v1.20+ or later)
 - [`kubectl`](https://kubernetes.io/docs/tasks/tools/) configured to communicate with your cluster
 - [`helm`](https://helm.sh/docs/intro/install/) (optional, for package management)
 
-#### Basic Deployment
+## Basic Deployment
 
-##### Namespace
+### Namespace
 
 First, create a dedicated namespace for One API:
 
@@ -28,7 +32,7 @@ metadata:
 kubectl apply -f namespace.yaml
 ```
 
-##### ConfigMap
+### ConfigMap
 
 Create a ConfigMap for One API configuration:
 
@@ -68,7 +72,7 @@ data:
 kubectl apply -f configmap.yaml
 ```
 
-##### Deployment
+### Deployment
 
 Create the main One API deployment:
 
@@ -163,11 +167,11 @@ spec:
 kubectl apply -f deployment.yaml
 ```
 
-#### Database Setup
+### Database Setup
 
 One API supports multiple database backends. Here are examples for PostgreSQL and MySQL:
 
-##### PostgreSQL Setup
+### PostgreSQL Setup
 
 ```yaml
 # postgresql.yaml
@@ -273,7 +277,7 @@ kubectl apply -f postgresql.yaml
 > [!NOTE]
 > **PostgreSQL Version**: The example above uses PostgreSQL version `15`. Check the [PostgreSQL Docker Hub page](https://hub.docker.com/_/postgres) for available versions and update accordingly. Consider using specific minor versions like `postgres:15.8` for production environments to ensure consistency.
 
-##### MySQL Setup
+### MySQL Setup
 
 ```yaml
 # mysql.yaml
@@ -383,7 +387,7 @@ kubectl apply -f mysql.yaml
 > [!NOTE]
 > **MySQL Version**: The example above uses MySQL version `8.0`. Check the [MySQL Docker Hub page](https://hub.docker.com/_/mysql) for available versions and update accordingly. Consider using specific minor versions like `mysql:8.0.39` for production environments to ensure consistency.
 
-#### Redis Setup
+### Redis Setup
 
 For caching and improved performance, deploy Redis:
 
@@ -488,11 +492,11 @@ kubectl apply -f redis.yaml
 > [!NOTE]
 > **Redis Version**: The example above uses Redis version `7-alpine`. Check the [Redis Docker Hub page](https://hub.docker.com/_/redis) for available versions and update accordingly. Consider using specific minor versions like `redis:7.4-alpine` for production environments to ensure consistency.
 
-#### NGINX Ingress Controller Installation
+### NGINX Ingress Controller Installation
 
 Before configuring Ingress for One API, you need to install an Ingress Controller. This section covers installing NGINX Ingress Controller, which is one of the most popular choices.
 
-##### For Cloud Providers
+#### For Cloud Providers
 
 ###### Google Kubernetes Engine (GKE)
 
@@ -545,7 +549,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 > [!NOTE]
 > **NGINX Ingress Controller Version**: The examples above use version `v1.8.4`. Always check the [NGINX Ingress Controller releases page](https://github.com/kubernetes/ingress-nginx/releases) for the latest stable version and update the URLs accordingly. Replace `controller-v1.8.4` with the latest version tag (e.g., `controller-v1.11.2` or newer).
 
-##### For Bare Metal / On-Premises
+#### For Bare Metal / On-Premises
 
 ###### Using NodePort
 
@@ -608,7 +612,7 @@ Then install NGINX Ingress Controller:
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/cloud/deploy.yaml
 ```
 
-##### Using Helm (Alternative Installation Method)
+#### Using Helm (Alternative Installation Method)
 
 Add the NGINX Ingress Controller Helm repository:
 
@@ -638,7 +642,7 @@ helm install ingress-nginx ingress-nginx/ingress-nginx \
   --set controller.service.type=LoadBalancer
 ```
 
-##### Custom Configuration
+#### Custom Configuration
 
 For production environments, you may want to customize the NGINX Ingress Controller:
 
@@ -688,7 +692,7 @@ data:
 kubectl apply -f nginx-ingress-custom.yaml
 ```
 
-##### Verify Installation
+#### Verify Installation
 
 Check that the NGINX Ingress Controller is running:
 
@@ -715,7 +719,7 @@ ingress-nginx-admission-create-xxx        0/1     Completed 0          5m
 ingress-nginx-admission-patch-xxx         0/1     Completed 1          5m
 ```
 
-##### Test the Installation
+#### Test the Installation
 
 Create a simple test to verify the ingress controller is working:
 
@@ -786,7 +790,7 @@ curl -H "Host: test.local" http://YOUR-INGRESS-IP
 kubectl delete -f test-app.yaml
 ```
 
-##### SSL Certificate Management (Optional)
+#### SSL Certificate Management (Optional)
 
 Install cert-manager for automatic SSL certificate management:
 
@@ -842,7 +846,7 @@ spec:
 kubectl apply -f letsencrypt-issuer.yaml
 ```
 
-##### Troubleshooting
+#### Troubleshooting
 
 Common issues and solutions:
 
@@ -1081,7 +1085,7 @@ spec:
       property: dsn
 ```
 
-##### Scaling
+### Scaling
 
 > [!IMPORTANT]
 > **Scaling Strategy for Components with Attached Storage**:
@@ -1152,7 +1156,7 @@ spec:
       app: one-api
 ```
 
-##### Monitoring and Logging
+### Monitoring and Logging
 
 1. **ServiceMonitor** for Prometheus (if using Prometheus Operator):
 
@@ -1192,7 +1196,7 @@ spec:
       storage: 50Gi
 ```
 
-##### Deployment Commands
+### Deployment Commands
 
 Deploy everything in the correct order:
 
@@ -1224,7 +1228,7 @@ kubectl get services -n one-api
 kubectl get ingress -n one-api
 ```
 
-##### Health Checks
+### Health Checks
 
 Monitor your deployment:
 
@@ -1243,7 +1247,7 @@ kubectl exec -it deployment/one-api -n one-api -- /bin/sh
 # Inside container: test database connection
 ```
 
-##### Backup Strategy
+### Backup Strategy
 
 For production environments, implement regular backups:
 
