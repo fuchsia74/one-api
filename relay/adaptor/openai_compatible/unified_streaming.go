@@ -1015,6 +1015,12 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 		// reasoning content to the requested field and clearing the source to avoid duplication
 		if enableThinking {
 			reasoningFormat := c.Query("reasoning_format")
+			// This fixes an issue where other providers (such as self-hosted GPU) don't have query parameters, so we default to reasoning_content
+			// when extracting <think></think> content
+			if reasoningFormat == "" {
+				reasoningFormat = string(model.ReasoningFormatReasoningContent)
+			}
+
 			for i := range streamResponse.Choices {
 				if streamResponse.Choices[i].Delta.ReasoningContent != nil {
 					rc := *streamResponse.Choices[i].Delta.ReasoningContent
