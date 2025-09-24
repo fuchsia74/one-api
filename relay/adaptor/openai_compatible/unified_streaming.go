@@ -1015,15 +1015,20 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 		// reasoning content to the requested field and clearing the source to avoid duplication
 		if enableThinking {
 			reasoningFormat := c.Query("reasoning_format")
-			for i := range streamResponse.Choices {
-				if streamResponse.Choices[i].Delta.ReasoningContent != nil {
-					rc := *streamResponse.Choices[i].Delta.ReasoningContent
-					streamResponse.Choices[i].Delta.SetReasoningContent(reasoningFormat, rc)
-					// If the requested format is not reasoning_content, clear ReasoningContent to avoid duplicate fields
-					if strings.ToLower(strings.TrimSpace(reasoningFormat)) != string(model.ReasoningFormatReasoningContent) {
-						streamResponse.Choices[i].Delta.ReasoningContent = nil
+			// This fixes an issue where other providers (such as self-hosted GPU) don't have query parameters, so we default to reasoning_content
+			// when extracting <think></think> content
+			if reasoningFormat != "" {
+				for i := range streamResponse.Choices {
+					if streamResponse.Choices[i].Delta.ReasoningContent != nil {
+						rc := *streamResponse.Choices[i].Delta.ReasoningContent
+						streamResponse.Choices[i].Delta.SetReasoningContent(reasoningFormat, rc)
+						// If the requested format is not reasoning_content, clear ReasoningContent to avoid duplicate fields
+						if strings.ToLower(strings.TrimSpace(reasoningFormat)) != string(model.ReasoningFormatReasoningContent) {
+							streamResponse.Choices[i].Delta.ReasoningContent = nil
+						}
 					}
 				}
+
 			}
 		}
 
