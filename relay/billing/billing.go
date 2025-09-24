@@ -90,18 +90,17 @@ func PostConsumeQuotaWithLog(ctx context.Context, tokenId int, quotaDelta int64,
 }
 
 func ReturnPreConsumedQuota(ctx context.Context, preConsumedQuota int64, tokenId int) {
-	if preConsumedQuota != 0 {
-		go func(ctx context.Context) {
-			// return pre-consumed quota
-			err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
-			if err != nil {
-				logger.Logger.Warn("failed to return pre-consumed quota - cleanup operation failed",
-					zap.Error(err),
-					zap.Int("tokenId", tokenId),
-					zap.Int64("preConsumedQuota", preConsumedQuota),
-					zap.String("note", "main billing already completed successfully"))
-			}
-		}(ctx)
+	if preConsumedQuota == 0 {
+		return
+	}
+	// Return pre-consumed quota synchronously; callers should wrap this in a lifecycle-managed goroutine
+	// if they do not want to block the handler. This ensures graceful drain can account for it.
+	if err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota); err != nil {
+		logger.Logger.Warn("failed to return pre-consumed quota - cleanup operation failed",
+			zap.Error(err),
+			zap.Int("tokenId", tokenId),
+			zap.Int64("preConsumedQuota", preConsumedQuota),
+			zap.String("note", "main billing already completed successfully"))
 	}
 }
 

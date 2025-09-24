@@ -17,11 +17,12 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/middleware"
 	dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/monitor"
-	"github.com/songquanpeng/one-api/relay/controller"
+	rcontroller "github.com/songquanpeng/one-api/relay/controller"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -35,24 +36,24 @@ func relayHelper(c *gin.Context, relayMode int) *model.ErrorWithStatusCode {
 	case relaymode.Realtime:
 		// For Phase 1, route through text helper which will delegate to adaptor based on meta.Mode
 		// Realtime adaptor code will handle websocket upgrade and upstream pass-through.
-		err = controller.RelayTextHelper(c)
+		err = rcontroller.RelayTextHelper(c)
 	case relaymode.ImagesGenerations,
 		relaymode.ImagesEdits:
-		err = controller.RelayImageHelper(c, relayMode)
+		err = rcontroller.RelayImageHelper(c, relayMode)
 	case relaymode.AudioSpeech:
 		fallthrough
 	case relaymode.AudioTranslation:
 		fallthrough
 	case relaymode.AudioTranscription:
-		err = controller.RelayAudioHelper(c, relayMode)
+		err = rcontroller.RelayAudioHelper(c, relayMode)
 	case relaymode.Proxy:
-		err = controller.RelayProxyHelper(c, relayMode)
+		err = rcontroller.RelayProxyHelper(c, relayMode)
 	case relaymode.ResponseAPI:
-		err = controller.RelayResponseAPIHelper(c)
+		err = rcontroller.RelayResponseAPIHelper(c)
 	case relaymode.ClaudeMessages:
-		err = controller.RelayClaudeMessagesHelper(c)
+		err = rcontroller.RelayClaudeMessagesHelper(c)
 	default:
-		err = controller.RelayTextHelper(c)
+		err = rcontroller.RelayTextHelper(c)
 	}
 	return err
 }
@@ -97,7 +98,10 @@ func Relay(c *gin.Context) {
 	channelName := c.GetString(ctxkey.ChannelName)
 	group := c.GetString(ctxkey.Group)
 	originalModel := c.GetString(ctxkey.RequestModel)
-	go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+	// Ensure channel error processing is completed during graceful drain
+	graceful.GoCritical(ctx, "processChannelRelayError", func(ctx context.Context) {
+		processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+	})
 
 	// Record failed relay request metrics
 	PrometheusMonitor.RecordRelayRequest(c, relayMeta, startTime, false, 0, 0, 0)
@@ -145,7 +149,11 @@ func Relay(c *gin.Context) {
 
 	// Debug logging to track channel exclusions (only when debug is enabled)
 	if config.DebugEnabled {
-		lg.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		if retryTimes > 0 {
+			lg.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		} else {
+			lg.Info(fmt.Sprintf("Debug: No retry will be attempted (retryTimes=0) - Channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		}
 	}
 
 	// For 429 errors, we should try lower priority channels first
@@ -240,7 +248,9 @@ func Relay(c *gin.Context) {
 		// Update group and originalModel potentially if changed by middleware, though unlikely for these.
 		group = c.GetString(ctxkey.Group)
 		originalModel = c.GetString(ctxkey.RequestModel)
-		go processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+		graceful.GoCritical(ctx, "processChannelRelayError", func(ctx context.Context) {
+			processChannelRelayError(ctx, userId, channelId, channelName, group, originalModel, *bizErr)
+		})
 	}
 
 	if bizErr != nil {

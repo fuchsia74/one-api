@@ -366,7 +366,7 @@ func IsAdmin(userId int) bool {
 	var user User
 	err := DB.Where("id = ?", userId).Select("role").Find(&user).Error
 	if err != nil {
-		logger.Logger.Error("no such user " + err.Error())
+		logger.Logger.Error("no such user", zap.Error(err))
 		return false
 	}
 	return user.Role >= RoleAdminUser
@@ -491,14 +491,14 @@ func updateUserUsedQuota(id int, quota int64) {
 		},
 	).Error
 	if err != nil {
-		logger.Logger.Error("failed to update user used quota: " + err.Error())
+		logger.Logger.Error("failed to update user used quota", zap.Error(err))
 	}
 }
 
 func updateUserRequestCount(id int, count int) {
 	err := DB.Model(&User{}).Where("id = ?", id).Update("request_count", gorm.Expr("request_count + ?", count)).Error
 	if err != nil {
-		logger.Logger.Error("failed to update user request count: " + err.Error())
+		logger.Logger.Error("failed to update user request count", zap.Error(err))
 	}
 }
 

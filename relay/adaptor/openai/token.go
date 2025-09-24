@@ -10,6 +10,7 @@ import (
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/pkoukk/tiktoken-go"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -83,6 +84,8 @@ func getTokenNum(tokenEncoder *tiktoken.Tiktoken, text string) int {
 // CountTokenMessages counts the number of tokens in a list of messages.
 func CountTokenMessages(ctx context.Context,
 	messages []model.Message, actualModel string) int {
+	lg := gmw.GetLogger(ctx)
+
 	tokenEncoder := getTokenEncoder(actualModel)
 	// Reference:
 	// https://github.com/openai/openai-cookbook/blob/main/examples/How_to_count_tokens_with_tiktoken.ipynb
@@ -111,26 +114,52 @@ func CountTokenMessages(ctx context.Context,
 					tokenNum += getTokenNum(tokenEncoder, *content.Text)
 				}
 			case model.ContentTypeImageURL:
-				imageTokens, err := countImageTokens(
-					content.ImageURL.Url,
-					content.ImageURL.Detail,
-					actualModel)
+				imageURL := ""
+				detail := ""
+				if content.ImageURL != nil {
+					imageURL = content.ImageURL.Url
+					detail = content.ImageURL.Detail
+				}
+				imageTokens, err := countImageTokens(imageURL, detail, actualModel)
 				if err != nil {
-					gmw.GetLogger(ctx).Error("error counting image tokens: " + err.Error())
+					// Provide structured diagnostics without dumping full base64 content
+					isDataURL := strings.HasPrefix(imageURL, "data:image/")
+					b64Len := 0
+					sample := ""
+					if isDataURL {
+						// Extract after comma
+						if idx := strings.Index(imageURL, ","); idx >= 0 && idx+1 < len(imageURL) {
+							raw := imageURL[idx+1:]
+							b64Len = len(raw)
+							if b64Len > 48 {
+								sample = raw[:48]
+							} else {
+								sample = raw
+							}
+						}
+					}
+					lg.Error("error counting image tokens",
+						zap.Error(err),
+						zap.String("model", actualModel),
+						zap.Bool("data_url", isDataURL),
+						zap.Int("base64_len", b64Len),
+						zap.String("detail", detail),
+						zap.String("base64_sample", sample),
+					)
 				} else {
 					tokenNum += imageTokens
 				}
 			case model.ContentTypeInputAudio:
 				audioData, err := base64.StdEncoding.DecodeString(content.InputAudio.Data)
 				if err != nil {
-					gmw.GetLogger(ctx).Error("error decoding audio data: " + err.Error())
+					lg.Error("error decoding audio data", zap.Error(err))
 				}
 
 				audioTokens, err := helper.GetAudioTokens(ctx,
 					bytes.NewReader(audioData),
 					ratio.GetAudioPromptTokensPerSecond(actualModel))
 				if err != nil {
-					gmw.GetLogger(ctx).Error("error counting audio tokens: " + err.Error())
+					lg.Error("error counting audio tokens", zap.Error(err))
 				} else {
 					totalAudioTokens += audioTokens
 				}
@@ -260,12 +289,15 @@ func countImageTokens(url string, detail string, model string) (_ int, err error
 		if fetchSize {
 			width, height, err = getImageSizeFn(url)
 			if err != nil {
-				return 0, err
+				return 0, errors.Wrap(err, "failed to get image size")
 			}
 		}
 		// Claude-specific: cap long edge at 1568 then approx tokens by area/750
 		// We detect Claude via model prefix to avoid importing meta here
-		if strings.HasPrefix(model, "claude-") || strings.HasPrefix(model, "sonnet") || strings.HasPrefix(model, "haiku") || strings.HasPrefix(model, "opus") {
+		if strings.HasPrefix(model, "claude-") ||
+			strings.HasPrefix(model, "sonnet") ||
+			strings.HasPrefix(model, "haiku") ||
+			strings.HasPrefix(model, "opus") {
 			// Cap long edge to 1568 while preserving aspect ratio
 			maxEdge := 1568.0
 			w := float64(width)

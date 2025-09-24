@@ -19,6 +19,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/metrics"
 	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/model"
@@ -58,7 +59,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	metalib.Set2Context(c, meta)
 
 	// get channel model ratio
-	channelModelRatio, channelCompletionRatio := getChannelRatios(c, meta.ChannelId)
+	channelModelRatio, channelCompletionRatio := getChannelRatios(c)
 
 	// get model ratio using three-layer pricing system
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
@@ -167,14 +168,16 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		}
 		if estimated > 0 {
 			if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, estimated); err != nil {
-				gmw.GetLogger(c).Warn("record provisional user request cost failed", zap.Error(err))
+				lg.Warn("record provisional user request cost failed", zap.Error(err))
 			}
 		}
 	}
 
 	// Check for HTTP errors when an HTTP response is returned by the adaptor
 	if resp != nil && resp.StatusCode != http.StatusOK {
-		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+		graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
+			billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+		})
 		// Reconcile provisional record to 0 since upstream returned error
 		quotaId := c.GetInt(ctxkey.Id)
 		requestId := c.GetString(ctxkey.RequestId)
@@ -384,7 +387,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// If usage is available (e.g., client disconnected after upstream response),
 		// proceed with billing; otherwise, refund pre-consumed quota and return error.
 		if usage == nil {
-			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+			graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
+				billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, c.GetInt(ctxkey.TokenId))
+			})
 			return respErr
 		}
 		// Fall through to billing with available usage
@@ -396,7 +401,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 	// Capture trace ID before launching goroutine
 	traceId := tracing.GetTraceID(c)
-	go func() {
+	graceful.GoCritical(gmw.BackgroundCtx(c), "postBilling", func(ctx context.Context) {
 		// Use configurable billing timeout with model-specific adjustments
 		baseBillingTimeout := time.Duration(config.BillingTimeoutSec) * time.Second
 		billingTimeout := baseBillingTimeout
@@ -441,10 +446,12 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 				// TODO: Implement dead letter queue or retry mechanism for failed billing
 			}
 		}
-	}()
+	})
 
 	return nil
 }
+
+// Removed redundant getChannelRatiosForClaude; use getChannelRatios from response.go to keep DRY.
 
 // rewriteClaudeModelInJSON rewrites the top-level "model" field in a Claude Messages JSON payload.
 // It preserves the rest of the body intact to avoid conversion artifacts.

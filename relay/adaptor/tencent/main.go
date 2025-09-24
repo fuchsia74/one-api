@@ -13,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laisky/zap"
+
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/gin-gonic/gin"
@@ -156,6 +158,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 	common.SetEventStreamHeaders(c)
 
+	lg := gmw.GetLogger(c)
 	for scanner.Scan() {
 		data := scanner.Text()
 		if len(data) < 5 || !strings.HasPrefix(data, "data:") {
@@ -166,7 +169,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var tencentResponse ChatResponse
 		err := json.Unmarshal([]byte(data), &tencentResponse)
 		if err != nil {
-			gmw.GetLogger(c).Error("error unmarshalling stream response: " + err.Error())
+			lg.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 
@@ -177,12 +180,12 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 		err = render.ObjectData(c, response)
 		if err != nil {
-			gmw.GetLogger(c).Error(err.Error())
+			lg.Error("error rendering stream response", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		gmw.GetLogger(c).Error("error reading stream: " + err.Error())
+		lg.Error("error reading stream", zap.Error(err))
 	}
 
 	render.Done(c)

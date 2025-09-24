@@ -48,22 +48,20 @@ data:
   SESSION_SECRET: "your-session-secret-here"
   DEBUG: "false"
   DEBUG_SQL: "false"
-  
   # Rate limiting
   GLOBAL_API_RATE_LIMIT: "1000"
   GLOBAL_WEB_RATE_LIMIT: "1000"
   GLOBAL_RELAY_RATE_LIMIT: "1000"
   GLOBAL_CHANNEL_RATE_LIMIT: "1"
-  
   # Token settings
   DEFAULT_MAX_TOKEN: "2048"
   MAX_INLINE_IMAGE_SIZE_MB: "30"
   MAX_ITEMS_PER_PAGE: "10"
-  
+
   # Channel settings
   CHANNEL_SUSPEND_SECONDS_FOR_429: "60"
   OPENROUTER_PROVIDER_SORT: "throughput"
-  
+
   # Usage enforcement
   ENFORCE_INCLUDE_USAGE: "true"
 ```
@@ -96,54 +94,54 @@ spec:
         app: one-api
     spec:
       containers:
-      - name: one-api
-        image: ppcelery/one-api:latest
-        ports:
-        - containerPort: 3000
-          name: http
-        envFrom:
-        - configMapRef:
-            name: one-api-config
-        - secretRef:
-            name: one-api-secrets
-            optional: true
-        env:
-        - name: SQL_DSN
-          valueFrom:
-            secretKeyRef:
-              name: one-api-database
-              key: dsn
-        - name: REDIS_CONN_STRING
-          valueFrom:
-            secretKeyRef:
-              name: one-api-redis
-              key: connection-string
-              optional: true
-        volumeMounts:
-        - name: data
-          mountPath: /data
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "1000m"
-        livenessProbe:
-          httpGet:
-            path: /api/status
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /api/status
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
+        - name: one-api
+          image: ppcelery/one-api:latest
+          ports:
+            - containerPort: 3000
+              name: http
+          envFrom:
+            - configMapRef:
+                name: one-api-config
+            - secretRef:
+                name: one-api-secrets
+                optional: true
+          env:
+            - name: SQL_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: one-api-database
+                  key: dsn
+            - name: REDIS_CONN_STRING
+              valueFrom:
+                secretKeyRef:
+                  name: one-api-redis
+                  key: connection-string
+                  optional: true
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            httpGet:
+              path: /api/status
+              port: 3000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /api/status
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
       volumes:
-      - name: data
-        emptyDir: {}
+        - name: data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -156,10 +154,10 @@ spec:
   selector:
     app: one-api
   ports:
-  - port: 80
-    targetPort: 3000
-    protocol: TCP
-    name: http
+    - port: 80
+      targetPort: 3000
+      protocol: TCP
+      name: http
   type: ClusterIP
 ```
 
@@ -191,39 +189,39 @@ spec:
         app: postgresql
     spec:
       containers:
-      - name: postgresql
-        image: postgres:15
-        env:
-        - name: POSTGRES_DB
-          value: "oneapi"
-        - name: POSTGRES_USER
-          valueFrom:
-            secretKeyRef:
-              name: postgresql-secret
-              key: username
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: postgresql-secret
-              key: password
-        - name: PGDATA
-          value: /var/lib/postgresql/data/pgdata
-        ports:
-        - containerPort: 5432
-        volumeMounts:
-        - name: postgresql-storage
-          mountPath: /var/lib/postgresql/data
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
+        - name: postgresql
+          image: postgres:15
+          env:
+            - name: POSTGRES_DB
+              value: "oneapi"
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secret
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgresql-secret
+                  key: password
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          ports:
+            - containerPort: 5432
+          volumeMounts:
+            - name: postgresql-storage
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
       volumes:
-      - name: postgresql-storage
-        persistentVolumeClaim:
-          claimName: postgresql-pvc
+        - name: postgresql-storage
+          persistentVolumeClaim:
+            claimName: postgresql-pvc
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -246,8 +244,8 @@ spec:
   selector:
     app: postgresql
   ports:
-  - port: 5432
-    targetPort: 5432
+    - port: 5432
+      targetPort: 5432
 ---
 apiVersion: v1
 kind: Secret
@@ -256,8 +254,8 @@ metadata:
   namespace: one-api
 type: Opaque
 data:
-  username: b25lYXBp  # oneapi (base64)
-  password: cGFzc3dvcmQ=  # password (base64) - Change this!
+  username: b25lYXBp # oneapi (base64)
+  password: cGFzc3dvcmQ= # password (base64) - Change this!
 ---
 apiVersion: v1
 kind: Secret
@@ -274,8 +272,7 @@ data:
 kubectl apply -f postgresql.yaml
 ```
 
-> [!NOTE]
-> **PostgreSQL Version**: The example above uses PostgreSQL version `15`. Check the [PostgreSQL Docker Hub page](https://hub.docker.com/_/postgres) for available versions and update accordingly. Consider using specific minor versions like `postgres:15.8` for production environments to ensure consistency.
+> [!NOTE] > **PostgreSQL Version**: The example above uses PostgreSQL version `15`. Check the [PostgreSQL Docker Hub page](https://hub.docker.com/_/postgres) for available versions and update accordingly. Consider using specific minor versions like `postgres:15.8` for production environments to ensure consistency.
 
 ### MySQL Setup
 
@@ -297,42 +294,42 @@ spec:
         app: mysql
     spec:
       containers:
-      - name: mysql
-        image: mysql:8.0
-        env:
-        - name: MYSQL_DATABASE
-          value: "oneapi"
-        - name: MYSQL_USER
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: username
-        - name: MYSQL_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: password
-        - name: MYSQL_ROOT_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mysql-secret
-              key: root-password
-        ports:
-        - containerPort: 3306
-        volumeMounts:
-        - name: mysql-storage
-          mountPath: /var/lib/mysql
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "1Gi"
-            cpu: "500m"
+        - name: mysql
+          image: mysql:8.0
+          env:
+            - name: MYSQL_DATABASE
+              value: "oneapi"
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: username
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: password
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: root-password
+          ports:
+            - containerPort: 3306
+          volumeMounts:
+            - name: mysql-storage
+              mountPath: /var/lib/mysql
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "1Gi"
+              cpu: "500m"
       volumes:
-      - name: mysql-storage
-        persistentVolumeClaim:
-          claimName: mysql-pvc
+        - name: mysql-storage
+          persistentVolumeClaim:
+            claimName: mysql-pvc
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -355,8 +352,8 @@ spec:
   selector:
     app: mysql
   ports:
-  - port: 3306
-    targetPort: 3306
+    - port: 3306
+      targetPort: 3306
 ---
 apiVersion: v1
 kind: Secret
@@ -365,9 +362,9 @@ metadata:
   namespace: one-api
 type: Opaque
 data:
-  username: b25lYXBp  # oneapi (base64)
-  password: cGFzc3dvcmQ=  # password (base64) - Change this!
-  root-password: cm9vdHBhc3N3b3Jk  # rootpassword (base64) - Change this!
+  username: b25lYXBp # oneapi (base64)
+  password: cGFzc3dvcmQ= # password (base64) - Change this!
+  root-password: cm9vdHBhc3N3b3Jk # rootpassword (base64) - Change this!
 ---
 apiVersion: v1
 kind: Secret
@@ -384,8 +381,7 @@ data:
 kubectl apply -f mysql.yaml
 ```
 
-> [!NOTE]
-> **MySQL Version**: The example above uses MySQL version `8.0`. Check the [MySQL Docker Hub page](https://hub.docker.com/_/mysql) for available versions and update accordingly. Consider using specific minor versions like `mysql:8.0.39` for production environments to ensure consistency.
+> [!NOTE] > **MySQL Version**: The example above uses MySQL version `8.0`. Check the [MySQL Docker Hub page](https://hub.docker.com/_/mysql) for available versions and update accordingly. Consider using specific minor versions like `mysql:8.0.39` for production environments to ensure consistency.
 
 ### Redis Setup
 
@@ -409,36 +405,36 @@ spec:
         app: redis
     spec:
       containers:
-      - name: redis
-        image: redis:7-alpine
-        ports:
-        - containerPort: 6379
-        args:
-        - redis-server
-        - --appendonly
-        - "yes"
-        - --requirepass
-        - "$(REDIS_PASSWORD)"
-        env:
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: redis-secret
-              key: password
-        volumeMounts:
-        - name: redis-storage
-          mountPath: /data
-        resources:
-          requests:
-            memory: "64Mi"
-            cpu: "100m"
-          limits:
-            memory: "256Mi"
-            cpu: "200m"
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          args:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --requirepass
+            - "$(REDIS_PASSWORD)"
+          env:
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: redis-secret
+                  key: password
+          volumeMounts:
+            - name: redis-storage
+              mountPath: /data
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "200m"
       volumes:
-      - name: redis-storage
-        persistentVolumeClaim:
-          claimName: redis-pvc
+        - name: redis-storage
+          persistentVolumeClaim:
+            claimName: redis-pvc
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -461,8 +457,8 @@ spec:
   selector:
     app: redis
   ports:
-  - port: 6379
-    targetPort: 6379
+    - port: 6379
+      targetPort: 6379
 ---
 apiVersion: v1
 kind: Secret
@@ -471,7 +467,7 @@ metadata:
   namespace: one-api
 type: Opaque
 data:
-  password: cmVkaXNwYXNzd29yZA==  # redispassword (base64) - Change this!
+  password: cmVkaXNwYXNzd29yZA== # redispassword (base64) - Change this!
 ---
 apiVersion: v1
 kind: Secret
@@ -484,13 +480,11 @@ data:
   # redis://:redispassword@redis-service:6379/0 (base64)
 ```
 
-
 ```bash
 kubectl apply -f redis.yaml
 ```
 
-> [!NOTE]
-> **Redis Version**: The example above uses Redis version `7-alpine`. Check the [Redis Docker Hub page](https://hub.docker.com/_/redis) for available versions and update accordingly. Consider using specific minor versions like `redis:7.4-alpine` for production environments to ensure consistency.
+> [!NOTE] > **Redis Version**: The example above uses Redis version `7-alpine`. Check the [Redis Docker Hub page](https://hub.docker.com/_/redis) for available versions and update accordingly. Consider using specific minor versions like `redis:7.4-alpine` for production environments to ensure consistency.
 
 ### NGINX Ingress Controller Installation
 
@@ -546,8 +540,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.8.4/deploy/static/provider/ovhcloud/deploy.yaml
 ```
 
-> [!NOTE]
-> **NGINX Ingress Controller Version**: The examples above use version `v1.8.4`. Always check the [NGINX Ingress Controller releases page](https://github.com/kubernetes/ingress-nginx/releases) for the latest stable version and update the URLs accordingly. Replace `controller-v1.8.4` with the latest version tag (e.g., `controller-v1.11.2` or newer).
+> [!NOTE] > **NGINX Ingress Controller Version**: The examples above use version `v1.8.4`. Always check the [NGINX Ingress Controller releases page](https://github.com/kubernetes/ingress-nginx/releases) for the latest stable version and update the URLs accordingly. Replace `controller-v1.8.4` with the latest version tag (e.g., `controller-v1.11.2` or newer).
 
 #### For Bare Metal / On-Premises
 
@@ -576,8 +569,7 @@ kubectl apply -f metallb-namespace.yaml
 kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
 ```
 
-> [!NOTE]
-> **MetalLB Version**: The example above uses MetalLB version `v0.13.12`. Check the [MetalLB releases page](https://github.com/metallb/metallb/releases) for the latest stable version and update the URL accordingly. Replace `v0.13.12` with the latest version tag (e.g., `v0.14.8` or newer).
+> [!NOTE] > **MetalLB Version**: The example above uses MetalLB version `v0.13.12`. Check the [MetalLB releases page](https://github.com/metallb/metallb/releases) for the latest stable version and update the URL accordingly. Replace `v0.13.12` with the latest version tag (e.g., `v0.14.8` or newer).
 
 Configure MetalLB IP address pool:
 
@@ -590,7 +582,7 @@ metadata:
   namespace: metallb-system
 spec:
   addresses:
-  - 192.168.1.240-192.168.1.250  # Adjust to your network
+    - 192.168.1.240-192.168.1.250 # Adjust to your network
 ---
 apiVersion: metallb.io/v1beta1
 kind: L2Advertisement
@@ -599,7 +591,7 @@ metadata:
   namespace: metallb-system
 spec:
   ipAddressPools:
-  - first-pool
+    - first-pool
 ```
 
 ```bash
@@ -660,29 +652,28 @@ data:
   # Increase proxy buffer sizes for large requests
   proxy-buffer-size: "16k"
   proxy-buffers-number: "8"
-  
   # Enable compression
   use-gzip: "true"
   gzip-level: "6"
   gzip-types: "text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript"
-  
+
   # Security headers
   add-base-url: "true"
   enable-real-ip: "true"
-  
+
   # Connection settings
   keep-alive-requests: "10000"
   upstream-keepalive-connections: "50"
   upstream-keepalive-requests: "100"
-  
+
   # Rate limiting (optional)
   rate-limit-rpm: "300"
   rate-limit-connections: "10"
-  
+
   # Client settings
   client-max-body-size: "100m"
   client-body-buffer-size: "1m"
-  
+
   # SSL settings
   ssl-protocols: "TLSv1.2 TLSv1.3"
   ssl-ciphers: "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305"
@@ -741,10 +732,10 @@ spec:
         app: test-app
     spec:
       containers:
-      - name: test-app
-        image: nginx:alpine
-        ports:
-        - containerPort: 80
+        - name: test-app
+          image: nginx:alpine
+          ports:
+            - containerPort: 80
 ---
 apiVersion: v1
 kind: Service
@@ -755,8 +746,8 @@ spec:
   selector:
     app: test-app
   ports:
-  - port: 80
-    targetPort: 80
+    - port: 80
+      targetPort: 80
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -767,16 +758,16 @@ metadata:
     kubernetes.io/ingress.class: nginx
 spec:
   rules:
-  - host: test.local
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: test-app-service
-            port:
-              number: 80
+    - host: test.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: test-app-service
+                port:
+                  number: 80
 ```
 
 ```bash
@@ -804,8 +795,7 @@ kubectl wait --for=condition=ready pod -l app=cainjector -n cert-manager --timeo
 kubectl wait --for=condition=ready pod -l app=webhook -n cert-manager --timeout=60s
 ```
 
-> [!NOTE]
-> **cert-manager Version**: The example above uses cert-manager version `v1.13.3`. Check the [cert-manager releases page](https://github.com/cert-manager/cert-manager/releases) for the latest stable version and update the URL accordingly. Replace `v1.13.3` with the latest version tag (e.g., `v1.16.1` or newer).
+> [!NOTE] > **cert-manager Version**: The example above uses cert-manager version `v1.13.3`. Check the [cert-manager releases page](https://github.com/cert-manager/cert-manager/releases) for the latest stable version and update the URL accordingly. Replace `v1.13.3` with the latest version tag (e.g., `v1.16.1` or newer).
 
 Create a ClusterIssuer for Let's Encrypt:
 
@@ -818,13 +808,13 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com  # Replace with your email
+    email: your-email@example.com # Replace with your email
     privateKeySecretRef:
       name: letsencrypt-prod
     solvers:
-    - http01:
-        ingress:
-          class: nginx
+      - http01:
+          ingress:
+            class: nginx
 ---
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -833,13 +823,13 @@ metadata:
 spec:
   acme:
     server: https://acme-staging-v02.api.letsencrypt.org/directory
-    email: your-email@example.com  # Replace with your email
+    email: your-email@example.com # Replace with your email
     privateKeySecretRef:
       name: letsencrypt-staging
     solvers:
-    - http01:
-        ingress:
-          class: nginx
+      - http01:
+          ingress:
+            class: nginx
 ```
 
 ```bash
@@ -851,36 +841,39 @@ kubectl apply -f letsencrypt-issuer.yaml
 Common issues and solutions:
 
 1. **Ingress Controller not starting**:
+
    ```bash
    # Check logs
    kubectl logs -n ingress-nginx deployment/ingress-nginx-controller
-   
+
    # Check events
    kubectl get events -n ingress-nginx --sort-by=.metadata.creationTimestamp
    ```
 
 2. **External IP pending (for LoadBalancer)**:
+
    - On cloud providers: Check if LoadBalancer service is supported
    - On bare metal: Install MetalLB or use NodePort service type
 
 3. **Ingress not working**:
+
    ```bash
    # Check ingress resource
    kubectl describe ingress <ingress-name> -n <namespace>
-   
+
    # Check service endpoints
    kubectl get endpoints -n <namespace>
-   
+
    # Debug from inside cluster
    kubectl exec -it <any-pod> -- curl http://<service-name>.<namespace>:80
    ```
 
 4. **SSL certificate issues**:
+
    ```bash
    # Check certificate status
    kubectl get certificates -A
    kubectl describe certificate <cert-name> -n <namespace>
-   
    # Check cert-manager logs
    kubectl logs -n cert-manager deployment/cert-manager
    ```
@@ -911,23 +904,23 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-body-size: "100m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
     nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
-    cert-manager.io/cluster-issuer: "letsencrypt-prod"  # If using cert-manager
+    cert-manager.io/cluster-issuer: "letsencrypt-prod" # If using cert-manager
 spec:
   tls:
-  - hosts:
-    - oneapi.yourdomain.com
-    secretName: one-api-tls
+    - hosts:
+        - oneapi.yourdomain.com
+      secretName: one-api-tls
   rules:
-  - host: oneapi.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: one-api-service
-            port:
-              number: 80
+    - host: oneapi.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: one-api-service
+                port:
+                  number: 80
 ```
 
 ##### Traefik Ingress
@@ -946,20 +939,20 @@ metadata:
     traefik.ingress.kubernetes.io/router.middlewares: default-redirect-https@kubernetescrd
 spec:
   tls:
-  - hosts:
-    - oneapi.yourdomain.com
-    secretName: one-api-tls
+    - hosts:
+        - oneapi.yourdomain.com
+      secretName: one-api-tls
   rules:
-  - host: oneapi.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: one-api-service
-            port:
-              number: 80
+    - host: oneapi.yourdomain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: one-api-service
+                port:
+                  number: 80
 ```
 
 ```bash
@@ -984,37 +977,37 @@ spec:
     matchLabels:
       app: one-api
   policyTypes:
-  - Ingress
-  - Egress
+    - Ingress
+    - Egress
   ingress:
-  - from:
-    - namespaceSelector:
-        matchLabels:
-          name: ingress-nginx  # Adjust based on your ingress controller
-    ports:
-    - protocol: TCP
-      port: 3000
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx # Adjust based on your ingress controller
+      ports:
+        - protocol: TCP
+          port: 3000
   egress:
-  - to:
-    - podSelector:
-        matchLabels:
-          app: postgresql  # or mysql
-    ports:
-    - protocol: TCP
-      port: 5432  # or 3306 for MySQL
-  - to:
-    - podSelector:
-        matchLabels:
-          app: redis
-    ports:
-    - protocol: TCP
-      port: 6379
-  - to: []  # Allow outbound internet access for AI APIs
-    ports:
-    - protocol: TCP
-      port: 443
-    - protocol: TCP
-      port: 80
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql # or mysql
+      ports:
+        - protocol: TCP
+          port: 5432 # or 3306 for MySQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: redis
+      ports:
+        - protocol: TCP
+          port: 6379
+    - to: [] # Allow outbound internet access for AI APIs
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
 ```
 
 2. **Pod Security Standards**: Add security context to deployments:
@@ -1027,14 +1020,14 @@ securityContext:
   runAsGroup: 1000
   fsGroup: 1000
 containers:
-- name: one-api
-  # ... other config
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    capabilities:
-      drop:
-      - ALL
+  - name: one-api
+    # ... other config
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
 ```
 
 3. **Secrets Management**: Use external secret management systems like:
@@ -1079,17 +1072,17 @@ spec:
     name: one-api-database
     creationPolicy: Owner
   data:
-  - secretKey: dsn
-    remoteRef:
-      key: "One API Database"
-      property: dsn
+    - secretKey: dsn
+      remoteRef:
+        key: "One API Database"
+        property: dsn
 ```
 
 ### Scaling
 
-> [!IMPORTANT]
-> **Scaling Strategy for Components with Attached Storage**:
+> [!IMPORTANT] > **Scaling Strategy for Components with Attached Storage**:
 > For deployments with attached persistent storage (such as PostgreSQL, MySQL, Redis, or **One API with persistent volumes**), **vertical scaling** (increasing CPU/memory resources) is recommended rather than horizontal scaling. This is because:
+>
 > - PersistentVolumeClaims with `ReadWriteOnce` access mode cannot be shared across multiple pods
 > - Database clustering/replication requires specific configuration and coordination
 > - Horizontal scaling of stateful services can lead to data consistency issues
@@ -1113,31 +1106,31 @@ spec:
   minReplicas: 2
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
-      target:
-        type: Utilization
-        averageUtilization: 70
-  - type: Resource
-    resource:
-      name: memory
-      target:
-        type: Utilization
-        averageUtilization: 80
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
   behavior:
     scaleDown:
       stabilizationWindowSeconds: 300
       policies:
-      - type: Percent
-        value: 50
-        periodSeconds: 60
+        - type: Percent
+          value: 50
+          periodSeconds: 60
     scaleUp:
       stabilizationWindowSeconds: 60
       policies:
-      - type: Percent
-        value: 100
-        periodSeconds: 60
+        - type: Percent
+          value: 100
+          periodSeconds: 60
 ```
 
 2. **Pod Disruption Budget**:
@@ -1174,8 +1167,8 @@ spec:
     matchLabels:
       app: one-api
   endpoints:
-  - port: http
-    path: /api/metrics
+    - port: http
+      path: /api/metrics
 ```
 
 2. **Persistent Volumes** for production databases:
@@ -1190,7 +1183,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: fast-ssd  # Adjust based on your cluster
+  storageClassName: fast-ssd # Adjust based on your cluster
   resources:
     requests:
       storage: 50Gi
@@ -1259,8 +1252,8 @@ kubectl exec -it deployment/postgresql -n one-api -- pg_dump -U oneapi oneapi > 
 kubectl exec -it deployment/mysql -n one-api -- mysqldump -u oneapi -p oneapi > backup-$(date +%Y%m%d).sql
 ```
 
-> [!NOTE]
-> **Production Recommendations:**
+> [!NOTE] > **Production Recommendations:**
+>
 > - Use managed database services (RDS, Cloud SQL, etc.) for better reliability
 > - Implement proper backup and disaster recovery procedures
 > - Use monitoring solutions like Prometheus + Grafana

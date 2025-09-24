@@ -346,6 +346,12 @@ Previous function calls:
 3. Function name and arguments preservation
 4. Finish reason set to `tool_calls` when functions present
 
+Unified OpenAI-compatible streaming handler:
+
+- All OpenAI-compatible adapters delegate streaming to a shared handler in `relay/adaptor/openai_compatible`.
+- Optional thinking extraction is controlled via URL parameter `?thinking=true` and the extracted reasoning is mapped to the field specified by `?reasoning_format=` (supports `reasoning_content`, `reasoning`, and `thinking`).
+- When upstream usage is missing/partial, token usage is computed from streamed text plus tool call arguments.
+
 ### 7.3 Example Conversion
 
 **Input (ChatCompletion)**:
@@ -826,7 +832,7 @@ These adapters implement custom Claude Messages conversion logic:
 - **VertexAI**: Custom conversion with sub-adapter routing
 - **Replicate**: Custom conversion implementation
 - **Cohere**: Custom conversion implementation
-- **Cloudflare**: Custom conversion implementation
+- **Cloudflare**: Uses shared OpenAI-compatible response handlers for streaming and non-streaming; retains custom request URL/model mapping
 - **Palm**: Basic text-only conversion support
 - **Ollama**: Basic text-only conversion support
 - **Coze**: Basic text-only conversion support

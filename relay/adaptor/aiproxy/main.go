@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
@@ -109,6 +110,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 	common.SetEventStreamHeaders(c)
 
+	lg := gmw.GetLogger(c)
 	for scanner.Scan() {
 		data := scanner.Text()
 		if len(data) < 5 || data[:5] != "data:" {
@@ -119,7 +121,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		var AIProxyLibraryResponse LibraryStreamResponse
 		err := json.Unmarshal([]byte(data), &AIProxyLibraryResponse)
 		if err != nil {
-			gmw.GetLogger(c).Error("error unmarshalling stream response: " + err.Error())
+			lg.Error("error unmarshalling stream response", zap.Error(err))
 			continue
 		}
 		if len(AIProxyLibraryResponse.Documents) != 0 {
@@ -128,18 +130,18 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		response := streamResponseAIProxyLibrary2OpenAI(&AIProxyLibraryResponse)
 		err = render.ObjectData(c, response)
 		if err != nil {
-			gmw.GetLogger(c).Error(err.Error())
+			lg.Error("render object data error", zap.Error(err))
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		gmw.GetLogger(c).Error("error reading stream: " + err.Error())
+		lg.Error("error reading stream", zap.Error(err))
 	}
 
 	response := documentsAIProxyLibrary(documents)
 	err := render.ObjectData(c, response)
 	if err != nil {
-		gmw.GetLogger(c).Error(err.Error())
+		lg.Error("render object data error", zap.Error(err))
 	}
 	render.Done(c)
 

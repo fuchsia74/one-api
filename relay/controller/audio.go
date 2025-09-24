@@ -21,6 +21,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
@@ -183,15 +184,13 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			return
 		}
 		if preConsumedQuota > 0 {
-			// we need to roll back the pre-consumed quota
+			// we need to roll back the pre-consumed quota under lifecycle tracking
 			defer func() {
-				go func() {
-					// negative means add quota back for token & user
-					err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota)
-					if err != nil {
-						gmw.GetLogger(ctx).Error("error rollback pre-consumed quota", zap.Error(err))
+				graceful.GoCritical(ctx, "audioRollbackPreConsumed", func(cctx context.Context) {
+					if err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota); err != nil {
+						gmw.GetLogger(cctx).Error("error rollback pre-consumed quota", zap.Error(err))
 					}
-				}()
+				})
 			}()
 		}
 	}()
@@ -248,8 +247,9 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	req.Header.Set("Content-Type", c.Request.Header.Get("Content-Type"))
 	req.Header.Set("Accept", c.Request.Header.Get("Accept"))
 
+	lg := gmw.GetLogger(c)
 	// Log upstream request for billing tracking
-	gmw.GetLogger(c).Info("sending audio request to upstream channel",
+	lg.Info("sending audio request to upstream channel",
 		zap.String("url", fullRequestURL),
 		zap.Int("channelId", channelId),
 		zap.Int("userId", userId),
@@ -267,7 +267,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	{
 		requestId := c.GetString(ctxkey.RequestId)
 		if err := model.UpdateUserRequestCostQuotaByRequestID(userId, requestId, quota); err != nil {
-			gmw.GetLogger(c).Warn("record provisional user request cost failed", zap.Error(err))
+			lg.Warn("record provisional user request cost failed", zap.Error(err))
 		}
 	}
 
@@ -326,7 +326,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	if resp.StatusCode != http.StatusOK {
 		// Reconcile provisional record to 0 since upstream returned error
 		if err := model.UpdateUserRequestCostQuotaByRequestID(userId, c.GetString(ctxkey.RequestId), 0); err != nil {
-			gmw.GetLogger(c).Warn("update user request cost to zero failed", zap.Error(err))
+			lg.Warn("update user request cost to zero failed", zap.Error(err))
 		}
 		return RelayErrorHandler(resp)
 	}
@@ -358,11 +358,13 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			TraceId:          traceID,
 			ElapsedTime:      helper.CalcElapsedTime(meta.StartTime), // capture request latency in ms
 		}
-		go billing.PostConsumeQuotaWithLog(bgctx, tokenId, quotaDelta, quota, entry)
+		graceful.GoCritical(bgctx, "audioPostConsumeWithLog", func(cctx context.Context) {
+			billing.PostConsumeQuotaWithLog(cctx, tokenId, quotaDelta, quota, entry)
+		})
 
 		// Reconcile user request cost to final quota (override provisional value)
 		if err := model.UpdateUserRequestCostQuotaByRequestID(userId, c.GetString(ctxkey.RequestId), quota); err != nil {
-			gmw.GetLogger(c).Error("update user request cost failed", zap.Error(err))
+			lg.Error("update user request cost failed", zap.Error(err))
 		}
 	}()
 

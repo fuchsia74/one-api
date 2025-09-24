@@ -4,6 +4,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 )
@@ -59,12 +61,12 @@ func batchUpdate() {
 			case BatchUpdateTypeUserQuota:
 				err := increaseUserQuota(key, value)
 				if err != nil {
-					logger.Logger.Error("failed to batch update user quota: " + err.Error())
+					logger.Logger.Error("failed to batch update user quota", zap.Error(err))
 				}
 			case BatchUpdateTypeTokenQuota:
 				err := increaseTokenQuota(key, value)
 				if err != nil {
-					logger.Logger.Error("failed to batch update token quota: " + err.Error())
+					logger.Logger.Error("failed to batch update token quota", zap.Error(err))
 				}
 			case BatchUpdateTypeUsedQuota:
 				updateUserUsedQuota(key, value)

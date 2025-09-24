@@ -6,8 +6,10 @@ import (
 	"encoding/base64"
 	"net/http"
 	"os"
+	"os/signal"
 	"runtime"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/Laisky/errors/v2"
@@ -23,6 +25,7 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/client"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/graceful"
 	"github.com/songquanpeng/one-api/common/i18n"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/controller"
@@ -203,10 +206,39 @@ func main() {
 	if port == "" {
 		port = strconv.Itoa(*common.Port)
 	}
-	logger.Logger.Info("server started", zap.String("address", "http://localhost:"+port))
-	err = server.Run(":" + port)
-	if err != nil {
-		logger.Logger.Fatal("failed to start HTTP server", zap.Error(err))
+	addr := ":" + port
+	srv := &http.Server{Addr: addr, Handler: server}
+
+	// Start server in background
+	go func() {
+		logger.Logger.Info("server started", zap.String("address", "http://localhost:"+port))
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logger.Logger.Fatal("failed to start HTTP server", zap.Error(err))
+		}
+	}()
+
+	// Handle shutdown signals
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
+	logger.Logger.Info("shutdown signal received, starting graceful drain")
+	graceful.SetDraining()
+
+	// Stop accepting new requests and wait for handlers to return
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), time.Duration(config.ShutdownTimeoutSec)*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		logger.Logger.Error("server shutdown error", zap.Error(err))
+	}
+
+	// Drain critical background tasks (billing, refunds, etc.)
+	if err := graceful.Drain(shutdownCtx); err != nil {
+		logger.Logger.Error("graceful drain finished with timeout/error", zap.Error(err))
+	}
+
+	// Close DB after all drains complete
+	if derr := model.CloseDB(); derr != nil {
+		logger.Logger.Error("failed to close database", zap.Error(derr))
 	}
 }
 
