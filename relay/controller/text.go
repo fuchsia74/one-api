@@ -271,7 +271,8 @@ func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.
 		return nil, errors.Wrap(err, "marshal converted request failed")
 	}
 
-	gmw.GetLogger(c).Debug("converted request", zap.ByteString("json", jsonData))
+	lg := gmw.GetLogger(c)
+	lg.Debug("converted request", zap.ByteString("json", jsonData))
 	requestBody = bytes.NewBuffer(jsonData)
 	return requestBody, nil
 }

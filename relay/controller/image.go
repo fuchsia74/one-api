@@ -382,7 +382,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		quotaId := c.GetInt(ctxkey.Id)
 		requestId := c.GetString(ctxkey.RequestId)
 		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, preConsumedQuota); err != nil {
-			gmw.GetLogger(c).Warn("record provisional user request cost failed", zap.Error(err))
+			lg.Warn("record provisional user request cost failed", zap.Error(err))
 		}
 	}
 

@@ -231,7 +231,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			claudeResp := new(anthropic.StreamResponse)
 			err := json.NewDecoder(bytes.NewReader(v.Value.Bytes)).Decode(claudeResp)
 			if err != nil {
-				gmw.GetLogger(c).Error("error unmarshalling stream response: " + err.Error())
+				gmw.GetLogger(c).Error("error unmarshalling stream response", zap.Error(err))
 				return false
 			}
 

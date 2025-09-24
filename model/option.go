@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laisky/zap"
+
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	billingratio "github.com/songquanpeng/one-api/relay/billing/ratio"
@@ -89,7 +91,7 @@ func loadOptionsFromDatabase() {
 		}
 		err := updateOptionMap(option.Key, option.Value)
 		if err != nil {
-			logger.Logger.Error("failed to update option map: " + err.Error())
+			logger.Logger.Error("failed to update option map", zap.Error(err))
 		}
 	}
 }

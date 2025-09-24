@@ -168,7 +168,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		}
 		if estimated > 0 {
 			if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, estimated); err != nil {
-				gmw.GetLogger(c).Warn("record provisional user request cost failed", zap.Error(err))
+				lg.Warn("record provisional user request cost failed", zap.Error(err))
 			}
 		}
 	}

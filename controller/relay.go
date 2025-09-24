@@ -149,7 +149,11 @@ func Relay(c *gin.Context) {
 
 	// Debug logging to track channel exclusions (only when debug is enabled)
 	if config.DebugEnabled {
-		lg.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		if retryTimes > 0 {
+			lg.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		} else {
+			lg.Info(fmt.Sprintf("Debug: No retry will be attempted (retryTimes=0) - Channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		}
 	}
 
 	// For 429 errors, we should try lower priority channels first
