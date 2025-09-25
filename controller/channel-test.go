@@ -339,7 +339,7 @@ func TestChannel(c *gin.Context) {
 				// clear invalid stored value and pick cheapest
 				channel.TestingModel = nil
 				if err := model.DB.Model(channel).Where("id = ?", channel.Id).Update("testing_model", nil).Error; err != nil {
-					gmw.GetLogger(c).Error("failed to clear invalid testing_model", zap.Error(err))
+					lg.Error("failed to clear invalid testing_model", zap.Error(err))
 				}
 			}
 		}
@@ -411,6 +411,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 		disableThreshold = 10000000 // a impossible value
 	}
 	go func() {
+		lg := gmw.GetLogger(ctx)
 		for _, channel := range channels {
 			isChannelEnabled := channel.Status == model.ChannelStatusEnabled
 			tik := time.Now()
@@ -430,7 +431,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 				} else {
 					channel.TestingModel = nil
 					if err := model.DB.Model(channel).Where("id = ?", channel.Id).Update("testing_model", nil).Error; err != nil {
-						gmw.GetLogger(ctx).Error("failed to clear invalid testing_model in bulk test", zap.Error(err))
+						lg.Error("failed to clear invalid testing_model in bulk test", zap.Error(err))
 					}
 				}
 			}
@@ -477,7 +478,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 		if notify {
 			err := message.Notify(message.ByAll, "Channel test completed", "", "Channel test completed, if you have not received the disable notification, it means that all channels are normal")
 			if err != nil {
-				gmw.GetLogger(ctx).Error("failed to send notify", zap.Error(err))
+				lg.Error("failed to send notify", zap.Error(err))
 			}
 		}
 	}()
@@ -506,10 +507,11 @@ func TestChannels(c *gin.Context) {
 
 func AutomaticallyTestChannels(frequency int) {
 	ctx := context.Background()
+	lg := gmw.GetLogger(ctx)
 	for {
 		time.Sleep(time.Duration(frequency) * time.Minute)
-		gmw.GetLogger(ctx).Info("testing all channels")
+		lg.Info("testing all channels")
 		_ = testChannels(ctx, false, "all")
-		gmw.GetLogger(ctx).Info("channel test finished")
+		lg.Info("channel test finished")
 	}
 }
