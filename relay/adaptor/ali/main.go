@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
@@ -103,10 +104,11 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 	if aliResponse.Code != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: aliResponse.Message,
-				Type:    aliResponse.Code,
-				Param:   aliResponse.RequestId,
-				Code:    aliResponse.Code,
+				Message:  aliResponse.Message,
+				Type:     aliResponse.Code,
+				Param:    aliResponse.RequestId,
+				Code:     aliResponse.Code,
+				RawError: errors.New(aliResponse.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
@@ -257,10 +259,11 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if aliResponse.Code != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: aliResponse.Message,
-				Type:    aliResponse.Code,
-				Param:   aliResponse.RequestId,
-				Code:    aliResponse.Code,
+				Message:  aliResponse.Message,
+				Type:     aliResponse.Code,
+				Param:    aliResponse.RequestId,
+				Code:     aliResponse.Code,
+				RawError: errors.New(aliResponse.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

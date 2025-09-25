@@ -34,10 +34,7 @@ func GetSubscription(c *gin.Context) {
 		expiredTime = 0
 	}
 	if err != nil {
-		Error := relaymodel.Error{
-			Message: err.Error(),
-			Type:    "upstream_error",
-		}
+		Error := relaymodel.Error{Message: err.Error(), Type: "upstream_error", RawError: err}
 		c.JSON(200, gin.H{
 			"error": Error,
 		})
@@ -76,10 +73,7 @@ func GetUsage(c *gin.Context) {
 		quota, err = model.GetUserUsedQuota(userId)
 	}
 	if err != nil {
-		Error := relaymodel.Error{
-			Message: err.Error(),
-			Type:    "one_api_error",
-		}
+		Error := relaymodel.Error{Message: err.Error(), Type: "one_api_error", RawError: err}
 		c.JSON(200, gin.H{
 			"error": Error,
 		})

@@ -6,16 +6,15 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
-
-	"github.com/songquanpeng/one-api/common/render"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/random"
+	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/constant"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -155,10 +154,11 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	if palmResponse.Error.Code != 0 || len(palmResponse.Candidates) == 0 {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: palmResponse.Error.Message,
-				Type:    palmResponse.Error.Status,
-				Param:   "",
-				Code:    palmResponse.Error.Code,
+				Message:  palmResponse.Error.Message,
+				Type:     palmResponse.Error.Status,
+				Param:    "",
+				Code:     palmResponse.Error.Code,
+				RawError: errors.New(palmResponse.Error.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

@@ -29,11 +29,7 @@ func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusC
 	lg := gmw.GetLogger(c)
 	if meta.Mode != relaymode.Realtime {
 		return &rmodel.ErrorWithStatusCode{
-			Error: rmodel.Error{
-				Message: "invalid mode for realtime handler",
-				Type:    "one_api_error",
-				Code:    "invalid_mode",
-			},
+			Error:      rmodel.Error{Message: "invalid mode for realtime handler", Type: "one_api_error", Code: "invalid_mode", RawError: errors.New("invalid mode for realtime handler")},
 			StatusCode: http.StatusBadRequest,
 		}, nil
 	}
@@ -47,7 +43,7 @@ func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusC
 	clientConn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		return &rmodel.ErrorWithStatusCode{
-			Error:      rmodel.Error{Message: "websocket upgrade failed: " + err.Error(), Type: "one_api_error", Code: "ws_upgrade_failed"},
+			Error:      rmodel.Error{Message: "websocket upgrade failed: " + err.Error(), Type: "one_api_error", Code: "ws_upgrade_failed", RawError: err},
 			StatusCode: http.StatusBadRequest,
 		}, nil
 	}
@@ -94,7 +90,7 @@ func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusC
 	if derr != nil {
 		_ = clientConn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseTryAgainLater, "upstream connect failed"))
 		return &rmodel.ErrorWithStatusCode{
-			Error:      rmodel.Error{Message: "upstream realtime connect failed: " + derr.Error(), Type: "one_api_error", Code: "upstream_connect_failed"},
+			Error:      rmodel.Error{Message: "upstream realtime connect failed: " + derr.Error(), Type: "one_api_error", Code: "upstream_connect_failed", RawError: derr},
 			StatusCode: http.StatusBadGateway,
 		}, nil
 	}
