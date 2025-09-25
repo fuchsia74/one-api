@@ -43,7 +43,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		return nil, &relaymodel.ErrorWithStatusCode{
 			StatusCode: http.StatusInternalServerError,
 			Error: relaymodel.Error{
-				Message: gerr.Error(),
+				Message:  gerr.Error(),
+				RawError: gerr,
 			},
 		}
 	}

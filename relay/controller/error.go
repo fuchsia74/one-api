@@ -109,8 +109,14 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	if errResponse.Error.Message != "" {
 		// OpenAI format error, so we override the default one
 		ErrorWithStatusCode.Error = errResponse.Error
+		if ErrorWithStatusCode.Error.RawError == nil && ErrorWithStatusCode.Error.Message != "" {
+			ErrorWithStatusCode.Error.RawError = errors.New(ErrorWithStatusCode.Error.Message)
+		}
 	} else {
 		ErrorWithStatusCode.Error.Message = errResponse.ToMessage()
+		if ErrorWithStatusCode.Error.RawError == nil && ErrorWithStatusCode.Error.Message != "" {
+			ErrorWithStatusCode.Error.RawError = errors.New(ErrorWithStatusCode.Error.Message)
+		}
 	}
 
 	if ErrorWithStatusCode.Error.Message == "" {

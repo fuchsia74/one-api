@@ -124,7 +124,9 @@ func Relay(c *gin.Context) {
 		// Try to get an estimate of available channels for this model/group
 		// to increase retry attempts accordingly
 		retryTimes = retryTimes * 2 // Increase retry attempts for 429 errors
-		lg.Info(fmt.Sprintf("429 error detected, increasing retry attempts to %d to exhaust alternative channels", retryTimes))
+		lg.Info("429 error detected, increasing retry attempts to exhaust alternative channels",
+			zap.Int("retry_attempts", retryTimes),
+		)
 	}
 
 	// For 413 errors, increase retry attempts to exhaust all available channels
@@ -135,11 +137,18 @@ func Relay(c *gin.Context) {
 		channels, err := dbmodel.GetChannelsFromCache(group, originalModel)
 		if err != nil {
 			retryTimes = 1
-			lg.Debug(fmt.Sprintf("413 error detected, Get channels from cache error: %v", err))
-			lg.Warn(fmt.Sprintf("413 error detected, Failed to get total number of channels for a model/group from cache. increasing retry attempts to %d", retryTimes))
+			lg.Debug("413 error detected, Get channels from cache error",
+				zap.Error(err),
+			)
+			lg.Warn("413 error detected, Failed to get total number of channels for a model/group from cache. increasing retry attempts",
+				zap.Int("retry_attempts", retryTimes),
+				zap.Error(err),
+			)
 		} else {
 			retryTimes = len(channels) - 1
-			lg.Info(fmt.Sprintf("413 error detected, increasing retry attempts to %d to exhaust alternative channels", retryTimes))
+			lg.Info("413 error detected, increasing retry attempts to exhaust alternative channels",
+				zap.Int("retry_attempts", retryTimes),
+			)
 		}
 	}
 
@@ -149,7 +158,19 @@ func Relay(c *gin.Context) {
 
 	// Debug logging to track channel exclusions (only when debug is enabled)
 	if config.DebugEnabled {
-		lg.Info(fmt.Sprintf("Debug: Starting retry logic - Initial failed channel: %d, Error: %d, Request ID: %s", lastFailedChannelId, bizErr.StatusCode, requestId))
+		if retryTimes > 0 {
+			lg.Info("Debug: Starting retry logic - Initial failed channel",
+				zap.Int("initial_failed_channel", lastFailedChannelId),
+				zap.Int("error_code", bizErr.StatusCode),
+				zap.String("request_id", requestId),
+			)
+		} else {
+			lg.Info("Debug: No retry will be attempted (retryTimes=0)",
+				zap.Int("channel_id", lastFailedChannelId),
+				zap.Int("error_code", bizErr.StatusCode),
+				zap.String("request_id", requestId),
+			)
+		}
 	}
 
 	// For 429 errors, we should try lower priority channels first
@@ -184,7 +205,9 @@ func Relay(c *gin.Context) {
 			channel, err = dbmodel.CacheGetRandomSatisfiedChannelExcluding(group, originalModel, true, failedChannels, false)
 			if err != nil {
 				// If no lower priority channels available, try highest priority channels (excluding failed ones)
-				lg.Info(fmt.Sprintf("No lower priority channels available, trying highest priority channels, excluding: %v", getChannelIds(failedChannels)))
+				lg.Info("No lower priority channels available, trying highest priority channels",
+					zap.Ints("excluded_channels", getChannelIds(failedChannels)),
+				)
 				channel, err = dbmodel.CacheGetRandomSatisfiedChannelExcluding(group, originalModel, false, failedChannels, false)
 			}
 		} else {
@@ -210,7 +233,10 @@ func Relay(c *gin.Context) {
 			break
 		}
 
-		lg.Info(fmt.Sprintf("using channel #%d to retry (remain times %d)", channel.Id, i))
+		lg.Info("using channel to retry",
+			zap.Int("channel_id", channel.Id),
+			zap.Int("remaining_attempts", i),
+		)
 		middleware.SetupContextForSelectedChannel(c, channel, originalModel)
 		requestBody, err := common.GetRequestBody(c)
 		c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
@@ -253,7 +279,7 @@ func Relay(c *gin.Context) {
 		if bizErr.StatusCode == http.StatusTooManyRequests {
 			// Provide more specific messaging for 429 errors after exhausting retries
 			if len(failedChannels) > 1 {
-				bizErr.Error.Message = fmt.Sprintf("All available channels (%d) for this model are currently rate limited, please try again later", len(failedChannels))
+				bizErr.Error.Message = fmt.Sprintf("All available channels (%d) for this model are currently rate limited, please try again later", len(failedChannels)) // Message for client, not logger
 			} else {
 				bizErr.Error.Message = "The current group load is saturated, please try again later"
 			}
@@ -365,6 +391,8 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 		return
 	}
 
+	lg := gmw.GetLogger(ctx)
+
 	var channelIds []int
 	for id := range failedChannelIds {
 		channelIds = append(channelIds, id)
@@ -374,12 +402,12 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 	now := time.Now()
 	groupCol := "`group`"
 	if common.UsingPostgreSQL {
-		groupCol = `"group"`
+		groupCol = "\"group\""
 	}
 
 	err := dbmodel.DB.Where(groupCol+" = ? AND model = ? AND channel_id IN (?)", group, model, channelIds).Find(&abilities).Error
 	if err != nil {
-		gmw.GetLogger(ctx).Error("Failed to check suspension status", zap.Error(err))
+		lg.Error("Failed to check suspension status", zap.Error(err))
 		return
 	}
 
@@ -395,35 +423,46 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 	}
 
 	if len(suspended) > 0 {
-		gmw.GetLogger(ctx).Info(fmt.Sprintf("Debug: Database suspension status - Suspended channels: %v, Available channels: %v, Model: %s, Group: %s", suspended, available, model, group))
+		lg.Info("Debug: Database suspension status",
+			zap.Ints("suspended_channels", suspended),
+			zap.Ints("available_channels", available),
+			zap.String("model", model),
+			zap.String("group", group),
+		)
 	}
 }
 
 func processChannelRelayError(ctx context.Context, userId int, channelId int, channelName string, group string, originalModel string, err model.ErrorWithStatusCode) {
+	// Always use a local logger variable
+	lg := gmw.GetLogger(ctx)
+
 	// Downgrade to WARN for client-side cancellations/timeouts to avoid noisy alerts
 	if isClientContextCancel(err.StatusCode, err.RawError) {
-		gmw.GetLogger(ctx).Warn("relay aborted by client (context canceled/deadline)",
+		lg.Warn("relay aborted by client (context canceled/deadline)",
 			zap.Int("channel_id", channelId),
 			zap.String("channel_name", channelName),
 			zap.Int("user_id", userId),
 			zap.String("group", group),
 			zap.String("model", originalModel),
-			zap.String("error_message", err.Message))
+			zap.Error(err.RawError))
 	} else {
-		gmw.GetLogger(ctx).Error("relay error",
+		lg.Error("relay error",
 			zap.Int("channel_id", channelId),
 			zap.String("channel_name", channelName),
 			zap.Int("user_id", userId),
 			zap.String("group", group),
 			zap.String("model", originalModel),
-			zap.String("error_message", err.Message))
+			zap.Error(err.RawError))
 	}
 
 	// Handle 400 errors differently - they are client request issues, not channel problems
 	if err.StatusCode == http.StatusBadRequest {
 		// For 400 errors, log but don't disable channel or suspend abilities
 		// These are typically schema validation errors or malformed requests
-		gmw.GetLogger(ctx).Info(fmt.Sprintf("client request error (400) for channel %d (%s) - not disabling channel as this is not a channel issue", channelId, channelName))
+		lg.Info("client request error (400) for channel - not disabling channel as this is not a channel issue",
+			zap.Int("channel_id", channelId),
+			zap.String("channel_name", channelName),
+		)
 		// Still emit failure for monitoring purposes, but don't disable the channel
 		monitor.Emit(channelId, false)
 		return
@@ -431,11 +470,16 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 
 	if err.StatusCode == http.StatusTooManyRequests {
 		// For 429, we will suspend the specific model for a while
-		gmw.GetLogger(ctx).Info(fmt.Sprintf("suspending model %s in group %s on channel %d (%s) due to rate limit", originalModel, group, channelId, channelName))
+		lg.Info("suspending model due to rate limit",
+			zap.String("model", originalModel),
+			zap.String("group", group),
+			zap.Int("channel_id", channelId),
+			zap.String("channel_name", channelName),
+		)
 		if suspendErr := dbmodel.SuspendAbility(ctx,
 			group, originalModel, channelId,
 			config.ChannelSuspendSecondsFor429); suspendErr != nil {
-			gmw.GetLogger(ctx).Error("failed to suspend ability for channel",
+			lg.Error("failed to suspend ability for channel",
 				zap.Int("channel_id", channelId),
 				zap.String("model", originalModel),
 				zap.String("group", group),
@@ -460,9 +504,15 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 
 	// 5xx or network-type server errors -> suspend ability briefly
 	if err.StatusCode >= 500 && err.StatusCode <= 599 {
-		gmw.GetLogger(ctx).Info(fmt.Sprintf("suspending model %s in group %s on channel %d (%s) due to server error %d", originalModel, group, channelId, channelName, err.StatusCode))
+		lg.Info("suspending model due to server error",
+			zap.String("model", originalModel),
+			zap.String("group", group),
+			zap.Int("channel_id", channelId),
+			zap.String("channel_name", channelName),
+			zap.Int("status_code", err.StatusCode),
+		)
 		if suspendErr := dbmodel.SuspendAbility(ctx, group, originalModel, channelId, config.ChannelSuspendSecondsFor5XX); suspendErr != nil {
-			gmw.GetLogger(ctx).Error("failed to suspend ability for 5xx", zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
+			lg.Error("failed to suspend ability for 5xx", zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
 		}
 		// Do not immediately auto-disable; transient
 		monitor.Emit(channelId, false)
@@ -471,9 +521,14 @@ func processChannelRelayError(ctx context.Context, userId int, channelId int, ch
 
 	// Auth/permission/quota errors (401/403 or vendor-indicated) -> suspend ability; escalate to auto-disable only if fatal
 	if err.StatusCode == http.StatusUnauthorized || err.StatusCode == http.StatusForbidden || classifyAuthLike(&err) {
-		gmw.GetLogger(ctx).Info(fmt.Sprintf("auth/permission issue for model %s group %s on channel %d (%s), suspending ability", originalModel, group, channelId, channelName))
+		lg.Info("auth/permission issue, suspending ability",
+			zap.String("model", originalModel),
+			zap.String("group", group),
+			zap.Int("channel_id", channelId),
+			zap.String("channel_name", channelName),
+		)
 		if suspendErr := dbmodel.SuspendAbility(ctx, group, originalModel, channelId, config.ChannelSuspendSecondsForAuth); suspendErr != nil {
-			gmw.GetLogger(ctx).Error("failed to suspend ability for auth/permission", zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
+			lg.Error("failed to suspend ability for auth/permission", zap.Error(errors.Wrap(suspendErr, "suspend ability failed")))
 		}
 
 		if monitor.ShouldDisableChannel(&err.Error, err.StatusCode) {

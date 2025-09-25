@@ -18,6 +18,70 @@ Also welcome to register and use my deployed one-api gateway, which supports var
 - [One API](#one-api)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
+    - [Docker Compose Deployment](#docker-compose-deployment)
+    - [Kubernetes Deployment](#kubernetes-deployment)
+  - [Contributors](#contributors)
+  - [New Features](#new-features)
+    - [Universal Features](#universal-features)
+      - [Support update user's remained quota](#support-update-users-remained-quota)
+      - [Get request's cost](#get-requests-cost)
+      - [Support Tracing info in logs](#support-tracing-info-in-logs)
+      - [Support Cached Input](#support-cached-input)
+        - [Support Anthropic Prompt caching](#support-anthropic-prompt-caching)
+      - [Automatically Enable Thinking and Customize Reasoning Format via URL Parameters](#automatically-enable-thinking-and-customize-reasoning-format-via-url-parameters)
+        - [Reasoning Format - reasoning-content](#reasoning-format---reasoning-content)
+        - [Reasoning Format - reasoning](#reasoning-format---reasoning)
+        - [Reasoning Format - thinking](#reasoning-format---thinking)
+    - [OpenAI Features](#openai-features)
+      - [(Merged) Support gpt-vision](#merged-support-gpt-vision)
+      - [Support openai images edits](#support-openai-images-edits)
+      - [Support OpenAI o1/o1-mini/o1-preview](#support-openai-o1o1-minio1-preview)
+      - [Support gpt-4o-audio](#support-gpt-4o-audio)
+      - [Support OpenAI web search models](#support-openai-web-search-models)
+      - [Support gpt-image-1's image generation \& edits](#support-gpt-image-1s-image-generation--edits)
+      - [Support o3-mini](#support-o3-mini)
+      - [Support o3 \& o4-mini \& gpt-4.1](#support-o3--o4-mini--gpt-41)
+      - [Support o3-pro \& reasoning content](#support-o3-pro--reasoning-content)
+      - [Support OpenAI Response API](#support-openai-response-api)
+    - [Anthropic (Claude) Features](#anthropic-claude-features)
+      - [(Merged) Support aws claude](#merged-support-aws-claude)
+      - [Support claude-3-7-sonnet \& thinking](#support-claude-3-7-sonnet--thinking)
+        - [Stream](#stream)
+        - [Non-Stream](#non-stream)
+      - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
+        - [Support Claude Code](#support-claude-code)
+    - [Google (Gemini \& Vertex) Features](#google-gemini--vertex-features)
+      - [Support gemini-2.0-flash-exp](#support-gemini-20-flash-exp)
+      - [Support gemini-2.0-flash](#support-gemini-20-flash)
+      - [Support gemini-2.0-flash-thinking-exp-01-21](#support-gemini-20-flash-thinking-exp-01-21)
+      - [Support Vertex Imagen3](#support-vertex-imagen3)
+      - [Support gemini multimodal output #2197](#support-gemini-multimodal-output-2197)
+      - [Support gemini-2.5-pro](#support-gemini-25-pro)
+      - [Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05](#support-gcp-vertex-gloabl-region-and-gemini-25-pro-preview-06-05)
+      - [Support gemini-2.5-flash-image-preview \& imagen-4 series](#support-gemini-25-flash-image-preview--imagen-4-series)
+    - [AWS Features](#aws-features)
+      - [Support AWS cross-region inferences](#support-aws-cross-region-inferences)
+      - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
+    - [Replicate Features](#replicate-features)
+      - [Support replicate flux \& remix](#support-replicate-flux--remix)
+      - [Support replicate chat models](#support-replicate-chat-models)
+    - [DeepSeek Features](#deepseek-features)
+      - [Support deepseek-reasoner](#support-deepseek-reasoner)
+    - [OpenRouter Features](#openrouter-features)
+      - [Support OpenRouter's reasoning content](#support-openrouters-reasoning-content)
+    - [Coze Features](#coze-features)
+      - [Support coze oauth authentication](#support-coze-oauth-authentication)
+    - [XAI / Grok Features](#xai--grok-features)
+      - [Support XAI/Grok Text \& Image Models](#support-xaigrok-text--image-models)
+    - [Black Forest Labs Features](#black-forest-labs-features)
+      - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
+  - [Bug Fixes \& Enterprise-Grade Improvements (Including Security Enhancements)](#bug-fixes--enterprise-grade-improvements-including-security-enhancements)
+    > > > > > > > main
+- [One API](#one-api)
+  - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
+  - [Tutorial](#tutorial)
+    - [Docker Compose Deployment](#docker-compose-deployment)
+    - [Kubernetes Deployment](#kubernetes-deployment)
   - [Contributors](#contributors)
   - [New Features](#new-features)
     - [Universal Features](#universal-features)
@@ -83,6 +147,8 @@ This repository is fully compatible with multi-agent frameworks and is recommend
 > For optimal performance in multi-agent environments, it's recommended to use models that already have automated cached prompt capabilities, such as `grok-code-fast-1`. These models can significantly reduce latency and improve response times by leveraging cached prompts, which is especially beneficial when multiple agents are making frequent requests with similar contexts.
 
 ## Tutorial
+
+### Docker Compose Deployment
 
 Run one-api using docker-compose:
 
@@ -155,6 +221,14 @@ oneapi:
 ```
 
 The initial default account and password are `root` / `123456`.
+
+> [!TIP] > **Secret Management**: For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables:
+
+### Kubernetes Deployment
+
+The Kubernetes deployment guide has been moved into a dedicated document:
+
+- [docs/manuals/k8s.md](docs/manuals/k8s.md)
 
 ## Contributors
 
@@ -433,5 +507,5 @@ By default, the thinking mode is automatically enabled for the deepseek-r1 model
 - [fix: oidc token endpoint request body #2106 #36](https://github.com/Laisky/one-api/pull/36)
 
 > [!NOTE]
-
+>
 > For additional enterprise-grade improvements, including security enhancements (e.g., [vulnerability fixes](https://github.com/Laisky/one-api/pull/126)), you can also view these pull requests [here](https://github.com/Laisky/one-api/pulls?q=is%3Apr+is%3Aclosed).

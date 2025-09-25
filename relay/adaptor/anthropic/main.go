@@ -975,10 +975,11 @@ func ClaudeNativeHandler(c *gin.Context, resp *http.Response, promptTokens int, 
 	if claudeResponse.Error.Type != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: claudeResponse.Error.Message,
-				Type:    claudeResponse.Error.Type,
-				Param:   "",
-				Code:    claudeResponse.Error.Type,
+				Message:  claudeResponse.Error.Message,
+				Type:     claudeResponse.Error.Type,
+				Param:    "",
+				Code:     claudeResponse.Error.Type,
+				RawError: errors.New(claudeResponse.Error.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
@@ -1026,10 +1027,11 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	if claudeResponse.Error.Type != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: claudeResponse.Error.Message,
-				Type:    claudeResponse.Error.Type,
-				Param:   "",
-				Code:    claudeResponse.Error.Type,
+				Message:  claudeResponse.Error.Message,
+				Type:     claudeResponse.Error.Type,
+				Param:    "",
+				Code:     claudeResponse.Error.Type,
+				RawError: errors.New(claudeResponse.Error.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

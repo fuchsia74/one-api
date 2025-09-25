@@ -133,7 +133,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 			var streamResponse CompletionsStreamResponse
 			err := json.Unmarshal([]byte(data[dataPrefixLength:]), &streamResponse)
 			if err != nil {
-				lg.Error("error unmarshalling stream response: " + err.Error())
+				lg.Error("error unmarshalling stream response", zap.Error(err))
 				continue
 			}
 
@@ -146,7 +146,7 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 
 	// Check for scanner errors
 	if err := scanner.Err(); err != nil {
-		lg.Error("error reading stream: " + err.Error())
+		lg.Error("error reading stream", zap.Error(err))
 	}
 
 	// Ensure stream termination is sent to client
@@ -224,7 +224,8 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 
 	// Reset response body for forwarding to client
 	resp.Body = io.NopCloser(bytes.NewBuffer(responseBody))
-	gmw.GetLogger(c).Debug("handler response", zap.ByteString("body", responseBody))
+	lg := gmw.GetLogger(c)
+	lg.Debug("handler response", zap.ByteString("body", responseBody))
 
 	// Check if this is a Claude Messages conversion - if so, don't write response here
 	// The DoResponse method will handle the conversion and response writing
@@ -363,8 +364,9 @@ func ResponseAPIHandler(c *gin.Context, resp *http.Response, promptTokens int, m
 		return ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError), nil
 	}
 
+	lg := gmw.GetLogger(c)
 	// Log the response body for debugging
-	gmw.GetLogger(c).Debug("got response from upstream", zap.ByteString("body", responseBody))
+	lg.Debug("got response from upstream", zap.ByteString("body", responseBody))
 
 	// Close the original response body
 	if err = resp.Body.Close(); err != nil {
@@ -428,7 +430,7 @@ func ResponseAPIHandler(c *gin.Context, resp *http.Response, promptTokens int, m
 		return ErrorWrapper(err, "marshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	gmw.GetLogger(c).Debug("generate response to user", zap.ByteString("body", jsonResponse))
+	lg.Debug("generate response to user", zap.ByteString("body", jsonResponse))
 
 	// Forward all response headers
 	for k, values := range resp.Header {

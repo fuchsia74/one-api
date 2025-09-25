@@ -200,7 +200,8 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 		return nil, &relayModel.ErrorWithStatusCode{
 			StatusCode: http.StatusInternalServerError,
 			Error: relayModel.Error{
-				Message: "adaptor not found",
+				Message:  "adaptor not found",
+				RawError: errors.New("adaptor not found"),
 			},
 		}
 	}

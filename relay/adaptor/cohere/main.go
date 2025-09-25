@@ -8,17 +8,16 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
-
-	"github.com/songquanpeng/one-api/common/ctxkey"
-	"github.com/songquanpeng/one-api/common/render"
-
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -212,10 +211,11 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	if cohereResponse.ResponseID == "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: cohereResponse.Message,
-				Type:    cohereResponse.Message,
-				Param:   "",
-				Code:    resp.StatusCode,
+				Message:  cohereResponse.Message,
+				Type:     cohereResponse.Message,
+				Param:    "",
+				Code:     resp.StatusCode,
+				RawError: errors.New(cohereResponse.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

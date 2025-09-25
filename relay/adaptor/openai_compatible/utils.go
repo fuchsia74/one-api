@@ -64,9 +64,10 @@ func NormalizeDataLine(data string) string {
 func ErrorWrapper(err error, code string, statusCode int) *model.ErrorWithStatusCode {
 	return &model.ErrorWithStatusCode{
 		Error: model.Error{
-			Message: err.Error(),
-			Type:    "one_api_error",
-			Code:    code,
+			Message:  err.Error(),
+			Type:     "one_api_error",
+			Code:     code,
+			RawError: err,
 		},
 		StatusCode: statusCode,
 	}
@@ -138,9 +139,14 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 
 	// Check for API error in response
 	if embeddingResponse.Error.Type != "" {
+		if embeddingResponse.Error.RawError == nil && embeddingResponse.Error.Message != "" {
+			embeddingResponse.Error.RawError = errors.New(embeddingResponse.Error.Message)
+		}
 		logger.Debug("upstream returned embedding error response",
 			zap.String("error_type", embeddingResponse.Error.Type),
-			zap.String("error_message", embeddingResponse.Error.Message))
+			zap.String("error_message", embeddingResponse.Error.Message),
+			// Prefer recording the raw upstream error for diagnostics
+			zap.Error(embeddingResponse.Error.RawError))
 		return &model.ErrorWithStatusCode{
 			Error:      embeddingResponse.Error,
 			StatusCode: resp.StatusCode,
@@ -205,9 +211,14 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	}
 
 	if textResponse.Error.Type != "" {
+		if textResponse.Error.RawError == nil && textResponse.Error.Message != "" {
+			textResponse.Error.RawError = errors.New(textResponse.Error.Message)
+		}
 		logger.Debug("upstream returned error response",
 			zap.String("error_type", textResponse.Error.Type),
-			zap.String("error_message", textResponse.Error.Message))
+			zap.String("error_message", textResponse.Error.Message),
+			// Prefer recording the raw upstream error for diagnostics
+			zap.Error(textResponse.Error.RawError))
 		return &model.ErrorWithStatusCode{
 			Error:      textResponse.Error,
 			StatusCode: resp.StatusCode,
@@ -374,9 +385,14 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 	}
 
 	if textResponse.Error.Type != "" {
+		if textResponse.Error.RawError == nil && textResponse.Error.Message != "" {
+			textResponse.Error.RawError = errors.New(textResponse.Error.Message)
+		}
 		logger.Debug("upstream returned error response",
 			zap.String("error_type", textResponse.Error.Type),
-			zap.String("error_message", textResponse.Error.Message))
+			zap.String("error_message", textResponse.Error.Message),
+			// Prefer recording the raw upstream error for diagnostics
+			zap.Error(textResponse.Error.RawError))
 		return &model.ErrorWithStatusCode{
 			Error:      textResponse.Error,
 			StatusCode: resp.StatusCode,

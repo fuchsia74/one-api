@@ -775,10 +775,11 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	if len(geminiResponse.Candidates) == 0 {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: "No candidates returned",
-				Type:    "server_error",
-				Param:   "",
-				Code:    500,
+				Message:  "No candidates returned",
+				Type:     "server_error",
+				Param:    "",
+				Code:     500,
+				RawError: errors.New("No candidates returned"),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
@@ -835,10 +836,11 @@ func EmbeddingHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStat
 	if geminiEmbeddingResponse.Error != nil {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: geminiEmbeddingResponse.Error.Message,
-				Type:    "gemini_error",
-				Param:   "",
-				Code:    geminiEmbeddingResponse.Error.Code,
+				Message:  geminiEmbeddingResponse.Error.Message,
+				Type:     "gemini_error",
+				Param:    "",
+				Code:     geminiEmbeddingResponse.Error.Code,
+				RawError: errors.New(geminiEmbeddingResponse.Error.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil
