@@ -2,10 +2,13 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { marked } from 'marked'
+import { ResponsivePageContainer } from '@/components/ui/responsive-container'
+import { useResponsive } from '@/hooks/useResponsive'
 
 export function HomePage() {
   const [home, setHome] = useState('') // URL or rendered HTML
   const [loaded, setLoaded] = useState(false)
+  const { isMobile } = useResponsive()
 
   const loadHome = async () => {
     try {
@@ -59,21 +62,23 @@ export function HomePage() {
   // If custom content exists (HTML/Markdown), render it; Markdown is pre-rendered to HTML
   if (loaded && home) {
     return (
-      <div className="container mx-auto px-4 py-10">
+      <ResponsivePageContainer>
         <Card>
-          <CardContent>
+          <CardContent className={isMobile ? 'p-4' : 'p-6'}>
             <div
-              className="prose prose-lg prose-headings:font-semibold prose-headings:tracking-tight prose-a:text-primary hover:prose-a:underline prose-pre:bg-muted/60 prose-code:before:content-[''] prose-code:after:content-[''] max-w-none dark:prose-invert"
+              className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-headings:break-words prose-headings:whitespace-pre-wrap prose-a:text-primary hover:prose-a:underline prose-pre:bg-muted/60 prose-pre:overflow-x-auto prose-code:before:content-[''] prose-code:after:content-['']"
               dangerouslySetInnerHTML={{ __html: home }}
             />
           </CardContent>
         </Card>
-      </div>
+      </ResponsivePageContainer>
     )
   }
 
   // Minimal empty state when no custom home content is configured
   return (
-    <div className="container mx-auto px-4 py-16" data-testid="home-empty" />
+    <ResponsivePageContainer>
+      <div className={isMobile ? 'py-8' : 'py-16'} data-testid="home-empty" />
+    </ResponsivePageContainer>
   )
 }

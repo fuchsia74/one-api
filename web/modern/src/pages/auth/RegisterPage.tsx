@@ -103,6 +103,7 @@ export function RegisterPage() {
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true)
+    data.aff_code = data.aff_code?.trim() || ''
     try {
       const payload = {
         username: data.username,
