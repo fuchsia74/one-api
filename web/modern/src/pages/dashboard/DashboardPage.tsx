@@ -533,9 +533,9 @@ export function DashboardPage() {
     >
       {/* Filter bar - Date Range Controls */}
       <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end">
-          <div className="flex gap-3 flex-1">
-            <div className="flex-1">
+        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end w-full">
+          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
+            <div className="flex-1 min-w-0">
               <label className="text-sm font-medium mb-2 block">From</label>
               <Input
                 type="date"
@@ -547,7 +547,7 @@ export function DashboardPage() {
                 aria-label="From date"
               />
             </div>
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <label className="text-sm font-medium mb-2 block">To</label>
               <Input
                 type="date"
@@ -560,7 +560,7 @@ export function DashboardPage() {
               />
             </div>
             {isAdmin && (
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <label className="text-sm font-medium mb-2 block">User</label>
                 <select
                   className="h-10 w-full border rounded-md px-3 text-sm bg-background"
@@ -577,12 +577,12 @@ export function DashboardPage() {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto sm:justify-end">
             <Button
               variant="outline"
               size="sm"
               onClick={() => applyPreset('today')}
-              className="h-10"
+              className="h-10 flex-1 min-w-[6rem] sm:flex-none"
             >
               Today
             </Button>
@@ -590,7 +590,7 @@ export function DashboardPage() {
               variant="outline"
               size="sm"
               onClick={() => applyPreset('7d')}
-              className="h-10"
+              className="h-10 flex-1 min-w-[6rem] sm:flex-none"
             >
               7D
             </Button>
@@ -598,14 +598,14 @@ export function DashboardPage() {
               variant="outline"
               size="sm"
               onClick={() => applyPreset('30d')}
-              className="h-10"
+              className="h-10 flex-1 min-w-[6rem] sm:flex-none"
             >
               30D
             </Button>
             <Button
               onClick={loadStats}
               disabled={loading}
-              className="h-10 px-6"
+              className="h-10 flex-1 min-w-[6rem] sm:flex-none sm:px-6"
             >
               {loading ? 'Loading...' : 'Apply'}
             </Button>
