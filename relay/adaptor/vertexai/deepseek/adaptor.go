@@ -57,11 +57,11 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, meta *meta.Met
 	// Use OpenAI-compatible response handling since DeepSeek is OpenAI-compatible
 	return openai_compatible.HandleClaudeMessagesResponse(c, resp, meta, func(c *gin.Context, resp *http.Response, promptTokens int, modelName string) (*model.ErrorWithStatusCode, *model.Usage) {
 		if meta.IsStream {
-			// TODO: This may need to return "openai_compatible.StreamHandlerWithThinking".
 			// Note: Vertex AI uses Unicode-escaped thinking tags (e.g., \u003cthink\u003e...\u003c/think\u003e)
-			// instead of raw XML-style tags like <think></think>.
-			return openai_compatible.StreamHandler(c, resp, promptTokens, modelName)
+			// instead of raw XML-style tags like <think></think>. This implementation therefore uses
+			// "StreamHandlerWithThinking" to ensure consistent handling.
+			return openai_compatible.StreamHandlerWithThinking(c, resp, promptTokens, modelName)
 		}
-		return openai_compatible.Handler(c, resp, promptTokens, modelName)
+		return openai_compatible.HandlerWithThinking(c, resp, promptTokens, modelName)
 	})
 }
