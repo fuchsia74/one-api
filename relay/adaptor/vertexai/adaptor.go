@@ -1,8 +1,11 @@
+// Note: This Vertex AI adapter has been refactored to be more easily leveraged and maintained.
+
 package vertexai
 
 import (
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -14,7 +17,10 @@ import (
 	channelhelper "github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/geminiOpenaiCompatible"
 	vertexaiClaude "github.com/songquanpeng/one-api/relay/adaptor/vertexai/claude"
+	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/deepseek"
 	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/imagen"
+	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/openai"
+	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/qwen"
 	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/veo"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -218,6 +224,9 @@ func (a *Adaptor) GetModelList() []string {
 	models = append(models, adaptor.GetModelListFromPricing(imagen.ModelRatios)...)
 	models = append(models, adaptor.GetModelListFromPricing(geminiOpenaiCompatible.ModelRatios)...)
 	models = append(models, adaptor.GetModelListFromPricing(veo.ModelRatios)...)
+	models = append(models, adaptor.GetModelListFromPricing(deepseek.ModelRatios)...)
+	models = append(models, adaptor.GetModelListFromPricing(openai.ModelRatios)...)
+	models = append(models, adaptor.GetModelListFromPricing(qwen.ModelRatios)...)
 
 	// Add VertexAI-specific models
 	models = append(models, "text-embedding-004", "aqa")
@@ -236,24 +245,25 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 	pricing := make(map[string]adaptor.ModelConfig)
 
 	// Import Claude models from claude subadaptor
-	for model, config := range vertexaiClaude.ModelRatios {
-		pricing[model] = config
-	}
+	maps.Copy(pricing, vertexaiClaude.ModelRatios)
 
 	// Import Imagen models from imagen subadaptor
-	for model, config := range imagen.ModelRatios {
-		pricing[model] = config
-	}
+	maps.Copy(pricing, imagen.ModelRatios)
 
 	// Import Gemini models from geminiOpenaiCompatible (shared with VertexAI)
-	for model, config := range geminiOpenaiCompatible.ModelRatios {
-		pricing[model] = config
-	}
+	maps.Copy(pricing, geminiOpenaiCompatible.ModelRatios)
 
 	// Import Veo models from veo subadaptor
-	for model, config := range veo.ModelRatios {
-		pricing[model] = config
-	}
+	maps.Copy(pricing, veo.ModelRatios)
+
+	// Import DeepSeek models from deepseek subadaptor
+	maps.Copy(pricing, deepseek.ModelRatios)
+
+	// Import OpenAI models from openai subadaptor
+	maps.Copy(pricing, openai.ModelRatios)
+
+	// Import Qwen models from qwen subadaptor
+	maps.Copy(pricing, qwen.ModelRatios)
 
 	// Add VertexAI-specific models that don't belong to subadaptors
 	// Using global ratio.MilliTokensUsd = 0.5 for consistent quota-based pricing
@@ -283,28 +293,138 @@ func (a *Adaptor) GetCompletionRatio(modelName string) float64 {
 	return 3.0
 }
 
-func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
-	// Determine the endpoint suffix based on model type and streaming
-	var suffix string
+// ModelEndpointType represents different endpoint types for VertexAI models
+type ModelEndpointType int
 
-	// Imagen models use the :predict endpoint (not generateContent / rawPredict)
-	// Docs: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/imagen-api
-	if isImagenModel(meta.ActualModelName) {
-		suffix = "predict"
-	} else if strings.Contains(meta.ActualModelName, "claude") {
-		// Claude models use rawPredict
-		suffix = "rawPredict"
-	} else {
-		// Gemini (and other text models) use generateContent / streamGenerateContent
-		if meta.IsStream {
-			suffix = "streamGenerateContent?alt=sse"
-		} else {
-			suffix = "generateContent"
-		}
+const (
+	EndpointTypeDeepSeek ModelEndpointType = iota
+	EndpointTypeOpenAI
+	EndpointTypeQwen
+	EndpointTypeImagen
+	EndpointTypeClaude
+	EndpointTypeGemini
+)
+
+// getModelEndpointType determines the endpoint type based on model name
+func getModelEndpointType(modelName string) ModelEndpointType {
+	switch {
+	case isDeepSeekModel(modelName):
+		return EndpointTypeDeepSeek
+	case isOpenAIModel(modelName):
+		return EndpointTypeOpenAI
+	case isQwenModel(modelName):
+		return EndpointTypeQwen
+	case isImagenModel(modelName):
+		return EndpointTypeImagen
+	case strings.Contains(modelName, "claude"):
+		return EndpointTypeClaude
+	default:
+		return EndpointTypeGemini
+	}
+}
+
+func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
+	// Validate required VertexAI configuration
+	if meta.Config.VertexAIProjectID == "" {
+		return "", errors.Errorf("VertexAI project ID is required but not configured for channel")
 	}
 
-	location := "us-central1"
-	baseHost := "us-central1-aiplatform.googleapis.com"
+	endpointType := getModelEndpointType(meta.ActualModelName)
+
+	switch endpointType {
+	case EndpointTypeDeepSeek:
+		return a.buildDeepSeekURL(meta)
+	case EndpointTypeOpenAI:
+		return a.buildOpenAIURL(meta)
+	case EndpointTypeQwen:
+		return a.buildQwenURL(meta)
+	case EndpointTypeImagen:
+		return a.buildImagenURL(meta)
+	case EndpointTypeClaude:
+		return a.buildClaudeURL(meta)
+	case EndpointTypeGemini:
+		return a.buildGeminiURL(meta)
+	default:
+		return a.buildGeminiURL(meta) // fallback to Gemini
+	}
+}
+
+// buildDeepSeekURL builds URL for DeepSeek models
+func (a *Adaptor) buildDeepSeekURL(meta *meta.Meta) (string, error) {
+	// DeepSeek models use OpenAI-compatible API with custom endpoint structure
+	baseHost, location := getDeepSeekEndpointConfig(meta.ActualModelName)
+
+	// Handle custom base URL and region
+	baseHost, location = a.applyCustomHostAndRegion(baseHost, location, meta)
+
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/endpoints/openapi/chat/completions",
+		baseHost, meta.Config.VertexAIProjectID, location), nil
+}
+
+// buildOpenAIURL builds URL for OpenAI GPT-OSS models
+func (a *Adaptor) buildOpenAIURL(meta *meta.Meta) (string, error) {
+	// OpenAI GPT-OSS models use OpenAI-compatible API with global endpoint
+	baseHost := "aiplatform.googleapis.com"
+	location := "global"
+
+	// Handle custom base URL and region
+	baseHost, location = a.applyCustomHostAndRegion(baseHost, location, meta)
+
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/endpoints/openapi/chat/completions",
+		baseHost, meta.Config.VertexAIProjectID, location), nil
+}
+
+// buildQwenURL builds URL for Qwen models
+func (a *Adaptor) buildQwenURL(meta *meta.Meta) (string, error) {
+	// Different Qwen models use different endpoints
+	baseHost, location := getQwenEndpointConfig(meta.ActualModelName)
+
+	// Handle custom base URL and region
+	baseHost, location = a.applyCustomHostAndRegion(baseHost, location, meta)
+
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/endpoints/openapi/chat/completions",
+		baseHost, meta.Config.VertexAIProjectID, location), nil
+}
+
+// buildImagenURL builds URL for Imagen models
+func (a *Adaptor) buildImagenURL(meta *meta.Meta) (string, error) {
+	// Imagen models use the :predict endpoint
+	// Docs: https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/imagen-api
+	baseHost, location := a.getDefaultHostAndLocation(meta)
+
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:predict",
+		baseHost, meta.Config.VertexAIProjectID, location, meta.ActualModelName), nil
+}
+
+// buildClaudeURL builds URL for Claude models
+func (a *Adaptor) buildClaudeURL(meta *meta.Meta) (string, error) {
+	// Claude models use rawPredict
+	baseHost, location := a.getDefaultHostAndLocation(meta)
+
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:rawPredict",
+		baseHost, meta.Config.VertexAIProjectID, location, meta.ActualModelName), nil
+}
+
+// buildGeminiURL builds URL for Gemini and other text models
+func (a *Adaptor) buildGeminiURL(meta *meta.Meta) (string, error) {
+	// Gemini (and other text models) use generateContent / streamGenerateContent
+	var suffix string
+	if meta.IsStream {
+		suffix = "streamGenerateContent?alt=sse"
+	} else {
+		suffix = "generateContent"
+	}
+
+	baseHost, location := a.getDefaultHostAndLocation(meta)
+
+	return fmt.Sprintf("https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:%s",
+		baseHost, meta.Config.VertexAIProjectID, location, meta.ActualModelName, suffix), nil
+}
+
+// getDefaultHostAndLocation returns the default host and location for standard VertexAI models
+func (a *Adaptor) getDefaultHostAndLocation(meta *meta.Meta) (baseHost, location string) {
+	location = "us-central1"
+	baseHost = "us-central1-aiplatform.googleapis.com"
 
 	// Check if model requires global endpoint
 	if IsRequireGlobalEndpoint(meta.ActualModelName) {
@@ -322,14 +442,24 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		baseHost = strings.TrimSuffix(baseHost, "/")
 	}
 
-	return fmt.Sprintf(
-		"https://%s/v1/projects/%s/locations/%s/publishers/google/models/%s:%s",
-		baseHost,
-		meta.Config.VertexAIProjectID,
-		location,
-		meta.ActualModelName,
-		suffix,
-	), nil
+	return baseHost, location
+}
+
+// applyCustomHostAndRegion applies custom base URL and region overrides
+func (a *Adaptor) applyCustomHostAndRegion(baseHost, location string, meta *meta.Meta) (string, string) {
+	// Handle custom base URL
+	if meta.BaseURL != "" {
+		baseHost = strings.TrimPrefix(meta.BaseURL, "https://")
+		baseHost = strings.TrimPrefix(baseHost, "http://")
+		baseHost = strings.TrimSuffix(baseHost, "/")
+	}
+
+	// Handle custom region if specified
+	if meta.Config.Region != "" {
+		location = meta.Config.Region
+	}
+
+	return baseHost, location
 }
 
 // isImagenModel returns true if the model name belongs to Vertex AI Imagen family.
@@ -339,6 +469,66 @@ func isImagenModel(model string) bool {
 		return false
 	}
 	return strings.HasPrefix(model, "imagen-") || strings.HasPrefix(model, "imagegeneration@")
+}
+
+// isDeepSeekModel returns true if the model name belongs to DeepSeek family.
+// DeepSeek models use OpenAI-compatible API with custom endpoint.
+func isDeepSeekModel(model string) bool {
+	if model == "" {
+		return false
+	}
+	return strings.HasPrefix(model, "deepseek-ai/")
+}
+
+// getDeepSeekEndpointConfig returns the appropriate endpoint configuration for DeepSeek models.
+// Different DeepSeek models use different endpoints and regions.
+func getDeepSeekEndpointConfig(model string) (baseHost, defaultRegion string) {
+	switch model {
+	case "deepseek-ai/deepseek-r1-0528-maas":
+		// DeepSeek R1 uses us-central1 endpoint
+		return "us-central1-aiplatform.googleapis.com", "us-central1"
+	case "deepseek-ai/deepseek-v3.1-maas":
+		// DeepSeek V3.1 uses us-west2 endpoint
+		return "us-west2-aiplatform.googleapis.com", "us-west2"
+	default:
+		// Default to us-west2 for any new DeepSeek models
+		return "us-west2-aiplatform.googleapis.com", "us-west2"
+	}
+}
+
+// isOpenAIModel returns true if the model name belongs to OpenAI GPT-OSS family.
+// OpenAI GPT-OSS models use OpenAI-compatible API with global endpoint.
+func isOpenAIModel(model string) bool {
+	if model == "" {
+		return false
+	}
+	return strings.HasPrefix(model, "openai/")
+}
+
+// isQwenModel returns true if the model name belongs to Qwen family.
+// Qwen models use OpenAI-compatible API with custom endpoint.
+func isQwenModel(model string) bool {
+	if model == "" {
+		return false
+	}
+	return strings.HasPrefix(model, "qwen/")
+}
+
+// getQwenEndpointConfig returns the appropriate endpoint configuration for Qwen models.
+// Different Qwen models use different endpoints and regions.
+func getQwenEndpointConfig(model string) (baseHost, defaultRegion string) {
+	switch model {
+	case "qwen/qwen3-next-80b-a3b-instruct-maas":
+		// Qwen3-next uses global endpoint
+		return "aiplatform.googleapis.com", "global"
+	case "qwen/qwen3-coder-480b-a35b-instruct-maas",
+		"qwen/qwen3-235b-a22b-instruct-2507-maas":
+		// Qwen3-coder and Qwen3-235b use us-south1 endpoint
+		return "us-south1-aiplatform.googleapis.com", "us-central1"
+	default:
+		// Default to us-south1 for any new Qwen models
+		return "us-south1-aiplatform.googleapis.com", "us-central1"
+	}
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) error {

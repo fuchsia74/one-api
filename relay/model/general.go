@@ -63,7 +63,7 @@ type GeneralOpenAIRequest struct {
 	TopLogprobs      *int     `json:"top_logprobs,omitempty"`
 	// MaxTokens is the maximum number of tokens to generate in the chat completion.
 	//
-	// Deprecated: Use MaxCompletionTokens instead.
+	// MaxTokens is not deprecated; most open-source models use max_tokens, not max_completion_tokens.
 	MaxTokens           int  `json:"max_tokens,omitempty"`
 	MaxCompletionTokens *int `json:"max_completion_tokens,omitempty"`
 	// N is how many chat completion choices to generate for each input message,

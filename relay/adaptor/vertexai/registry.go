@@ -7,8 +7,11 @@ import (
 
 	"github.com/songquanpeng/one-api/relay/adaptor/geminiOpenaiCompatible"
 	claude "github.com/songquanpeng/one-api/relay/adaptor/vertexai/claude"
+	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/deepseek"
 	gemini "github.com/songquanpeng/one-api/relay/adaptor/vertexai/gemini"
 	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/imagen"
+	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/openai"
+	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/qwen"
 	"github.com/songquanpeng/one-api/relay/adaptor/vertexai/veo"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -21,6 +24,9 @@ const (
 	VertexAIGemini
 	VertexAIImagen
 	VertexAIVeo
+	VertexAIDeepSeek
+	VertexAIOpenAI
+	VertexAIQwen
 )
 
 var modelMapping = map[string]VertexAIModelType{}
@@ -50,6 +56,24 @@ func init() {
 	for _, model := range veo.ModelList {
 		modelMapping[model] = VertexAIVeo
 	}
+
+	// register vertex deepseek models
+	modelList = append(modelList, deepseek.ModelList...)
+	for _, model := range deepseek.ModelList {
+		modelMapping[model] = VertexAIDeepSeek
+	}
+
+	// register vertex openai models
+	modelList = append(modelList, openai.ModelList...)
+	for _, model := range openai.ModelList {
+		modelMapping[model] = VertexAIOpenAI
+	}
+
+	// register vertex qwen models
+	modelList = append(modelList, qwen.ModelList...)
+	for _, model := range qwen.ModelList {
+		modelMapping[model] = VertexAIQwen
+	}
 }
 
 type innerAIAdapter interface {
@@ -69,6 +93,12 @@ func GetAdaptor(model string) innerAIAdapter {
 		return &imagen.Adaptor{}
 	case VertexAIVeo:
 		return &veo.Adaptor{}
+	case VertexAIDeepSeek:
+		return &deepseek.Adaptor{}
+	case VertexAIOpenAI:
+		return &openai.Adaptor{}
+	case VertexAIQwen:
+		return &qwen.Adaptor{}
 	default:
 		return nil
 	}
