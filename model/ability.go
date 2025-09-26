@@ -60,7 +60,13 @@ func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority b
 	channel := Channel{}
 	channel.Id = ability.ChannelId
 	err = DB.First(&channel, "id = ?", ability.ChannelId).Error
-	return &channel, err
+	if err != nil {
+		return nil, err
+	}
+	if !channel.SupportsModel(model) {
+		return nil, errors.Errorf("channel #%d does not list support for model %s", channel.Id, model)
+	}
+	return &channel, nil
 }
 
 func (channel *Channel) AddAbilities() error {
@@ -293,5 +299,11 @@ func GetRandomSatisfiedChannelExcluding(group string, model string, ignoreFirstP
 	channel := Channel{}
 	channel.Id = ability.ChannelId
 	err = DB.First(&channel, "id = ?", ability.ChannelId).Error
-	return &channel, err
+	if err != nil {
+		return nil, err
+	}
+	if !channel.SupportsModel(model) {
+		return nil, errors.Errorf("channel #%d does not list support for model %s", channel.Id, model)
+	}
+	return &channel, nil
 }

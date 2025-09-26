@@ -257,6 +257,35 @@ func (channel *Channel) GetSupportedModelNames() []string {
 	return out
 }
 
+// SupportsModel reports whether the channel allows the provided model name.
+// When the channel has no explicit supported models configured (empty list),
+// the channel is treated as supporting all models.
+func (channel *Channel) SupportsModel(modelName string) bool {
+	modelName = strings.TrimSpace(modelName)
+	if modelName == "" {
+		return true
+	}
+	supported := channel.GetSupportedModelNames()
+	if len(supported) == 0 {
+		return true
+	}
+	for _, name := range supported {
+		if strings.EqualFold(name, modelName) {
+			return true
+		}
+	}
+	if mapping := channel.GetModelMapping(); mapping != nil {
+		if mapped := strings.TrimSpace(mapping[modelName]); mapped != "" {
+			for _, name := range supported {
+				if strings.EqualFold(name, mapped) {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
 // GetCheapestSupportedModel returns the cheapest model among the channel's currently
 // supported models using channel-specific ModelConfigs ratios when available.
 // Returns empty string if none found.
