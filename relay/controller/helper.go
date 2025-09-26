@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"math"
 	"net/http"
 	"strings"
 
@@ -25,7 +24,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/controller/validator"
 	"github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
-	"github.com/songquanpeng/one-api/relay/pricing"
+	quotautil "github.com/songquanpeng/one-api/relay/quota"
 	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
@@ -161,6 +160,7 @@ func postConsumeQuota(ctx context.Context,
 	textRequest *relaymodel.GeneralOpenAIRequest,
 	ratio float64,
 	preConsumedQuota int64,
+	incrementallyCharged int64,
 	modelRatio float64,
 	groupRatio float64,
 	systemPromptReset bool,
@@ -170,127 +170,23 @@ func postConsumeQuota(ctx context.Context,
 		return
 	}
 
-	// Resolve completion ratio (three-layer) and apply tiered pricing + cached discounts
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
-	completionRatioResolved := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
-	promptTokens := usage.PromptTokens
-	completionTokens := usage.CompletionTokens
+	computeResult := quotautil.Compute(quotautil.ComputeInput{
+		Usage:                  usage,
+		ModelName:              textRequest.Model,
+		ModelRatio:             modelRatio,
+		GroupRatio:             groupRatio,
+		ChannelCompletionRatio: channelCompletionRatio,
+		PricingAdaptor:         pricingAdaptor,
+	})
 
-	// Tier resolution based on input token count (promptTokens)
-	eff := pricing.ResolveEffectivePricing(textRequest.Model, promptTokens, pricingAdaptor)
-
-	// Decide whether to use adapter's tiered base ratios or keep externally resolved ones
-	usedModelRatio := modelRatio
-	usedCompletionRatio := completionRatioResolved
-	if pricingAdaptor != nil {
-		defaultPricing := pricingAdaptor.GetDefaultModelPricing()
-		if _, ok := defaultPricing[textRequest.Model]; ok {
-			// If the adapter has native pricing for this model and modelRatio equals adaptor's base,
-			// we consider that no channel override applied, so we can adopt tiered base ratios.
-			adaptorBase := pricingAdaptor.GetModelRatio(textRequest.Model)
-			if math.Abs(modelRatio-adaptorBase) < 1e-12 {
-				usedModelRatio = eff.InputRatio
-				// Derive completion ratio from eff if available
-				baseComp := eff.OutputRatio
-				if eff.InputRatio != 0 {
-					baseComp = eff.OutputRatio / eff.InputRatio
-				} else {
-					baseComp = 1.0
-				}
-				usedCompletionRatio = baseComp
-			}
-		}
-	}
-
-	// Split cached vs non-cached tokens
-	// https://platform.openai.com/docs/guides/prompt-caching
-	cachedPrompt := 0
-	if usage.PromptTokensDetails != nil {
-		cachedPrompt = usage.PromptTokensDetails.CachedTokens
-		if cachedPrompt < 0 {
-			cachedPrompt = 0
-		}
-		if cachedPrompt > promptTokens {
-			cachedPrompt = promptTokens
-		}
-	}
-	nonCachedPrompt := promptTokens - cachedPrompt
-	// No cached completion billing; all completion tokens are non-cached
-	nonCachedCompletion := completionTokens
-
-	// Base per-token prices (include group ratio)
-	normalInputPrice := usedModelRatio * groupRatio
-	normalOutputPrice := usedModelRatio * usedCompletionRatio * groupRatio
-
-	// Cached per-token prices; negative means free; zero means no special discount
-	cachedInputPrice := normalInputPrice
-	if eff.CachedInputRatio < 0 {
-		cachedInputPrice = 0
-	} else if eff.CachedInputRatio > 0 {
-		cachedInputPrice = eff.CachedInputRatio * groupRatio
-	}
-	// No separate cached completion price
-
-	// Cache-write tokens (Claude prompt caching)
-	write5m := usage.CacheWrite5mTokens
-	write1h := usage.CacheWrite1hTokens
-	if write5m < 0 {
-		write5m = 0
-	}
-	if write1h < 0 {
-		write1h = 0
-	}
-	// Prevent double-charging: remove write tokens from normal input bucket
-	if write5m+write1h > nonCachedPrompt {
-		// Clamp to avoid negative counts due to inconsistent upstream reporting
-		writeExcess := write5m + write1h - nonCachedPrompt
-		if write1h >= writeExcess {
-			write1h -= writeExcess
-		} else {
-			writeExcess -= write1h
-			write1h = 0
-			if write5m >= writeExcess {
-				write5m -= writeExcess
-			} else {
-				write5m = 0
-			}
-		}
-		nonCachedPrompt = 0
-	} else {
-		nonCachedPrompt -= (write5m + write1h)
-	}
-
-	// Determine write prices (fall back to normal input price if not configured)
-	write5mPrice := normalInputPrice
-	if eff.CacheWrite5mRatio < 0 {
-		write5mPrice = 0
-	} else if eff.CacheWrite5mRatio > 0 {
-		write5mPrice = eff.CacheWrite5mRatio * groupRatio
-	}
-	write1hPrice := normalInputPrice
-	if eff.CacheWrite1hRatio < 0 {
-		write1hPrice = 0
-	} else if eff.CacheWrite1hRatio > 0 {
-		write1hPrice = eff.CacheWrite1hRatio * groupRatio
-	}
-
-	cost := float64(nonCachedPrompt)*normalInputPrice + float64(cachedPrompt)*cachedInputPrice +
-		float64(nonCachedCompletion)*normalOutputPrice +
-		float64(write5m)*write5mPrice + float64(write1h)*write1hPrice
-
-	quota = int64(math.Ceil(cost)) + usage.ToolsCost
-	if (usedModelRatio*groupRatio) != 0 && quota <= 0 {
-		quota = 1
-	}
-
-	totalTokens := promptTokens + completionTokens
+	quota = computeResult.TotalQuota
+	totalTokens := computeResult.PromptTokens + computeResult.CompletionTokens
 	if totalTokens == 0 {
-		// in this case, must be some error happened
-		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
 	}
-	// Use centralized detailed billing function to follow DRY principle
-	quotaDelta := quota - preConsumedQuota
+
+	quotaDelta := quota - preConsumedQuota - incrementallyCharged
 	// Derive RequestId/TraceId from std context if possible (gin ctx embedded by gmw.BackgroundCtx)
 	var requestId string
 	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
@@ -304,18 +200,18 @@ func postConsumeQuota(ctx context.Context,
 		TotalQuota:             quota,
 		UserId:                 meta.UserId,
 		ChannelId:              meta.ChannelId,
-		PromptTokens:           promptTokens,
-		CompletionTokens:       completionTokens,
-		ModelRatio:             usedModelRatio,
+		PromptTokens:           computeResult.PromptTokens,
+		CompletionTokens:       computeResult.CompletionTokens,
+		ModelRatio:             computeResult.UsedModelRatio,
 		GroupRatio:             groupRatio,
 		ModelName:              textRequest.Model,
 		TokenName:              meta.TokenName,
 		IsStream:               meta.IsStream,
 		StartTime:              meta.StartTime,
 		SystemPromptReset:      systemPromptReset,
-		CompletionRatio:        usedCompletionRatio,
+		CompletionRatio:        computeResult.UsedCompletionRatio,
 		ToolsCost:              usage.ToolsCost,
-		CachedPromptTokens:     cachedPrompt,
+		CachedPromptTokens:     computeResult.CachedPromptTokens,
 		CachedCompletionTokens: 0,
 		RequestId:              requestId,
 		TraceId:                traceId,
@@ -340,113 +236,22 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 		return
 	}
 
-	// Resolve completion ratio (three-layer) and apply tiered pricing + cached discounts
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
-	completionRatioResolved := pricing.GetCompletionRatioWithThreeLayers(textRequest.Model, channelCompletionRatio, pricingAdaptor)
-	promptTokens := usage.PromptTokens
-	completionTokens := usage.CompletionTokens
+	computeResult := quotautil.Compute(quotautil.ComputeInput{
+		Usage:                  usage,
+		ModelName:              textRequest.Model,
+		ModelRatio:             modelRatio,
+		GroupRatio:             groupRatio,
+		ChannelCompletionRatio: channelCompletionRatio,
+		PricingAdaptor:         pricingAdaptor,
+	})
 
-	eff := pricing.ResolveEffectivePricing(textRequest.Model, promptTokens, pricingAdaptor)
-
-	usedModelRatio := modelRatio
-	usedCompletionRatio := completionRatioResolved
-	if pricingAdaptor != nil {
-		defaultPricing := pricingAdaptor.GetDefaultModelPricing()
-		if _, ok := defaultPricing[textRequest.Model]; ok {
-			adaptorBase := pricingAdaptor.GetModelRatio(textRequest.Model)
-			if math.Abs(modelRatio-adaptorBase) < 1e-12 {
-				usedModelRatio = eff.InputRatio
-				baseComp := eff.OutputRatio
-				if eff.InputRatio != 0 {
-					baseComp = eff.OutputRatio / eff.InputRatio
-				} else {
-					baseComp = 1.0
-				}
-				usedCompletionRatio = baseComp
-			}
-		}
-	}
-
-	cachedPrompt := 0
-	if usage.PromptTokensDetails != nil {
-		cachedPrompt = usage.PromptTokensDetails.CachedTokens
-		if cachedPrompt < 0 {
-			cachedPrompt = 0
-		}
-		if cachedPrompt > promptTokens {
-			cachedPrompt = promptTokens
-		}
-	}
-	nonCachedPrompt := promptTokens - cachedPrompt
-	// No cached completion billing; all completion tokens are non-cached
-	nonCachedCompletion := completionTokens
-
-	normalInputPrice := usedModelRatio * groupRatio
-	normalOutputPrice := usedModelRatio * usedCompletionRatio * groupRatio
-
-	cachedInputPrice := normalInputPrice
-	if eff.CachedInputRatio < 0 {
-		cachedInputPrice = 0
-	} else if eff.CachedInputRatio > 0 {
-		cachedInputPrice = eff.CachedInputRatio * groupRatio
-	}
-	// No separate cached completion price
-	// Cache-write tokens (Claude prompt caching)
-	write5m := usage.CacheWrite5mTokens
-	write1h := usage.CacheWrite1hTokens
-	if write5m < 0 {
-		write5m = 0
-	}
-	if write1h < 0 {
-		write1h = 0
-	}
-	if write5m+write1h > nonCachedPrompt {
-		writeExcess := write5m + write1h - nonCachedPrompt
-		if write1h >= writeExcess {
-			write1h -= writeExcess
-		} else {
-			writeExcess -= write1h
-			write1h = 0
-			if write5m >= writeExcess {
-				write5m -= writeExcess
-			} else {
-				write5m = 0
-			}
-		}
-		nonCachedPrompt = 0
-	} else {
-		nonCachedPrompt -= (write5m + write1h)
-	}
-
-	write5mPrice := normalInputPrice
-	if eff.CacheWrite5mRatio < 0 {
-		write5mPrice = 0
-	} else if eff.CacheWrite5mRatio > 0 {
-		write5mPrice = eff.CacheWrite5mRatio * groupRatio
-	}
-	write1hPrice := normalInputPrice
-	if eff.CacheWrite1hRatio < 0 {
-		write1hPrice = 0
-	} else if eff.CacheWrite1hRatio > 0 {
-		write1hPrice = eff.CacheWrite1hRatio * groupRatio
-	}
-
-	cost := float64(nonCachedPrompt)*normalInputPrice + float64(cachedPrompt)*cachedInputPrice +
-		float64(nonCachedCompletion)*normalOutputPrice +
-		float64(write5m)*write5mPrice + float64(write1h)*write1hPrice
-
-	quota = int64(math.Ceil(cost)) + usage.ToolsCost
-	if (usedModelRatio*groupRatio) != 0 && quota <= 0 {
-		quota = 1
-	}
-
-	totalTokens := promptTokens + completionTokens
+	quota = computeResult.TotalQuota
+	totalTokens := computeResult.PromptTokens + computeResult.CompletionTokens
 	if totalTokens == 0 {
-		// in this case, must be some error happened
-		// we cannot just return, because we may have to return the pre-consumed quota
 		quota = 0
 	}
-	// Use centralized detailed billing function with explicit trace ID
+
 	quotaDelta := quota - preConsumedQuota
 	var requestId string
 	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
@@ -459,18 +264,18 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 		TotalQuota:             quota,
 		UserId:                 meta.UserId,
 		ChannelId:              meta.ChannelId,
-		PromptTokens:           promptTokens,
-		CompletionTokens:       completionTokens,
-		ModelRatio:             usedModelRatio,
+		PromptTokens:           computeResult.PromptTokens,
+		CompletionTokens:       computeResult.CompletionTokens,
+		ModelRatio:             computeResult.UsedModelRatio,
 		GroupRatio:             groupRatio,
 		ModelName:              textRequest.Model,
 		TokenName:              meta.TokenName,
 		IsStream:               meta.IsStream,
 		StartTime:              meta.StartTime,
 		SystemPromptReset:      systemPromptReset,
-		CompletionRatio:        usedCompletionRatio,
+		CompletionRatio:        computeResult.UsedCompletionRatio,
 		ToolsCost:              usage.ToolsCost,
-		CachedPromptTokens:     cachedPrompt,
+		CachedPromptTokens:     computeResult.CachedPromptTokens,
 		CachedCompletionTokens: 0,
 		RequestId:              requestId,
 		TraceId:                traceId,

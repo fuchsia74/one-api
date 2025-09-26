@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	stdErrors "errors"
 	"io"
 	"math"
 	"net/http"
@@ -21,8 +22,10 @@ import (
 	relaymodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
+	metalib "github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
+	"github.com/songquanpeng/one-api/relay/streaming"
 )
 
 // Use shared constants from openai_compatible package
@@ -42,6 +45,9 @@ func recordUpstreamCompleted(c *gin.Context) {
 // Returns error (if any), accumulated response text, and token usage information
 func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.ErrorWithStatusCode, string, *model.Usage) {
 	lg := gmw.GetLogger(c)
+	metaInfo := metalib.GetByContext(c)
+	tracker := streaming.FromContext(c)
+	var trackerErr error
 	// Initialize accumulators for the response
 	responseText := ""
 	reasoningText := ""
@@ -57,8 +63,22 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	common.SetEventStreamHeaders(c)
 
 	doneRendered := false
+	sendStreamingError := func(code, message string) {
+		if err := render.ObjectData(c, map[string]any{
+			"error": map[string]any{
+				"message": message,
+				"type":    code,
+				"code":    code,
+			},
+		}); err != nil {
+			lg.Warn("failed to render streaming error", zap.Error(err))
+		}
+		render.Done(c)
+		doneRendered = true
+	}
 
 	// Process each line from the stream
+streamLoop:
 	for scanner.Scan() {
 		data := openai_compatible.NormalizeDataLine(scanner.Text())
 
@@ -116,6 +136,27 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 
 				// Accumulate response content
 				responseText += conv.AsString(choice.Delta.Content)
+
+				if tracker != nil && metaInfo != nil {
+					deltaTokens := 0
+					if chunk := conv.AsString(choice.Delta.Content); chunk != "" {
+						deltaTokens += CountTokenText(chunk, metaInfo.ActualModelName)
+					}
+					if currentReasoningChunk != "" {
+						deltaTokens += CountTokenText(currentReasoningChunk, metaInfo.ActualModelName)
+					}
+					if deltaTokens > 0 {
+						if err := tracker.RecordCompletionTokens(deltaTokens); err != nil {
+							trackerErr = err
+							if stdErrors.Is(err, streaming.ErrQuotaExceeded) {
+								sendStreamingError("insufficient_user_quota", "user quota exhausted during streaming")
+							} else {
+								sendStreamingError("streaming_billing_failed", "failed to track streaming usage")
+							}
+							break streamLoop
+						}
+					}
+				}
 			}
 
 			// Send the processed data to the client
@@ -124,6 +165,9 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 			// Update usage information if available
 			if streamResponse.Usage != nil {
 				usage = streamResponse.Usage
+				if tracker != nil {
+					tracker.UpdateFinalUsage(streamResponse.Usage)
+				}
 			}
 
 		case relaymode.Completions:
@@ -140,12 +184,25 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 			// Accumulate text from all choices
 			for _, choice := range streamResponse.Choices {
 				responseText += choice.Text
+				if tracker != nil && metaInfo != nil {
+					if tokens := CountTokenText(choice.Text, metaInfo.ActualModelName); tokens > 0 {
+						if err := tracker.RecordCompletionTokens(tokens); err != nil {
+							trackerErr = err
+							if stdErrors.Is(err, streaming.ErrQuotaExceeded) {
+								sendStreamingError("insufficient_user_quota", "user quota exhausted during streaming")
+							} else {
+								sendStreamingError("streaming_billing_failed", "failed to track streaming usage")
+							}
+							break streamLoop
+						}
+					}
+				}
 			}
 		}
 	}
 
 	// Check for scanner errors
-	if err := scanner.Err(); err != nil {
+	if err := scanner.Err(); err != nil && trackerErr == nil {
 		lg.Error("error reading stream", zap.Error(err))
 	}
 
@@ -157,6 +214,13 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	// Clean up resources
 	if err := resp.Body.Close(); err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), "", nil
+	}
+
+	if trackerErr != nil {
+		if stdErrors.Is(trackerErr, streaming.ErrQuotaExceeded) {
+			return ErrorWrapper(trackerErr, "insufficient_user_quota", http.StatusForbidden), "", usage
+		}
+		return ErrorWrapper(trackerErr, "streaming_billing_failed", http.StatusInternalServerError), "", usage
 	}
 
 	// Record when upstream streaming is completed

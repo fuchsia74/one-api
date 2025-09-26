@@ -621,6 +621,13 @@ Helper:
 
 - `model.UpdateUserRequestCostQuotaByRequestID(userID, requestID, quota)` creates or updates the `user_request_costs` row keyed by `request_id`.
 
+### Streaming Incremental Billing (2025-09)
+
+- Streaming controllers for chat/text responses now charge completion usage in near real time while the upstream connection is still open. Instead of waiting for the final chunk, the billing subsystem flushes usage every few seconds.
+- The default flush cadence is **3 seconds** and can be tuned with the `STREAMING_BILLING_INTERVAL` environment variable (value in seconds).
+- If an incremental flush detects that the user no longer has sufficient quota, the stream is cut off immediately and an SSE error frame is emitted to the caller before the upstream sends additional tokens.
+- Final reconciliation subtracts the pre-consumed reservation and the already-charged incremental amount to avoid double billing and ensures the `usage` record remains authoritative.
+
 ### Quota Calculation
 
 Different request types use different calculation methods:
