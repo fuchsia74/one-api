@@ -18,4 +18,8 @@ temp
 /patch
 /logs/
 errlog
+
+# instructions
+.github/instructions/filesystem.instructions.md
+.github/instructions/gopls.instructions.md
 .github/instructions/laisky.instructions.md
