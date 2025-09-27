@@ -16,6 +16,7 @@ function getSafeViewport(): ViewportSize {
 
   const visualViewport = window.visualViewport
   const doc = typeof document !== 'undefined' ? document.documentElement : null
+  const screen = typeof window.screen !== 'undefined' ? window.screen : null
 
   const widthCandidates = [window.innerWidth]
   const heightCandidates = [window.innerHeight]
@@ -28,6 +29,21 @@ function getSafeViewport(): ViewportSize {
   if (doc) {
     widthCandidates.push(doc.clientWidth)
     heightCandidates.push(doc.clientHeight)
+  }
+
+  if (screen) {
+    if (typeof screen.width === 'number') {
+      widthCandidates.push(screen.width)
+    }
+    if (typeof screen.height === 'number') {
+      heightCandidates.push(screen.height)
+    }
+    if (typeof screen.availWidth === 'number') {
+      widthCandidates.push(screen.availWidth)
+    }
+    if (typeof screen.availHeight === 'number') {
+      heightCandidates.push(screen.availHeight)
+    }
   }
 
   const width = Math.min(...widthCandidates.filter((v): v is number => typeof v === 'number' && v > 0))
@@ -64,10 +80,10 @@ export function useResponsive(): BreakpointState {
           width < MOBILE_BREAKPOINT
             ? 'mobile'
             : width < TABLET_BREAKPOINT
-            ? 'tablet'
-            : width < DESKTOP_BREAKPOINT
-            ? 'desktop'
-            : 'large',
+              ? 'tablet'
+              : width < DESKTOP_BREAKPOINT
+                ? 'desktop'
+                : 'large',
       }
     }
 
@@ -103,10 +119,10 @@ export function useResponsive(): BreakpointState {
             width < MOBILE_BREAKPOINT
               ? 'mobile'
               : width < TABLET_BREAKPOINT
-              ? 'tablet'
-              : width < DESKTOP_BREAKPOINT
-              ? 'desktop'
-              : 'large',
+                ? 'tablet'
+                : width < DESKTOP_BREAKPOINT
+                  ? 'desktop'
+                  : 'large',
         }
       })
     }
@@ -126,7 +142,7 @@ export function useResponsive(): BreakpointState {
     window.addEventListener('resize', debouncedUpdate)
     window.visualViewport?.addEventListener('resize', debouncedUpdate)
     window.visualViewport?.addEventListener('scroll', debouncedUpdate)
-    
+
     return () => {
       window.removeEventListener('resize', debouncedUpdate)
       window.visualViewport?.removeEventListener('resize', debouncedUpdate)

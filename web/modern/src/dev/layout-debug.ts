@@ -49,13 +49,13 @@ export function logEditPageLayout(label = 'EditPage') {
         }
       }
 
-  const docBottom = Math.max(html.scrollHeight, body.scrollHeight)
+      const docBottom = Math.max(html.scrollHeight, body.scrollHeight)
 
-  // Footer diagnostics: how far is the document end from the footer bottom?
-  const footer = document.querySelector('footer') as HTMLElement | null
-  const footerRect = footer ? footer.getBoundingClientRect() : null
-  const footerBottom = footerRect ? (footerRect.bottom + window.scrollY) : null
-  const trailingAfterFooter = footerBottom ? (docBottom - footerBottom) : null
+      // Footer diagnostics: how far is the document end from the footer bottom?
+      const footer = document.querySelector('footer') as HTMLElement | null
+      const footerRect = footer ? footer.getBoundingClientRect() : null
+      const footerBottom = footerRect ? (footerRect.bottom + window.scrollY) : null
+      const trailingAfterFooter = footerBottom ? (docBottom - footerBottom) : null
 
       const domPath = (el: HTMLElement | null) => {
         if (!el) return 'null'
@@ -132,45 +132,45 @@ export function logEditPageLayout(label = 'EditPage') {
         culprit.setAttribute('data-layout-debug', 'culprit')
       }
 
-  // Print logs grouped (expanded)
-  // eslint-disable-next-line no-console
-  console.group(`[LAYOUT] ${label}`)
+      // Print logs grouped (expanded)
+      // eslint-disable-next-line no-console
+      console.group(`[LAYOUT] ${label}`)
       // eslint-disable-next-line no-console
       console.log('metrics', metrics)
       // eslint-disable-next-line no-console
       console.log('documentBottom(scrollHeight)', docBottom)
-  // eslint-disable-next-line no-console
-  console.log('footer', { bottom: footerBottom, trailingAfterFooter })
+      // eslint-disable-next-line no-console
+      console.log('footer', { bottom: footerBottom, trailingAfterFooter })
       // eslint-disable-next-line no-console
       console.log('culprit', culpritInfo)
       // eslint-disable-next-line no-console
       console.log('largeBoxes(>=90% viewport height)', largeBoxes.slice(0, 20))
-  // eslint-disable-next-line no-console
-  console.log('bottom-most elements (top 10)', bottoms)
+      // eslint-disable-next-line no-console
+      console.log('bottom-most elements (top 10)', bottoms)
       // eslint-disable-next-line no-console
       console.groupEnd()
 
-      // Expose quick helpers for manual inspection in DevTools
-      ;(window as any).__layoutDebug = {
-        label,
-        metrics,
-        culprit,
-        culpritInfo,
-        bottoms,
-        trailingAfterFooter,
-        scrollToCulprit() {
-          if (!culprit) return
-          const r = culprit.getBoundingClientRect()
-          const y = r.bottom + window.scrollY - window.innerHeight / 2
-          window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' })
-        },
-        removeCulprit() {
-          if (!culprit) return
-          const parent = culprit.parentElement
-          if (parent) parent.removeChild(culprit)
-        },
-        recheck: logOnce,
-      }
+        // Expose quick helpers for manual inspection in DevTools
+        ; (window as any).__layoutDebug = {
+          label,
+          metrics,
+          culprit,
+          culpritInfo,
+          bottoms,
+          trailingAfterFooter,
+          scrollToCulprit() {
+            if (!culprit) return
+            const r = culprit.getBoundingClientRect()
+            const y = r.bottom + window.scrollY - window.innerHeight / 2
+            window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' })
+          },
+          removeCulprit() {
+            if (!culprit) return
+            const parent = culprit.parentElement
+            if (parent) parent.removeChild(culprit)
+          },
+          recheck: logOnce,
+        }
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('[LAYOUT] debug error', e)

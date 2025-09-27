@@ -88,7 +88,7 @@ export function useBreakpointChange(
       .sort(([, a], [, b]) => a - b)
 
     let newBreakpoint = sortedBreakpoints[0][0]
-    
+
     for (const [name, minWidth] of sortedBreakpoints) {
       if (width >= minWidth) {
         newBreakpoint = name
@@ -229,7 +229,7 @@ export function useContainerQuery(query: string) {
     const resizeObserver = new ResizeObserver(entries => {
       for (const entry of entries) {
         const { width, height } = entry.contentRect
-        
+
         // Simple container query parsing (extend as needed)
         const match = query.match(/\(min-width:\s*(\d+)px\)/)
         if (match) {

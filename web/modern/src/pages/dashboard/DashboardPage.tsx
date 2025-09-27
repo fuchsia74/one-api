@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { useAuthStore } from '@/lib/stores/auth'
 import { Card, CardContent } from '@/components/ui/card'
@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
-import { DataTable } from '@/components/ui/data-table'
+import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { ResponsivePageContainer } from '@/components/ui/responsive-container'
 import { useResponsive } from '@/hooks/useResponsive'
 import { formatNumber, cn } from '@/lib/utils'
@@ -106,6 +106,23 @@ export function DashboardPage() {
   const { user } = useAuthStore()
   const { isMobile } = useResponsive()
   const isAdmin = useMemo(() => (user?.role ?? 0) >= 10, [user])
+  const [filtersReady, setFiltersReady] = useState(false)
+
+  useLayoutEffect(() => {
+    if (typeof document === 'undefined') {
+      return
+    }
+
+    const active = document.activeElement as HTMLElement | null
+    if (active && ['INPUT', 'SELECT', 'TEXTAREA'].includes(active.tagName)) {
+      active.blur()
+    }
+
+    // Defer mounting interactive filter controls until after layout settles
+    if (!filtersReady) {
+      requestAnimationFrame(() => setFiltersReady(true))
+    }
+  }, [])
 
   // date range defaults: last 7 days (inclusive)
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
@@ -532,86 +549,97 @@ export function DashboardPage() {
       description="Monitor your API usage and account statistics"
     >
       {/* Filter bar - Date Range Controls */}
-      <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
-        <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end w-full">
-          <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
-            <div className="flex-1 min-w-0">
-              <label className="text-sm font-medium mb-2 block">From</label>
-              <Input
-                type="date"
-                value={fromDate}
-                min={getMinDate()}
-                max={getMaxDate()}
-                onChange={(e) => setFromDate(e.target.value)}
-                className={cn("h-10", dateError ? "border-red-500" : "")}
-                aria-label="From date"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <label className="text-sm font-medium mb-2 block">To</label>
-              <Input
-                type="date"
-                value={toDate}
-                min={getMinDate()}
-                max={getMaxDate()}
-                onChange={(e) => setToDate(e.target.value)}
-                className={cn("h-10", dateError ? "border-red-500" : "")}
-                aria-label="To date"
-              />
-            </div>
-            {isAdmin && (
+      {filtersReady ? (
+        <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
+          <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-end w-full">
+            <div className="flex flex-col sm:flex-row gap-3 flex-1 w-full">
               <div className="flex-1 min-w-0">
-                <label className="text-sm font-medium mb-2 block">User</label>
-                <select
-                  className="h-11 sm:h-10 w-full border rounded-md px-3 py-2 text-base sm:text-sm bg-background"
-                  value={dashUser}
-                  onChange={(e) => setDashUser(e.target.value)}
-                  aria-label="Select user"
-                >
-                  <option value="all">All Users</option>
-                  {userOptions.map(u => (
-                    <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
-                  ))}
-                </select>
+                <label className="text-sm font-medium mb-2 block">From</label>
+                <Input
+                  type="date"
+                  value={fromDate}
+                  min={getMinDate()}
+                  max={getMaxDate()}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  className={cn("h-10", dateError ? "border-red-500" : "")}
+                  aria-label="From date"
+                />
               </div>
-            )}
-          </div>
+              <div className="flex-1 min-w-0">
+                <label className="text-sm font-medium mb-2 block">To</label>
+                <Input
+                  type="date"
+                  value={toDate}
+                  min={getMinDate()}
+                  max={getMaxDate()}
+                  onChange={(e) => setToDate(e.target.value)}
+                  className={cn("h-10", dateError ? "border-red-500" : "")}
+                  aria-label="To date"
+                />
+              </div>
+              {isAdmin && (
+                <div className="flex-1 min-w-0">
+                  <label className="text-sm font-medium mb-2 block">User</label>
+                  <select
+                    className="h-11 sm:h-10 w-full border rounded-md px-3 py-2 text-base sm:text-sm bg-background"
+                    value={dashUser}
+                    onChange={(e) => setDashUser(e.target.value)}
+                    aria-label="Select user"
+                  >
+                    <option value="all">All Users</option>
+                    {userOptions.map(u => (
+                      <option key={u.id} value={String(u.id)}>{u.display_name || u.username}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
-          <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto sm:justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyPreset('today')}
-              className="h-10 flex-1 min-w-[6rem] sm:flex-none"
-            >
-              Today
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyPreset('7d')}
-              className="h-10 flex-1 min-w-[6rem] sm:flex-none"
-            >
-              7D
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => applyPreset('30d')}
-              className="h-10 flex-1 min-w-[6rem] sm:flex-none"
-            >
-              30D
-            </Button>
-            <Button
-              onClick={loadStats}
-              disabled={loading}
-              className="h-10 flex-1 min-w-[6rem] sm:flex-none sm:px-6"
-            >
-              {loading ? 'Loading...' : 'Apply'}
-            </Button>
+            <div className="flex flex-wrap sm:flex-nowrap gap-2 w-full sm:w-auto sm:justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => applyPreset('today')}
+                className="h-10 flex-1 min-w-[6rem] sm:flex-none"
+              >
+                Today
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => applyPreset('7d')}
+                className="h-10 flex-1 min-w-[6rem] sm:flex-none"
+              >
+                7D
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => applyPreset('30d')}
+                className="h-10 flex-1 min-w-[6rem] sm:flex-none"
+              >
+                30D
+              </Button>
+              <Button
+                onClick={loadStats}
+                disabled={loading}
+                className="h-10 flex-1 min-w-[6rem] sm:flex-none sm:px-6"
+              >
+                {loading ? 'Loading...' : 'Apply'}
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
+          <div className="flex flex-col gap-3 animate-pulse">
+            <div className="h-4 bg-muted/30 rounded w-24" />
+            <div className="h-11 bg-muted/30 rounded" />
+            <div className="h-11 bg-muted/30 rounded" />
+            <div className="h-11 bg-muted/30 rounded" />
+          </div>
+        </div>
+      )}
 
       {/* Error Message */}
       {dateError && (
@@ -1067,13 +1095,18 @@ export function DashboardPage() {
         {/* Data Table */}
         <div className="bg-white dark:bg-gray-900 rounded-lg border p-6">
           <h3 className="text-lg font-semibold mb-4">Detailed Data</h3>
-          <DataTable
+          <EnhancedDataTable
             columns={columns}
             data={rows}
             pageIndex={0}
             pageSize={rows.length || 10}
             total={rows.length}
             onPageChange={() => { }}
+            onPageSizeChange={() => { }}
+            mobileCardLayout
+            hideColumnsOnMobile={['prompt_tokens', 'completion_tokens']}
+            compactMode={isMobile}
+            emptyMessage="No usage data in this range."
           />
         </div>
       </div>
