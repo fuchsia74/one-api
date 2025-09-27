@@ -175,6 +175,7 @@ type ThinkingProcessor struct {
 
 // ProcessThinkingContent processes delta content for thinking blocks with ultra-low latency
 // and extracts reasoning content from <think></think> tags in streaming chat completions.
+// Supports both normal tags (<think></think>) and Unicode-escaped tags (\u003cthink\u003e).
 //
 // This method implements a highly optimized single-pass algorithm that processes streaming
 // content chunks to separate user-facing content from internal reasoning content. It's
@@ -182,7 +183,8 @@ type ThinkingProcessor struct {
 //
 // Parameters:
 //   - deltaContent: Raw content chunk from streaming response. Can be empty, partial,
-//     or contain complete thinking blocks. May contain fragments of XML-like tags.
+//     or contain complete thinking blocks. May contain fragments of XML-like tags or
+//     Unicode-escaped equivalents.
 //
 // Returns:
 //   - content: User-facing content with thinking blocks removed. Empty string if all
@@ -195,8 +197,8 @@ type ThinkingProcessor struct {
 //
 // Processing Logic:
 //  1. Early termination: Returns unchanged if input is empty or thinking already processed
-//  2. Opening tag detection: Uses strings.Index for O(n) tag finding
-//  3. Complete block optimization: Handles full <think></think> in single chunk
+//  2. Opening tag detection: Uses optimized search for both normal and Unicode tags
+//  3. Complete block optimization: Handles full thinking blocks in single chunk
 //  4. Streaming fragments: Manages partial blocks across multiple chunks
 //  5. State management: Tracks block boundaries across streaming calls
 //
@@ -214,6 +216,7 @@ type ThinkingProcessor struct {
 //   - No thinking content: Passes through regular content unchanged
 //   - Multiple tags: Only processes first thinking block (by design)
 //   - Fragmented tags: Correctly handles tags split across chunks
+//   - Mixed tag types: Handles both normal and Unicode tags, processes first encountered
 //
 // Usage Examples:
 //
@@ -222,17 +225,17 @@ type ThinkingProcessor struct {
 //	content, reasoning, modified := processor.ProcessThinkingContent("Hello <think>reasoning here</think> world")
 //	// Result: content="Hello  world", reasoning="reasoning here", modified=true
 //
+//	// Unicode case: complete Unicode thinking block
+//	processor := &ThinkingProcessor{}
+//	content, reasoning, modified := processor.ProcessThinkingContent("Hello \\u003cthink\\u003ereasoning\\u003c/think\\u003e world")
+//	// Result: content="Hello  world", reasoning="reasoning", modified=true
+//
 //	// Streaming case: thinking block across multiple chunks
 //	processor := &ThinkingProcessor{}
 //	content1, reasoning1, _ := processor.ProcessThinkingContent("Hello <think>partial")
 //	// Result: content1="Hello ", reasoning1="partial", modified=true
 //	content2, reasoning2, _ := processor.ProcessThinkingContent(" reasoning</think> world")
 //	// Result: content2=" world", reasoning2=" reasoning", modified=true
-//
-//	// No thinking block case
-//	processor := &ThinkingProcessor{}
-//	content, reasoning, modified := processor.ProcessThinkingContent("Regular content")
-//	// Result: content="Regular content", reasoning=nil, modified=false
 //
 // Thread Safety:
 //
@@ -253,19 +256,19 @@ func (tp *ThinkingProcessor) ProcessThinkingContent(deltaContent string) (conten
 		return deltaContent, nil, false
 	}
 
-	// Fast single-pass processing for thinking blocks
+	// Fast single-pass processing for thinking blocks (both normal and Unicode)
 	if !tp.isInThinkingBlock {
-		// Look for opening think tag using optimized search
-		if thinkIdx := strings.Index(deltaContent, "<think>"); thinkIdx >= 0 {
+		// Look for opening think tag using optimized search for both formats
+		if thinkIdx, tagLen := findOpeningThinkTag(deltaContent); thinkIdx >= 0 {
 			tp.isInThinkingBlock = true
 			beforeContent := deltaContent[:thinkIdx]
-			afterThinkTag := deltaContent[thinkIdx+7:] // Skip "<think>"
+			afterThinkTag := deltaContent[thinkIdx+tagLen:] // Skip opening tag
 
 			// Check for complete thinking block in same chunk (common case optimization)
-			if endIdx := strings.Index(afterThinkTag, "</think>"); endIdx >= 0 {
+			if endIdx, closeTagLen := findClosingThinkTag(afterThinkTag); endIdx >= 0 {
 				// Complete block: extract thinking content and remaining content efficiently
 				thinkingContent := afterThinkTag[:endIdx]
-				remainingContent := afterThinkTag[endIdx+8:] // Skip "</think>"
+				remainingContent := afterThinkTag[endIdx+closeTagLen:] // Skip closing tag
 
 				// Build final content in single operation to minimize allocations
 				finalContent := beforeContent + remainingContent
@@ -286,11 +289,11 @@ func (tp *ThinkingProcessor) ProcessThinkingContent(deltaContent string) (conten
 			}
 		}
 	} else {
-		// Inside thinking block - check for closing tag using optimized search
-		if endIdx := strings.Index(deltaContent, "</think>"); endIdx >= 0 {
+		// Inside thinking block - check for closing tag using optimized search for both formats
+		if endIdx, tagLen := findClosingThinkTag(deltaContent); endIdx >= 0 {
 			// End of thinking block found
 			thinkingPart := deltaContent[:endIdx]
-			regularPart := deltaContent[endIdx+8:] // Skip "</think>"
+			regularPart := deltaContent[endIdx+tagLen:] // Skip closing tag
 
 			tp.isInThinkingBlock = false
 			tp.hasProcessedThinkTag = true

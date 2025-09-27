@@ -66,7 +66,7 @@ export function HomePage() {
         <Card>
           <CardContent className={isMobile ? 'p-4' : 'p-6'}>
             <div
-              className="prose prose-lg max-w-none dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-headings:break-words prose-headings:whitespace-pre-wrap prose-a:text-primary hover:prose-a:underline prose-pre:bg-muted/60 prose-pre:overflow-x-auto prose-code:before:content-[''] prose-code:after:content-['']"
+              className="prose prose-lg max-w-full break-words dark:prose-invert prose-headings:font-semibold prose-headings:tracking-tight prose-headings:break-words prose-headings:whitespace-pre-wrap prose-a:text-primary prose-a:break-words hover:prose-a:underline prose-a:break-all prose-pre:bg-muted/60 prose-pre:overflow-x-auto prose-code:before:content-[''] prose-code:after:content-['']"
               dangerouslySetInnerHTML={{ __html: home }}
             />
           </CardContent>
