@@ -50,7 +50,7 @@ export function MobileDrawer({
     if (isOpen) {
       const originalStyle = window.getComputedStyle(document.body).overflow
       document.body.style.overflow = 'hidden'
-      
+
       return () => {
         document.body.style.overflow = originalStyle
       }
@@ -190,13 +190,15 @@ interface NavigationDrawerProps {
     isActive?: boolean
   }>
   title?: string
+  footer?: ReactNode
 }
 
 export function NavigationDrawer({
   isOpen,
   onClose,
   navigationItems,
-  title = 'Navigation'
+  title = 'Navigation',
+  footer
 }: NavigationDrawerProps) {
   return (
     <MobileDrawer
@@ -224,6 +226,12 @@ export function NavigationDrawer({
           </a>
         ))}
       </nav>
+
+      {footer && (
+        <div className="mt-6 border-t border-border pt-4">
+          {footer}
+        </div>
+      )}
     </MobileDrawer>
   )
 }
@@ -255,7 +263,7 @@ export function FilterDrawer({
     >
       <div className="space-y-4">
         {children}
-        
+
         {(onApply || onReset) && (
           <div className="flex gap-2 pt-4 border-t">
             {onReset && (
