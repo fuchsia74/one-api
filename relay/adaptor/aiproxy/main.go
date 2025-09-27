@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
@@ -170,9 +171,10 @@ func Handler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusCode, *
 	if AIProxyLibraryResponse.ErrCode != 0 {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: AIProxyLibraryResponse.Message,
-				Type:    strconv.Itoa(AIProxyLibraryResponse.ErrCode),
-				Code:    AIProxyLibraryResponse.ErrCode,
+				Message:  AIProxyLibraryResponse.Message,
+				Type:     strconv.Itoa(AIProxyLibraryResponse.ErrCode),
+				Code:     AIProxyLibraryResponse.ErrCode,
+				RawError: errors.New(AIProxyLibraryResponse.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}, nil

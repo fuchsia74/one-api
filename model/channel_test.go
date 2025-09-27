@@ -8,6 +8,38 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestChannelSupportsModel(t *testing.T) {
+	priority := int64(10)
+	channel := &Channel{
+		Id:       1,
+		Name:     "test",
+		Models:   "gpt-4,gpt-4o-mini",
+		Group:    "default",
+		Priority: &priority,
+	}
+
+	t.Run("listed model", func(t *testing.T) {
+		assert.True(t, channel.SupportsModel("gpt-4"))
+	})
+
+	t.Run("case insensitive match", func(t *testing.T) {
+		assert.True(t, channel.SupportsModel("GPT-4O-MINI"))
+	})
+
+	t.Run("unlisted model", func(t *testing.T) {
+		assert.False(t, channel.SupportsModel("gpt-5"))
+	})
+
+	t.Run("empty restriction", func(t *testing.T) {
+		openChannel := &Channel{Models: ""}
+		assert.True(t, openChannel.SupportsModel("anything"))
+	})
+
+	t.Run("empty model name", func(t *testing.T) {
+		assert.True(t, channel.SupportsModel(""))
+	})
+}
+
 func TestChannel_MigrateModelConfigsToModelPrice(t *testing.T) {
 	tests := []struct {
 		name            string

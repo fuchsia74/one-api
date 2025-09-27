@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	gutils "github.com/Laisky/go-utils/v5"
 	"github.com/gin-gonic/gin"
@@ -419,12 +420,8 @@ func RetrieveModel(c *gin.Context) {
 	if model, ok := modelsMap[modelId]; ok {
 		c.JSON(200, model)
 	} else {
-		Error := relaymodel.Error{
-			Message: fmt.Sprintf("The model '%s' does not exist", modelId),
-			Type:    "invalid_request_error",
-			Param:   "model",
-			Code:    "model_not_found",
-		}
+		msg := fmt.Sprintf("The model '%s' does not exist", modelId)
+		Error := relaymodel.Error{Message: msg, Type: "invalid_request_error", Param: "model", Code: "model_not_found", RawError: errors.New(msg)}
 		c.JSON(200, gin.H{
 			"error": Error,
 		})

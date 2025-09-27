@@ -158,6 +158,8 @@ var BatchUpdateInterval = env.Int("BATCH_UPDATE_INTERVAL", 5)
 var RelayTimeout = env.Int("RELAY_TIMEOUT", 0)          // unit is second
 var IdleTimeout = env.Int("IDLE_TIMEOUT", 30)           // unit is second
 var BillingTimeoutSec = env.Int("BILLING_TIMEOUT", 300) // unit is second
+var StreamingBillingIntervalSec = env.Int("STREAMING_BILLING_INTERVAL", 3)
+
 // ShutdownTimeoutSec controls how long to wait for graceful shutdown and drains (seconds)
 var ShutdownTimeoutSec = env.Int("SHUTDOWN_TIMEOUT", 360)
 

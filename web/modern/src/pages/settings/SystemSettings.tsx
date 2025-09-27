@@ -1,19 +1,148 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { api } from '@/lib/api'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Info } from 'lucide-react'
+import { useNotifications } from '@/components/ui/notifications'
 
 interface OptionRow {
   key: string
   value: string
 }
 
+interface OptionGroup {
+  id: string
+  title: string
+  description?: string
+  keys: string[]
+}
+
+const OPTION_GROUPS: OptionGroup[] = [
+  {
+    id: 'authentication',
+    title: 'Authentication & Registration',
+    description: 'Control how users sign up and sign in to your workspace.',
+    keys: [
+      'PasswordLoginEnabled',
+      'PasswordRegisterEnabled',
+      'RegisterEnabled',
+      'EmailVerificationEnabled',
+      'EmailDomainRestrictionEnabled',
+      'EmailDomainWhitelist',
+    ],
+  },
+  {
+    id: 'oauth',
+    title: 'OAuth / SSO Providers',
+    description: 'Connect third-party identity providers for seamless sign-in.',
+    keys: [
+      'GitHubOAuthEnabled',
+      'GitHubClientId',
+      'OidcEnabled',
+      'OidcClientId',
+      'OidcWellKnown',
+      'OidcAuthorizationEndpoint',
+      'OidcTokenEndpoint',
+      'OidcUserinfoEndpoint',
+      'LarkClientId',
+      'WeChatAuthEnabled',
+      'WeChatServerAddress',
+      'WeChatAccountQRCodeImageURL',
+    ],
+  },
+  {
+    id: 'security',
+    title: 'Anti-bot & Security',
+    description: 'Configure bot protection and security checks.',
+    keys: [
+      'TurnstileCheckEnabled',
+      'TurnstileSiteKey',
+      'TurnstileSecretKey',
+    ],
+  },
+  {
+    id: 'email',
+    title: 'Email (SMTP)',
+    description: 'Set up outbound email delivery.',
+    keys: [
+      'SMTPServer',
+      'SMTPPort',
+      'SMTPAccount',
+      'SMTPFrom',
+    ],
+  },
+  {
+    id: 'branding',
+    title: 'Branding & Content',
+    description: 'Customize the look and feel of the product experience.',
+    keys: [
+      'SystemName',
+      'Logo',
+      'Footer',
+      'Notice',
+      'About',
+      'HomePageContent',
+      'Theme',
+    ],
+  },
+  {
+    id: 'links',
+    title: 'Links',
+    description: 'Control external links exposed to your end users.',
+    keys: [
+      'TopUpLink',
+      'ChatLink',
+      'ServerAddress',
+    ],
+  },
+  {
+    id: 'quota',
+    title: 'Quota & Billing',
+    description: 'Manage quotas, billing ratios, and currency presentation.',
+    keys: [
+      'QuotaForNewUser',
+      'QuotaForInviter',
+      'QuotaForInvitee',
+      'QuotaRemindThreshold',
+      'PreConsumedQuota',
+      'GroupRatio',
+      'QuotaPerUnit',
+      'DisplayInCurrencyEnabled',
+      'DisplayTokenStatEnabled',
+      'ApproximateTokenEnabled',
+    ],
+  },
+  {
+    id: 'channels',
+    title: 'Channels & Reliability',
+    description: 'Automatically react to upstream channel health and retry behavior.',
+    keys: [
+      'AutomaticDisableChannelEnabled',
+      'AutomaticEnableChannelEnabled',
+      'ChannelDisableThreshold',
+      'RetryTimes',
+    ],
+  },
+  {
+    id: 'logging',
+    title: 'Logging, Metrics & Integrations',
+    description: 'Tune observability and downstream integrations.',
+    keys: [
+      'LogConsumeEnabled',
+      'MessagePusherAddress',
+      'MessagePusherToken',
+    ],
+  },
+]
+
+const OPTION_GROUP_KEY_SET = new Set(OPTION_GROUPS.flatMap((group) => group.keys))
+
 export function SystemSettings() {
   const [options, setOptions] = useState<OptionRow[]>([])
   const [loading, setLoading] = useState(false)
+  const { notify } = useNotifications()
 
   // Map each option key to a concise, user-friendly description for tooltips
   const descriptions = useMemo<Record<string, string>>(
@@ -106,16 +235,32 @@ export function SystemSettings() {
     load()
   }, [])
 
-  const save = async (key: string, value: string) => {
+  const save = useCallback(async (key: string, value: string) => {
     try {
       // Unified API call - complete URL with /api prefix
       await api.put('/api/option/', { key, value })
-      // Show success message
-      console.log(`Saved ${key}: ${value}`)
-    } catch (error) {
+      setOptions((prev) => prev.map((opt) => (opt.key === key ? { ...opt, value } : opt)))
+      notify({ type: 'success', title: 'Setting saved', message: `${key} updated successfully.` })
+    } catch (error: any) {
       console.error('Error saving option:', error)
+      const errMsg = error?.response?.data?.message || error?.message || 'Unknown error'
+      notify({ type: 'error', title: 'Save failed', message: String(errMsg) })
+      throw error
     }
-  }
+  }, [notify])
+
+  const optionsMap = useMemo(() => {
+    const map: Record<string, OptionRow> = {}
+    for (const opt of options) {
+      map[opt.key] = opt
+    }
+    return map
+  }, [options])
+
+  const uncategorizedOptions = useMemo(
+    () => options.filter((opt) => !OPTION_GROUP_KEY_SET.has(opt.key)),
+    [options]
+  )
 
   return (
     <Card>
@@ -132,46 +277,57 @@ export function SystemSettings() {
       </CardHeader>
       <CardContent>
         <TooltipProvider>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {options.map((opt, idx) => (
-              <div key={idx} className="border rounded-lg p-4">
-                <div className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-2">
-                  <span>{opt.key}</span>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        className="inline-flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
-                        aria-label={`Info about ${opt.key}`}
-                      >
-                        <Info className="h-4 w-4" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" align="start" className="max-w-[320px]">
-                      {descriptions[opt.key] || 'No description available for this setting yet.'}
-                    </TooltipContent>
-                  </Tooltip>
+          <div className="space-y-10">
+            {OPTION_GROUPS.map((group) => {
+              const groupOptions = group.keys
+                .map((key) => optionsMap[key])
+                .filter(Boolean)
+
+              if (!groupOptions.length) return null
+
+              return (
+                <section key={group.id} className="space-y-4">
+                  <div className="space-y-1">
+                    <h3 className="text-lg font-semibold leading-6">{group.title}</h3>
+                    {group.description && (
+                      <p className="text-sm text-muted-foreground">{group.description}</p>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {groupOptions.map((opt) => (
+                      <OptionItem
+                        key={opt.key}
+                        option={opt}
+                        description={descriptions[opt.key]}
+                        onSave={save}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+
+            {uncategorizedOptions.length > 0 && (
+              <section className="space-y-4">
+                <div className="space-y-1">
+                  <h3 className="text-lg font-semibold leading-6">Other Settings</h3>
+                  <p className="text-sm text-muted-foreground">Configuration keys that are not yet categorized.</p>
                 </div>
-                <div className="flex gap-2">
-                  <Input
-                    defaultValue={opt.value}
-                    onBlur={(e) => save(opt.key, e.target.value)}
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    onClick={(e) => {
-                      const target = (e.currentTarget.previousSibling as HTMLInputElement)
-                      save(opt.key, target.value)
-                    }}
-                  >
-                    Save
-                  </Button>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {uncategorizedOptions.map((opt) => (
+                    <OptionItem
+                      key={opt.key}
+                      option={opt}
+                      description={descriptions[opt.key]}
+                      onSave={save}
+                    />
+                  ))}
                 </div>
-              </div>
-            ))}
+              </section>
+            )}
+
             {!options.length && (
-              <div className="col-span-full text-center text-sm text-muted-foreground py-8">
+              <div className="text-center text-sm text-muted-foreground py-8">
                 No options available or insufficient permissions.
               </div>
             )}
@@ -179,6 +335,72 @@ export function SystemSettings() {
         </TooltipProvider>
       </CardContent>
     </Card>
+  )
+}
+
+interface OptionItemProps {
+  option: OptionRow
+  description?: string
+  onSave: (key: string, value: string) => Promise<void>
+}
+
+function OptionItem({ option, description, onSave }: OptionItemProps) {
+  const [value, setValue] = useState(option.value)
+  const [isSaving, setIsSaving] = useState(false)
+
+  useEffect(() => {
+    setValue(option.value)
+  }, [option.value])
+
+  const handleSave = useCallback(async () => {
+    if (isSaving || value === option.value) return
+    setIsSaving(true)
+    try {
+      await onSave(option.key, value)
+    } catch (_error) {
+      setValue(option.value)
+    } finally {
+      setIsSaving(false)
+    }
+  }, [isSaving, onSave, option.key, option.value, value])
+
+  const handleBlur = useCallback(async () => {
+    if (value === option.value) return
+    await handleSave()
+  }, [handleSave, option.value, value])
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+        <span>{option.key}</span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              className="inline-flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
+              aria-label={`Info about ${option.key}`}
+            >
+              <Info className="h-4 w-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" align="start" className="max-w-[320px]">
+            {description || 'No description available for this setting yet.'}
+          </TooltipContent>
+        </Tooltip>
+      </div>
+      <div className="flex flex-col gap-2 sm:flex-row">
+        <Input
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          onBlur={handleBlur}
+          className="flex-1"
+          disabled={isSaving}
+        />
+        <Button variant="outline" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </div>
   )
 }
 

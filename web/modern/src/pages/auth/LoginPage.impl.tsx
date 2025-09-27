@@ -28,6 +28,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { useAuthStore } from "@/lib/stores/auth";
 import { api } from "@/lib/api";
+import Turnstile from "@/components/Turnstile";
 import { buildGitHubOAuthUrl, getOAuthState } from "@/lib/oauth";
 
 const loginSchema = z.object({
@@ -50,6 +51,8 @@ interface SystemStatus {
   lark_client_id?: string;
   system_name?: string;
   logo?: string;
+  turnstile_check?: boolean;
+  turnstile_site_key?: string;
 }
 
 export function LoginPage() {
@@ -58,6 +61,7 @@ export function LoginPage() {
   const [systemStatus, setSystemStatus] = useState<SystemStatus>({});
   const [successMessage, setSuccessMessage] = useState<string>("");
   const [totpValue, setTotpValue] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
   const totpRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -117,6 +121,10 @@ export function LoginPage() {
   };
 
   const onSubmit = async (data: LoginForm) => {
+    if (systemStatus?.turnstile_check && !turnstileToken) {
+      form.setError("root", { message: "Please complete the Turnstile verification" });
+      return;
+    }
     setIsLoading(true);
     try {
       const payload: Record<string, string> = {
@@ -125,7 +133,11 @@ export function LoginPage() {
       };
       if (totpRequired && totpValue) payload.totp_code = totpValue;
       // Unified API call - complete URL with /api prefix
-      const response = await api.post("/api/user/login", payload);
+      const query =
+        systemStatus?.turnstile_check && turnstileToken
+          ? `?turnstile=${encodeURIComponent(turnstileToken)}`
+          : "";
+      const response = await api.post(`/api/user/login${query}`, payload);
       const { success, message, data: respData } = response.data;
       const m = typeof message === "string" ? message.trim().toLowerCase() : "";
       const dataTotp = !!(
@@ -290,7 +302,11 @@ export function LoginPage() {
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading || (totpRequired && totpValue.length !== 6)}
+                disabled={
+                  isLoading ||
+                  (totpRequired && totpValue.length !== 6) ||
+                  (systemStatus?.turnstile_check && !turnstileToken)
+                }
               >
                 {isLoading
                   ? "Signing in..."
@@ -298,6 +314,15 @@ export function LoginPage() {
                     ? "Verify TOTP"
                     : "Sign In"}
               </Button>
+
+              {systemStatus?.turnstile_check && systemStatus?.turnstile_site_key && (
+                <Turnstile
+                  siteKey={systemStatus.turnstile_site_key}
+                  onVerify={(token) => setTurnstileToken(token)}
+                  onExpire={() => setTurnstileToken("")}
+                  className="mt-2 flex justify-center"
+                />
+              )}
 
               {totpRequired && (
                 <Button

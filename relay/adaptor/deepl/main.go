@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
@@ -119,8 +120,9 @@ func Handler(c *gin.Context, resp *http.Response, modelName string) *model.Error
 	if deeplResponse.Message != "" {
 		return &model.ErrorWithStatusCode{
 			Error: model.Error{
-				Message: deeplResponse.Message,
-				Code:    "deepl_error",
+				Message:  deeplResponse.Message,
+				Code:     "deepl_error",
+				RawError: errors.New(deeplResponse.Message),
 			},
 			StatusCode: resp.StatusCode,
 		}

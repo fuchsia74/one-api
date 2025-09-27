@@ -29,6 +29,7 @@ import (
 	metalib "github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/pricing"
+	"github.com/songquanpeng/one-api/relay/streaming"
 )
 
 func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
@@ -80,6 +81,24 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	if bizErr != nil {
 		lg.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
 		return bizErr
+	}
+
+	var tracker *streaming.QuotaTracker
+	if textRequest.Stream {
+		tracker = streaming.NewQuotaTracker(streaming.QuotaTrackerParams{
+			UserID:                 meta.UserId,
+			TokenID:                meta.TokenId,
+			ChannelID:              meta.ChannelId,
+			ModelName:              textRequest.Model,
+			PromptTokens:           promptTokens,
+			ModelRatio:             modelRatio,
+			GroupRatio:             groupRatio,
+			PreConsumedQuota:       preConsumedQuota,
+			ChannelCompletionRatio: channelCompletionRatio,
+			PricingAdaptor:         pricingAdaptor,
+			FlushInterval:          time.Duration(config.StreamingBillingIntervalSec) * time.Second,
+		})
+		streaming.StoreTracker(c, tracker)
 	}
 
 	adaptor := relay.GetAdaptor(meta.APIType)
@@ -154,6 +173,20 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// Fall through to billing with available usage
 	}
 
+	var incrementalCharged int64
+	if tracker != nil {
+		var trackerErr error
+		usage, incrementalCharged, trackerErr = tracker.Finalize(usage)
+		if trackerErr != nil {
+			if errors.Is(trackerErr, streaming.ErrQuotaExceeded) {
+				billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+				return openai.ErrorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusForbidden)
+			}
+			billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+			return openai.ErrorWrapper(trackerErr, "streaming_billing_failed", http.StatusInternalServerError)
+		}
+	}
+
 	// post-consume quota
 	quotaId := c.GetInt(ctxkey.Id)
 	// refund pre-consumed quota immediately
@@ -213,7 +246,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 		requestId := c.GetString(ctxkey.RequestId)
 		go func() {
-			quota = postConsumeQuota(ctx, usage, meta, textRequest, ratio, preConsumedQuota, modelRatio, groupRatio, systemPromptReset, channelCompletionRatio)
+			quota = postConsumeQuota(ctx, usage, meta, textRequest, ratio, preConsumedQuota, incrementalCharged, modelRatio, groupRatio, systemPromptReset, channelCompletionRatio)
 
 			// Reconcile request cost with final quota (override provisional pre-consumed value)
 			if quota != 0 {

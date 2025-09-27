@@ -67,7 +67,7 @@ func TestPostConsumeQuota_OutputPricingIndependentOfCache(t *testing.T) {
 
 	// Case A: No cache
 	usageNoCache := &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completionTokens}
-	quotaNoCache := postConsumeQuota(context.Background(), usageNoCache, meta, req, 0, 0, modelRatio, groupRatio, false, nil)
+	quotaNoCache := postConsumeQuota(context.Background(), usageNoCache, meta, req, 0, 0, 0, modelRatio, groupRatio, false, nil)
 
 	// Case B: Some cached prompt tokens (e.g., 60%)
 	cachedPrompt := int(float64(promptTokens) * 0.6)
@@ -78,7 +78,7 @@ func TestPostConsumeQuota_OutputPricingIndependentOfCache(t *testing.T) {
 			CachedTokens: cachedPrompt,
 		},
 	}
-	quotaCached := postConsumeQuota(context.Background(), usageCached, meta, req, 0, 0, modelRatio, groupRatio, false, nil)
+	quotaCached := postConsumeQuota(context.Background(), usageCached, meta, req, 0, 0, 0, modelRatio, groupRatio, false, nil)
 
 	// Expected delta arises only from input pricing change on cached tokens
 	// Base prompt tokens: promptTokens. With caching, cachedPrompt tokens charged at cachedInputPrice instead of normalInputPrice.
@@ -123,11 +123,11 @@ func TestPostConsumeQuota_CacheWriteDoesNotAffectOutput(t *testing.T) {
 
 	// Base: no cache writes
 	usageBase := &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completionTokens}
-	base := postConsumeQuota(context.Background(), usageBase, meta, req, 0, 0, modelRatio, groupRatio, false, nil)
+	base := postConsumeQuota(context.Background(), usageBase, meta, req, 0, 0, 0, modelRatio, groupRatio, false, nil)
 
 	// With write tokens
 	usageWrite := &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completionTokens, CacheWrite5mTokens: write5m}
-	withWrite := postConsumeQuota(context.Background(), usageWrite, meta, req, 0, 0, modelRatio, groupRatio, false, nil)
+	withWrite := postConsumeQuota(context.Background(), usageWrite, meta, req, 0, 0, 0, modelRatio, groupRatio, false, nil)
 
 	// Expected delta is purely input-side: write tokens shift from normalInputPrice to write5mPrice
 	expectedDelta := int64(math.Ceil(float64(write5m) * (write5mPrice - normalInputPrice)))

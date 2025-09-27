@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { api } from '@/lib/api'
+import Turnstile from '@/components/Turnstile'
 import { buildGitHubOAuthUrl, getOAuthState } from '@/lib/oauth'
 
 const registerSchema = z.object({
@@ -16,7 +17,7 @@ const registerSchema = z.object({
   password2: z.string().min(8, 'Password confirmation is required'),
   email: z.string().email('Valid email is required'),
   verification_code: z.string().min(1, 'Verification code is required'),
-  invitation_code: z.string().optional(),
+  aff_code: z.string().optional(),
 }).refine((data) => data.password === data.password2, {
   message: "Passwords don't match",
   path: ["password2"],
@@ -28,7 +29,12 @@ export function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isEmailSent, setIsEmailSent] = useState(false)
   const [systemStatus, setSystemStatus] = useState<any>({})
+  const [turnstileToken, setTurnstileToken] = useState<string>('')
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+
+  // Extract affiliate code from URL parameter
+  const affCodeFromUrl = searchParams.get('aff') || ''
 
   const form = useForm<RegisterForm>({
     resolver: zodResolver(registerSchema),
@@ -38,7 +44,7 @@ export function RegisterPage() {
       password2: '',
       email: '',
       verification_code: '',
-      invitation_code: '',
+      aff_code: affCodeFromUrl,
     },
   })
 
@@ -79,12 +85,15 @@ export function RegisterPage() {
     try {
       setIsLoading(true)
       // Unified API call - complete URL with /api prefix
-      const response = await api.get(`/api/verification?email=${encodeURIComponent(email)}`)
+      const url = `/api/verification?email=${encodeURIComponent(email)}${systemStatus?.turnstile_check ? `&turnstile=${encodeURIComponent(turnstileToken)}` : ''}`
+      const response = await api.get(url)
       const { success, message } = response.data
 
       if (success) {
         setIsEmailSent(true)
         form.clearErrors('email')
+        // Reset token after successful verification send to encourage a fresh check next action
+        if (systemStatus?.turnstile_check) setTurnstileToken('')
       } else {
         form.setError('email', { message: message || 'Failed to send verification code' })
       }
@@ -99,17 +108,19 @@ export function RegisterPage() {
 
   const onSubmit = async (data: RegisterForm) => {
     setIsLoading(true)
+    data.aff_code = data.aff_code?.trim() || ''
     try {
       const payload = {
         username: data.username,
         password: data.password,
         email: data.email,
         verification_code: data.verification_code,
-        ...(data.invitation_code && { invitation_code: data.invitation_code }),
+        ...(data.aff_code && { aff_code: data.aff_code }),
       }
 
       // Unified API call - complete URL with /api prefix
-      const response = await api.post('/api/user/register', payload)
+      const path = `/api/user/register${systemStatus?.turnstile_check ? `?turnstile=${encodeURIComponent(turnstileToken)}` : ''}`
+      const response = await api.post(path, payload)
       const { success, message } = response.data
 
       if (success) {
@@ -198,7 +209,12 @@ export function RegisterPage() {
                           type="button"
                           variant="outline"
                           onClick={sendVerificationCode}
-                          disabled={isLoading || !emailValue || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)}
+                          disabled={
+                            isLoading ||
+                            !emailValue ||
+                            !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue) ||
+                            (systemStatus?.turnstile_check && !turnstileToken)
+                          }
                         >
                           {isLoading ? 'Sending...' : isEmailSent ? 'Sent' : 'Send Code'}
                         </Button>
@@ -225,10 +241,10 @@ export function RegisterPage() {
 
               <FormField
                 control={form.control}
-                name="invitation_code"
+                name="aff_code"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Invitation Code (Optional)</FormLabel>
+                    <FormLabel>Invitation/Affiliate Code (Optional)</FormLabel>
                     <FormControl>
                       <Input placeholder="Enter invitation code" {...field} />
                     </FormControl>
@@ -243,9 +259,24 @@ export function RegisterPage() {
                 </div>
               )}
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={isLoading || (systemStatus?.turnstile_check && !turnstileToken)}
+              >
                 {isLoading ? 'Creating Account...' : 'Create Account'}
               </Button>
+
+              {systemStatus?.turnstile_check && systemStatus?.turnstile_site_key && (
+                <div className="mt-2">
+                  <Turnstile
+                    siteKey={systemStatus.turnstile_site_key}
+                    onVerify={(token) => setTurnstileToken(token)}
+                    onExpire={() => setTurnstileToken('')}
+                    className="flex justify-center"
+                  />
+                </div>
+              )}
 
               {systemStatus?.github_oauth && (
                 <div className="space-y-2">

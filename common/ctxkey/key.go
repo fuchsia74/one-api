@@ -196,4 +196,9 @@ const (
 	// Set in: image controller from request payload.
 	// Read in: image controller to format the response properly.
 	ResponseFormat = "response_format"
+
+	// StreamingQuotaTracker stores the active quota tracker for incremental billing in streaming flows.
+	// Set in: relay/controller/text when initializing a streaming request.
+	// Read in: streaming adaptors to record completion progress and enforce quota limits mid-stream.
+	StreamingQuotaTracker = "streaming_quota_tracker"
 )

@@ -341,9 +341,17 @@ func CacheGetRandomSatisfiedChannel(group string, model string, ignoreFirstPrior
 	}
 
 	// Make a copy to safely work with outside the lock for selection logic
-	candidateChannels := make([]*Channel, len(channelsFromCache))
-	copy(candidateChannels, channelsFromCache)
+	candidateChannels := make([]*Channel, 0, len(channelsFromCache))
+	for _, ch := range channelsFromCache {
+		if model == "" || ch.SupportsModel(model) {
+			candidateChannels = append(candidateChannels, ch)
+		}
+	}
 	channelSyncLock.RUnlock()
+
+	if len(candidateChannels) == 0 {
+		return nil, errors.Errorf("no channels in cache support model %s", model)
+	}
 
 	endIdx := len(candidateChannels)
 	// choose by priority
@@ -463,8 +471,16 @@ func CacheGetRandomSatisfiedChannelExcluding(group string, model string, ignoreF
 	}
 	channelSyncLock.RUnlock()
 
+	filtered := make([]*Channel, 0, len(candidateChannels))
+	for _, ch := range candidateChannels {
+		if model == "" || ch.SupportsModel(model) {
+			filtered = append(filtered, ch)
+		}
+	}
+	candidateChannels = filtered
+
 	if len(candidateChannels) == 0 {
-		return nil, errors.New("no available channels after excluding failed channels")
+		return nil, errors.Errorf("no available channels support model %s after exclusions", model)
 	}
 
 	// If ignoreFirstPriority is true, we want to select from lower priority channels

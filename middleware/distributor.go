@@ -41,21 +41,39 @@ func Distribute() func(c *gin.Context) {
 				AbortWithError(c, http.StatusForbidden, errors.New("The channel has been disabled"))
 				return
 			}
+			requestModel = c.GetString(ctxkey.RequestModel)
+			if requestModel != "" && !channel.SupportsModel(requestModel) {
+				AbortWithError(c, http.StatusBadRequest,
+					errors.Errorf("Channel #%d does not support the requested model: %s", channelId, requestModel))
+				return
+			}
 		} else {
 			requestModel = c.GetString(ctxkey.RequestModel)
+			selectChannel := func(ignoreFirstPriority bool, exclude map[int]bool) (*model.Channel, error) {
+				for {
+					candidate, err := model.CacheGetRandomSatisfiedChannelExcluding(userGroup, requestModel, ignoreFirstPriority, exclude, false)
+					if err != nil {
+						return nil, err
+					}
+					if requestModel == "" || candidate.SupportsModel(requestModel) {
+						return candidate, nil
+					}
+					exclude[candidate.Id] = true
+					lg.Warn("channel skipped - does not support requested model",
+						zap.Int("channel_id", candidate.Id),
+						zap.String("channel_name", candidate.Name),
+						zap.String("requested_model", requestModel))
+				}
+			}
+
+			exclude := make(map[int]bool)
 			var err error
-			// First try to get highest priority channels
-			channel, err = model.CacheGetRandomSatisfiedChannel(userGroup, requestModel, false)
+			channel, err = selectChannel(false, exclude)
 			if err != nil {
-				// If no highest priority channels available, try lower priority channels as fallback
 				lg.Info(fmt.Sprintf("No highest priority channels available for model %s in group %s, trying lower priority channels", requestModel, userGroup))
-				channel, err = model.CacheGetRandomSatisfiedChannel(userGroup, requestModel, true)
+				channel, err = selectChannel(true, exclude)
 				if err != nil {
 					message := fmt.Sprintf("No available channels for Model %s under Group %s", requestModel, userGroup)
-					if channel != nil {
-						lg.Error("Channel does not exist", zap.Int("channel_id", channel.Id))
-						message = "Database consistency has been broken, please contact the administrator"
-					}
 					AbortWithError(c, http.StatusServiceUnavailable, errors.New(message))
 					return
 				}
