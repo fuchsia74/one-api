@@ -43,6 +43,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support o3 \& o4-mini \& gpt-4.1](#support-o3--o4-mini--gpt-41)
       - [Support o3-pro \& reasoning content](#support-o3-pro--reasoning-content)
       - [Support OpenAI Response API](#support-openai-response-api)
+      - [Support gpt-5 series](#support-gpt-5-series)
     - [Anthropic (Claude) Features](#anthropic-claude-features)
       - [(Merged) Support aws claude](#merged-support-aws-claude)
       - [Support claude-3-7-sonnet \& thinking](#support-claude-3-7-sonnet--thinking)
@@ -292,6 +293,10 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 **Partially supported, still in development.**
 
 ![](https://s3.laisky.com/uploads/2025/07/response-api.png)
+
+#### Support gpt-5 series
+
+gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex
 
 ### Anthropic (Claude) Features
 
