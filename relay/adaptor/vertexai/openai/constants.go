@@ -10,11 +10,11 @@ import (
 var ModelRatios = map[string]adaptor.ModelConfig{
 	"openai/gpt-oss-20b-maas": {
 		Ratio:           0.15 * ratio.MilliTokensUsd, // $0.15 per million tokens input
-		CompletionRatio: 0.60 * ratio.MilliTokensUsd, // $0.60 per million tokens output
+		CompletionRatio: 0.60 / 0.15,                 // Output/Input ratio = $0.60 / $0.15 = 4
 	},
 	"openai/gpt-oss-120b-maas": {
 		Ratio:           0.075 * ratio.MilliTokensUsd, // $0.075 per million tokens input
-		CompletionRatio: 0.30 * ratio.MilliTokensUsd,  // $0.30 per million tokens output
+		CompletionRatio: 0.30 / 0.075,                 // Output/Input ratio = $0.30 / $0.075 = 4
 	},
 }
 
