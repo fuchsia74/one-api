@@ -563,7 +563,7 @@ export function DashboardPage() {
               <div className="flex-1 min-w-0">
                 <label className="text-sm font-medium mb-2 block">User</label>
                 <select
-                  className="h-10 w-full border rounded-md px-3 text-sm bg-background"
+                  className="h-11 sm:h-10 w-full border rounded-md px-3 py-2 text-base sm:text-sm bg-background"
                   value={dashUser}
                   onChange={(e) => setDashUser(e.target.value)}
                   aria-label="Select user"

@@ -285,11 +285,14 @@ export function EnhancedDataTable<TData, TValue>({
                     }
 
                     return (
-                      <div key={cell.id} className="flex justify-between items-start gap-3">
-                        <span className="text-sm font-medium text-muted-foreground min-w-0 flex-shrink-0">
-                          {label}:
+                      <div key={cell.id} className="flex flex-col gap-1">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {label}
                         </span>
-                        <div className="text-right min-w-0 flex-1 break-words break-all">
+                        <div
+                          className="text-sm text-foreground break-words"
+                          data-label={label}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </div>
                       </div>

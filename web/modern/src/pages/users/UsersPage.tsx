@@ -15,6 +15,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { renderQuota, cn } from '@/lib/utils'
+import { ResponsiveActionGroup } from '@/components/ui/responsive-action-group'
 
 interface UserRow {
   id: number
@@ -156,7 +157,7 @@ export function UsersPage() {
     {
       header: 'Actions',
       cell: ({ row }) => (
-        <div className="space-x-2">
+        <ResponsiveActionGroup justify="start">
           <Button
             variant="outline"
             size="sm"
@@ -173,7 +174,7 @@ export function UsersPage() {
           </Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
           <Button variant="outline" size="sm" onClick={() => setOpenTopup({ open: true, userId: row.original.id, username: row.original.username })}>Top Up</Button>
-        </div>
+        </ResponsiveActionGroup>
       ),
     },
   ]
@@ -215,7 +216,7 @@ export function UsersPage() {
       </Button>
       <select
         className={cn(
-          "h-9 border rounded-md px-2 text-sm",
+          "h-11 sm:h-9 border rounded-md px-3 py-2 text-base sm:text-sm",
           isMobile ? "w-full" : ""
         )}
         value={sortBy}

@@ -1,5 +1,44 @@
 import { useState, useEffect } from 'react'
 
+const MOBILE_BREAKPOINT = 768
+const TABLET_BREAKPOINT = 1024
+const DESKTOP_BREAKPOINT = 1280
+
+interface ViewportSize {
+  width: number
+  height: number
+}
+
+function getSafeViewport(): ViewportSize {
+  if (typeof window === 'undefined') {
+    return { width: 0, height: 0 }
+  }
+
+  const visualViewport = window.visualViewport
+  const doc = typeof document !== 'undefined' ? document.documentElement : null
+
+  const widthCandidates = [window.innerWidth]
+  const heightCandidates = [window.innerHeight]
+
+  if (visualViewport) {
+    widthCandidates.push(visualViewport.width)
+    heightCandidates.push(visualViewport.height)
+  }
+
+  if (doc) {
+    widthCandidates.push(doc.clientWidth)
+    heightCandidates.push(doc.clientHeight)
+  }
+
+  const width = Math.min(...widthCandidates.filter((v): v is number => typeof v === 'number' && v > 0))
+  const height = Math.min(...heightCandidates.filter((v): v is number => typeof v === 'number' && v > 0))
+
+  return {
+    width: Math.round(width),
+    height: Math.round(height),
+  }
+}
+
 interface BreakpointState {
   isMobile: boolean
   isTablet: boolean
@@ -12,23 +51,26 @@ interface BreakpointState {
 
 export function useResponsive(): BreakpointState {
   const [state, setState] = useState<BreakpointState>(() => {
-    // Initialize with current window size if available
     if (typeof window !== 'undefined') {
-      const width = window.innerWidth
-      const height = window.innerHeight
+      const { width, height } = getSafeViewport()
       return {
         width,
         height,
-        isMobile: width < 768,
-        isTablet: width >= 768 && width < 1024,
-        isDesktop: width >= 1024 && width < 1280,
-        isLarge: width >= 1280,
-        currentBreakpoint: width < 768 ? 'mobile' : 
-                          width < 1024 ? 'tablet' : 
-                          width < 1280 ? 'desktop' : 'large'
+        isMobile: width < MOBILE_BREAKPOINT,
+        isTablet: width >= MOBILE_BREAKPOINT && width < TABLET_BREAKPOINT,
+        isDesktop: width >= TABLET_BREAKPOINT && width < DESKTOP_BREAKPOINT,
+        isLarge: width >= DESKTOP_BREAKPOINT,
+        currentBreakpoint:
+          width < MOBILE_BREAKPOINT
+            ? 'mobile'
+            : width < TABLET_BREAKPOINT
+            ? 'tablet'
+            : width < DESKTOP_BREAKPOINT
+            ? 'desktop'
+            : 'large',
       }
     }
-    
+
     // Server-side rendering fallback
     return {
       width: 0,
@@ -43,39 +85,55 @@ export function useResponsive(): BreakpointState {
 
   useEffect(() => {
     const updateState = () => {
-      const width = window.innerWidth
-      const height = window.innerHeight
-      
-      const newState: BreakpointState = {
-        width,
-        height,
-        isMobile: width < 768,
-        isTablet: width >= 768 && width < 1024,
-        isDesktop: width >= 1024 && width < 1280,
-        isLarge: width >= 1280,
-        currentBreakpoint: width < 768 ? 'mobile' : 
-                          width < 1024 ? 'tablet' : 
-                          width < 1280 ? 'desktop' : 'large'
-      }
-      
-      setState(newState)
+      const { width, height } = getSafeViewport()
+
+      setState((prev) => {
+        if (prev.width === width && prev.height === height) {
+          return prev
+        }
+
+        return {
+          width,
+          height,
+          isMobile: width < MOBILE_BREAKPOINT,
+          isTablet: width >= MOBILE_BREAKPOINT && width < TABLET_BREAKPOINT,
+          isDesktop: width >= TABLET_BREAKPOINT && width < DESKTOP_BREAKPOINT,
+          isLarge: width >= DESKTOP_BREAKPOINT,
+          currentBreakpoint:
+            width < MOBILE_BREAKPOINT
+              ? 'mobile'
+              : width < TABLET_BREAKPOINT
+              ? 'tablet'
+              : width < DESKTOP_BREAKPOINT
+              ? 'desktop'
+              : 'large',
+        }
+      })
     }
 
     // Update on mount
     updateState()
 
     // Add event listener with debouncing
-    let timeoutId: NodeJS.Timeout
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
     const debouncedUpdate = () => {
-      clearTimeout(timeoutId)
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
       timeoutId = setTimeout(updateState, 100)
     }
 
     window.addEventListener('resize', debouncedUpdate)
+    window.visualViewport?.addEventListener('resize', debouncedUpdate)
+    window.visualViewport?.addEventListener('scroll', debouncedUpdate)
     
     return () => {
       window.removeEventListener('resize', debouncedUpdate)
-      clearTimeout(timeoutId)
+      window.visualViewport?.removeEventListener('resize', debouncedUpdate)
+      window.visualViewport?.removeEventListener('scroll', debouncedUpdate)
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
     }
   }, [])
 

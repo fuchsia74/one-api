@@ -7,6 +7,7 @@ import { useResponsive } from '@/hooks/useResponsive'
 import { SearchableDropdown, type SearchOption } from '@/components/ui/searchable-dropdown'
 import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { ResponsiveActionGroup } from '@/components/ui/responsive-action-group'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -130,7 +131,7 @@ export function RedemptionsPage() {
     {
       header: 'Actions',
       cell: ({ row }) => (
-        <div className="space-x-2">
+        <ResponsiveActionGroup justify="start">
           <Button
             variant="outline"
             size="sm"
@@ -146,7 +147,7 @@ export function RedemptionsPage() {
             {row.original.status === 1 ? 'Disable' : 'Enable'}
           </Button>
           <Button variant="destructive" size="sm" onClick={() => manage(row.original.id, 'delete', row.index)}>Delete</Button>
-        </div>
+        </ResponsiveActionGroup>
       ),
     },
   ]
@@ -190,7 +191,7 @@ export function RedemptionsPage() {
         )}>
           <Button onClick={() => navigate('/redemptions/add')} className={cn(isMobile ? 'w-full touch-target' : '')}>Add Redemption</Button>
           <select
-            className={cn('h-9 border rounded-md px-2 text-sm', isMobile ? 'w-full' : '')}
+            className={cn('h-11 sm:h-9 border rounded-md px-3 py-2 text-base sm:text-sm', isMobile ? 'w-full' : '')}
             value={sortBy}
             onChange={(e) => { setSortBy(e.target.value); setSortOrder('desc') }}
           >

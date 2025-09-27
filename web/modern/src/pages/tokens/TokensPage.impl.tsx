@@ -11,6 +11,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { renderQuota } from '@/lib/utils'
+import { ResponsiveActionGroup } from '@/components/ui/responsive-action-group'
 import { Plus, Copy, Eye, EyeOff } from 'lucide-react'
 
 interface Token {
@@ -329,7 +330,7 @@ export function TokensPage() {
       cell: ({ row }) => {
         const token = row.original
         return (
-          <div className="flex items-center gap-1 mobile-table-cell">
+          <ResponsiveActionGroup className="mobile-table-cell" justify="start">
             <Button
               variant="outline"
               size="sm"
@@ -364,7 +365,7 @@ export function TokensPage() {
             >
               Delete
             </Button>
-          </div>
+          </ResponsiveActionGroup>
         )
       },
     },

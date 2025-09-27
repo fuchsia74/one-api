@@ -148,6 +148,14 @@
     touch-action: manipulation;
   }
 
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+    min-height: 44px;
+    line-height: 1.5;
+  }
+
   .touch-friendly {
     padding: 0.75rem;
     touch-action: manipulation;

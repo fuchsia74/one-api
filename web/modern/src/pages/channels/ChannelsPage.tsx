@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { formatTimestamp, cn } from '@/lib/utils'
 import { Plus, TestTube, RefreshCw, Trash2, Settings, AlertCircle } from 'lucide-react'
 import { useNotifications } from '@/components/ui/notifications'
+import { ResponsiveActionGroup } from '@/components/ui/responsive-action-group'
 
 interface Channel {
   id: number
@@ -442,7 +443,7 @@ export function ChannelsPage() {
       cell: ({ row }) => {
         const channel = row.original
         return (
-          <div className="flex items-center gap-1">
+          <ResponsiveActionGroup className="sm:items-center">
             <Button
               variant="outline"
               size="sm"
@@ -483,7 +484,7 @@ export function ChannelsPage() {
               <Trash2 className="h-3 w-3" />
               Delete
             </Button>
-          </div>
+          </ResponsiveActionGroup>
         )
       },
     },

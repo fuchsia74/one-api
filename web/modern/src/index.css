@@ -83,6 +83,58 @@
 		@apply bg-background text-foreground;
 		/* Do not force overflow-x hidden globally; allow tables and toolbars to scroll when needed */
 	}
+
+	input,
+	select,
+	textarea {
+		font-size: 1rem;
+		line-height: 1.5;
+	}
+
+	@media (min-width: 640px) {
+		input,
+		select,
+		textarea {
+			font-size: 0.875rem;
+		}
+	}
+
+	input[type='date'],
+	input[type='time'],
+	input[type='datetime-local'] {
+		font-size: 1rem;
+	}
+
+	input[type='date']::-webkit-date-and-time-value,
+	input[type='time']::-webkit-date-and-time-value,
+	input[type='datetime-local']::-webkit-date-and-time-value {
+		min-height: 2.75rem;
+		line-height: 1.5;
+		font-size: 1rem;
+	}
+
+	input[type='date']::-webkit-datetime-edit,
+	input[type='date']::-webkit-datetime-edit-fields-wrapper,
+	input[type='date']::-webkit-datetime-edit-text,
+	input[type='date']::-webkit-datetime-edit-month-field,
+	input[type='date']::-webkit-datetime-edit-day-field,
+	input[type='date']::-webkit-datetime-edit-year-field,
+	input[type='time']::-webkit-datetime-edit,
+	input[type='time']::-webkit-datetime-edit-fields-wrapper,
+	input[type='time']::-webkit-datetime-edit-text,
+	input[type='time']::-webkit-datetime-edit-hour-field,
+	input[type='time']::-webkit-datetime-edit-minute-field,
+	input[type='datetime-local']::-webkit-datetime-edit,
+	input[type='datetime-local']::-webkit-datetime-edit-fields-wrapper,
+	input[type='datetime-local']::-webkit-datetime-edit-text,
+	input[type='datetime-local']::-webkit-datetime-edit-month-field,
+	input[type='datetime-local']::-webkit-datetime-edit-day-field,
+	input[type='datetime-local']::-webkit-datetime-edit-year-field,
+	input[type='datetime-local']::-webkit-datetime-edit-hour-field,
+	input[type='datetime-local']::-webkit-datetime-edit-minute-field {
+		font-size: 1rem;
+		line-height: 1.5;
+	}
 }
 
 /* Enhanced data table styles */
