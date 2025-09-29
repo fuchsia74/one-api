@@ -196,6 +196,12 @@ func isModelSupportedReasoning(modelName string) bool {
 	}
 }
 
+// isWebSearchModel returns true when the upstream OpenAI model uses the web search surface
+// and therefore rejects parameters like temperature/top_p.
+func isWebSearchModel(modelName string) bool {
+	return strings.HasSuffix(modelName, "-search") || strings.HasSuffix(modelName, "-search-preview")
+}
+
 // applyRequestTransformations applies the existing request transformations
 func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.GeneralOpenAIRequest) error {
 	switch meta.ChannelType {
@@ -257,8 +263,8 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		}(request.Messages)
 	}
 
-	// web search do not support system prompt/max_tokens/temperature
-	if strings.HasSuffix(meta.ActualModelName, "-search") {
+	// web search models do not support system prompt/max_tokens/temperature overrides
+	if isWebSearchModel(meta.ActualModelName) {
 		request.Temperature = nil
 		request.TopP = nil
 		request.PresencePenalty = nil
