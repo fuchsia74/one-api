@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -264,7 +264,8 @@ export function EditChannelPage() {
 
   const [loading, setLoading] = useState(isEdit)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [allModels, setAllModels] = useState<Model[]>([])
+  const [modelsCatalog, setModelsCatalog] = useState<Record<number, string[]>>({})
+  const [availableModels, setAvailableModels] = useState<Model[]>([])
   const [channelModels, setChannelModels] = useState<string[]>([])
   const [modelSearchTerm, setModelSearchTerm] = useState('')
   const [groups, setGroups] = useState<string[]>([])
@@ -275,6 +276,20 @@ export function EditChannelPage() {
   const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
   const [loadedChannelType, setLoadedChannelType] = useState<number | null>(null) // Track the loaded channel type
   const [autoFilledType, setAutoFilledType] = useState<number | null>(null) // Prevent repeated auto-fill per type
+
+  const syncModelsForType = useCallback((type: number | null | undefined, catalog?: Record<number, string[]>) => {
+    const numericType = typeof type === 'number' ? type : Number(type ?? NaN)
+    if (!Number.isFinite(numericType)) {
+      setChannelModels([])
+      setAvailableModels([])
+      return
+    }
+
+    const source = catalog ?? modelsCatalog
+    const rawModels = source[numericType] ?? []
+    setChannelModels(rawModels)
+    setAvailableModels(rawModels.map((model) => ({ id: model, name: model })))
+  }, [modelsCatalog])
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -458,10 +473,8 @@ export function EditChannelPage() {
         // Load channel-specific models and default pricing
         if (channelType) {
           console.log(`[CHANNEL_TYPE_DEBUG] load models+pricing for type=${String(channelType)}`)
-          await Promise.all([
-            loadChannelModels(channelType),
-            loadDefaultPricing(channelType)
-          ])
+          syncModelsForType(channelType)
+          await loadDefaultPricing(channelType)
         }
 
         console.log('[CHANNEL_TYPE_DEBUG] about to reset form with data')
@@ -501,47 +514,29 @@ export function EditChannelPage() {
     }
   }
 
-  const loadAllModels = async () => {
+  const loadModelsCatalog = useCallback(async () => {
     try {
       // Unified API call - complete URL with /api prefix
       const response = await api.get('/api/models')
       const { success, data } = response.data
 
       if (success && data) {
-        // Extract models from channelId2Models structure
-        const allModelsSet = new Set<string>()
-        Object.values(data).forEach((channelModels: any) => {
-          if (Array.isArray(channelModels)) {
-            channelModels.forEach((model: string) => allModelsSet.add(model))
-          }
+        const catalog: Record<number, string[]> = {}
+        Object.entries(data).forEach(([typeKey, models]) => {
+          if (!Array.isArray(models)) return
+          const typeId = Number(typeKey)
+          if (!Number.isFinite(typeId)) return
+          catalog[typeId] = (models as string[])
+            .filter((model) => typeof model === 'string' && model.trim() !== '')
         })
-
-        const models = Array.from(allModelsSet).map((model: string) => ({
-          id: model,
-          name: model,
-        }))
-        setAllModels(models)
+        setModelsCatalog(catalog)
+        const currentType = form.getValues('type')
+        syncModelsForType(currentType, catalog)
       }
     } catch (error) {
-      console.error('Error loading models:', error)
+      console.error('Error loading models catalog:', error)
     }
-  }
-
-  const loadChannelModels = async (type: number) => {
-    try {
-      // Unified API call - complete URL with /api prefix
-      const response = await api.get('/api/models')
-      const { success, data } = response.data
-
-      if (success && data) {
-        // data is channelId2Models object, where keys are channel types
-        const typeModels = data[type] || []
-        setChannelModels(typeModels)
-      }
-    } catch (error) {
-      console.error('Error loading channel models:', error)
-    }
-  }
+  }, [form, syncModelsForType])
 
   const loadDefaultPricing = async (channelType: number) => {
     try {
@@ -594,20 +589,26 @@ export function EditChannelPage() {
       console.log('[CHANNEL_TYPE_DEBUG] Not in edit mode, setting loading to false')
       setLoading(false)
     }
-    loadAllModels()
+    loadModelsCatalog()
     loadGroups()
   }, [isEdit, channelId])
 
   useEffect(() => {
     console.log('[CHANNEL_TYPE_DEBUG] watchType useEffect triggered:', watchType)
     if (watchType) {
-      loadChannelModels(watchType)
+      syncModelsForType(watchType)
       loadDefaultPricing(watchType)
       // Do NOT auto-populate models on type change; only explicit user actions should modify models
     }
-  }, [watchType])
+  }, [watchType, syncModelsForType])
 
-  const filteredModels = allModels.filter(model =>
+  useEffect(() => {
+    if (watchType) {
+      syncModelsForType(watchType)
+    }
+  }, [modelsCatalog, watchType, syncModelsForType])
+
+  const filteredModels = availableModels.filter(model =>
     model.name.toLowerCase().includes(modelSearchTerm.toLowerCase())
   )
 
@@ -844,7 +845,7 @@ export function EditChannelPage() {
 
   const fillAllModels = () => {
     const currentModels = form.getValues('models')
-    const allModelIds = allModels.map(m => m.id)
+    const allModelIds = availableModels.map(m => m.id)
     const uniqueModels = [...new Set([...currentModels, ...allModelIds])]
     form.setValue('models', uniqueModels)
   }
@@ -1545,8 +1546,9 @@ export function EditChannelPage() {
                             variant="outline"
                             onClick={fillAllModels}
                             size="sm"
+                            disabled={availableModels.length === 0}
                           >
-                            Fill All Models ({allModels.length})
+                            Fill All Supported Models ({availableModels.length})
                           </Button>
                           <Button
                             type="button"
