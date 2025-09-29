@@ -199,7 +199,7 @@ func isModelSupportedReasoning(modelName string) bool {
 // isWebSearchModel returns true when the upstream OpenAI model uses the web search surface
 // and therefore rejects parameters like temperature/top_p.
 func isWebSearchModel(modelName string) bool {
-	return strings.HasSuffix(modelName, "-search") || strings.HasSuffix(modelName, "-search-preview")
+	return strings.Contains(modelName, "-search") || strings.Contains(modelName, "-search-preview")
 }
 
 // applyRequestTransformations applies the existing request transformations
