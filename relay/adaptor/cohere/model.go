@@ -13,7 +13,7 @@ type Request struct {
 	Temperature      *float64      `json:"temperature,omitempty"` // default to 0.3
 	MaxTokens        int           `json:"max_tokens,omitempty"`
 	MaxInputTokens   int           `json:"max_input_tokens,omitempty"`
-	K                int           `json:"k,omitempty"` // default to 0
+	K                *int          `json:"k,omitempty"` // default to 0
 	P                *float64      `json:"p,omitempty"` // default to 0.75
 	Seed             int           `json:"seed,omitempty"`
 	StopSequences    []string      `json:"stop_sequences,omitempty"`

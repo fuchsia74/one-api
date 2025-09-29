@@ -17,7 +17,7 @@ type Input struct {
 
 type Parameters struct {
 	TopP              *float64     `json:"top_p,omitempty"`
-	TopK              int          `json:"top_k,omitempty"`
+	TopK              *int         `json:"top_k,omitempty"`
 	Seed              uint64       `json:"seed,omitempty"`
 	EnableSearch      bool         `json:"enable_search,omitempty"`
 	IncrementalOutput bool         `json:"incremental_output,omitempty"`

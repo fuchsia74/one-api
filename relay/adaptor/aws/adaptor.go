@@ -206,17 +206,22 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 		"claude-2.0":                 {Ratio: 8 * ratio.MilliTokensUsd, CompletionRatio: 3.125},   // $8/$25 per 1M tokens
 		"claude-2.1":                 {Ratio: 8 * ratio.MilliTokensUsd, CompletionRatio: 3.125},   // $8/$25 per 1M tokens
 		"claude-3-haiku-20240307":    {Ratio: 0.25 * ratio.MilliTokensUsd, CompletionRatio: 5},    // $0.25/$1.25 per 1M tokens
+		"claude-3-5-haiku-20241022":  {Ratio: 1 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $1/$5 per 1M tokens
 		"claude-3-sonnet-20240229":   {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
-		"claude-3-opus-20240229":     {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
-		"claude-opus-4-20250514":     {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
-		"claude-opus-4-1-20250805":   {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
+		"claude-3-5-sonnet-latest":   {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-3-5-sonnet-20240620": {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-3-5-sonnet-20241022": {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
-		"claude-3-5-sonnet-latest":   {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
-		"claude-3-5-haiku-20241022":  {Ratio: 1 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $1/$5 per 1M tokens
 		"claude-3-7-sonnet-latest":   {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-3-7-sonnet-20250219": {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
+		"claude-sonnet-4-0":          {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
 		"claude-sonnet-4-20250514":   {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
+		"claude-sonnet-4-5":          {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
+		"claude-sonnet-4-5-20250929": {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},       // $3/$15 per 1M tokens
+		"claude-3-opus-20240229":     {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
+		"claude-opus-4-0":            {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
+		"claude-opus-4-20250514":     {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
+		"claude-opus-4-1":            {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
+		"claude-opus-4-1-20250805":   {Ratio: 15 * ratio.MilliTokensUsd, CompletionRatio: 5},      // $15/$75 per 1M tokens
 
 		// Llama Models on AWS Bedrock
 		// Note: Pricing may need to be updated later; also this model is significantly faster on AWS GPUs.

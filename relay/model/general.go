@@ -86,7 +86,7 @@ type GeneralOpenAIRequest struct {
 	StreamOptions    *StreamOptions  `json:"stream_options,omitempty"`
 	Temperature      *float64        `json:"temperature,omitempty"`
 	TopP             *float64        `json:"top_p,omitempty"`
-	TopK             int             `json:"top_k,omitempty"`
+	TopK             *int            `json:"top_k,omitempty"`
 	Tools            []Tool          `json:"tools,omitempty"`
 	ToolChoice       any             `json:"tool_choice,omitempty"`
 	ParallelTooCalls *bool           `json:"parallel_tool_calls,omitempty"`

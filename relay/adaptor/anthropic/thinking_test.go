@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"fmt"
+	"math"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -23,6 +25,37 @@ func setupTestContext() *gin.Context {
 	c.Request = req
 	c.Set(ctxkey.TokenId, 12345)
 	return c
+}
+
+func TestConvertRequest_DefaultMaxTokensWithThinking(t *testing.T) {
+	InitSignatureCache(time.Hour)
+
+	c := setupTestContext()
+
+	textRequest := model.GeneralOpenAIRequest{
+		Model: "claude-4-sonnet",
+		Messages: []model.Message{
+			{Role: "user", Content: "Hello"},
+		},
+	}
+
+	claudeRequest, err := ConvertRequest(c, textRequest)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	if claudeRequest.MaxTokens != config.DefaultMaxToken {
+		t.Fatalf("Expected max tokens %d, got %d", config.DefaultMaxToken, claudeRequest.MaxTokens)
+	}
+
+	if claudeRequest.Thinking == nil {
+		t.Fatal("Expected thinking to be enabled when query parameter is present")
+	}
+
+	expectedBudget := int(math.Min(1024, float64(config.DefaultMaxToken/2)))
+	if claudeRequest.Thinking.BudgetTokens != expectedBudget {
+		t.Fatalf("Expected budget tokens %d, got %d", expectedBudget, claudeRequest.Thinking.BudgetTokens)
+	}
 }
 
 func TestStreamResponseClaude2OpenAI_ThinkingDelta(t *testing.T) {

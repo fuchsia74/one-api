@@ -195,7 +195,7 @@ func ConvertClaudeRequest(c *gin.Context, claudeRequest model.ClaudeRequest) (*R
 
 	// Handle TopK (convert from *int to int)
 	if claudeRequest.TopK != nil {
-		request.TopK = *claudeRequest.TopK
+		request.TopK = claudeRequest.TopK
 	}
 
 	return request, nil
@@ -248,6 +248,10 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 		Thinking:    textRequest.Thinking,
 	}
 
+	if claudeRequest.MaxTokens == 0 {
+		claudeRequest.MaxTokens = config.DefaultMaxToken
+	}
+
 	// Track if we need to use fallback mode (will be set if any signature restoration fails)
 	var useFallbackMode bool
 
@@ -286,9 +290,13 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 		}
 		claudeRequest.ToolChoice = claudeToolChoice
 	}
-	if claudeRequest.MaxTokens == 0 {
-		claudeRequest.MaxTokens = config.DefaultMaxToken
+
+	if claudeRequest.Thinking != nil {
+		claudeRequest.Temperature = nil
+		claudeRequest.TopK = nil
+		claudeRequest.TopP = nil
 	}
+
 	for _, message := range textRequest.Messages {
 		if message.Role == "system" && claudeRequest.System == "" {
 			claudeRequest.System = message.StringContent()
