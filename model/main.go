@@ -235,7 +235,7 @@ func InitLogDB() {
 func migrateLOGDB() error {
 	var err error
 	if err = LOG_DB.AutoMigrate(&Log{}); err != nil {
-		return err
+		return errors.Wrap(err, "auto migrate log database")
 	}
 	return nil
 }
@@ -310,7 +310,7 @@ func CloseDB() error {
 	if LOG_DB != DB {
 		err := closeDB(LOG_DB)
 		if err != nil {
-			return err
+			return errors.Wrap(err, "close log database")
 		}
 	}
 	return closeDB(DB)

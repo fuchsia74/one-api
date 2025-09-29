@@ -472,7 +472,7 @@ func convertCohereToConverseRequest(cohereReq *Request, modelID string) (*bedroc
 	// Convert messages using shared helper
 	converseMessages, systemMessages, err := convertMessages(cohereReq.Messages)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "convert messages for Cohere request")
 	}
 
 	// Create inference configuration using shared helper
@@ -605,7 +605,7 @@ func convertCohereToConverseStreamRequest(cohereReq *Request, modelID string) (*
 	// Convert messages using shared helper
 	converseMessages, systemMessages, err := convertMessages(cohereReq.Messages)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "convert messages for Cohere stream request")
 	}
 
 	// Create inference configuration using shared helper

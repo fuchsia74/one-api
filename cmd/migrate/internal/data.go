@@ -317,7 +317,7 @@ func (m *Migrator) insertBatchWithConflictResolution(batch interface{}, tableInf
 	}
 
 	// For non-conflict errors, return the original error
-	return err
+	return errors.WithStack(err)
 }
 
 // isConflictError checks if the error is a primary key or unique constraint violation

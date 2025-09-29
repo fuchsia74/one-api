@@ -132,9 +132,11 @@ func SendEmail(subject string, receiver string, content string) error {
 
 	// Use the same sender address in the SMTP protocol as in the From header
 	err := smtp.SendMail(addr, auth, config.SMTPFrom, receiverEmails, mail)
-	if err != nil && strings.Contains(err.Error(), "short response") { // 部分提供商返回该错误，但实际上邮件已经发送成功
+	if err != nil && strings.Contains(err.Error(), "short response") {
+		// Certain providers report an error, yet the email has been delivered successfully.
 		logger.Logger.Warn("short response from SMTP server, return nil instead of error", zap.Error(err))
 		return nil
 	}
-	return err
+
+	return errors.WithStack(err)
 }

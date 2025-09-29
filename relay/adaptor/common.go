@@ -95,7 +95,7 @@ func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	// keep logger from context if available
 	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "perform upstream request")
 	}
 	if resp == nil {
 		return nil, errors.New("resp is nil")

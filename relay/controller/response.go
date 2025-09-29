@@ -230,7 +230,7 @@ func getAndValidateResponseAPIRequest(c *gin.Context) (*openai.ResponseAPIReques
 	responseAPIRequest := &openai.ResponseAPIRequest{}
 	err := common.UnmarshalBodyReusable(c, responseAPIRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unmarshal Response API request")
 	}
 
 	// Basic validation
@@ -418,7 +418,7 @@ func getResponseAPIRequestBody(c *gin.Context, meta *metalib.Meta, responseAPIRe
 	// The request is already in the correct format
 	jsonData, err := json.Marshal(responseAPIRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "marshal Response API request")
 	}
 	return bytes.NewReader(jsonData), nil
 }

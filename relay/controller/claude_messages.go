@@ -478,7 +478,7 @@ func getAndValidateClaudeMessagesRequest(c *gin.Context) (*ClaudeMessagesRequest
 	claudeRequest := &ClaudeMessagesRequest{}
 	err := common.UnmarshalBodyReusable(c, claudeRequest)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "unmarshal Claude messages request")
 	}
 
 	// Basic validation

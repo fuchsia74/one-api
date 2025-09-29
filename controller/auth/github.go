@@ -38,11 +38,11 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	values := map[string]string{"client_id": config.GitHubClientId, "client_secret": config.GitHubClientSecret, "code": code}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "marshal GitHub OAuth payload")
 	}
 	req, err := http.NewRequest("POST", "https://github.com/login/oauth/access_token", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build GitHub OAuth request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -55,13 +55,12 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	}
 	defer res.Body.Close()
 	var oAuthResponse GitHubOAuthResponse
-	err = json.NewDecoder(res.Body).Decode(&oAuthResponse)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res.Body).Decode(&oAuthResponse); err != nil {
+		return nil, errors.Wrap(err, "decode GitHub OAuth response")
 	}
 	req, err = http.NewRequest("GET", "https://api.github.com/user", nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build GitHub user info request")
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", oAuthResponse.AccessToken))
 	res2, err := client.Do(req)
@@ -70,9 +69,8 @@ func getGitHubUserInfoByCode(code string) (*GitHubUser, error) {
 	}
 	defer res2.Body.Close()
 	var githubUser GitHubUser
-	err = json.NewDecoder(res2.Body).Decode(&githubUser)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res2.Body).Decode(&githubUser); err != nil {
+		return nil, errors.Wrap(err, "decode GitHub user info")
 	}
 	if githubUser.Login == "" {
 		return nil, errors.New("The return value is illegal, the user field is empty, please try again later!")

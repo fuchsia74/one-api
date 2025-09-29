@@ -175,13 +175,13 @@ func responseAli2OpenAIImage(response *TaskResponse, responseFormat string) *ope
 func getImageData(url string) ([]byte, error) {
 	response, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "download image from url %s", url)
 	}
 	defer response.Body.Close()
 
 	imageData, err := io.ReadAll(response.Body)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "read image response body")
 	}
 
 	return imageData, nil

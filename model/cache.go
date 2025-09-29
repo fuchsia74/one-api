@@ -39,7 +39,10 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 			return nil, errors.New("database not initialized")
 		}
 		err := DB.Where(keyCol+" = ?", key).First(&token).Error
-		return &token, err
+		if err != nil {
+			return nil, errors.Wrapf(err, "get token by key %s", key)
+		}
+		return &token, nil
 	}
 	tokenObjectString, err := common.RedisGet(fmt.Sprintf("token:%s", key))
 	if err != nil {
@@ -48,13 +51,13 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 		}
 		err := DB.Where(keyCol+" = ?", key).First(&token).Error
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "get token by key %s", key)
 		}
 		// Marshal without custom Token.MarshalJSON to keep raw key in cache
 		type plainToken Token
 		jsonBytes, err := json.Marshal(plainToken(token))
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "marshal token %d for cache", token.Id)
 		}
 		err = common.RedisSet(fmt.Sprintf("token:%s", key), string(jsonBytes), time.Duration(TokenCacheSeconds)*time.Second)
 		if err != nil {
@@ -64,7 +67,10 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 	}
 
 	err = json.Unmarshal([]byte(tokenObjectString), &token)
-	return &token, err
+	if err != nil {
+		return nil, errors.Wrapf(err, "unmarshal cached token for key %s", key)
+	}
+	return &token, nil
 }
 
 func CacheGetUserGroup(id int) (group string, err error) {
@@ -75,14 +81,17 @@ func CacheGetUserGroup(id int) (group string, err error) {
 	if err != nil {
 		group, err = GetUserGroup(id)
 		if err != nil {
-			return "", err
+			return "", errors.Wrapf(err, "get user group for user %d", id)
 		}
 		err = common.RedisSet(fmt.Sprintf("user_group:%d", id), group, time.Duration(UserId2GroupCacheSeconds)*time.Second)
 		if err != nil {
 			logger.Logger.Warn("Redis set user group failed, continuing without cache", zap.Int("user_id", id), zap.Error(err))
 		}
 	}
-	return group, err
+	if err != nil {
+		return group, errors.Wrapf(err, "cache user group for user %d", id)
+	}
+	return group, nil
 }
 
 func fetchAndUpdateUserQuota(ctx context.Context, id int) (quota int64, err error) {
@@ -122,10 +131,13 @@ func CacheUpdateUserQuota(ctx context.Context, id int) error {
 	}
 	quota, err := CacheGetUserQuota(ctx, id)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "get cached quota for user %d", id)
 	}
 	err = common.RedisSet(fmt.Sprintf("user_quota:%d", id), fmt.Sprintf("%d", quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
-	return err
+	if err != nil {
+		return errors.Wrapf(err, "set cached quota for user %d", id)
+	}
+	return nil
 }
 
 func CacheDecreaseUserQuota(id int, quota int64) error {
@@ -133,7 +145,10 @@ func CacheDecreaseUserQuota(id int, quota int64) error {
 		return nil
 	}
 	err := common.RedisDecrease(fmt.Sprintf("user_quota:%d", id), int64(quota))
-	return err
+	if err != nil {
+		return errors.Wrapf(err, "decrease cached quota for user %d", id)
+	}
+	return nil
 }
 
 func CacheIsUserEnabled(userId int) (bool, error) {
@@ -147,7 +162,7 @@ func CacheIsUserEnabled(userId int) (bool, error) {
 
 	userEnabled, err := IsUserEnabled(userId)
 	if err != nil {
-		return false, err
+		return false, errors.Wrapf(err, "check user %d enabled", userId)
 	}
 	enabled = "0"
 	if userEnabled {
@@ -157,7 +172,10 @@ func CacheIsUserEnabled(userId int) (bool, error) {
 	if err != nil {
 		logger.Logger.Warn("Redis set user enabled failed, continuing without cache", zap.Int("user_id", userId), zap.Error(err))
 	}
-	return userEnabled, err
+	if err != nil {
+		return userEnabled, errors.Wrapf(err, "cache enabled status for user %d", userId)
+	}
+	return userEnabled, nil
 }
 
 // CacheGetGroupModels returns models of a group
@@ -173,7 +191,7 @@ func CacheGetGroupModels(ctx context.Context, group string) (models []string, er
 	}
 	models, err = GetGroupModels(ctx, group)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get group models")
 	}
 	err = common.RedisSet(fmt.Sprintf("group_models:%s", group), strings.Join(models, ","), time.Duration(GroupModelsCacheSeconds)*time.Second)
 	if err != nil {

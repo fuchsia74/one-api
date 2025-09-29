@@ -42,11 +42,11 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 	}
 	jsonData, err := json.Marshal(values)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "marshal Lark OAuth payload")
 	}
 	req, err := http.NewRequest("POST", "https://open.feishu.cn/open-apis/authen/v2/oauth/token", bytes.NewBuffer(jsonData))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build Lark OAuth request")
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
@@ -60,13 +60,12 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 	}
 	defer res.Body.Close()
 	var oAuthResponse LarkOAuthResponse
-	err = json.NewDecoder(res.Body).Decode(&oAuthResponse)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res.Body).Decode(&oAuthResponse); err != nil {
+		return nil, errors.Wrap(err, "decode Lark OAuth response")
 	}
 	req, err = http.NewRequest("GET", "https://passport.feishu.cn/suite/passport/oauth/userinfo", nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build Lark user info request")
 	}
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", oAuthResponse.AccessToken))
 	res2, err := client.Do(req)
@@ -75,9 +74,8 @@ func getLarkUserInfoByCode(code string) (*LarkUser, error) {
 		return nil, errors.Wrapf(err, "unable to connect to Lark server for user info")
 	}
 	var larkUser LarkUser
-	err = json.NewDecoder(res2.Body).Decode(&larkUser)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res2.Body).Decode(&larkUser); err != nil {
+		return nil, errors.Wrap(err, "decode Lark user info")
 	}
 	return &larkUser, nil
 }

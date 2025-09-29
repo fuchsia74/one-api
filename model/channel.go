@@ -650,7 +650,7 @@ func (channel *Channel) SetInferenceProfileArnMap(arnMap map[string]string) erro
 
 	jsonBytes, err := json.Marshal(arnMap)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "marshal inference profile ARN map")
 	}
 	jsonStr := string(jsonBytes)
 	channel.InferenceProfileArnMap = &jsonStr
@@ -774,16 +774,14 @@ func (channel *Channel) UpdateBalance(balance float64) {
 }
 
 func (channel *Channel) Delete() error {
-	var err error
-	err = DB.Delete(channel).Error
-	if err != nil {
-		return err
+	if err := DB.Delete(channel).Error; err != nil {
+		return errors.Wrapf(err, "delete channel %d", channel.Id)
 	}
-	err = channel.DeleteAbilities()
-	if err == nil {
-		InitChannelCache()
+	if err := channel.DeleteAbilities(); err != nil {
+		return errors.Wrapf(err, "delete abilities for channel %d", channel.Id)
 	}
-	return err
+	InitChannelCache()
+	return nil
 }
 
 func (channel *Channel) LoadConfig() (ChannelConfig, error) {
@@ -793,7 +791,7 @@ func (channel *Channel) LoadConfig() (ChannelConfig, error) {
 	}
 	err := json.Unmarshal([]byte(channel.Config), &cfg)
 	if err != nil {
-		return cfg, err
+		return cfg, errors.Wrapf(err, "unmarshal channel %d config", channel.Id)
 	}
 	return cfg, nil
 }
@@ -841,7 +839,7 @@ func (channel *Channel) SetModelRatio(modelRatio map[string]float64) error {
 	}
 	jsonBytes, err := json.Marshal(modelRatio)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "marshal channel model ratio")
 	}
 	jsonStr := string(jsonBytes)
 	channel.ModelRatio = &jsonStr
@@ -857,7 +855,7 @@ func (channel *Channel) SetCompletionRatio(completionRatio map[string]float64) e
 	}
 	jsonBytes, err := json.Marshal(completionRatio)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "marshal channel completion ratio")
 	}
 	jsonStr := string(jsonBytes)
 	channel.CompletionRatio = &jsonStr
@@ -1068,7 +1066,7 @@ func (channel *Channel) MigrateHistoricalPricingToModelConfigs() error {
 			logger.Logger.Error("Failed to set migrated ModelConfigs for channel",
 				zap.Int("channel_id", channel.Id),
 				zap.Error(err))
-			return err
+			return errors.Wrapf(err, "set migrated model configs for channel %d", channel.Id)
 		}
 
 		logger.Logger.Info("Successfully migrated historical pricing data to ModelConfigs",
@@ -1163,7 +1161,7 @@ func performFieldMigration() error {
 
 	if err != nil {
 		tx.Rollback()
-		return err
+		return errors.Wrap(err, "perform field migration")
 	}
 
 	// Commit the transaction

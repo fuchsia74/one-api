@@ -97,12 +97,14 @@ func Redeem(ctx context.Context, key string, userId int) (quota int64, err error
 		}
 		err = tx.Model(&User{}).Where("id = ?", userId).Update("quota", gorm.Expr("quota + ?", redemption.Quota)).Error
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "increase user %d quota with redemption", userId)
 		}
 		redemption.RedeemedTime = helper.GetTimestamp()
 		redemption.Status = RedemptionCodeStatusUsed
-		err = tx.Save(redemption).Error
-		return err
+		if err = tx.Save(redemption).Error; err != nil {
+			return errors.Wrap(err, "update redemption status")
+		}
+		return nil
 	})
 	if err != nil {
 		return 0, errors.Wrap(err, "Redeem failed")
@@ -112,9 +114,10 @@ func Redeem(ctx context.Context, key string, userId int) (quota int64, err error
 }
 
 func (redemption *Redemption) Insert() error {
-	var err error
-	err = DB.Create(redemption).Error
-	return err
+	if err := DB.Create(redemption).Error; err != nil {
+		return errors.Wrap(err, "insert redemption")
+	}
+	return nil
 }
 
 func (redemption *Redemption) SelectUpdate() error {
@@ -124,15 +127,17 @@ func (redemption *Redemption) SelectUpdate() error {
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
-	var err error
-	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time").Updates(redemption).Error
-	return err
+	if err := DB.Model(redemption).Select("name", "status", "quota", "redeemed_time").Updates(redemption).Error; err != nil {
+		return errors.Wrapf(err, "update redemption %d", redemption.Id)
+	}
+	return nil
 }
 
 func (redemption *Redemption) Delete() error {
-	var err error
-	err = DB.Delete(redemption).Error
-	return err
+	if err := DB.Delete(redemption).Error; err != nil {
+		return errors.Wrapf(err, "delete redemption %d", redemption.Id)
+	}
+	return nil
 }
 
 func DeleteRedemptionById(id int) (err error) {
@@ -142,7 +147,7 @@ func DeleteRedemptionById(id int) (err error) {
 	redemption := Redemption{Id: id}
 	err = DB.Where(redemption).First(&redemption).Error
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "find redemption %d", id)
 	}
 	return redemption.Delete()
 }

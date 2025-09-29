@@ -171,7 +171,7 @@ func convertWriterToConverseRequest(writerReq *Request, modelID string) (*bedroc
 func convertWriterToConverseStreamRequest(writerReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
 	converseReq, err := convertWriterToConverseRequest(writerReq, modelID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "convert writer request for stream")
 	}
 
 	return &bedrockruntime.ConverseStreamInput{

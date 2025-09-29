@@ -407,7 +407,7 @@ func convertOpenAIToConverseStreamRequest(openaiReq *Request, modelID string) (*
 	// Convert to regular converse request first
 	converseReq, err := convertOpenAIToConverseRequest(openaiReq, modelID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "convert openai request for stream")
 	}
 
 	// Create stream request

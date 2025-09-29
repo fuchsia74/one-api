@@ -248,7 +248,7 @@ func convertLlamaToConverseRequest(c *gin.Context, llamaReq *Request, modelID st
 func convertLlamaToConverseStreamRequest(c *gin.Context, llamaReq *Request, modelID string) (*bedrockruntime.ConverseStreamInput, error) {
 	converseReq, err := convertLlamaToConverseRequest(c, llamaReq, modelID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "convert llama request for stream")
 	}
 
 	return &bedrockruntime.ConverseStreamInput{

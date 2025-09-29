@@ -49,7 +49,7 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	formData := values.Encode()
 	req, err := http.NewRequest("POST", config.OidcTokenEndpoint, strings.NewReader(formData))
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build OIDC token request")
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.Header.Set("Accept", "application/json")
@@ -62,13 +62,12 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 	}
 	defer res.Body.Close()
 	var oidcResponse OidcResponse
-	err = json.NewDecoder(res.Body).Decode(&oidcResponse)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res.Body).Decode(&oidcResponse); err != nil {
+		return nil, errors.Wrap(err, "decode OIDC token response")
 	}
 	req, err = http.NewRequest("GET", config.OidcUserinfoEndpoint, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build OIDC userinfo request")
 	}
 	req.Header.Set("Authorization", "Bearer "+oidcResponse.AccessToken)
 	res2, err := client.Do(req)
@@ -76,9 +75,8 @@ func getOidcUserInfoByCode(code string) (*OidcUser, error) {
 		return nil, errors.Wrap(err, "unable to connect to the OIDC server for user info")
 	}
 	var oidcUser OidcUser
-	err = json.NewDecoder(res2.Body).Decode(&oidcUser)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res2.Body).Decode(&oidcUser); err != nil {
+		return nil, errors.Wrap(err, "decode OIDC user info")
 	}
 	return &oidcUser, nil
 }

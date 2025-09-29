@@ -535,7 +535,7 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 	adaptor.SetupCommonRequestHeader(c, req, meta)
 	token, err := getToken(c, meta.ChannelId, meta.Config.VertexAIADC)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "get Vertex AI token")
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	return nil

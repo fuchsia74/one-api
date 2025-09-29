@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 	"gorm.io/gorm"
 
@@ -405,7 +406,7 @@ func DeleteOldLog(targetTimestamp int64) (int64, error) {
 func GetLogById(id int) (*Log, error) {
 	var log Log
 	if err := LOG_DB.Where("id = ?", id).First(&log).Error; err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "get log by id %d", id)
 	}
 	return &log, nil
 }

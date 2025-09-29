@@ -61,7 +61,7 @@ func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority b
 	channel.Id = ability.ChannelId
 	err = DB.First(&channel, "id = ?", ability.ChannelId).Error
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "load channel %d for ability", ability.ChannelId)
 	}
 	if !channel.SupportsModel(model) {
 		return nil, errors.Errorf("channel #%d does not list support for model %s", channel.Id, model)
@@ -101,12 +101,12 @@ func (channel *Channel) UpdateAbilities() error {
 	// First delete all abilities of this channel
 	err := channel.DeleteAbilities()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "delete abilities for channel %d", channel.Id)
 	}
 	// Then add new abilities
 	err = channel.AddAbilities()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "add abilities for channel %d", channel.Id)
 	}
 	return nil
 }
@@ -125,7 +125,7 @@ func GetGroupModels(ctx context.Context, group string) ([]string, error) {
 	var models []string
 	err := DB.Model(&Ability{}).Distinct("model").Where(groupCol+" = ? AND enabled = "+trueVal+" AND (suspend_until IS NULL OR suspend_until < ?)", group, time.Now()).Pluck("model", &models).Error
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "get group models")
 	}
 	sort.Strings(models)
 	return models, err
@@ -300,7 +300,7 @@ func GetRandomSatisfiedChannelExcluding(group string, model string, ignoreFirstP
 	channel.Id = ability.ChannelId
 	err = DB.First(&channel, "id = ?", ability.ChannelId).Error
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "load channel %d for ability exclusion check", ability.ChannelId)
 	}
 	if !channel.SupportsModel(model) {
 		return nil, errors.Errorf("channel #%d does not list support for model %s", channel.Id, model)

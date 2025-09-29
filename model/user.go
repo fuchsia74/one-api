@@ -353,10 +353,12 @@ func ResetUserPasswordByEmail(email string, password string) error {
 	}
 	hashedPassword, err := common.Password2Hash(password)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "hash password for reset")
 	}
-	err = DB.Model(&User{}).Where("email = ?", email).Update("password", hashedPassword).Error
-	return err
+	if err = DB.Model(&User{}).Where("email = ?", email).Update("password", hashedPassword).Error; err != nil {
+		return errors.Wrapf(err, "update password for email %s", email)
+	}
+	return nil
 }
 
 func IsAdmin(userId int) bool {
@@ -379,7 +381,7 @@ func IsUserEnabled(userId int) (bool, error) {
 	var user User
 	err := DB.Where("id = ?", userId).Select("status").Find(&user).Error
 	if err != nil {
-		return false, err
+		return false, errors.Wrapf(err, "query user %d status", userId)
 	}
 	return user.Status == UserStatusEnabled, nil
 }
@@ -398,17 +400,26 @@ func ValidateAccessToken(token string) (user *User) {
 
 func GetUserQuota(id int) (quota int64, err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Select("quota").Find(&quota).Error
-	return quota, err
+	if err != nil {
+		return 0, errors.Wrapf(err, "get quota for user %d", id)
+	}
+	return quota, nil
 }
 
 func GetUserUsedQuota(id int) (quota int64, err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Select("used_quota").Find(&quota).Error
-	return quota, err
+	if err != nil {
+		return 0, errors.Wrapf(err, "get used quota for user %d", id)
+	}
+	return quota, nil
 }
 
 func GetUserEmail(id int) (email string, err error) {
 	err = DB.Model(&User{}).Where("id = ?", id).Select("email").Find(&email).Error
-	return email, err
+	if err != nil {
+		return "", errors.Wrapf(err, "get email for user %d", id)
+	}
+	return email, nil
 }
 
 func GetUserGroup(id int) (group string, err error) {
@@ -418,7 +429,10 @@ func GetUserGroup(id int) (group string, err error) {
 	}
 
 	err = DB.Model(&User{}).Where("id = ?", id).Select(groupCol).Find(&group).Error
-	return group, err
+	if err != nil {
+		return "", errors.Wrapf(err, "get group for user %d", id)
+	}
+	return group, nil
 }
 
 func IncreaseUserQuota(id int, quota int64) (err error) {
@@ -433,8 +447,10 @@ func IncreaseUserQuota(id int, quota int64) (err error) {
 }
 
 func increaseUserQuota(id int, quota int64) (err error) {
-	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error
-	return err
+	if err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error; err != nil {
+		return errors.Wrapf(err, "increase quota for user %d", id)
+	}
+	return nil
 }
 
 func DecreaseUserQuota(id int, quota int64) (err error) {
@@ -449,8 +465,10 @@ func DecreaseUserQuota(id int, quota int64) (err error) {
 }
 
 func decreaseUserQuota(id int, quota int64) (err error) {
-	err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota - ?", quota)).Error
-	return err
+	if err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota - ?", quota)).Error; err != nil {
+		return errors.Wrapf(err, "decrease quota for user %d", id)
+	}
+	return nil
 }
 
 func GetRootUserEmail() (email string) {

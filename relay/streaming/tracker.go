@@ -98,7 +98,10 @@ func (t *QuotaTracker) RecordCompletionTokens(delta int) error {
 	t.completionSum += delta
 	err := t.flushLocked(false)
 	t.mu.Unlock()
-	return err
+	if err != nil {
+		return errors.Wrap(err, "flush streaming quota during record")
+	}
+	return nil
 }
 
 // UpdateFinalUsage stores the usage reported by the upstream provider. This is
@@ -133,7 +136,10 @@ func (t *QuotaTracker) Finalize(finalUsage *relaymodel.Usage) (*relaymodel.Usage
 	if abortErr != nil {
 		return snapshot, charged, abortErr
 	}
-	return snapshot, charged, err
+	if err != nil {
+		return snapshot, charged, errors.Wrap(err, "flush streaming quota during finalize")
+	}
+	return snapshot, charged, nil
 }
 
 // ChargedQuota returns the total quota charged during streaming (excluding the
@@ -156,7 +162,10 @@ func (t *QuotaTracker) maybeFlush(force bool) error {
 	t.mu.Lock()
 	err := t.flushLocked(force)
 	t.mu.Unlock()
-	return err
+	if err != nil {
+		return errors.Wrap(err, "flush streaming quota")
+	}
+	return nil
 }
 
 func (t *QuotaTracker) flushLocked(force bool) error {
@@ -177,10 +186,11 @@ func (t *QuotaTracker) flushLocked(force bool) error {
 	}
 
 	if err := t.ensureQuotaLocked(delta); err != nil {
+		wrappedErr := errors.Wrap(err, "ensure quota during streaming flush")
 		if errors.Is(err, ErrQuotaExceeded) {
-			t.abortErr = err
+			t.abortErr = wrappedErr
 		}
-		return err
+		return wrappedErr
 	}
 
 	if err := model.PostConsumeTokenQuota(t.params.TokenID, delta); err != nil {

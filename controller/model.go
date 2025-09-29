@@ -269,7 +269,7 @@ func GetModelsDisplay(c *gin.Context) {
 		v, err, _ := anonymousModelsDisplayGroup.Do(cacheKey, func() (interface{}, error) {
 			channels, err := model.GetAllEnabledChannels()
 			if err != nil {
-				return nil, err
+				return nil, errors.Wrap(err, "get all enabled channels")
 			}
 			result := make(map[string]ChannelModelsDisplayInfo)
 			for _, ch := range channels {

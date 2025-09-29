@@ -104,7 +104,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	// The original request body will be forwarded directly for better compatibility
 	_, err := ConvertClaudeRequest(c, *request)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "convert Claude request for billing")
 	}
 
 	// Return the original request - this won't be marshaled since we use direct pass-through

@@ -56,7 +56,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	apiKey = strings.TrimPrefix(apiKey, "Bearer ")
 	_, secretId, secretKey, err := ParseConfig(apiKey)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "parse tencent channel config")
 	}
 	var convertedRequest any
 	switch relayMode {

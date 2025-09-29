@@ -153,7 +153,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if relayMode == relaymode.ResponseAPI {
 		// Apply transformations (e.g., image URL -> base64) and pass through
 		if err := a.applyRequestTransformations(meta, request); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "apply request transformations for Response API")
 		}
 		return request, nil
 	}
@@ -165,7 +165,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
 		// Apply existing transformations first
 		if err := a.applyRequestTransformations(meta, request); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "apply request transformations for chat completion conversion")
 		}
 
 		// Convert to Response API format
@@ -179,7 +179,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 	// Apply existing transformations for other modes
 	if err := a.applyRequestTransformations(meta, request); err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "apply request transformations")
 	}
 
 	return request, nil
@@ -471,7 +471,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
 		// Apply transformations first
 		if err := a.applyRequestTransformations(meta, openaiRequest); err != nil {
-			return nil, err
+			return nil, errors.Wrap(err, "apply request transformations for Claude conversion")
 		}
 
 		// Convert to Response API format

@@ -129,25 +129,25 @@ func GetAuthHeader(token string) http.Header {
 func GetResponseBody(method, url string, channel *model.Channel, headers http.Header) ([]byte, error) {
 	req, err := http.NewRequest(method, url, nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "new %s request to %s failed", method, url)
 	}
 	for k := range headers {
 		req.Header.Add(k, headers.Get(k))
 	}
 	res, err := client.HTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "upstream request failed for channel %d", channel.Id)
 	}
 	if res.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("status code: %d", res.StatusCode)
 	}
 	body, err := io.ReadAll(res.Body)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "read channel billing response body")
 	}
 	err = res.Body.Close()
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "close channel billing response body")
 	}
 	return body, nil
 }
@@ -157,12 +157,12 @@ func updateChannelCloseAIBalance(channel *model.Channel) (float64, error) {
 	body, err := GetResponseBody("GET", url, channel, GetAuthHeader(channel.Key))
 
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "get CloseAI balance response")
 	}
 	response := OpenAICreditGrants{}
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "unmarshal CloseAI balance response")
 	}
 	channel.UpdateBalance(response.TotalAvailable)
 	return response.TotalAvailable, nil
@@ -172,19 +172,19 @@ func updateChannelOpenAISBBalance(channel *model.Channel) (float64, error) {
 	url := fmt.Sprintf("https://api.openai-sb.com/sb-api/user/status?api_key=%s", channel.Key)
 	body, err := GetResponseBody("GET", url, channel, GetAuthHeader(channel.Key))
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "get OpenAI SB balance response")
 	}
 	response := OpenAISBUsageResponse{}
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "unmarshal OpenAI SB balance response")
 	}
 	if response.Data == nil {
 		return 0, errors.New(response.Msg)
 	}
 	balance, err := strconv.ParseFloat(response.Data.Credit, 64)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "parse OpenAI SB balance")
 	}
 	channel.UpdateBalance(balance)
 	return balance, nil
@@ -196,7 +196,7 @@ func updateChannelAIProxyBalance(channel *model.Channel) (float64, error) {
 	headers.Add("Api-Key", channel.Key)
 	body, err := GetResponseBody("GET", url, channel, headers)
 	if err != nil {
-		return 0, err
+		return 0, errors.Wrap(err, "get AIProxy balance response")
 	}
 	response := AIProxyUserOverviewResponse{}
 	err = json.Unmarshal(body, &response)
@@ -409,7 +409,7 @@ func UpdateChannelBalance(c *gin.Context) {
 func updateAllChannelsBalance() error {
 	channels, err := model.GetAllChannels(0, 0, "all", "", "")
 	if err != nil {
-		return err
+		return errors.Wrap(err, "get all channels for balance update")
 	}
 	for _, channel := range channels {
 		if channel.Status != model.ChannelStatusEnabled {

@@ -294,20 +294,19 @@ func getBaiduAccessTokenHelper(apiKey string) (*AccessToken, error) {
 	req, err := http.NewRequest("POST", fmt.Sprintf("https://aip.baidubce.com/oauth/2.0/token?grant_type=client_credentials&client_id=%s&client_secret=%s",
 		parts[0], parts[1]), nil)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "build baidu access token request")
 	}
 	req.Header.Add("Content-Type", "application/json")
 	req.Header.Add("Accept", "application/json")
 	res, err := client.ImpatientHTTPClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrap(err, "request baidu access token")
 	}
 	defer res.Body.Close()
 
 	var accessToken AccessToken
-	err = json.NewDecoder(res.Body).Decode(&accessToken)
-	if err != nil {
-		return nil, err
+	if err = json.NewDecoder(res.Body).Decode(&accessToken); err != nil {
+		return nil, errors.Wrap(err, "decode baidu access token response")
 	}
 	if accessToken.Error != "" {
 		return nil, errors.New(accessToken.Error + ": " + accessToken.ErrorDescription)

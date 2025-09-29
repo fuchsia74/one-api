@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -243,5 +244,8 @@ func updateOptionMap(key string, value string) (err error) {
 	case "Theme":
 		config.Theme = value
 	}
-	return err
+	if err != nil {
+		return errors.Wrap(err, "update group ratio configuration")
+	}
+	return nil
 }
