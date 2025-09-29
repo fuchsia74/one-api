@@ -297,6 +297,11 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 		claudeRequest.TopP = nil
 	}
 
+	if claudeRequest.Temperature != nil {
+		// `temperature` and `top_p` cannot both be specified for this model
+		claudeRequest.TopP = nil
+	}
+
 	for _, message := range textRequest.Messages {
 		if message.Role == "system" && claudeRequest.System == "" {
 			claudeRequest.System = message.StringContent()
