@@ -2,6 +2,7 @@ package anthropic
 
 import (
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
@@ -13,6 +14,104 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/model"
 )
+
+func float64Ptr(v float64) *float64 {
+	return &v
+}
+
+func intPtr(v int) *int {
+	return &v
+}
+
+func newThinkingContext(t *testing.T, rawURL string) *gin.Context {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodPost, rawURL, nil)
+	c.Request = req
+	return c
+}
+
+func TestConvertRequest_ThinkingEnabledViaQuery(t *testing.T) {
+	c := newThinkingContext(t, "/v1/chat/completions?thinking=enabled")
+
+	request := model.GeneralOpenAIRequest{
+		Model:     "claude-3-opus-latest",
+		MaxTokens: 4096,
+		Messages:  []model.Message{{Role: "user", Content: "hello"}},
+	}
+
+	converted, err := ConvertRequest(c, request)
+	require.NoError(t, err)
+	require.NotNil(t, converted)
+
+	if assert.NotNil(t, converted.Thinking) {
+		assert.Equal(t, "enabled", converted.Thinking.Type)
+		assert.Equal(t, 1024, converted.Thinking.BudgetTokens)
+	}
+}
+
+func TestConvertRequest_RejectsThinkingWhenMaxTokensTooSmall(t *testing.T) {
+	c := newThinkingContext(t, "/v1/chat/completions")
+
+	request := model.GeneralOpenAIRequest{
+		Model:     "claude-3-opus-latest",
+		MaxTokens: 1024,
+		Thinking: &model.Thinking{
+			Type:         "enabled",
+			BudgetTokens: 1024,
+		},
+	}
+
+	_, err := ConvertRequest(c, request)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "max_tokens must be greater than 1024")
+}
+
+func TestConvertRequest_ClearsMutuallyExclusiveParametersWhenThinkingEnabled(t *testing.T) {
+	c := newThinkingContext(t, "/v1/chat/completions")
+
+	request := model.GeneralOpenAIRequest{
+		Model:     "claude-3-opus-latest",
+		MaxTokens: 4096,
+		Thinking: &model.Thinking{
+			Type:         "enabled",
+			BudgetTokens: 2048,
+		},
+		Temperature: float64Ptr(0.7),
+		TopP:        float64Ptr(0.5),
+		TopK:        intPtr(32),
+	}
+
+	converted, err := ConvertRequest(c, request)
+	require.NoError(t, err)
+	require.NotNil(t, converted)
+
+	assert.Nil(t, converted.Temperature, "temperature should be nil when thinking is enabled")
+	assert.Nil(t, converted.TopP, "top_p should be nil when thinking is enabled")
+	assert.Nil(t, converted.TopK, "top_k should be nil when thinking is enabled")
+}
+
+func TestConvertRequest_ClearsTopPWhenTemperatureSpecified(t *testing.T) {
+	c := newThinkingContext(t, "/v1/chat/completions")
+
+	request := model.GeneralOpenAIRequest{
+		Model:       "claude-3-opus-latest",
+		MaxTokens:   4096,
+		Temperature: float64Ptr(0.8),
+		TopP:        float64Ptr(0.6),
+	}
+
+	converted, err := ConvertRequest(c, request)
+	require.NoError(t, err)
+	require.NotNil(t, converted)
+
+	assert.Nil(t, converted.TopP, "top_p should be nil when temperature is provided")
+	if assert.NotNil(t, converted.Temperature) {
+		assert.InEpsilon(t, 0.8, *converted.Temperature, 1e-9)
+	}
+}
 
 func TestConvertRequest_EmptyAssistantMessageWithToolCalls(t *testing.T) {
 	gin.SetMode(gin.TestMode)

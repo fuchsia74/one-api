@@ -12,10 +12,11 @@ import (
 )
 
 func TestGetAudioDuration(t *testing.T) {
-	// skip if there is no ffmpeg installed
-	_, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		t.Skip("ffmpeg not installed, skipping test")
+	// skip if there is no ffprobe installed
+	if _, err := exec.LookPath("ffprobe"); err != nil {
+		if _, altErr := exec.LookPath("avprobe"); altErr != nil {
+			t.Skip("ffprobe not installed, skipping test")
+		}
 	}
 
 	t.Run("should return correct duration for a valid audio file", func(t *testing.T) {
@@ -25,8 +26,14 @@ func TestGetAudioDuration(t *testing.T) {
 
 		// download test audio file
 		resp, err := http.Get("https://s3.laisky.com/uploads/2025/01/audio-sample.m4a")
-		require.NoError(t, err)
+		if err != nil {
+			t.Skipf("skipping audio duration test due to download failure: %v", err)
+		}
 		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Skipf("skipping audio duration test due to unexpected status: %s", resp.Status)
+		}
 
 		_, err = io.Copy(tmpFile, resp.Body)
 		require.NoError(t, err)
@@ -44,17 +51,23 @@ func TestGetAudioDuration(t *testing.T) {
 }
 
 func TestGetAudioTokens(t *testing.T) {
-	// skip if there is no ffmpeg installed
-	_, err := exec.LookPath("ffmpeg")
-	if err != nil {
-		t.Skip("ffmpeg not installed, skipping test")
+	if _, err := exec.LookPath("ffprobe"); err != nil {
+		if _, altErr := exec.LookPath("avprobe"); altErr != nil {
+			t.Skip("ffprobe not installed, skipping test")
+		}
 	}
 
 	t.Run("should return correct tokens for a valid audio file", func(t *testing.T) {
 		// download test audio file
 		resp, err := http.Get("https://s3.laisky.com/uploads/2025/01/audio-sample.m4a")
-		require.NoError(t, err)
+		if err != nil {
+			t.Skipf("skipping audio tokens test due to download failure: %v", err)
+		}
 		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			t.Skipf("skipping audio tokens test due to unexpected status: %s", resp.Status)
+		}
 
 		tokens, err := GetAudioTokens(context.Background(), resp.Body, 50)
 		require.NoError(t, err)
