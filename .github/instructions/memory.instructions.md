@@ -92,6 +92,14 @@ This document contains essential, abstract, and up-to-date information about the
 - **Time Handling:** Always use UTC for server, DB, and API time.
 - **Golang ORM:** Use `gorm.io/gorm` for writes; prefer SQL for reads to minimize DB load.
 
+## Models Display Permissions (2025-09)
+
+- `/api/models/display` now filters strictly by configuration and user entitlements:
+    - Anonymous users only see models explicitly listed in a channel’s `Models` field. Channels without configured models are hidden from the public listing.
+    - Authenticated users see the intersection of their group/channel abilities and the channel’s supported models; abilities are deduplicated and sorted for deterministic output.
+    - Filtering runs before pricing lookups, so orphaned or whitespace-only entries are dropped to avoid nil pricing reads.
+- Controller tests seed isolated SQLite databases, disable Redis, and reset shared caches (`anonymousModelsDisplayCache`, `singleflight` group) per test. Follow this pattern when extending display logic to keep tests deterministic.
+
 ## Handover Guidance
 
 - **Claude Messages API:** Universal conversion and billing parity. See `docs/arch/api_billing.md` and `docs/arch/api_convert.md` for details.

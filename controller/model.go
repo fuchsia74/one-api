@@ -205,7 +205,14 @@ func GetModelsDisplay(c *gin.Context) {
 		pricing := adaptor.GetDefaultModelPricing()
 		modelMapping := channel.GetModelMapping()
 
-		for _, modelName := range modelNames {
+		for _, rawName := range modelNames {
+			modelName := strings.TrimSpace(rawName)
+			if modelName == "" {
+				continue
+			}
+			if !channel.SupportsModel(modelName) {
+				continue
+			}
 			if keyword != "" && !strings.Contains(strings.ToLower(modelName), keyword) {
 				continue
 			}
@@ -273,18 +280,11 @@ func GetModelsDisplay(c *gin.Context) {
 			}
 			result := make(map[string]ChannelModelsDisplayInfo)
 			for _, ch := range channels {
-				adaptor := relay.GetAdaptor(channeltype.ToAPIType(ch.Type))
-				if adaptor == nil {
-					adaptor = relay.GetAdaptor(apitype.OpenAI)
-					if adaptor == nil {
-						continue
-					}
-				}
-				modelList := adaptor.GetModelList()
-				if len(modelList) == 0 {
+				supported := ch.GetSupportedModelNames()
+				if len(supported) == 0 {
 					continue
 				}
-				modelInfos := buildChannelModels(ch, modelList)
+				modelInfos := buildChannelModels(ch, supported)
 				if len(modelInfos) == 0 {
 					continue
 				}
@@ -316,16 +316,29 @@ func GetModelsDisplay(c *gin.Context) {
 	}
 
 	result := make(map[string]ChannelModelsDisplayInfo)
-	// Group abilities by channel ID
-	ch2models := make(map[int][]string)
+	// Group abilities by channel ID and deduplicate models
+	ch2models := make(map[int]map[string]struct{})
 	for _, ab := range abilities {
-		ch2models[ab.ChannelId] = append(ch2models[ab.ChannelId], ab.Model)
+		if _, ok := ch2models[ab.ChannelId]; !ok {
+			ch2models[ab.ChannelId] = make(map[string]struct{})
+		}
+		ch2models[ab.ChannelId][ab.Model] = struct{}{}
 	}
-	for chID, models := range ch2models {
+	for chID, modelSet := range ch2models {
 		ch, err := model.GetChannelById(chID, true)
 		if err != nil {
 			continue
 		}
+		models := make([]string, 0, len(modelSet))
+		for m := range modelSet {
+			if ch.SupportsModel(m) {
+				models = append(models, m)
+			}
+		}
+		if len(models) == 0 {
+			continue
+		}
+		sort.Strings(models)
 		infos := buildChannelModels(ch, models)
 		if len(infos) == 0 {
 			continue
