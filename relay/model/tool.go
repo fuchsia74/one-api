@@ -14,6 +14,10 @@ type Tool struct {
 	Type     string    `json:"type,omitempty"`     // Tool type (e.g., "function", "mcp"), may be empty when splicing claude tools stream messages
 	Function *Function `json:"function,omitempty"` // Function definition (for type="function")
 	Index    *int      `json:"index,omitempty"`    // Index identifies which function call the delta is for in streaming responses
+	// Web-search specific configuration (type="web_search")
+	SearchContextSize *string           `json:"search_context_size,omitempty"`
+	Filters           *WebSearchFilters `json:"filters,omitempty"`
+	UserLocation      *UserLocation     `json:"user_location,omitempty"`
 
 	// MCP-specific fields (for type="mcp")
 	ServerLabel     string            `json:"server_label,omitempty"`     // Label for the MCP server

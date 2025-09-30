@@ -2,9 +2,14 @@ package openai
 
 import (
 	"encoding/json"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
+
+	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -1784,5 +1789,70 @@ func TestResponseAPIUsageWithFallback(t *testing.T) {
 	if chatCompletion.Usage.PromptTokens != 0 || chatCompletion.Usage.CompletionTokens != 0 {
 		t.Errorf("Expected zero usage when zero usage provided, got prompt=%d, completion=%d",
 			chatCompletion.Usage.PromptTokens, chatCompletion.Usage.CompletionTokens)
+	}
+}
+
+func TestApplyWebSearchToolCostForCallCount(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set(ctxkey.WebSearchCallCount, 3)
+	metaInfo := &meta.Meta{ActualModelName: "gpt-5"}
+	var usage *model.Usage
+
+	if err := applyWebSearchToolCost(c, &usage, metaInfo); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if usage == nil {
+		t.Fatal("expected usage to be allocated")
+	}
+
+	perCall := webSearchCallQuotaPerInvocation(metaInfo.ActualModelName)
+	expected := int64(3) * perCall
+	if usage.ToolsCost != expected {
+		t.Fatalf("expected tools cost %d, got %d", expected, usage.ToolsCost)
+	}
+}
+
+func TestApplyWebSearchToolCostForSearchPreview(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set(ctxkey.WebSearchCallCount, 1)
+	metaInfo := &meta.Meta{ActualModelName: "gpt-4o-search-preview"}
+	usage := &model.Usage{}
+
+	if err := applyWebSearchToolCost(c, &usage, metaInfo); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	perCall := webSearchCallQuotaPerInvocation(metaInfo.ActualModelName)
+	if perCall <= 0 {
+		t.Fatalf("expected positive per-call quota for preview model, got %d", perCall)
+	}
+	if usage.ToolsCost != perCall {
+		t.Fatalf("expected tools cost %d, got %d", perCall, usage.ToolsCost)
+	}
+}
+
+func TestWebSearchCallUSDPerThousandTiering(t *testing.T) {
+	cases := []struct {
+		model string
+		usd   float64
+	}{
+		{"gpt-4o-search-preview", 25.0},
+		{"gpt-4o-mini-search-preview-2025-01-01", 25.0},
+		{"gpt-4.1-mini-search-preview", 25.0},
+		{"gpt-5-search", 10.0},
+		{"o1-preview-search", 10.0},
+		{"gpt-4o-search", 10.0},
+	}
+
+	for _, tc := range cases {
+		got := webSearchCallUSDPerThousand(tc.model)
+		if got != tc.usd {
+			t.Fatalf("model %s: expected USD %.2f, got %.2f", tc.model, tc.usd, got)
+		}
 	}
 }

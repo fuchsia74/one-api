@@ -42,6 +42,32 @@ type Adaptor struct {
 	ChannelType int
 }
 
+func webSearchCallUSDPerThousand(modelName string) float64 {
+	lower := strings.ToLower(modelName)
+	if strings.TrimSpace(lower) == "" {
+		return 10.0
+	}
+
+	if strings.Contains(lower, "search-preview") {
+		highTier := []string{"gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"}
+		for _, key := range highTier {
+			if strings.Contains(lower, key) {
+				return 25.0
+			}
+		}
+	}
+
+	return 10.0
+}
+
+func webSearchCallQuotaPerInvocation(modelName string) int64 {
+	usd := webSearchCallUSDPerThousand(modelName)
+	if usd <= 0 {
+		return 0
+	}
+	return int64(math.Ceil(usd / 1000.0 * ratio.QuotaPerUsd))
+}
+
 func (a *Adaptor) Init(meta *meta.Meta) {
 	a.ChannelType = meta.ChannelType
 }
@@ -573,56 +599,8 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 		}
 	}
 
-	// -------------------------------------
-	// calculate web-search tool cost
-	// -------------------------------------
-	if usage != nil {
-		searchContextSize := "medium"
-		var req *model.GeneralOpenAIRequest
-		if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
-			if req, ok = vi.(*model.GeneralOpenAIRequest); ok {
-				if req != nil &&
-					req.WebSearchOptions != nil &&
-					req.WebSearchOptions.SearchContextSize != nil {
-					searchContextSize = *req.WebSearchOptions.SearchContextSize
-				}
-
-				switch {
-				case strings.HasPrefix(meta.ActualModelName, "gpt-4o-search"):
-					switch searchContextSize {
-					case "low":
-						usage.ToolsCost += int64(math.Ceil(30.0 / 1000.0 * ratio.QuotaPerUsd))
-					case "medium":
-						usage.ToolsCost += int64(math.Ceil(35.0 / 1000.0 * ratio.QuotaPerUsd))
-					case "high":
-						usage.ToolsCost += int64(math.Ceil(40.0 / 1000.0 * ratio.QuotaPerUsd))
-					default:
-						return nil, ErrorWrapper(
-							errors.Errorf("invalid search context size %q", searchContextSize),
-							"invalid search context size: "+searchContextSize,
-							http.StatusBadRequest)
-					}
-				case strings.HasPrefix(meta.ActualModelName, "gpt-4o-mini-search"):
-					switch searchContextSize {
-					case "low":
-						usage.ToolsCost += int64(math.Ceil(25.0 / 1000.0 * ratio.QuotaPerUsd))
-					case "medium":
-						usage.ToolsCost += int64(math.Ceil(27.5 / 1000.0 * ratio.QuotaPerUsd))
-					case "high":
-						usage.ToolsCost += int64(math.Ceil(30.0 / 1000.0 * ratio.QuotaPerUsd))
-					default:
-						return nil, ErrorWrapper(
-							errors.Errorf("invalid search context size %q", searchContextSize),
-							"invalid search context size: "+searchContextSize,
-							http.StatusBadRequest)
-					}
-				}
-
-				// No surcharge for structured outputs (json_schema); only token usage is billed.
-			}
-		}
-
-		// Also check the original request in case it wasn't converted — still no surcharge.
+	if errCost := applyWebSearchToolCost(c, &usage, meta); errCost != nil {
+		return nil, errCost
 	}
 
 	// Handle Claude Messages response conversion
@@ -642,6 +620,44 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 	}
 
 	return
+}
+
+func applyWebSearchToolCost(c *gin.Context, usage **model.Usage, meta *meta.Meta) *model.ErrorWithStatusCode {
+	if usage == nil || meta == nil {
+		return nil
+	}
+
+	ensureUsage := func() *model.Usage {
+		if *usage == nil {
+			*usage = &model.Usage{}
+		}
+		return *usage
+	}
+
+	modelName := meta.ActualModelName
+	perCallQuota := webSearchCallQuotaPerInvocation(modelName)
+
+	if callCountAny, ok := c.Get(ctxkey.WebSearchCallCount); ok {
+		count := 0
+		switch v := callCountAny.(type) {
+		case int:
+			count = v
+		case int32:
+			count = int(v)
+		case int64:
+			count = int(v)
+		case float64:
+			count = int(v)
+		}
+		if count < 0 {
+			count = 0
+		}
+		if count > 0 && perCallQuota > 0 {
+			ensureUsage().ToolsCost += int64(count) * perCallQuota
+		}
+	}
+
+	return nil
 }
 
 // convertToClaudeResponse converts OpenAI response format to Claude Messages format

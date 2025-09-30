@@ -72,6 +72,10 @@ const (
 	// Read in: adaptor DoRequest/DoResponse or signing steps that need the converted structure.
 	ConvertedRequest = "converted_request"
 
+	// WebSearchCallCount stores the number of OpenAI web search tool invocations observed in the upstream
+	// response. Set by adaptors after parsing provider responses and consumed during billing adjustments.
+	WebSearchCallCount = "web_search_call_count"
+
 	// Group is the user group resolved for the current user (affects routing & ratios).
 	// Set in: middleware/distributor (via model.CacheGetUserGroup).
 	// Read in: meta/metrics and for channel selection.

@@ -451,6 +451,10 @@ func ResponseAPIHandler(c *gin.Context, resp *http.Response, promptTokens int, m
 		}, nil
 	}
 
+	if calls := countWebSearchSearchActions(responseAPIResp.Output); calls > 0 {
+		c.Set(ctxkey.WebSearchCallCount, calls)
+	}
+
 	// Convert Response API response to ChatCompletion format
 	chatCompletionResp := ConvertResponseAPIToChatCompletion(&responseAPIResp)
 	chatCompletionResp.Model = modelName
@@ -522,6 +526,8 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 	responseText := ""
 	reasoningText := ""
 	var usage *model.Usage
+	webSearchSeen := make(map[string]struct{})
+	webSearchCount := 0
 
 	// Set up scanner for reading the stream line by line
 	scanner := bufio.NewScanner(resp.Body)
@@ -576,6 +582,10 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 		} else {
 			// Skip this chunk if we can't parse it
 			continue
+		}
+
+		if newCalls := countNewWebSearchSearchActions(responseAPIChunk.Output, webSearchSeen); newCalls > 0 {
+			webSearchCount += newCalls
 		}
 
 		// IMPORTANT: Accumulate response text for token counting - but only from delta events to avoid duplicates
@@ -676,6 +686,10 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), responseText, usage
 	}
 
+	if webSearchCount > 0 {
+		c.Set(ctxkey.WebSearchCallCount, webSearchCount)
+	}
+
 	// Record when upstream streaming is completed
 	recordUpstreamCompleted(c)
 
@@ -712,6 +726,10 @@ func ResponseAPIDirectHandler(c *gin.Context, resp *http.Response, promptTokens 
 			Error:      *responseAPIResp.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
+	}
+
+	if calls := countWebSearchSearchActions(responseAPIResp.Output); calls > 0 {
+		c.Set(ctxkey.WebSearchCallCount, calls)
 	}
 
 	// Extract usage information for billing
@@ -765,6 +783,8 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 	// Initialize accumulators for the response
 	responseText := ""
 	var usage *model.Usage
+	webSearchSeen := make(map[string]struct{})
+	webSearchCount := 0
 
 	// Set up scanner for reading the stream line by line
 	scanner := bufio.NewScanner(resp.Body)
@@ -816,6 +836,10 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 			continue
 		}
 
+		if newCalls := countNewWebSearchSearchActions(responseAPIChunk.Output, webSearchSeen); newCalls > 0 {
+			webSearchCount += newCalls
+		}
+
 		// Accumulate response text for token counting - only from delta events to avoid duplicates
 		if streamEvent != nil && strings.Contains(streamEvent.Type, "delta") {
 			// Only accumulate content from delta events to prevent duplication
@@ -846,6 +870,10 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 
 	if err := resp.Body.Close(); err != nil {
 		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), responseText, usage
+	}
+
+	if webSearchCount > 0 {
+		c.Set(ctxkey.WebSearchCallCount, webSearchCount)
 	}
 
 	// Record when upstream streaming is completed

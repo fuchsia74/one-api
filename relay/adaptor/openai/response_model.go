@@ -110,12 +110,31 @@ type ResponseAPITool struct {
 	Description string                 `json:"description,omitempty"` // Function description (for function tools)
 	Parameters  map[string]interface{} `json:"parameters,omitempty"`  // Function parameters (for function tools)
 
+	// Web-search specific configuration
+	SearchContextSize *string                 `json:"search_context_size,omitempty"`
+	Filters           *model.WebSearchFilters `json:"filters,omitempty"`
+	UserLocation      *model.UserLocation     `json:"user_location,omitempty"`
+
 	// MCP-specific fields (for MCP tools)
 	ServerLabel     string            `json:"server_label,omitempty"`
 	ServerUrl       string            `json:"server_url,omitempty"`
 	RequireApproval any               `json:"require_approval,omitempty"`
 	AllowedTools    []string          `json:"allowed_tools,omitempty"`
 	Headers         map[string]string `json:"headers,omitempty"`
+}
+
+// WebSearchCallAction captures metadata about a single web search invocation emitted by the OpenAI Responses API.
+type WebSearchCallAction struct {
+	Type    string                `json:"type,omitempty"`
+	Query   string                `json:"query,omitempty"`
+	Domains []string              `json:"domains,omitempty"`
+	Sources []WebSearchCallSource `json:"sources,omitempty"`
+}
+
+// WebSearchCallSource represents an individual source returned by the web search tool.
+type WebSearchCallSource struct {
+	Url   string `json:"url,omitempty"`
+	Title string `json:"title,omitempty"`
 }
 
 // ResponseTextConfig represents the text configuration for Response API
@@ -416,13 +435,13 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 	}
 
 	// Handle tools (modern format)
+	responseAPITools := make([]ResponseAPITool, 0, len(request.Tools)+len(request.Functions)+1)
+	webSearchAdded := false
+
 	if len(request.Tools) > 0 {
-		// Convert ChatCompletion tools to Response API tool format
-		responseAPITools := make([]ResponseAPITool, 0, len(request.Tools))
 		for _, tool := range request.Tools {
-			if tool.Type == "mcp" {
-				// For MCP tools, preserve the original MCP structure
-				// Response API expects MCP tools to maintain their MCP-specific fields
+			switch tool.Type {
+			case "mcp":
 				responseAPITools = append(responseAPITools, ResponseAPITool{
 					Type:            tool.Type,
 					ServerLabel:     tool.ServerLabel,
@@ -431,47 +450,62 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 					AllowedTools:    tool.AllowedTools,
 					Headers:         tool.Headers,
 				})
-			} else {
-				// For function tools, use the existing logic
+			case "web_search":
+				responseAPITools = append(responseAPITools, ResponseAPITool{
+					Type:              "web_search",
+					SearchContextSize: tool.SearchContextSize,
+					Filters:           tool.Filters,
+					UserLocation:      tool.UserLocation,
+				})
+				webSearchAdded = true
+			default:
+				if tool.Function == nil {
+					continue
+				}
 				responseAPITool := ResponseAPITool{
 					Type:        tool.Type,
 					Name:        tool.Function.Name,
 					Description: tool.Function.Description,
 				}
-
-				// Convert Parameters from any to map[string]interface{}
 				if tool.Function.Parameters != nil {
 					if params, ok := tool.Function.Parameters.(map[string]interface{}); ok {
 						responseAPITool.Parameters = params
 					}
 				}
-
 				responseAPITools = append(responseAPITools, responseAPITool)
 			}
 		}
-		responseReq.Tools = responseAPITools
-		responseReq.ToolChoice = request.ToolChoice
-	} else if len(request.Functions) > 0 {
-		// Handle legacy functions format by converting to Response API tool format
-		responseAPITools := make([]ResponseAPITool, 0, len(request.Functions))
+		if request.ToolChoice != nil {
+			responseReq.ToolChoice = request.ToolChoice
+		}
+	}
+
+	if len(request.Functions) > 0 {
 		for _, function := range request.Functions {
 			responseAPITool := ResponseAPITool{
 				Type:        "function",
 				Name:        function.Name,
 				Description: function.Description,
 			}
-
-			// Convert Parameters from any to map[string]interface{}
 			if function.Parameters != nil {
 				if params, ok := function.Parameters.(map[string]interface{}); ok {
 					responseAPITool.Parameters = params
 				}
 			}
-
 			responseAPITools = append(responseAPITools, responseAPITool)
 		}
+		if request.FunctionCall != nil {
+			responseReq.ToolChoice = request.FunctionCall
+		}
+	}
+
+	if !webSearchAdded && request.WebSearchOptions != nil {
+		responseAPITools = append(responseAPITools, convertWebSearchOptionsToTool(request.WebSearchOptions))
+		webSearchAdded = true
+	}
+
+	if len(responseAPITools) > 0 {
 		responseReq.Tools = responseAPITools
-		responseReq.ToolChoice = request.FunctionCall
 	}
 
 	// Handle thinking/reasoning
@@ -531,6 +565,58 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 	}
 
 	return responseReq
+}
+
+func convertWebSearchOptionsToTool(options *model.WebSearchOptions) ResponseAPITool {
+	tool := ResponseAPITool{Type: "web_search"}
+	if options == nil {
+		return tool
+	}
+	tool.SearchContextSize = options.SearchContextSize
+	tool.Filters = options.Filters
+	tool.UserLocation = options.UserLocation
+	return tool
+}
+
+func isChargeableWebSearchAction(item OutputItem) bool {
+	if item.Type != "web_search_call" {
+		return false
+	}
+	if item.Action == nil {
+		return true
+	}
+	actionType := strings.ToLower(strings.TrimSpace(item.Action.Type))
+	return actionType == "" || actionType == "search"
+}
+
+func countWebSearchSearchActions(outputs []OutputItem) int {
+	return countNewWebSearchSearchActions(outputs, make(map[string]struct{}))
+}
+
+func countNewWebSearchSearchActions(outputs []OutputItem, seen map[string]struct{}) int {
+	added := 0
+	for _, item := range outputs {
+		if !isChargeableWebSearchAction(item) {
+			continue
+		}
+		key := item.Id
+		if key == "" && item.Action != nil {
+			if item.Action.Query != "" {
+				key = item.Action.Query
+			} else if len(item.Action.Domains) > 0 {
+				key = strings.Join(item.Action.Domains, ",")
+			}
+		}
+		if key == "" {
+			key = fmt.Sprintf("anon-%d", len(seen)+added)
+		}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		added++
+	}
+	return added
 }
 
 // ResponseAPIUsage represents the usage information structure for Response API
@@ -603,12 +689,13 @@ type ResponseAPIResponse struct {
 
 // OutputItem represents an item in the response output array
 type OutputItem struct {
-	Type    string          `json:"type"`              // Type of output item (e.g., "message", "reasoning", "function_call", "mcp_list_tools", "mcp_call", "mcp_approval_request")
-	Id      string          `json:"id,omitempty"`      // Unique identifier for this item
-	Status  string          `json:"status,omitempty"`  // Status of this item (e.g., "completed")
-	Role    string          `json:"role,omitempty"`    // Role of the message (e.g., "assistant")
-	Content []OutputContent `json:"content,omitempty"` // Array of content items
-	Summary []OutputContent `json:"summary,omitempty"` // Array of summary items (for reasoning)
+	Type    string               `json:"type"`              // Type of output item (e.g., "message", "reasoning", "function_call", "mcp_list_tools", "mcp_call", "mcp_approval_request")
+	Id      string               `json:"id,omitempty"`      // Unique identifier for this item
+	Status  string               `json:"status,omitempty"`  // Status of this item (e.g., "completed")
+	Role    string               `json:"role,omitempty"`    // Role of the message (e.g., "assistant")
+	Content []OutputContent      `json:"content,omitempty"` // Array of content items
+	Summary []OutputContent      `json:"summary,omitempty"` // Array of summary items (for reasoning)
+	Action  *WebSearchCallAction `json:"action,omitempty"`  // Action details for web_search_call items
 
 	// Function call fields
 	CallId    string `json:"call_id,omitempty"`   // Call ID for function calls

@@ -12,6 +12,7 @@ import (
 	metalib "github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/pricing"
+	quotautil "github.com/songquanpeng/one-api/relay/quota"
 )
 
 // absDiffI64 returns absolute difference for int64
@@ -137,8 +138,8 @@ func TestPostConsumeQuota_CacheWriteDoesNotAffectOutput(t *testing.T) {
 	}
 }
 
-// Response API: cached prompt details should not affect quota (and specifically not the output term)
-func TestPostConsumeResponseAPIQuota_IgnoresCachedPromptDetails(t *testing.T) {
+// Response API: cached prompt tokens should follow cached-input pricing without affecting completion cost.
+func TestPostConsumeResponseAPIQuota_UsesCachedInputPricing(t *testing.T) {
 	modelName := "gpt-4o"
 	channelType := channeltype.OpenAI
 	adaptor := relay.GetAdaptor(channelType)
@@ -147,10 +148,11 @@ func TestPostConsumeResponseAPIQuota_IgnoresCachedPromptDetails(t *testing.T) {
 	}
 	modelRatio := adaptor.GetModelRatio(modelName)
 	groupRatio := 1.0
-	ratio := modelRatio * groupRatio
 
 	promptTokens := 200_000
 	completionTokens := 300_000
+	// Resolve effective pricing to compare cached vs normal input pricing
+	eff := pricing.ResolveEffectivePricing(modelName, promptTokens, adaptor)
 
 	// Use TokenId=0 to disable DB writes in billing during tests
 	meta := &metalib.Meta{ChannelType: channelType, ChannelId: 1, TokenId: 0, UserId: 1, TokenName: "test-token", StartTime: time.Now()}
@@ -159,13 +161,51 @@ func TestPostConsumeResponseAPIQuota_IgnoresCachedPromptDetails(t *testing.T) {
 
 	// Base usage
 	usageBase := &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completionTokens}
-	base := postConsumeResponseAPIQuota(context.Background(), usageBase, meta, respReq, ratio, 0, modelRatio, groupRatio, nil)
+	base := postConsumeResponseAPIQuota(context.Background(), usageBase, meta, respReq, 0, modelRatio, groupRatio, nil)
+	baseResult := quotautil.Compute(quotautil.ComputeInput{
+		Usage:          usageBase,
+		ModelName:      modelName,
+		ModelRatio:     modelRatio,
+		GroupRatio:     groupRatio,
+		PricingAdaptor: adaptor,
+	})
+	if base != baseResult.TotalQuota {
+		t.Fatalf("postConsumeResponseAPIQuota mismatch with compute result: got %d, want %d", base, baseResult.TotalQuota)
+	}
 
-	// With cached prompt details present (should not change anything for Response API)
-	usageCached := &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completionTokens, PromptTokensDetails: &relaymodel.UsagePromptTokensDetails{CachedTokens: promptTokens}}
-	withCache := postConsumeResponseAPIQuota(context.Background(), usageCached, meta, respReq, ratio, 0, modelRatio, groupRatio, nil)
+	// With cached prompt details present - expect delta only from input pricing change
+	cachedPrompt := int(float64(promptTokens) * 0.6)
+	usageCached := &relaymodel.Usage{PromptTokens: promptTokens, CompletionTokens: completionTokens, PromptTokensDetails: &relaymodel.UsagePromptTokensDetails{CachedTokens: cachedPrompt}}
+	withCache := postConsumeResponseAPIQuota(context.Background(), usageCached, meta, respReq, 0, modelRatio, groupRatio, nil)
+	cachedResult := quotautil.Compute(quotautil.ComputeInput{
+		Usage:          usageCached,
+		ModelName:      modelName,
+		ModelRatio:     modelRatio,
+		GroupRatio:     groupRatio,
+		PricingAdaptor: adaptor,
+	})
+	if withCache != cachedResult.TotalQuota {
+		t.Fatalf("postConsumeResponseAPIQuota mismatch with compute result (cached): got %d, want %d", withCache, cachedResult.TotalQuota)
+	}
 
-	if base != withCache {
-		t.Fatalf("Response API quota changed due to cached prompt details: base=%d withCache=%d", base, withCache)
+	normalInputPrice := baseResult.UsedModelRatio * groupRatio
+	cachedInputPrice := normalInputPrice
+	if eff.CachedInputRatio < 0 {
+		cachedInputPrice = 0
+	} else if eff.CachedInputRatio > 0 {
+		cachedInputPrice = eff.CachedInputRatio * groupRatio
+	}
+	if math.Abs(cachedInputPrice-normalInputPrice) < 1e-12 {
+		t.Skipf("model %s lacks distinct cached input pricing", modelName)
+	}
+
+	expectedDelta := int64(math.Ceil(float64(cachedPrompt) * (cachedInputPrice - normalInputPrice)))
+	actualDelta := withCache - base
+	if absDiffI64(actualDelta, expectedDelta) > 2 {
+		t.Fatalf("unexpected Response API cached quota delta: got %d, want ~%d (±2). base=%d cached=%d", actualDelta, expectedDelta, base, withCache)
+	}
+
+	if math.Abs(cachedResult.UsedCompletionRatio-baseResult.UsedCompletionRatio) > 1e-12 {
+		t.Fatalf("completion ratio changed due to cached prompt tokens: base=%.6f cached=%.6f", baseResult.UsedCompletionRatio, cachedResult.UsedCompletionRatio)
 	}
 }

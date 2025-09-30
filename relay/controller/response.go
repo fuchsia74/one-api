@@ -27,6 +27,7 @@ import (
 	metalib "github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/pricing"
+	quotautil "github.com/songquanpeng/one-api/relay/quota"
 )
 
 // RelayResponseAPIHelper handles Response API requests with direct pass-through
@@ -177,7 +178,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		go func() {
 			// Attach IDs into context using a lightweight wrapper struct in meta if needed; for now,
 			// we keep postConsumeResponseAPIQuota signature and rely on it to read IDs from outer scope.
-			quota = postConsumeResponseAPIQuota(ctx, usage, meta, responseAPIRequest, ratio, preConsumedQuota, modelRatio, groupRatio, channelCompletionRatio)
+			quota = postConsumeResponseAPIQuota(ctx, usage, meta, responseAPIRequest, preConsumedQuota, modelRatio, groupRatio, channelCompletionRatio)
 
 			// Reconcile request cost with final quota (override provisional pre-consumed value)
 			if quota != 0 {
@@ -342,7 +343,6 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 	usage *relaymodel.Usage,
 	meta *metalib.Meta,
 	responseAPIRequest *openai.ResponseAPIRequest,
-	ratio float64,
 	preConsumedQuota int64,
 	modelRatio float64,
 	groupRatio float64,
@@ -354,29 +354,34 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 		return
 	}
 
-	// Use three-layer pricing system for completion ratio
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
-	completionRatio := pricing.GetCompletionRatioWithThreeLayers(responseAPIRequest.Model, channelCompletionRatio, pricingAdaptor)
+	computeResult := quotautil.Compute(quotautil.ComputeInput{
+		Usage:                  usage,
+		ModelName:              responseAPIRequest.Model,
+		ModelRatio:             modelRatio,
+		GroupRatio:             groupRatio,
+		ChannelCompletionRatio: channelCompletionRatio,
+		PricingAdaptor:         pricingAdaptor,
+	})
 
-	// Calculate quota using the same formula as ChatCompletion
-	promptTokens := usage.PromptTokens
-	completionTokens := usage.CompletionTokens
-	quota = int64((float64(promptTokens)+float64(completionTokens)*completionRatio)*ratio) + usage.ToolsCost
-	if ratio != 0 && quota <= 0 {
-		quota = 1
+	quota = computeResult.TotalQuota
+	totalTokens := computeResult.PromptTokens + computeResult.CompletionTokens
+	if totalTokens == 0 {
+		quota = 0
 	}
 
 	// Use centralized detailed billing function to follow DRY principle
 	quotaDelta := quota - preConsumedQuota
-	cachedPrompt := 0
-	if usage.PromptTokensDetails != nil {
-		cachedPrompt = usage.PromptTokensDetails.CachedTokens
-		if cachedPrompt < 0 {
-			cachedPrompt = 0
-		}
-		if cachedPrompt > promptTokens {
-			cachedPrompt = promptTokens
-		}
+	cachedPrompt := computeResult.CachedPromptTokens
+	promptTokens := computeResult.PromptTokens
+	completionTokens := computeResult.CompletionTokens
+	usedModelRatio := computeResult.UsedModelRatio
+	if usedModelRatio == 0 {
+		usedModelRatio = modelRatio
+	}
+	usedCompletionRatio := computeResult.UsedCompletionRatio
+	if usedCompletionRatio == 0 {
+		usedCompletionRatio = pricing.GetCompletionRatioWithThreeLayers(responseAPIRequest.Model, channelCompletionRatio, pricingAdaptor)
 	}
 
 	// Derive RequestId/TraceId from std context if possible
@@ -394,14 +399,14 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 		ChannelId:              meta.ChannelId,
 		PromptTokens:           promptTokens,
 		CompletionTokens:       completionTokens,
-		ModelRatio:             modelRatio,
+		ModelRatio:             usedModelRatio,
 		GroupRatio:             groupRatio,
 		ModelName:              responseAPIRequest.Model,
 		TokenName:              meta.TokenName,
 		IsStream:               meta.IsStream,
 		StartTime:              meta.StartTime,
 		SystemPromptReset:      false,
-		CompletionRatio:        completionRatio,
+		CompletionRatio:        usedCompletionRatio,
 		ToolsCost:              usage.ToolsCost,
 		CachedPromptTokens:     cachedPrompt,
 		CachedCompletionTokens: 0,
