@@ -86,14 +86,12 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"o1-mini-2024-09-12":    {Ratio: 1.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.55 * ratio.MilliTokensUsd},
 
 	// o3 Models
-	"o3":                 {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.5 * ratio.MilliTokensUsd},
-	"o3-2025-04-16":      {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.5 * ratio.MilliTokensUsd},
-	"o3-mini":            {Ratio: 1.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.55 * ratio.MilliTokensUsd},
-	"o3-mini-2025-01-31": {Ratio: 1.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.55 * ratio.MilliTokensUsd},
-	"o3-pro":             {Ratio: 20.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
-	"o3-pro-2025-06-10":  {Ratio: 20.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
-
-	// o3 Deep Research Models
+	"o3":                          {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.5 * ratio.MilliTokensUsd},
+	"o3-2025-04-16":               {Ratio: 2.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.5 * ratio.MilliTokensUsd},
+	"o3-mini":                     {Ratio: 1.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.55 * ratio.MilliTokensUsd},
+	"o3-mini-2025-01-31":          {Ratio: 1.1 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 0.55 * ratio.MilliTokensUsd},
+	"o3-pro":                      {Ratio: 20.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
+	"o3-pro-2025-06-10":           {Ratio: 20.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0},
 	"o3-deep-research":            {Ratio: 10.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 2.5 * ratio.MilliTokensUsd},
 	"o3-deep-research-2025-06-26": {Ratio: 10.0 * ratio.MilliTokensUsd, CompletionRatio: 4.0, CachedInputRatio: 2.5 * ratio.MilliTokensUsd},
 

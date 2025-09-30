@@ -510,27 +510,17 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 
 	// Handle thinking/reasoning
 	if isModelSupportedReasoning(request.Model) {
-		if request.ReasoningEffort != nil || request.Thinking != nil {
-			if responseReq.Reasoning == nil {
-				responseReq.Reasoning = &model.OpenAIResponseReasoning{
-					Effort: request.ReasoningEffort,
-				}
-			}
-		}
-
-		// Initialize reasoning if not already set for reasoning-supported models
 		if responseReq.Reasoning == nil {
 			responseReq.Reasoning = &model.OpenAIResponseReasoning{}
 		}
 
+		normalizedEffort := normalizeReasoningEffortForModel(request.Model, request.ReasoningEffort)
+		responseReq.Reasoning.Effort = normalizedEffort
+		request.ReasoningEffort = normalizedEffort
+
 		if responseReq.Reasoning.Summary == nil {
 			reasoningSummary := "auto"
 			responseReq.Reasoning.Summary = &reasoningSummary
-		}
-
-		if request.ReasoningEffort == nil {
-			reasoningEffort := "high"
-			responseReq.Reasoning.Effort = &reasoningEffort
 		}
 	} else {
 		request.ReasoningEffort = nil

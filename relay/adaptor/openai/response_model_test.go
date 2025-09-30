@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
+	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -1847,6 +1848,7 @@ func TestWebSearchCallUSDPerThousandTiering(t *testing.T) {
 		{"gpt-5-search", 10.0},
 		{"o1-preview-search", 10.0},
 		{"gpt-4o-search", 10.0},
+		{"o3-deep-research", 10.0},
 	}
 
 	for _, tc := range cases {
@@ -1854,5 +1856,58 @@ func TestWebSearchCallUSDPerThousandTiering(t *testing.T) {
 		if got != tc.usd {
 			t.Fatalf("model %s: expected USD %.2f, got %.2f", tc.model, tc.usd, got)
 		}
+	}
+}
+
+func TestDeepResearchConversionIncludesWebSearchTool(t *testing.T) {
+	req := &model.GeneralOpenAIRequest{
+		Model: "o3-deep-research",
+		Messages: []model.Message{
+			{Role: "user", Content: "Research topic"},
+		},
+	}
+
+	adaptor := &Adaptor{}
+	metaInfo := &meta.Meta{ChannelType: channeltype.OpenAI, ActualModelName: "o3-deep-research"}
+
+	if err := adaptor.applyRequestTransformations(metaInfo, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	converted := ConvertChatCompletionToResponseAPI(req)
+	if len(converted.Tools) == 0 {
+		t.Fatal("expected tools to include web_search for deep research model")
+	}
+
+	found := false
+	for _, tool := range converted.Tools {
+		if strings.EqualFold(tool.Type, "web_search") {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		t.Fatal("web_search tool not found in converted Response API request")
+	}
+}
+
+func TestApplyWebSearchToolCostForDeepResearch(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Set(ctxkey.WebSearchCallCount, 2)
+
+	metaInfo := &meta.Meta{ActualModelName: "o3-deep-research"}
+	usage := &model.Usage{}
+
+	if err := applyWebSearchToolCost(c, &usage, metaInfo); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	perCall := webSearchCallQuotaPerInvocation(metaInfo.ActualModelName)
+	expected := int64(2) * perCall
+	if usage.ToolsCost != expected {
+		t.Fatalf("expected tools cost %d, got %d", expected, usage.ToolsCost)
 	}
 }

@@ -1454,6 +1454,29 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 	})
 }
 
+func TestConvertChatCompletionToResponseAPI_DeepResearchDefaultEffort(t *testing.T) {
+	chatRequest := &model.GeneralOpenAIRequest{
+		Model: "o4-mini-deep-research",
+		Messages: []model.Message{
+			{Role: "user", Content: "Conduct a deep research summary."},
+		},
+	}
+
+	responseAPI := ConvertChatCompletionToResponseAPI(chatRequest)
+
+	if responseAPI.Reasoning == nil {
+		t.Fatal("expected reasoning config to be set for deep research model")
+	}
+
+	if responseAPI.Reasoning.Effort == nil || *responseAPI.Reasoning.Effort != "medium" {
+		t.Fatalf("expected reasoning effort to default to 'medium', got %v", responseAPI.Reasoning.Effort)
+	}
+
+	if chatRequest.ReasoningEffort == nil || *chatRequest.ReasoningEffort != "medium" {
+		t.Fatalf("expected source request reasoning effort to be normalized to 'medium', got %v", chatRequest.ReasoningEffort)
+	}
+}
+
 func boolPtr(b bool) *bool {
 	return &b
 }

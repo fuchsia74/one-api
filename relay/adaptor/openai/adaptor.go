@@ -16,10 +16,6 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	imgutil "github.com/songquanpeng/one-api/common/image"
-
-	// "github.com/songquanpeng/one-api/common/logger"
-
-	// dbmodel "github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/alibailian"
 	"github.com/songquanpeng/one-api/relay/adaptor/baiduv2"
@@ -228,6 +224,58 @@ func isWebSearchModel(modelName string) bool {
 	return strings.Contains(modelName, "-search") || strings.Contains(modelName, "-search-preview")
 }
 
+func isDeepResearchModel(modelName string) bool {
+	return strings.Contains(modelName, "deep-research")
+}
+
+func defaultReasoningEffortForModel(modelName string) string {
+	if isDeepResearchModel(modelName) {
+		return "medium"
+	}
+	return "high"
+}
+
+func isReasoningEffortAllowedForModel(modelName, effort string) bool {
+	if effort == "" {
+		return false
+	}
+	if isDeepResearchModel(modelName) {
+		return effort == "medium"
+	}
+	switch effort {
+	case "low", "medium", "high":
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizeReasoningEffortForModel(modelName string, effort *string) *string {
+	defaultEffort := defaultReasoningEffortForModel(modelName)
+	if effort == nil {
+		return stringRef(defaultEffort)
+	}
+	normalized := strings.ToLower(strings.TrimSpace(*effort))
+	if !isReasoningEffortAllowedForModel(modelName, normalized) {
+		return stringRef(defaultEffort)
+	}
+	return stringRef(normalized)
+}
+
+func stringRef(value string) *string {
+	return &value
+}
+
+func ensureWebSearchTool(request *model.GeneralOpenAIRequest) {
+	for _, tool := range request.Tools {
+		if strings.EqualFold(tool.Type, "web_search") {
+			return
+		}
+	}
+
+	request.Tools = append(request.Tools, model.Tool{Type: "web_search"})
+}
+
 // applyRequestTransformations applies the existing request transformations
 func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.GeneralOpenAIRequest) error {
 	switch meta.ChannelType {
@@ -273,10 +321,7 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		temperature := float64(1)
 		request.Temperature = &temperature // Only the default (1) value is supported
 		request.TopP = nil
-		if request.ReasoningEffort == nil {
-			effortHigh := "high"
-			request.ReasoningEffort = &effortHigh
-		}
+		request.ReasoningEffort = normalizeReasoningEffortForModel(meta.ActualModelName, request.ReasoningEffort)
 
 		request.Messages = func(raw []model.Message) (filtered []model.Message) {
 			for i := range raw {
@@ -296,6 +341,15 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		request.PresencePenalty = nil
 		request.N = nil
 		request.FrequencyPenalty = nil
+	}
+
+	modelName := meta.ActualModelName
+	if strings.TrimSpace(modelName) == "" {
+		modelName = request.Model
+	}
+
+	if isDeepResearchModel(modelName) {
+		ensureWebSearchTool(request)
 	}
 
 	if request.Stream && !config.EnforceIncludeUsage &&

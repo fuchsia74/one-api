@@ -12,6 +12,10 @@ func float64PtrRT(v float64) *float64 {
 	return &v
 }
 
+func stringPtrRT(s string) *string {
+	return &s
+}
+
 func TestApplyRequestTransformations_ReasoningDefaults(t *testing.T) {
 	adaptor := &Adaptor{}
 
@@ -57,5 +61,91 @@ func TestApplyRequestTransformations_ReasoningDefaults(t *testing.T) {
 
 	if len(req.Messages) != 1 || req.Messages[0].Role != "user" {
 		t.Fatalf("expected system messages to be stripped for reasoning models, got %+v", req.Messages)
+	}
+}
+
+func TestApplyRequestTransformations_DeepResearchAddsWebSearchTool(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "o3-deep-research",
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "o3-deep-research",
+		Messages: []model.Message{
+			{Role: "user", Content: "summarize the news"},
+		},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	count := 0
+	for _, tool := range req.Tools {
+		if tool.Type == "web_search" {
+			count++
+		}
+	}
+
+	if count != 1 {
+		t.Fatalf("expected exactly one web_search tool after transformation, got %d", count)
+	}
+
+	// Running transformations again should not duplicate the tool
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("second applyRequestTransformations returned error: %v", err)
+	}
+
+	count = 0
+	for _, tool := range req.Tools {
+		if tool.Type == "web_search" {
+			count++
+		}
+	}
+
+	if count != 1 {
+		t.Fatalf("expected web_search tool count to remain 1 after second pass, got %d", count)
+	}
+}
+
+func TestApplyRequestTransformations_DeepResearchReasoningEffort(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "o4-mini-deep-research",
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "o4-mini-deep-research",
+		Messages: []model.Message{
+			{Role: "user", Content: "Summarize the latest research on fusion"},
+		},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	if req.ReasoningEffort == nil || *req.ReasoningEffort != "medium" {
+		t.Fatalf("expected ReasoningEffort to default to 'medium', got %v", req.ReasoningEffort)
+	}
+
+	// User-provided unsupported effort should be normalized to medium
+	req = &model.GeneralOpenAIRequest{
+		Model:           "o4-mini-deep-research",
+		ReasoningEffort: stringPtrRT("high"),
+		Messages:        []model.Message{{Role: "user", Content: "analyze"}},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	if req.ReasoningEffort == nil || *req.ReasoningEffort != "medium" {
+		t.Fatalf("expected ReasoningEffort to be normalized to 'medium', got %v", req.ReasoningEffort)
 	}
 }
