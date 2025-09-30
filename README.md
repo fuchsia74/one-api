@@ -39,11 +39,10 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support gpt-4o-audio](#support-gpt-4o-audio)
       - [Support OpenAI web search models](#support-openai-web-search-models)
       - [Support gpt-image-1's image generation \& edits](#support-gpt-image-1s-image-generation--edits)
-      - [Support o3-mini](#support-o3-mini)
-      - [Support o3 \& o4-mini \& gpt-4.1](#support-o3--o4-mini--gpt-41)
-      - [Support o3-pro \& reasoning content](#support-o3-pro--reasoning-content)
+      - [Support o3-mini \& o3 \& o4-mini \& gpt-4.1 \& o3-pro \& reasoning content](#support-o3-mini--o3--o4-mini--gpt-41--o3-pro--reasoning-content)
       - [Support OpenAI Response API](#support-openai-response-api)
-      - [Support gpt-5 series](#support-gpt-5-series)
+      - [Support gpt-5 family](#support-gpt-5-family)
+      - [Support o3-deep-research \& o4-mini-deep-research](#support-o3-deep-research--o4-mini-deep-research)
     - [Anthropic (Claude) Features](#anthropic-claude-features)
       - [(Merged) Support aws claude](#merged-support-aws-claude)
       - [Support claude-3-7-sonnet \& thinking](#support-claude-3-7-sonnet--thinking)
@@ -51,6 +50,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
         - [Non-Stream](#non-stream)
       - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
         - [Support Claude Code](#support-claude-code)
+    - [Support claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5](#support-claude-opus-4-0--claude-opus-4-1--claude-sonnet-4-0--claude-sonnet-4-5)
     - [Google (Gemini \& Vertex) Features](#google-gemini--vertex-features)
       - [Support gemini-2.0-flash-exp](#support-gemini-20-flash-exp)
       - [Support gemini-2.0-flash](#support-gemini-20-flash)
@@ -278,13 +278,9 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 
 ![](https://s3.laisky.com/uploads/2025/04/gpt-image-1-1.png)
 
-#### Support o3-mini
+#### Support o3-mini & o3 & o4-mini & gpt-4.1 & o3-pro & reasoning content
 
 - [feat: extend support for o3 models and update model ratios #2048](https://github.com/songquanpeng/one-api/pull/2048)
-
-#### Support o3 & o4-mini & gpt-4.1
-
-#### Support o3-pro & reasoning content
 
 ![](https://s3.laisky.com/uploads/2025/06/o3-pro.png)
 
@@ -294,9 +290,13 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 
 ![](https://s3.laisky.com/uploads/2025/07/response-api.png)
 
-#### Support gpt-5 series
+#### Support gpt-5 family
 
 gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex
+
+#### Support o3-deep-research & o4-mini-deep-research
+
+![](https://s3.laisky.com/uploads/2025/09/o4-mini-deep-research.png)
 
 ### Anthropic (Claude) Features
 
@@ -335,6 +335,10 @@ export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
 ```
 
 You can use any model you like for Claude Code, even if the model doesn’t natively support the Claude Messages API.
+
+### Support claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5
+
+![](https://s3.laisky.com/uploads/2025/09/claude-sonnet-4-5.png)
 
 ### Google (Gemini & Vertex) Features
 
