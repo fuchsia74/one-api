@@ -2,17 +2,21 @@
 
 ## Synopsis
 
-**One‑API** – a revived, open‑source API gateway that lets you manage tenants, forward AI‑model requests, and control costs—all from a single, easy‑to‑use platform. 🎯
+One‑API is a **single‑endpoint gateway** that lets you manage and call dozens of AI SaaS models without the headache of custom adapters. 🌐 Simply change the `model_name` and you can reach OpenAI, Anthropic, Gemini, Groq, DeepSeek, and many others—all through the same request format.
 
-The original project was abandoned, so as a long‑time contributor I forked the repository and rebuilt it from the ground up to bring the features you need today.
+![](https://s3.laisky.com/uploads/2025/07/oneapi.drawio.png)
 
-### Why choose this fork?
+### Why this fork exists
 
-- **🔧 Full billing overhaul** – per‑model, per‑channel pricing, plus discounts for cached inputs.
-- **🖥️ Modern UI** – the front‑end has been completely rewritten for a smoother, more intuitive experience.
-- **🔀 Transparent API conversion** – send requests in **ChatCompletion**, **Response**, or **Claude Messages** format and the gateway will automatically translate them to the appropriate model.
-- **🗄️ Drop‑in database compatibility** – works with the original One‑API schema, so you can migrate without any data pain.
-- **💻 Cross‑platform support** – runs on Linux x86_64, Linux arm64, and Windows.
+The original author stopped maintaining the project, leaving critical PRs and new features unaddressed. As a long‑time contributor, I’ve forked the repository and rebuilt the core to keep the ecosystem alive and evolving.
+
+### What’s new
+
+- **🔧 Complete billing overhaul** – per‑channel pricing for the same model, discounted rates for cached inputs, and transparent usage reports.
+- **🖥️ Refreshed UI/UX** – a fully rewritten front‑end that makes tenant, quota, and cost management a breeze.
+- **🔀 Transparent API conversion** – send a request in **ChatCompletion**, **Response**, or **Claude Messages** format and One‑API will automatically translate it to the target provider’s native schema.
+- **🔄 Drop‑in database compatibility** – the original One‑API schema is fully supported, so you can migrate without data loss or schema changes.
+- **🐳 Multi‑architecture support** – runs on Linux x86_64, ARM64, and Windows out of the box.
 
 Docker images available on Docker Hub:
 
@@ -29,7 +33,8 @@ Also welcome to register and use my deployed one-api gateway, which supports var
 
 - [One API](#one-api)
   - [Synopsis](#synopsis)
-    - [Why choose this fork?](#why-choose-this-fork)
+    - [Why this fork exists](#why-this-fork-exists)
+    - [What’s new](#whats-new)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
