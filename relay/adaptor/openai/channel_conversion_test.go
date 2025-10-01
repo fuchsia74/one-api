@@ -55,6 +55,7 @@ func TestChannelSpecificConversion(t *testing.T) {
 				RequestURLPath: "/v1/chat/completions",
 				BaseURL:        "https://api.openai.com",
 			}
+			testMeta.ActualModelName = chatRequest.Model
 			// Azure requires a deployment/model name in the URL; set a dummy one for the test
 			if tc.channelType == channeltype.Azure {
 				testMeta.ActualModelName = "gpt-4o-mini"
@@ -91,7 +92,7 @@ func TestChannelSpecificConversion(t *testing.T) {
 				if !isResponseAPI {
 					t.Errorf("Expected request conversion for %s but request was not converted", tc.name)
 				}
-				t.Logf("✓ %s: Correctly converted to Response API", tc.name)
+				t.Logf("✓ %s: Converted to Response API", tc.name)
 			} else {
 				if urlConverted {
 					t.Errorf("Did not expect URL conversion for %s but got: %s", tc.name, url)
@@ -99,7 +100,7 @@ func TestChannelSpecificConversion(t *testing.T) {
 				if isResponseAPI {
 					t.Errorf("Did not expect request conversion for %s but request was converted", tc.name)
 				}
-				t.Logf("✓ %s: Correctly kept as ChatCompletion API", tc.name)
+				t.Logf("✓ %s: Kept as native ChatCompletion payload", tc.name)
 			}
 		})
 	}
@@ -114,12 +115,11 @@ func TestModelSpecificConversion(t *testing.T) {
 		expectConversion bool
 		name             string
 	}{
-		{"gpt-4", true, "GPT-4 should be converted"},
-		{"gpt-4o", true, "GPT-4o should be converted"},
-		{"gpt-3.5-turbo", true, "GPT-3.5-turbo should be converted"},
-		{"o1-preview", true, "o1-preview should be converted"},
-		// Add future models that only support ChatCompletion here
-		// {"legacy-model", false, "Legacy model should not be converted"},
+		{"gpt-4", true, "GPT-4 should convert"},
+		{"gpt-4o", true, "GPT-4o should convert"},
+		{"gpt-3.5-turbo", true, "GPT-3.5-turbo should convert"},
+		{"o1-preview", true, "o1-preview should convert"},
+		{"gpt-4-search-2024-12-20", false, "Search model should stay ChatCompletion"},
 	}
 
 	for _, tc := range testCases {
@@ -145,6 +145,7 @@ func TestModelSpecificConversion(t *testing.T) {
 				RequestURLPath: "/v1/chat/completions",
 				BaseURL:        "https://api.openai.com",
 			}
+			testMeta.ActualModelName = tc.model
 			c.Set("meta", testMeta)
 
 			// Create adaptor
@@ -157,20 +158,18 @@ func TestModelSpecificConversion(t *testing.T) {
 				t.Fatalf("ConvertRequest failed: %v", err)
 			}
 
-			// Check if request was converted to ResponseAPIRequest
 			_, isResponseAPI := convertedReq.(*ResponseAPIRequest)
 
-			// Verify expectations
 			if tc.expectConversion {
 				if !isResponseAPI {
 					t.Errorf("Expected request conversion for model %s but request was not converted", tc.model)
 				}
-				t.Logf("✓ Model %s: Correctly converted to Response API", tc.model)
+				t.Logf("✓ Model %s: Converted to Response API", tc.model)
 			} else {
 				if isResponseAPI {
 					t.Errorf("Did not expect request conversion for model %s but request was converted", tc.model)
 				}
-				t.Logf("✓ Model %s: Correctly kept as ChatCompletion API", tc.model)
+				t.Logf("✓ Model %s: Kept as ChatCompletion payload", tc.model)
 			}
 		})
 	}

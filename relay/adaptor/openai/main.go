@@ -226,8 +226,18 @@ streamLoop:
 	// Record when upstream streaming is completed
 	recordUpstreamCompleted(c)
 
+	combined := reasoningText + responseText
+	if combined != "" || usage != nil {
+		c.Set(ctxkey.ConvertedResponse, map[string]any{
+			"stream":    true,
+			"reasoning": reasoningText,
+			"content":   combined,
+			"usage":     usage,
+		})
+	}
+
 	// Return the complete response text (reasoning + content) and usage
-	return nil, reasoningText + responseText, usage
+	return nil, combined, usage
 }
 
 // Helper function to extract reasoning content from message delta
@@ -317,6 +327,8 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		// Return usage even on write failure so billing can proceed for forwarded requests
 		return ErrorWrapper(err, "copy_response_body_failed", http.StatusInternalServerError), &textResponse.Usage
 	}
+
+	c.Set(ctxkey.ConvertedResponse, textResponse)
 
 	// Close the reset body
 	if err = resp.Body.Close(); err != nil {
@@ -773,6 +785,8 @@ func ResponseAPIDirectHandler(c *gin.Context, resp *http.Response, promptTokens 
 		return ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError), finalUsage
 	}
 
+	c.Set(ctxkey.ConvertedResponse, responseAPIResp)
+
 	return nil, finalUsage
 }
 
@@ -785,6 +799,7 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 	var usage *model.Usage
 	webSearchSeen := make(map[string]struct{})
 	webSearchCount := 0
+	var lastFullResponse *ResponseAPIResponse
 
 	// Set up scanner for reading the stream line by line
 	scanner := bufio.NewScanner(resp.Body)
@@ -828,6 +843,7 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 		var responseAPIChunk ResponseAPIResponse
 		if fullResponse != nil {
 			responseAPIChunk = *fullResponse
+			lastFullResponse = fullResponse
 		} else if streamEvent != nil {
 			// Convert streaming event to ResponseAPIResponse for processing
 			responseAPIChunk = ConvertStreamEventToResponse(streamEvent)
@@ -878,6 +894,16 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 
 	// Record when upstream streaming is completed
 	recordUpstreamCompleted(c)
+
+	if lastFullResponse != nil {
+		c.Set(ctxkey.ConvertedResponse, *lastFullResponse)
+	} else if responseText != "" || usage != nil {
+		c.Set(ctxkey.ConvertedResponse, map[string]any{
+			"stream":  true,
+			"content": responseText,
+			"usage":   usage,
+		})
+	}
 
 	return nil, responseText, usage
 }

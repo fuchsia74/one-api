@@ -15,6 +15,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/graceful"
@@ -108,7 +109,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	adaptor.Init(meta)
 
 	// get request body
-	requestBody, err := getRequestBody(c, meta, textRequest, adaptor)
+	requestBody, err := getRequestBody(c, meta, textRequest, adaptor, systemPromptReset)
 	if err != nil {
 		// Check if this is a validation error and preserve the correct HTTP status code
 		//
@@ -283,18 +284,22 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	return nil
 }
 
-func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.GeneralOpenAIRequest, adaptor adaptor.Adaptor) (io.Reader, error) {
+func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.GeneralOpenAIRequest, adaptor adaptor.Adaptor, systemPromptReset bool) (io.Reader, error) {
+	originalBody, err := common.GetRequestBody(c)
+	if err != nil {
+		return nil, errors.Wrap(err, "get raw request body")
+	}
+
 	if !config.EnforceIncludeUsage &&
 		meta.APIType == apitype.OpenAI &&
 		meta.OriginModelName == meta.ActualModelName &&
-		meta.ChannelType != channeltype.OpenAI && // openai also need to convert request
+		meta.ChannelType != channeltype.OpenAI &&
 		meta.ChannelType != channeltype.Baichuan &&
 		meta.ForcedSystemPrompt == "" {
-		return c.Request.Body, nil
+		c.Set(ctxkey.ConvertedRequest, textRequest)
+		return bytes.NewBuffer(originalBody), nil
 	}
 
-	// get request body
-	var requestBody io.Reader
 	convertedRequest, err := adaptor.ConvertRequest(c, meta.Mode, textRequest)
 	if err != nil {
 		return nil, errors.Wrap(err, "convert request failed")
@@ -306,8 +311,50 @@ func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.
 		return nil, errors.Wrap(err, "marshal converted request failed")
 	}
 
+	// When upstream expects the native OpenAI chat payload and we didn't rewrite the
+	// system prompt, merge unknown user fields (e.g. encrypted extensions) back into
+	// the converted JSON so we can preserve pass-through semantics.
+	if _, isChatPayload := convertedRequest.(*relaymodel.GeneralOpenAIRequest); isChatPayload &&
+		meta.APIType == apitype.OpenAI &&
+		meta.ChannelType == channeltype.OpenAI &&
+		!config.EnforceIncludeUsage &&
+		!systemPromptReset {
+		if merged, mergeErr := mergeJSONPreservingUnknown(originalBody, jsonData); mergeErr == nil {
+			jsonData = merged
+		} else {
+			return nil, errors.Wrap(mergeErr, "merge original request fields")
+		}
+	}
+
 	lg := gmw.GetLogger(c)
 	lg.Debug("converted request", zap.ByteString("json", jsonData))
-	requestBody = bytes.NewBuffer(jsonData)
-	return requestBody, nil
+	return bytes.NewBuffer(jsonData), nil
+}
+
+func mergeJSONPreservingUnknown(original, updated []byte) ([]byte, error) {
+	if len(original) == 0 {
+		return updated, nil
+	}
+
+	var originalMap map[string]json.RawMessage
+	if err := json.Unmarshal(original, &originalMap); err != nil {
+		return nil, err
+	}
+
+	var updatedMap map[string]json.RawMessage
+	if err := json.Unmarshal(updated, &updatedMap); err != nil {
+		return nil, err
+	}
+
+	for key, value := range originalMap {
+		if _, exists := updatedMap[key]; !exists {
+			updatedMap[key] = value
+		}
+	}
+
+	merged, err := json.Marshal(updatedMap)
+	if err != nil {
+		return nil, err
+	}
+	return merged, nil
 }

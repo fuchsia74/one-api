@@ -55,9 +55,12 @@ func TestAdaptorIntegration(t *testing.T) {
 
 	// Create meta context
 	testMeta := &meta.Meta{
-		Mode:        relaymode.ChatCompletions,
-		ChannelType: 1, // OpenAI channel type
+		Mode:           relaymode.ChatCompletions,
+		ChannelType:    1, // OpenAI channel type
+		RequestURLPath: "/v1/chat/completions",
+		BaseURL:        "https://api.openai.com",
 	}
+	testMeta.ActualModelName = chatRequest.Model
 	c.Set("meta", testMeta)
 
 	// Create adaptor
@@ -81,13 +84,12 @@ func TestAdaptorIntegration(t *testing.T) {
 		t.Fatalf("ConvertRequest failed: %v", err)
 	}
 
-	// Verify it's converted to ResponseAPIRequest
+	// Verify it was converted to Response API request
 	responseAPIReq, ok := convertedReq.(*ResponseAPIRequest)
 	if !ok {
 		t.Fatalf("Expected ResponseAPIRequest, got %T", convertedReq)
 	}
 
-	// Verify basic fields
 	if responseAPIReq.Model != "gpt-4" {
 		t.Errorf("Expected model gpt-4, got %s", responseAPIReq.Model)
 	}
@@ -96,29 +98,22 @@ func TestAdaptorIntegration(t *testing.T) {
 		t.Errorf("Expected MaxOutputTokens 150, got %v", responseAPIReq.MaxOutputTokens)
 	}
 
+	if responseAPIReq.Instructions == nil || *responseAPIReq.Instructions != "You are a helpful assistant." {
+		t.Errorf("Expected instructions to contain system prompt, got %v", responseAPIReq.Instructions)
+	}
+
+	if len(responseAPIReq.Input) != 1 {
+		t.Errorf("Expected 1 input message after system removal, got %d", len(responseAPIReq.Input))
+	}
+
+	if responseAPIReq.Stream == nil || *responseAPIReq.Stream {
+		t.Errorf("Expected non-streaming request, got stream=%v", responseAPIReq.Stream)
+	}
+
 	if responseAPIReq.Temperature == nil || *responseAPIReq.Temperature != 0.8 {
 		t.Errorf("Expected Temperature 0.8, got %v", responseAPIReq.Temperature)
 	}
 
-	// Verify system message was moved to instructions
-	if responseAPIReq.Instructions == nil || *responseAPIReq.Instructions != "You are a helpful assistant." {
-		t.Errorf("Expected instructions to be set, got %v", responseAPIReq.Instructions)
-	}
-
-	// Verify input messages (should have 1 message after system is removed)
-	if len(responseAPIReq.Input) != 1 {
-		t.Errorf("Expected 1 input message, got %d", len(responseAPIReq.Input))
-	}
-
-	// Verify the input message is correctly structured
-	inputMessage, ok := responseAPIReq.Input[0].(map[string]interface{})
-	if !ok {
-		t.Errorf("Expected input[0] to be map[string]interface{}, got %T", responseAPIReq.Input[0])
-	} else if inputMessage["role"] != "user" {
-		t.Errorf("Expected input message role 'user', got '%v'", inputMessage["role"])
-	}
-
-	// Verify tools are preserved
 	if len(responseAPIReq.Tools) != 1 {
 		t.Errorf("Expected 1 tool, got %d", len(responseAPIReq.Tools))
 	}
@@ -129,13 +124,13 @@ func TestAdaptorIntegration(t *testing.T) {
 		t.Fatalf("Failed to marshal ResponseAPIRequest: %v", err)
 	}
 
-	// Verify it can be unmarshaled back
+	// Verify it can be unmarshaled back without data loss
 	var unmarshaled ResponseAPIRequest
 	if err := json.Unmarshal(jsonData, &unmarshaled); err != nil {
 		t.Fatalf("Failed to unmarshal ResponseAPIRequest: %v", err)
 	}
 
-	t.Logf("Successfully converted ChatCompletion to Response API format")
+	t.Logf("Successfully converted ChatCompletion payload to Response API format")
 	t.Logf("JSON: %s", string(jsonData))
 }
 

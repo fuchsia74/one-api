@@ -134,14 +134,13 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 			return GetFullRequestURL(meta.BaseURL, chatCompletionsPath, meta.ChannelType), nil
 		}
 
-		// Convert chat completions to responses API for OpenAI only
-		// Skip conversion for models that only support ChatCompletion API
-		if meta.Mode == relaymode.ChatCompletions &&
-			meta.ChannelType == channeltype.OpenAI &&
+		if meta.ChannelType == channeltype.OpenAI &&
+			(meta.Mode == relaymode.ChatCompletions || meta.Mode == relaymode.ClaudeMessages) &&
 			!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
 			responseAPIPath := "/v1/responses"
 			return GetFullRequestURL(meta.BaseURL, responseAPIPath, meta.ChannelType), nil
 		}
+
 		return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), nil
 	}
 }
@@ -183,32 +182,20 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return request, nil
 	}
 
-	// Convert ChatCompletion and Claude Messages requests to Response API format only for OpenAI
-	// Skip conversion for models that only support ChatCompletion API
+	// Apply existing transformations for other modes before determining conversion strategy
+	if err := a.applyRequestTransformations(meta, request); err != nil {
+		return nil, errors.Wrap(err, "apply request transformations")
+	}
+
 	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
 		meta.ChannelType == channeltype.OpenAI &&
 		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
-		// Apply existing transformations first
-		if err := a.applyRequestTransformations(meta, request); err != nil {
-			return nil, errors.Wrap(err, "apply request transformations for chat completion conversion")
-		}
-
-		// Convert to Response API format
 		responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
-
-		// Store the converted request in context to detect it later in DoResponse
-		c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
-
 		logConvertedRequest(c, meta, relayMode, responseAPIRequest)
 		return responseAPIRequest, nil
 	}
 
-	// Apply existing transformations for other modes
-	if err := a.applyRequestTransformations(meta, request); err != nil {
-		return nil, errors.Wrap(err, "apply request transformations")
-	}
 	logConvertedRequest(c, meta, relayMode, request)
-
 	return request, nil
 }
 

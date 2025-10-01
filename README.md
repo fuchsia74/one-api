@@ -1,21 +1,35 @@
 # One API
 
-One API is an open-source API gateway that provides a unified interface for various AI models, allowing users to manage and utilize multiple AI services through a single platform. It supports token management, quota management, and usage statistics, making it easier for developers to integrate and manage different AI models in their applications.
+## Synopsis
 
-With one-api, you can aggregate various AI APIs and request in ChatCompletion, Response, or Claude Messages API formats as needed.
+**One‑API** – a revived, open‑source API gateway that lets you manage tenants, forward AI‑model requests, and control costs—all from a single, easy‑to‑use platform. 🎯
 
-![](https://s3.laisky.com/uploads/2025/07/oneapi.drawio.png)
+The original project was abandoned, so as a long‑time contributor I forked the repository and rebuilt it from the ground up to bring the features you need today.
 
-The original author of one-api has not been active for a long time, resulting in a backlog of PRs that cannot be updated. Therefore, I forked the code and merged some PRs that I consider important. I also welcome everyone to submit PRs, and I will respond and handle them actively and quickly.
+### Why choose this fork?
 
-Fully compatible with the upstream version, can be used directly by replacing the container image, docker images:
+- **🔧 Full billing overhaul** – per‑model, per‑channel pricing, plus discounts for cached inputs.
+- **🖥️ Modern UI** – the front‑end has been completely rewritten for a smoother, more intuitive experience.
+- **🔀 Transparent API conversion** – send requests in **ChatCompletion**, **Response**, or **Claude Messages** format and the gateway will automatically translate them to the appropriate model.
+- **🗄️ Drop‑in database compatibility** – works with the original One‑API schema, so you can migrate without any data pain.
+- **💻 Cross‑platform support** – runs on Linux x86_64, Linux arm64, and Windows.
+
+Docker images available on Docker Hub:
 
 - `ppcelery/one-api:latest`
 - `ppcelery/one-api:arm64-latest`
 
-Also welcome to register and use my deployed one-api gateway, which supports various mainstream models. For usage instructions, please refer to <https://wiki.laisky.com/projects/gpt/pay/cn/#page_gpt_pay_cn>.
+One‑API empowers developers to:
+
+- Centralize **tenant management** and **quota control**.
+- Route AI calls to the right model with a single endpoint.
+- Track usage and costs in real time.
+
+Also welcome to register and use my deployed one-api gateway, which supports various mainstream models. For usage instructions, please refer to <https://wiki.laisky.com/projects/gpt/pay/>.
 
 - [One API](#one-api)
+  - [Synopsis](#synopsis)
+    - [Why choose this fork?](#why-choose-this-fork)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)

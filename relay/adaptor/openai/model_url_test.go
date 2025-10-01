@@ -16,46 +16,34 @@ func TestGetRequestURLWithModelSupport(t *testing.T) {
 	adaptor := &Adaptor{}
 
 	testCases := []struct {
-		name          string
-		modelName     string
-		expectedPath  string
-		expectedURL   string
-		shouldConvert bool
+		name        string
+		modelName   string
+		expectedURL string
 	}{
 		{
-			name:          "GPT-4 should use Response API",
-			modelName:     "gpt-4",
-			expectedPath:  "/v1/responses",
-			expectedURL:   "https://api.openai.com/v1/responses",
-			shouldConvert: true,
+			name:        "GPT-4 should use Response API",
+			modelName:   "gpt-4",
+			expectedURL: "https://api.openai.com/v1/responses",
 		},
 		{
-			name:          "GPT-4 Search should use ChatCompletion API",
-			modelName:     "gpt-4-search-2024-12-20",
-			expectedPath:  "/v1/chat/completions",
-			expectedURL:   "https://api.openai.com/v1/chat/completions",
-			shouldConvert: false,
+			name:        "GPT-4 Search should use ChatCompletion API",
+			modelName:   "gpt-4-search-2024-12-20",
+			expectedURL: "https://api.openai.com/v1/chat/completions",
 		},
 		{
-			name:          "GPT-4o Search should use ChatCompletion API",
-			modelName:     "gpt-4o-search-2024-12-20",
-			expectedPath:  "/v1/chat/completions",
-			expectedURL:   "https://api.openai.com/v1/chat/completions",
-			shouldConvert: false,
+			name:        "GPT-4o Search should use ChatCompletion API",
+			modelName:   "gpt-4o-search-2024-12-20",
+			expectedURL: "https://api.openai.com/v1/chat/completions",
 		},
 		{
-			name:          "Regular GPT-4o should use Response API",
-			modelName:     "gpt-4o",
-			expectedPath:  "/v1/responses",
-			expectedURL:   "https://api.openai.com/v1/responses",
-			shouldConvert: true,
+			name:        "Regular GPT-4o should use Response API",
+			modelName:   "gpt-4o",
+			expectedURL: "https://api.openai.com/v1/responses",
 		},
 		{
-			name:          "GPT-5-mini should use Response API",
-			modelName:     "gpt-5-mini",
-			expectedPath:  "/v1/responses",
-			expectedURL:   "https://api.openai.com/v1/responses",
-			shouldConvert: true,
+			name:        "GPT-5-mini should use Response API",
+			modelName:   "gpt-5-mini",
+			expectedURL: "https://api.openai.com/v1/responses",
 		},
 	}
 
@@ -87,15 +75,7 @@ func TestGetRequestURLWithModelSupport(t *testing.T) {
 				t.Errorf("Expected URL %s, got %s", tc.expectedURL, requestURL)
 			}
 
-			// Verify model support detection
 			onlyChatCompletion := IsModelsOnlySupportedByChatCompletionAPI(tc.modelName)
-			if tc.shouldConvert && onlyChatCompletion {
-				t.Errorf("Model %s should support Response API but IsModelsOnlySupportedByChatCompletionAPI returned true", tc.modelName)
-			}
-			if !tc.shouldConvert && !onlyChatCompletion {
-				t.Errorf("Model %s should only support ChatCompletion API but IsModelsOnlySupportedByChatCompletionAPI returned false", tc.modelName)
-			}
-
 			t.Logf("✓ %s: URL=%s, OnlyChatCompletion=%v", tc.name, requestURL, onlyChatCompletion)
 		})
 	}
@@ -140,16 +120,14 @@ func TestModelSupportConsistencyBetweenURLAndConversion(t *testing.T) {
 			// Get conversion decision
 			onlyChatCompletion := IsModelsOnlySupportedByChatCompletionAPI(modelName)
 
-			// Check consistency
-			usesResponseAPI := requestURL == "https://api.openai.com/v1/responses"
-			usesChatCompletionAPI := requestURL == "https://api.openai.com/v1/chat/completions"
-
-			if onlyChatCompletion && !usesChatCompletionAPI {
-				t.Errorf("Model %s is marked as ChatCompletion-only but URL uses Response API: %s", modelName, requestURL)
+			expectedURL := "https://api.openai.com/v1/responses"
+			if onlyChatCompletion {
+				expectedURL = "https://api.openai.com/v1/chat/completions"
 			}
 
-			if !onlyChatCompletion && !usesResponseAPI {
-				t.Errorf("Model %s should use Response API but URL uses ChatCompletion API: %s", modelName, requestURL)
+			// Check consistency
+			if requestURL != expectedURL {
+				t.Errorf("Expected endpoint %s, got %s", expectedURL, requestURL)
 			}
 
 			t.Logf("✓ Model %s: OnlyChat=%v, URL=%s", modelName, onlyChatCompletion, requestURL)

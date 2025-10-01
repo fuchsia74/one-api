@@ -61,6 +61,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	responseAPIRequest.Model = metalib.GetMappedModelName(meta.OriginModelName, meta.ModelMapping)
 	meta.ActualModelName = responseAPIRequest.Model
 	metalib.Set2Context(c, meta)
+	c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
 
 	// get channel model ratio
 	channelModelRatio, channelCompletionRatio := getChannelRatios(c)
@@ -451,13 +452,48 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 
 // getResponseAPIRequestBody gets the request body for Response API requests
 func getResponseAPIRequestBody(c *gin.Context, meta *metalib.Meta, responseAPIRequest *openai.ResponseAPIRequest, adaptor adaptor.Adaptor) (io.Reader, error) {
-	// For Response API, we pass through the request directly without conversion
-	// The request is already in the correct format
-	jsonData, err := json.Marshal(responseAPIRequest)
+	// Prefer forwarding the exact user payload to avoid mutating vendor-specific fields
+	rawBody, err := common.GetRequestBody(c)
 	if err != nil {
-		return nil, errors.Wrap(err, "marshal Response API request")
+		return nil, errors.Wrap(err, "get raw Response API request body")
 	}
-	return bytes.NewReader(jsonData), nil
+
+	// If the mapped model name differs, patch only the top-level model field while
+	// preserving every other byte of the original payload where possible.
+	if meta.ActualModelName != meta.OriginModelName {
+		patched, err := patchResponseAPIModel(rawBody, responseAPIRequest.Model)
+		if err != nil {
+			return nil, errors.Wrap(err, "patch Response API request model")
+		}
+		rawBody = patched
+	}
+
+	return bytes.NewReader(rawBody), nil
+}
+
+// patchResponseAPIModel updates the top-level "model" field while preserving
+// the rest of the payload (including vendor-specific extensions).
+func patchResponseAPIModel(rawBody []byte, mappedModel string) ([]byte, error) {
+	if len(rawBody) == 0 {
+		return rawBody, nil
+	}
+
+	var root map[string]json.RawMessage
+	if err := json.Unmarshal(rawBody, &root); err != nil {
+		return nil, errors.Wrap(err, "unmarshal raw Response API request for model patch")
+	}
+
+	modelBytes, err := json.Marshal(mappedModel)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal mapped model value")
+	}
+	root["model"] = modelBytes
+
+	patched, err := json.Marshal(root)
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal patched Response API request")
+	}
+	return patched, nil
 }
 
 func applyResponseAPIStreamParams(c *gin.Context, meta *metalib.Meta) error {
