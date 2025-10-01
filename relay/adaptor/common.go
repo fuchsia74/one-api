@@ -93,7 +93,15 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 
 func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	// keep logger from context if available
-	resp, err := client.HTTPClient.Do(req)
+	httpClient := client.HTTPClient
+	if httpClient == nil {
+		client.Init()
+		httpClient = client.HTTPClient
+		if httpClient == nil {
+			httpClient = http.DefaultClient
+		}
+	}
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return nil, errors.Wrap(err, "perform upstream request")
 	}
@@ -104,8 +112,12 @@ func DoRequest(c *gin.Context, req *http.Request) (*http.Response, error) {
 	// Optionally: Record when first response is received from upstream (non-standard event)
 	tracing.RecordTraceTimestamp(c, model.TimestampFirstUpstreamResponse)
 
-	_ = req.Body.Close()
-	_ = c.Request.Body.Close()
+	if req.Body != nil {
+		_ = req.Body.Close()
+	}
+	if c.Request != nil && c.Request.Body != nil {
+		_ = c.Request.Body.Close()
+	}
 
 	return resp, nil
 }

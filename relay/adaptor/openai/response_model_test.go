@@ -163,6 +163,85 @@ func TestConvertWithTools(t *testing.T) {
 	}
 }
 
+func TestConvertChatCompletionToResponseAPISanitizesEncryptedReasoning(t *testing.T) {
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-5",
+		Messages: []model.Message{
+			{
+				Role: "assistant",
+				Content: []interface{}{
+					map[string]interface{}{
+						"type":              "reasoning",
+						"encrypted_content": "gAAAA...",
+						"summary": []interface{}{
+							map[string]interface{}{
+								"type": "summary_text",
+								"text": "Concise reasoning summary",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	converted := ConvertChatCompletionToResponseAPI(req)
+
+	if len(converted.Input) != 1 {
+		toJSON, _ := json.Marshal(converted.Input)
+		t.Fatalf("expected single sanitized message, got %d (payload: %s)", len(converted.Input), string(toJSON))
+	}
+
+	msg, ok := converted.Input[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map message, got %T", converted.Input[0])
+	}
+
+	content, ok := msg["content"].([]map[string]interface{})
+	if !ok {
+		t.Fatalf("expected content slice, got %T", msg["content"])
+	}
+
+	if len(content) != 1 {
+		t.Fatalf("expected single content item, got %d", len(content))
+	}
+
+	item := content[0]
+	if item["type"] != "output_text" {
+		t.Fatalf("expected output_text type, got %v", item["type"])
+	}
+	if item["text"] != "Concise reasoning summary" {
+		t.Fatalf("expected sanitized summary text, got %v", item["text"])
+	}
+	if _, exists := item["encrypted_content"]; exists {
+		t.Fatalf("encrypted_content should be removed, found %v", item["encrypted_content"])
+	}
+}
+
+func TestConvertChatCompletionToResponseAPIDropsUnverifiableReasoning(t *testing.T) {
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-5",
+		Messages: []model.Message{
+			{
+				Role: "assistant",
+				Content: []interface{}{
+					map[string]interface{}{
+						"type":              "reasoning",
+						"encrypted_content": "gAAAA...",
+					},
+				},
+			},
+		},
+	}
+
+	converted := ConvertChatCompletionToResponseAPI(req)
+
+	if len(converted.Input) != 0 {
+		toJSON, _ := json.Marshal(converted.Input)
+		t.Fatalf("expected unverifiable reasoning message to be dropped, got %d items (payload: %s)", len(converted.Input), string(toJSON))
+	}
+}
+
 func TestConvertWithResponseFormat(t *testing.T) {
 	// Test response format conversion
 	chatRequest := &model.GeneralOpenAIRequest{

@@ -237,10 +237,11 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 			switch part.Type {
 			case model.ContentTypeText:
 				if part.Text != nil && *part.Text != "" {
-					convertedContent = append(convertedContent, map[string]interface{}{
+					item := map[string]interface{}{
 						"type": textContentType,
 						"text": *part.Text,
-					})
+					}
+					convertedContent = append(convertedContent, sanitizeResponseAPIContentItem(item, textContentType)...)
 				}
 			case model.ContentTypeImageURL:
 				if part.ImageURL != nil && part.ImageURL.Url != "" {
@@ -252,14 +253,15 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 					if part.ImageURL.Detail != "" {
 						item["detail"] = part.ImageURL.Detail
 					}
-					convertedContent = append(convertedContent, item)
+					convertedContent = append(convertedContent, sanitizeResponseAPIContentItem(item, textContentType)...)
 				}
 			case model.ContentTypeInputAudio:
 				if part.InputAudio != nil {
-					convertedContent = append(convertedContent, map[string]interface{}{
+					item := map[string]interface{}{
 						"type":        "input_audio",
 						"input_audio": part.InputAudio,
-					})
+					}
+					convertedContent = append(convertedContent, sanitizeResponseAPIContentItem(item, textContentType)...)
 				}
 			default:
 				// For unknown types, try to preserve as much as possible
@@ -269,7 +271,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 				if part.Text != nil {
 					partMap["text"] = *part.Text
 				}
-				convertedContent = append(convertedContent, partMap)
+				convertedContent = append(convertedContent, sanitizeResponseAPIContentItem(partMap, textContentType)...)
 			}
 		}
 		if len(convertedContent) > 0 {
@@ -307,7 +309,10 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 						}
 					}
 				}
-				convertedContent = append(convertedContent, convertedItem)
+				sanitizedItems := sanitizeResponseAPIContentItem(convertedItem, textContentType)
+				if len(sanitizedItems) > 0 {
+					convertedContent = append(convertedContent, sanitizedItems...)
+				}
 			}
 		}
 		if len(convertedContent) > 0 {
@@ -330,7 +335,73 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 		responseMsg["name"] = *message.Name
 	}
 
+	if _, hasContent := responseMsg["content"]; !hasContent {
+		return nil
+	}
+
 	return responseMsg
+}
+
+func sanitizeResponseAPIContentItem(item map[string]interface{}, textContentType string) []map[string]interface{} {
+	if item == nil {
+		return nil
+	}
+
+	itemType, _ := item["type"].(string)
+
+	// Reasoning items from non-OpenAI providers may carry encrypted payloads that OpenAI cannot verify.
+	// Convert them into plain text summaries to preserve user-visible context while avoiding upstream errors.
+	if itemType == "reasoning" {
+		if summaryText := extractReasoningSummaryText(item); summaryText != "" {
+			return []map[string]interface{}{{
+				"type": textContentType,
+				"text": summaryText,
+			}}
+		}
+		if text, ok := item["text"].(string); ok && strings.TrimSpace(text) != "" {
+			return []map[string]interface{}{{
+				"type": textContentType,
+				"text": text,
+			}}
+		}
+		// Drop unverifiable reasoning items if no readable summary is available.
+		return nil
+	}
+
+	// openai do not support encrypted_content in reasoning history,
+	// could cause 400 error
+	delete(item, "encrypted_content")
+
+	return []map[string]interface{}{item}
+}
+
+func extractReasoningSummaryText(item map[string]interface{}) string {
+	summary, ok := item["summary"].([]interface{})
+	if !ok {
+		return ""
+	}
+
+	var builder strings.Builder
+	for _, entry := range summary {
+		entryMap, ok := entry.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		text, ok := entryMap["text"].(string)
+		if !ok {
+			continue
+		}
+		trimmed := strings.TrimSpace(text)
+		if trimmed == "" {
+			continue
+		}
+		if builder.Len() > 0 {
+			builder.WriteString("\n")
+		}
+		builder.WriteString(trimmed)
+	}
+
+	return builder.String()
 }
 
 // ConvertChatCompletionToResponseAPI converts a ChatCompletion request to Response API format
@@ -358,8 +429,9 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 
 			// If assistant has text content, include it
 			if message.Content != "" {
-				convertedMsg := convertMessageToResponseAPIFormat(message)
-				responseReq.Input = append(responseReq.Input, convertedMsg)
+				if convertedMsg := convertMessageToResponseAPIFormat(message); convertedMsg != nil {
+					responseReq.Input = append(responseReq.Input, convertedMsg)
+				}
 			}
 		} else {
 			// For regular messages, add any pending function call summary first
@@ -378,8 +450,9 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 					Role:    "assistant",
 					Content: summary,
 				}
-				convertedSummaryMsg := convertMessageToResponseAPIFormat(summaryMsg)
-				responseReq.Input = append(responseReq.Input, convertedSummaryMsg)
+				if convertedSummaryMsg := convertMessageToResponseAPIFormat(summaryMsg); convertedSummaryMsg != nil {
+					responseReq.Input = append(responseReq.Input, convertedSummaryMsg)
+				}
 
 				// Clear pending calls and results
 				pendingToolCalls = nil
@@ -387,8 +460,9 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			}
 
 			// Add the regular message - convert to Response API format
-			convertedMsg := convertMessageToResponseAPIFormat(message)
-			responseReq.Input = append(responseReq.Input, convertedMsg)
+			if convertedMsg := convertMessageToResponseAPIFormat(message); convertedMsg != nil {
+				responseReq.Input = append(responseReq.Input, convertedMsg)
+			}
 		}
 	}
 
@@ -407,8 +481,9 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			Role:    "assistant",
 			Content: summary,
 		}
-		convertedSummaryMsg := convertMessageToResponseAPIFormat(summaryMsg)
-		responseReq.Input = append(responseReq.Input, convertedSummaryMsg)
+		if convertedSummaryMsg := convertMessageToResponseAPIFormat(summaryMsg); convertedSummaryMsg != nil {
+			responseReq.Input = append(responseReq.Input, convertedSummaryMsg)
+		}
 	}
 
 	// Map other fields

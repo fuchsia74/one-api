@@ -46,9 +46,10 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
 
-	if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
-		lg.Debug("get response api request", zap.ByteString("body", reqBody.([]byte)))
-	}
+	// duplicated
+	// if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
+	// 	lg.Debug("get response api request", zap.ByteString("body", reqBody.([]byte)))
+	// }
 
 	// Check if channel supports Response API
 	if meta.ChannelType != channeltype.OpenAI { // Only OpenAI channels support Response API for now
