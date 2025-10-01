@@ -4,6 +4,10 @@ applyTo: "**/*"
 
 ## General
 
+### Agents
+
+Multiple agents might be modifying the code at the same time. If you come across changes that aren't yours, preserve them and avoid interfering with other agents' work. Only halt the task and inform me when you encounter an irreconcilable conflict.
+
 ### TimeZone
 
 Always use UTC for time handling in servers, databases, and APIs.

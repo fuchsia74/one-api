@@ -5,7 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"io"
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/Laisky/errors/v2"
@@ -24,6 +26,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/billing"
+	"github.com/songquanpeng/one-api/relay/channeltype"
 	metalib "github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/pricing"
@@ -48,7 +51,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 
 	// Check if channel supports Response API
-	if meta.ChannelType != 1 { // Only OpenAI channels support Response API for now
+	if meta.ChannelType != channeltype.OpenAI { // Only OpenAI channels support Response API for now
 		return openai.ErrorWrapper(errors.New("Response API is only supported for OpenAI channels"), "unsupported_channel", http.StatusBadRequest)
 	}
 
@@ -64,14 +67,17 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	// get model ratio using three-layer pricing system
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
 	modelRatio := pricing.GetModelRatioWithThreeLayers(responseAPIRequest.Model, channelModelRatio, pricingAdaptor)
+	completionRatio := pricing.GetCompletionRatioWithThreeLayers(responseAPIRequest.Model, channelCompletionRatio, pricingAdaptor)
 	groupRatio := c.GetFloat64(ctxkey.ChannelRatio)
 
 	ratio := modelRatio * groupRatio
+	outputRatio := ratio * completionRatio
+	backgroundEnabled := responseAPIRequest.Background != nil && *responseAPIRequest.Background
 
 	// pre-consume quota based on estimated input tokens
 	promptTokens := getResponseAPIPromptTokens(gmw.Ctx(c), responseAPIRequest)
 	meta.PromptTokens = promptTokens
-	preConsumedQuota, bizErr := preConsumeResponseAPIQuota(c, responseAPIRequest, promptTokens, ratio, meta)
+	preConsumedQuota, bizErr := preConsumeResponseAPIQuota(c, responseAPIRequest, promptTokens, ratio, outputRatio, backgroundEnabled, meta)
 	if bizErr != nil {
 		lg.Warn("preConsumeResponseAPIQuota failed", zap.Any("error", *bizErr))
 		return bizErr
@@ -305,17 +311,16 @@ func getResponseAPIPromptTokens(ctx context.Context, responseAPIRequest *openai.
 }
 
 // preConsumeResponseAPIQuota pre-consumes quota for Response API requests
-func preConsumeResponseAPIQuota(c *gin.Context, responseAPIRequest *openai.ResponseAPIRequest, promptTokens int, ratio float64, meta *metalib.Meta) (int64, *relaymodel.ErrorWithStatusCode) {
-	// Use similar logic to ChatCompletion pre-consumption
-	preConsumedTokens := int64(promptTokens)
-	if responseAPIRequest.MaxOutputTokens != nil {
-		preConsumedTokens += int64(*responseAPIRequest.MaxOutputTokens)
-	}
-
-	baseQuota := int64(float64(preConsumedTokens) * ratio)
-	if ratio != 0 && baseQuota <= 0 {
-		baseQuota = 1
-	}
+func preConsumeResponseAPIQuota(
+	c *gin.Context,
+	responseAPIRequest *openai.ResponseAPIRequest,
+	promptTokens int,
+	inputRatio float64,
+	outputRatio float64,
+	background bool,
+	meta *metalib.Meta,
+) (int64, *relaymodel.ErrorWithStatusCode) {
+	baseQuota := calculateResponseAPIPreconsumeQuota(promptTokens, responseAPIRequest.MaxOutputTokens, inputRatio, outputRatio, background)
 
 	tokenQuota := c.GetInt64(ctxkey.TokenQuota)
 	tokenQuotaUnlimited := c.GetBool(ctxkey.TokenQuotaUnlimited)
@@ -337,6 +342,30 @@ func preConsumeResponseAPIQuota(c *gin.Context, responseAPIRequest *openai.Respo
 	}
 
 	return baseQuota, nil
+}
+
+func calculateResponseAPIPreconsumeQuota(promptTokens int, maxOutputTokens *int, inputRatio float64, outputRatio float64, background bool) int64 {
+	preConsumedTokens := int64(promptTokens)
+	if maxOutputTokens != nil {
+		preConsumedTokens += int64(*maxOutputTokens)
+	}
+
+	baseQuota := int64(float64(preConsumedTokens) * inputRatio)
+	if inputRatio != 0 && baseQuota <= 0 {
+		baseQuota = 1
+	}
+
+	if background && outputRatio > 0 {
+		backgroundQuota := int64(math.Ceil(float64(config.PreconsumeTokenForBackgroundRequest) * outputRatio))
+		if backgroundQuota <= 0 {
+			backgroundQuota = 1
+		}
+		if baseQuota < backgroundQuota {
+			baseQuota = backgroundQuota
+		}
+	}
+
+	return baseQuota
 }
 
 // postConsumeResponseAPIQuota calculates final quota consumption for Response API requests
@@ -428,4 +457,137 @@ func getResponseAPIRequestBody(c *gin.Context, meta *metalib.Meta, responseAPIRe
 		return nil, errors.Wrap(err, "marshal Response API request")
 	}
 	return bytes.NewReader(jsonData), nil
+}
+
+func applyResponseAPIStreamParams(c *gin.Context, meta *metalib.Meta) error {
+	streamParam := c.Query("stream")
+	if streamParam == "" {
+		meta.IsStream = false
+		return nil
+	}
+
+	stream, err := strconv.ParseBool(streamParam)
+	if err != nil {
+		return errors.Wrap(err, "parse stream query parameter")
+	}
+	meta.IsStream = stream
+	return nil
+}
+
+// RelayResponseAPIGetHelper handles GET /v1/responses/:response_id requests
+func RelayResponseAPIGetHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
+	meta := metalib.GetByContext(c)
+
+	if meta.ChannelType != channeltype.OpenAI {
+		return openai.ErrorWrapper(errors.New("Response API is only supported for OpenAI channels"), "unsupported_channel", http.StatusBadRequest)
+	}
+
+	if err := applyResponseAPIStreamParams(c, meta); err != nil {
+		return openai.ErrorWrapper(err, "invalid_query_parameter", http.StatusBadRequest)
+	}
+	metalib.Set2Context(c, meta)
+
+	adaptor := relay.GetAdaptor(meta.APIType)
+	if adaptor == nil {
+		return openai.ErrorWrapper(errors.New("invalid api type"), "invalid_api_type", http.StatusBadRequest)
+	}
+	adaptor.Init(meta)
+
+	resp, err := adaptor.DoRequest(c, meta, nil)
+	if err != nil {
+		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return RelayErrorHandlerWithContext(c, resp)
+	}
+
+	_, respErr := adaptor.DoResponse(c, resp, meta)
+	if respErr != nil {
+		return respErr
+	}
+
+	return nil
+}
+
+// RelayResponseAPIDeleteHelper handles DELETE /v1/responses/:response_id requests
+func RelayResponseAPIDeleteHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
+	meta := metalib.GetByContext(c)
+	meta.IsStream = false
+	metalib.Set2Context(c, meta)
+
+	if meta.ChannelType != channeltype.OpenAI {
+		return openai.ErrorWrapper(errors.New("Response API is only supported for OpenAI channels"), "unsupported_channel", http.StatusBadRequest)
+	}
+
+	adaptor := relay.GetAdaptor(meta.APIType)
+	if adaptor == nil {
+		return openai.ErrorWrapper(errors.New("invalid api type"), "invalid_api_type", http.StatusBadRequest)
+	}
+	adaptor.Init(meta)
+
+	resp, err := adaptor.DoRequest(c, meta, nil)
+	if err != nil {
+		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return RelayErrorHandlerWithContext(c, resp)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return openai.ErrorWrapper(err, "read_response_body_failed", http.StatusInternalServerError)
+	}
+	if err = resp.Body.Close(); err != nil {
+		return openai.ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError)
+	}
+
+	for key, values := range resp.Header {
+		for _, value := range values {
+			c.Writer.Header().Add(key, value)
+		}
+	}
+	if resp.Header.Get("Content-Type") == "" {
+		c.Writer.Header().Set("Content-Type", "application/json")
+	}
+	c.Writer.WriteHeader(resp.StatusCode)
+	if _, err = c.Writer.Write(body); err != nil {
+		return openai.ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError)
+	}
+
+	return nil
+}
+
+// RelayResponseAPICancelHelper handles POST /v1/responses/:response_id/cancel requests
+func RelayResponseAPICancelHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
+	meta := metalib.GetByContext(c)
+	meta.IsStream = false
+	metalib.Set2Context(c, meta)
+
+	if meta.ChannelType != channeltype.OpenAI {
+		return openai.ErrorWrapper(errors.New("Response API is only supported for OpenAI channels"), "unsupported_channel", http.StatusBadRequest)
+	}
+
+	adaptor := relay.GetAdaptor(meta.APIType)
+	if adaptor == nil {
+		return openai.ErrorWrapper(errors.New("invalid api type"), "invalid_api_type", http.StatusBadRequest)
+	}
+	adaptor.Init(meta)
+
+	resp, err := adaptor.DoRequest(c, meta, nil)
+	if err != nil {
+		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return RelayErrorHandlerWithContext(c, resp)
+	}
+
+	_, respErr := adaptor.DoResponse(c, resp, meta)
+	if respErr != nil {
+		return respErr
+	}
+
+	return nil
 }

@@ -137,6 +137,7 @@ var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
 var QuotaRemindThreshold int64 = 1000
 var PreConsumedQuota int64 = 500
+var PreconsumeTokenForBackgroundRequest = env.Int("PRECONSUME_TOKEN_FOR_BACKGROUND_REQUEST", 15000)
 var ApproximateTokenEnabled = false
 var RetryTimes = 0
 
