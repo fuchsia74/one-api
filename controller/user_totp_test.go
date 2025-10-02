@@ -136,8 +136,38 @@ func TestSetupTotp(t *testing.T) {
 	assert.True(t, response["success"].(bool))
 
 	data := response["data"].(map[string]interface{})
-	assert.NotEmpty(t, data["secret"])
-	assert.NotEmpty(t, data["qr_code"])
+	secret := data["secret"].(string)
+	qrCode := data["qr_code"].(string)
+
+	// Verify secret is not empty and is valid base32
+	assert.NotEmpty(t, secret)
+	assert.Regexp(t, "^[A-Z2-7]+=*$", secret, "Secret should be valid base32")
+
+	// Verify QR code URI format and proper encoding
+	assert.NotEmpty(t, qrCode)
+	assert.Contains(t, qrCode, "otpauth://totp/", "QR code should start with otpauth://totp/")
+	assert.Contains(t, qrCode, secret, "QR code should contain the secret")
+	assert.Contains(t, qrCode, "testuser", "QR code should contain the username")
+
+	// Verify proper URI encoding - spaces should be %20, not double-encoded
+	// The issuer name should be properly encoded
+	assert.Contains(t, qrCode, "issuer=", "QR code should contain issuer parameter")
+
+	// Test that the URI can be parsed correctly
+	assert.NotContains(t, qrCode, "%%", "QR code should not contain double-encoded characters")
+	assert.NotContains(t, qrCode, "%2520", "QR code should not contain double-encoded spaces")
+
+	// Verify the secret can be used to create a valid TOTP instance
+	totp, err := gcrypto.NewTOTP(gcrypto.OTPArgs{
+		Base32Secret: secret,
+	})
+	assert.NoError(t, err, "Secret from setup should be valid for TOTP creation")
+	assert.NotNil(t, totp)
+
+	// Verify that a code can be generated
+	code := totp.Key()
+	assert.Len(t, code, 6, "Generated TOTP code should be 6 digits")
+	assert.Regexp(t, "^[0-9]{6}$", code, "TOTP code should be 6 digits")
 }
 
 func TestTotpSetupRequest(t *testing.T) {
