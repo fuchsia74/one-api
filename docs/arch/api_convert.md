@@ -18,6 +18,7 @@ This guide explains how one-api transparently converts between different AI API 
     - [5.1 OpenAI ↔ Response API Conversion](#51-openai--response-api-conversion)
     - [5.2 Claude Messages API Conversion](#52-claude-messages-api-conversion)
     - [5.3 Model Support Detection](#53-model-support-detection)
+    - [5.4 Response API Fallback via ChatCompletion](#54-response-api-fallback-via-chatcompletion)
   - [6. Data Structure Mappings](#6-data-structure-mappings)
     - [6.1 Request Conversion](#61-request-conversion)
     - [6.2 Response Conversion (Non-streaming)](#62-response-conversion-non-streaming)
@@ -107,7 +108,6 @@ This guide explains how one-api transparently converts between different AI API 
     - [2. Performance Optimizations](#2-performance-optimizations)
     - [3. Extended Adapter Support](#3-extended-adapter-support)
   - [Summary](#summary)
-
 
 ## 1. Introduction
 
@@ -249,6 +249,14 @@ return GetFullRequestURL(meta.BaseURL, meta.RequestURLPath, meta.ChannelType), n
 - ✅ **URL Consistency**: Endpoint selection matches conversion logic
 - ✅ **Test Coverage**: Comprehensive tests verify both URL generation and conversion consistency
 
+### 5.4 Response API Fallback via ChatCompletion
+
+- **When it triggers:** If a `/v1/responses` request targets a channel whose upstream does not yet speak the Response API (e.g., Azure, third-party OpenAI compatibles), the controller routes the call through `relayResponseAPIThroughChat`.
+- **Request conversion:** `ConvertResponseAPIToChatCompletionRequest` collapses text-only `input` arrays back into simple message strings, retains multimodal items (images/audio) as structured content, preserves tool definitions/reasoning settings, and rejects currently unsupported `background` or prompt template fields. Streaming is disabled on this path.
+- **Response rewriting:** After the adapter completes the ChatCompletion call, the controller registers `ctxkey.ResponseRewriteHandler`, which takes the upstream `SlimTextResponse` and rehydrates a Response API envelope (status, output array, usage). The original payload is stored under `ctxkey.ResponseAPIRequestOriginal` so instructions, text formatting, and tool-choice metadata can be echoed in the response.
+- **Quota + metrics:** The fallback shares the ChatCompletion pre-consume / post-billing flow and reconciles provisional quota once upstream usage arrives, ensuring billing parity with native Response API calls.
+- **Regression coverage:** `TestConvertResponseAPIToChatCompletionRequest` verifies conversion fidelity, while `TestRenderChatResponseAsResponseAPI` ensures the rewrite handler emits valid Response API JSON.
+
 ## 6. Data Structure Mappings
 
 ### 6.1 Request Conversion
@@ -271,6 +279,8 @@ Previous function calls:
 - Called get_current_datetime({}) → {"year":2025,"month":6,"day":12}
 - Called get_weather({"location":"Boston"}) → {"temperature":22,"condition":"sunny"}
 ```
+
+> **Fallback note:** When the controller must relay a Response API request through a ChatCompletion-only upstream, `ConvertResponseAPIToChatCompletionRequest` performs the inverse mapping—collapsing text-only segments back into message strings, preserving multimodal content, and carrying over tool definitions / reasoning settings.
 
 ### 6.2 Response Conversion (Non-streaming)
 
@@ -429,6 +439,7 @@ Response API emits both delta and completion events. The implementation:
 
 - Token usage calculation fallback when API doesn't provide usage
 - Content extraction fallback for malformed responses
+- Response API requests automatically downgrade to ChatCompletion when a channel lacks native Response API support; responses are rewritten back through `ResponseRewriteHandler` to keep client contracts intact.
 
 ## 9. Testing & Extensibility
 
@@ -443,6 +454,8 @@ Response API emits both delta and completion events. The implementation:
 - `TestConvertResponseAPIStreamToChatCompletion()` - Streaming conversion
 - `TestFunctionCallWorkflow()` - End-to-end function calling
 - `TestChannelSpecificConversion()` - Channel type filtering
+- `TestConvertResponseAPIToChatCompletionRequest()` - Fallback request conversion coverage
+- `TestRenderChatResponseAsResponseAPI()` - ChatCompletion→Response rewrite validation
 
 ### 9.2 Integration Tests
 
@@ -465,6 +478,7 @@ Tests conversion behavior for different channel types:
 
 - Request phase: Store converted ResponseAPI request
 - Response phase: Detect need for response conversion
+- Response API fallback registers `ResponseRewriteHandler` (rewrapper callback) and `ResponseAPIRequestOriginal` (original payload snapshot) so the controller can reshape upstream ChatCompletion responses back into Response API format.
 
 ### 10.2 Context Flow
 

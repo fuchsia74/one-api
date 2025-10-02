@@ -12,6 +12,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/model"
 )
@@ -250,9 +251,6 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		}
 	}
 
-	// Forward the (possibly modified) response to client
-	c.JSON(resp.StatusCode, textResponse)
-
 	// Calculate usage if not provided
 	usage := textResponse.Usage
 	if usage.PromptTokens == 0 {
@@ -292,6 +290,20 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		zap.Int("prompt_tokens", usage.PromptTokens),
 		zap.Int("completion_tokens", usage.CompletionTokens),
 		zap.Int("total_tokens", usage.TotalTokens))
+
+	textResponse.Usage = usage
+
+	if rewriteAny, exists := c.Get(ctxkey.ResponseRewriteHandler); exists {
+		if rewriter, ok := rewriteAny.(func(*gin.Context, int, *SlimTextResponse) error); ok {
+			if err := rewriter(c, resp.StatusCode, &textResponse); err != nil {
+				return ErrorWrapper(err, "response_rewrite_failed", http.StatusInternalServerError), nil
+			}
+			return nil, &usage
+		}
+	}
+
+	// Forward the (possibly modified) response to client
+	c.JSON(resp.StatusCode, textResponse)
 
 	return nil, &usage
 }

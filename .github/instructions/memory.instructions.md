@@ -6,75 +6,86 @@ applyTo: "**/*"
 
 This document contains essential, abstract, and up-to-date information about the project, collaboratively maintained by all developers. It is regularly updated to reflect key architectural decisions, subtle implementation details, and recent developments. Outdated content is removed to maintain clarity and relevance.
 
-
-
 ## Claude Prompt Caching & Billing (2025-08)
 
 - **Claude Prompt Caching Billing Model:**
-    - Claude prompt caching uses a three-bucket billing model:
-        - **Normal input tokens**: Prompt tokens not covered by cache-read or cache-write.
-        - **Cache-read tokens**: Prompt tokens served from cache (billed at `CachedInputRatio`).
-        - **Cache-write tokens**: Prompt tokens written to cache (billed at `CacheWrite5mRatio` or `CacheWrite1hRatio`).
-    - **Cache-write tokens** are subtracted from the normal input bucket to prevent double-charging. If the sum of cache-write tokens exceeds normal input, values are clamped to zero.
-    - **Cached completion (output) tokens are never billed**. All code, API, and UI references to cached completion billing and `CachedOutputRatio` have been removed. The field remains in logs for compatibility but is always zero for Claude.
-    - **Pricing configuration** for Claude and VertexAI Claude models now includes `CachedInputRatio`, `CacheWrite5mRatio`, and `CacheWrite1hRatio` for all models. All new Claude models must include these fields.
-    - **API/DB/Log schema**: Only `cached_prompt_tokens` is surfaced and shown in the UI. `cached_completion_tokens` is deprecated and always zero for Claude.
-    - **Documentation and tests**: All formulas, docs, and tests are updated to match this logic. See `docs/arch/billing.md` for the canonical formula and mapping.
+
+  - Claude prompt caching uses a three-bucket billing model:
+    - **Normal input tokens**: Prompt tokens not covered by cache-read or cache-write.
+    - **Cache-read tokens**: Prompt tokens served from cache (billed at `CachedInputRatio`).
+    - **Cache-write tokens**: Prompt tokens written to cache (billed at `CacheWrite5mRatio` or `CacheWrite1hRatio`).
+  - **Cache-write tokens** are subtracted from the normal input bucket to prevent double-charging. If the sum of cache-write tokens exceeds normal input, values are clamped to zero.
+  - **Cached completion (output) tokens are never billed**. All code, API, and UI references to cached completion billing and `CachedOutputRatio` have been removed. The field remains in logs for compatibility but is always zero for Claude.
+  - **Pricing configuration** for Claude and VertexAI Claude models now includes `CachedInputRatio`, `CacheWrite5mRatio`, and `CacheWrite1hRatio` for all models. All new Claude models must include these fields.
+  - **API/DB/Log schema**: Only `cached_prompt_tokens` is surfaced and shown in the UI. `cached_completion_tokens` is deprecated and always zero for Claude.
+  - **Documentation and tests**: All formulas, docs, and tests are updated to match this logic. See `docs/arch/billing.md` for the canonical formula and mapping.
 
 - **Subtle Implementation Details:**
-    - Cache-write tokens are mapped from Anthropic API fields: `Ephemeral5mInputTokens`, `Ephemeral1hInputTokens`, or legacy `CacheCreationInputTokens` (all treated as 5m if duration unspecified).
-    - The billing formula clamps negative values and prevents double-charging by subtracting cache-write tokens from normal input.
-    - All code, tests, and documentation must remain in sync. Any new billing field or logic must be reflected in backend, API, UI, and docs.
-    - All changes must pass `go test -race ./...` before merge. Use floating-point tolerance in tests.
+
+  - Cache-write tokens are mapped from Anthropic API fields: `Ephemeral5mInputTokens`, `Ephemeral1hInputTokens`, or legacy `CacheCreationInputTokens` (all treated as 5m if duration unspecified).
+  - The billing formula clamps negative values and prevents double-charging by subtracting cache-write tokens from normal input.
+  - All code, tests, and documentation must remain in sync. Any new billing field or logic must be reflected in backend, API, UI, and docs.
+  - All changes must pass `go test -race ./...` before merge. Use floating-point tolerance in tests.
 
 - **Handover Guidance:**
-    - When handing over, ensure the new assistant is aware of the three-bucket Claude prompt caching billing model, the removal of cached completion billing, and the requirement to keep all pricing, API, and documentation in sync. All new Claude models must include cache-read and cache-write pricing fields. Remove outdated content and keep this file concise and abstract.
+  - When handing over, ensure the new assistant is aware of the three-bucket Claude prompt caching billing model, the removal of cached completion billing, and the requirement to keep all pricing, API, and documentation in sync. All new Claude models must include cache-read and cache-write pricing fields. Remove outdated content and keep this file concise and abstract.
 
+## Response API Fallback & Rewriter (2025-10)
 
+- **Cross-Channel Support:** Non-OpenAI channels receiving `/v1/responses` requests are auto-converted to ChatCompletion payloads via `ConvertResponseAPIToChatCompletionRequest`. Streaming remains unsupported on this path until upstream parity exists.
+- **Content Normalization:** Text-only `input` arrays collapse back into single string messages, while multimodal segments (images/audio) stay structured. Tool definitions, reasoning config, and JSON schema formats are preserved.
+- **Response Rewriter:** `relay/controller/response.go` registers `ctxkey.ResponseRewriteHandler`, which wraps upstream ChatCompletion replies back into Response API envelopes using metadata from `ctxkey.ResponseAPIRequestOriginal`.
+- **Quota & Metrics:** Fallback shares ChatCompletion pre-consume/post-billing logic and reconciles provisional quota after upstream usage arrives. Metrics mirror the native Response API flow.
+- **Regression Tests:** `TestConvertResponseAPIToChatCompletionRequest` and `TestRenderChatResponseAsResponseAPI` guard the conversion/rewrite pipeline. Always run `go test ./relay/adaptor/openai ./relay/controller` and `go test -race ./...` before handoff.
 
 ## Frontend API Path Unification & Verification (2025-08)
 
 - **API Path Convention:**
-    - All frontend API calls must use explicit, full URLs with the `/api` prefix. The shared Axios client no longer sets a `baseURL`.
-    - Every API call (GET, POST, PUT, DELETE) must include `/api/` in the path. This applies to all pages, components, and utility functions.
-    - Inline comments (`// Unified API call - complete URL with /api prefix`) are used to clarify this convention for maintainers.
+
+  - All frontend API calls must use explicit, full URLs with the `/api` prefix. The shared Axios client no longer sets a `baseURL`.
+  - Every API call (GET, POST, PUT, DELETE) must include `/api/` in the path. This applies to all pages, components, and utility functions.
+  - Inline comments (`// Unified API call - complete URL with /api prefix`) are used to clarify this convention for maintainers.
 
 - **Verification & Migration:**
-    - A verification script (`grep -r "api\.get|api\.post|api\.put|api\.delete" ... | grep -v "/api/" | grep -v "Unified API call"`) is used to ensure no legacy or missing `/api` prefixes remain.
-    - As of August 2025, all API calls in the modern frontend have been verified and fixed to use the `/api` prefix. The migration is complete and consistent.
-    - Any future code or third-party integration must follow this invariant. If the backend route structure changes, a full review is required.
+
+  - A verification script (`grep -r "api\.get|api\.post|api\.put|api\.delete" ... | grep -v "/api/" | grep -v "Unified API call"`) is used to ensure no legacy or missing `/api` prefixes remain.
+  - As of August 2025, all API calls in the modern frontend have been verified and fixed to use the `/api` prefix. The migration is complete and consistent.
+  - Any future code or third-party integration must follow this invariant. If the backend route structure changes, a full review is required.
 
 - **Subtle Implementation Details & Risks:**
-    - Any missed API call without `/api` will fail (404 or unexpected behavior). All new code must be checked for compliance.
-    - Components using `fetch()` or other HTTP clients directly must also use the `/api` prefix.
-    - Tests, mocks, and documentation must be kept in sync with this convention.
-    - If the backend changes the `/api` prefix, both frontend and backend must be updated in lockstep.
+
+  - Any missed API call without `/api` will fail (404 or unexpected behavior). All new code must be checked for compliance.
+  - Components using `fetch()` or other HTTP clients directly must also use the `/api` prefix.
+  - Tests, mocks, and documentation must be kept in sync with this convention.
+  - If the backend changes the `/api` prefix, both frontend and backend must be updated in lockstep.
 
 - **Handover Guidance:**
-    - When handing over, ensure the new assistant is aware of the explicit API path requirement, the verification process, and the need to keep this invariant in all future work. Use the verification script after any major refactor or dependency update.
+  - When handing over, ensure the new assistant is aware of the explicit API path requirement, the verification process, and the need to keep this invariant in all future work. Use the verification script after any major refactor or dependency update.
 
 ## Frontend Authentication, Validation, and Testing (2025-08)
 
 - **Login & Registration:**
-    - TOTP (Two-Factor Authentication) is strictly validated in the login flow. The UI disables the submit button unless a 6-digit code is entered when required. TOTP state is managed separately from the form state.
-    - Success messages (e.g., after registration or password reset) are passed via navigation state and displayed on the login page (not for direct URL access).
-    - Email validation in registration is regex-based and enforced before sending verification codes. The "Send Code" button is disabled unless a valid email is entered.
-    - Form error handling is decoupled from form context, improving maintainability.
+
+  - TOTP (Two-Factor Authentication) is strictly validated in the login flow. The UI disables the submit button unless a 6-digit code is entered when required. TOTP state is managed separately from the form state.
+  - Success messages (e.g., after registration or password reset) are passed via navigation state and displayed on the login page (not for direct URL access).
+  - Email validation in registration is regex-based and enforced before sending verification codes. The "Send Code" button is disabled unless a valid email is entered.
+  - Form error handling is decoupled from form context, improving maintainability.
 
 - **Testing Infrastructure:**
-    - The modern frontend uses Vitest as the test runner, with `jsdom` as the default environment. All test scripts and TypeScript configs are updated accordingly.
-    - All test files must use the correct mocking API for Vitest (e.g., `vi.mock`).
-    - The global Vitest setup may affect tests that expect a Node environment or use other runners. All new dependencies must be kept up to date.
+
+  - The modern frontend uses Vitest as the test runner, with `jsdom` as the default environment. All test scripts and TypeScript configs are updated accordingly.
+  - All test files must use the correct mocking API for Vitest (e.g., `vi.mock`).
+  - The global Vitest setup may affect tests that expect a Node environment or use other runners. All new dependencies must be kept up to date.
 
 - **Subtle Implementation Details & Risks:**
-    - TOTP and email validation are stricter; if backend or other clients expect different behavior, login or registration may fail.
-    - The use of navigation state for success messages means direct URL access will not show these messages.
-    - The refactor of error handling may break custom error handling in other forms if they relied on the previous implementation.
-    - The global Vitest setup may affect tests that expect a Node environment or use other runners.
+
+  - TOTP and email validation are stricter; if backend or other clients expect different behavior, login or registration may fail.
+  - The use of navigation state for success messages means direct URL access will not show these messages.
+  - The refactor of error handling may break custom error handling in other forms if they relied on the previous implementation.
+  - The global Vitest setup may affect tests that expect a Node environment or use other runners.
 
 - **Handover Guidance:**
-    - When handing over, ensure the new assistant is aware of the stricter validation logic, the decoupled error handling, and the global Vitest test environment. All authentication and registration flows must be tested after changes. Any test runner or environment changes must be validated for compatibility.
-
+  - When handing over, ensure the new assistant is aware of the stricter validation logic, the decoupled error handling, and the global Vitest test environment. All authentication and registration flows must be tested after changes. Any test runner or environment changes must be validated for compatibility.
 
 ## Pricing & Billing Architecture (2025-07)
 
@@ -86,7 +97,7 @@ This document contains essential, abstract, and up-to-date information about the
 ## General Project Practices
 
 - **Error Handling:** Always use `github.com/Laisky/errors/v2` for error wrapping. Never return bare errors.
-- **Context Keys:** All context keys are pre-defined in `common/ctxkey/key.go`.
+- **Context Keys:** All context keys are pre-defined in `common/ctxkey/key.go`. Recent additions include `ResponseRewriteHandler` (rewriter callback) and `ResponseAPIRequestOriginal` (stores the original Response API payload).
 - **Package Management:** Use package managers only. Never edit package files by hand.
 - **Testing:** All bug fixes/features require updated unit tests. No temporary scripts.
 - **Time Handling:** Always use UTC for server, DB, and API time.
@@ -95,9 +106,9 @@ This document contains essential, abstract, and up-to-date information about the
 ## Models Display Permissions (2025-09)
 
 - `/api/models/display` now filters strictly by configuration and user entitlements:
-    - Anonymous users only see models explicitly listed in a channel’s `Models` field. Channels without configured models are hidden from the public listing.
-    - Authenticated users see the intersection of their group/channel abilities and the channel’s supported models; abilities are deduplicated and sorted for deterministic output.
-    - Filtering runs before pricing lookups, so orphaned or whitespace-only entries are dropped to avoid nil pricing reads.
+  - Anonymous users only see models explicitly listed in a channel’s `Models` field. Channels without configured models are hidden from the public listing.
+  - Authenticated users see the intersection of their group/channel abilities and the channel’s supported models; abilities are deduplicated and sorted for deterministic output.
+  - Filtering runs before pricing lookups, so orphaned or whitespace-only entries are dropped to avoid nil pricing reads.
 - Controller tests seed isolated SQLite databases, disable Redis, and reset shared caches (`anonymousModelsDisplayCache`, `singleflight` group) per test. Follow this pattern when extending display logic to keep tests deterministic.
 
 ## Handover Guidance
@@ -108,40 +119,42 @@ This document contains essential, abstract, and up-to-date information about the
 
 ---
 
-
 ## Frontend Responsive & Table Architecture (2025-08)
 
 - **Unified Responsive System:**
-    - All management tables (Users, Channels, Tokens, Redemptions, Logs) and main pages now use a unified responsive architecture. This includes:
-        - `useResponsive` hook for device detection (`isMobile`, `isTablet`, etc.).
-        - `ResponsivePageContainer`, `ResponsiveSection`, and `AdaptiveGrid` for consistent, adaptive layouts.
-        - Card-based mobile layouts for tables, with label-value pairs and touch-friendly controls.
-        - All table action buttons and pagination controls are touch-friendly, visually consistent, and use minimum 44px tap targets.
-        - Table columns can be hidden on mobile via `hideColumnsOnMobile` prop; all table cells use `data-label` for accessibility.
-        - Pagination is always visible, styled for both desktop and mobile, and never slices data locally for server-side pagination.
-        - All table and UI changes must be validated on both desktop and mobile after any refactor.
+
+  - All management tables (Users, Channels, Tokens, Redemptions, Logs) and main pages now use a unified responsive architecture. This includes:
+    - `useResponsive` hook for device detection (`isMobile`, `isTablet`, etc.).
+    - `ResponsivePageContainer`, `ResponsiveSection`, and `AdaptiveGrid` for consistent, adaptive layouts.
+    - Card-based mobile layouts for tables, with label-value pairs and touch-friendly controls.
+    - All table action buttons and pagination controls are touch-friendly, visually consistent, and use minimum 44px tap targets.
+    - Table columns can be hidden on mobile via `hideColumnsOnMobile` prop; all table cells use `data-label` for accessibility.
+    - Pagination is always visible, styled for both desktop and mobile, and never slices data locally for server-side pagination.
+    - All table and UI changes must be validated on both desktop and mobile after any refactor.
 
 - **CSS & Tailwind:**
-    - `mobile.css` and `tailwind.config.js` are extended for modular, maintainable responsive utilities (custom breakpoints, touch targets, responsive spacing, etc.).
-    - Legacy or global CSS overrides that break pagination or table layout have been removed. Always check for such overrides when UI elements are missing.
-    - Never use inline style overrides for layout/visibility; always prefer maintainable CSS fixes.
-    - Remove outdated or redundant CSS as part of any major UI refactor.
+
+  - `mobile.css` and `tailwind.config.js` are extended for modular, maintainable responsive utilities (custom breakpoints, touch targets, responsive spacing, etc.).
+  - Legacy or global CSS overrides that break pagination or table layout have been removed. Always check for such overrides when UI elements are missing.
+  - Never use inline style overrides for layout/visibility; always prefer maintainable CSS fixes.
+  - Remove outdated or redundant CSS as part of any major UI refactor.
 
 - **Testing & Build:**
-    - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
-    - Test files must use the correct mocking API for the test runner (e.g., `vi.mock` for Vitest, not `jest.mock`).
-    - After major refactors, always validate build and test integrity. Fixes for test runner compatibility (e.g., Vitest vs Jest) should be documented.
+
+  - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
+  - Test files must use the correct mocking API for the test runner (e.g., `vi.mock` for Vitest, not `jest.mock`).
+  - After major refactors, always validate build and test integrity. Fixes for test runner compatibility (e.g., Vitest vs Jest) should be documented.
 
 - **Subtle Implementation Details:**
-    - All model lists for channel/adaptor editing are fetched in real-time from the backend, never from local cache.
-    - Table sorting dropdowns and icons are visually unified and always server-side.
-    - When adding models to a channel, deduplicate and never overwrite existing selections unless explicitly cleared.
-    - Mobile usability and accessibility (touch targets, `data-label`, focus/active states) are first-class concerns.
-    - Any new UI/UX or backend logic must be kept in sync with documentation and user-facing messages.
+
+  - All model lists for channel/adaptor editing are fetched in real-time from the backend, never from local cache.
+  - Table sorting dropdowns and icons are visually unified and always server-side.
+  - When adding models to a channel, deduplicate and never overwrite existing selections unless explicitly cleared.
+  - Mobile usability and accessibility (touch targets, `data-label`, focus/active states) are first-class concerns.
+  - Any new UI/UX or backend logic must be kept in sync with documentation and user-facing messages.
 
 - **Handover Guidance:**
-    - When handing over, ensure the new assistant is aware of the unified responsive/table architecture, the importance of data-labels for mobile, the need to keep UI/UX in sync with backend and documentation, and the requirement for proper test/build practices (including test runner compatibility).
-
+  - When handing over, ensure the new assistant is aware of the unified responsive/table architecture, the importance of data-labels for mobile, the need to keep UI/UX in sync with backend and documentation, and the requirement for proper test/build practices (including test runner compatibility).
 
 ## Claude Messages API: Universal Conversion
 
@@ -168,33 +181,39 @@ This document contains essential, abstract, and up-to-date information about the
 **Recent Developments (2025-08):**
 
 - **Frontend Pagination Bug:**
-    - Pagination controls in management tables were hidden due to a legacy CSS rule. The rule was removed; all tables now use server-side pagination and visible controls.
-    - Always check for global/legacy CSS overrides when UI elements are missing. Prefer maintainable CSS fixes over inline overrides.
-    - Pagination logic must match data loading strategy. For server-side pagination, render API results directly.
+
+  - Pagination controls in management tables were hidden due to a legacy CSS rule. The rule was removed; all tables now use server-side pagination and visible controls.
+  - Always check for global/legacy CSS overrides when UI elements are missing. Prefer maintainable CSS fixes over inline overrides.
+  - Pagination logic must match data loading strategy. For server-side pagination, render API results directly.
 
 - **Model Pricing Refactor:**
-    - All pricing, quota, and billing logic standardized to "per 1M tokens". Shared pricing maps and fallback logic are used everywhere. Documentation and UI must always match backend logic.
+
+  - All pricing, quota, and billing logic standardized to "per 1M tokens". Shared pricing maps and fallback logic are used everywhere. Documentation and UI must always match backend logic.
 
 - **Table Sorting & Data Consistency:**
-    - All management tables (Users, Channels, Tokens, Redemptions, Logs) now use server-side sorting and pagination. Sorting is unified via dropdown and clickable column headers with icons. All tables fetch data in real-time from the server—no local cache is used for editing or display.
-    - "Fill Related Models" and "Fill All Models" buttons in channel editing serve distinct purposes: Related adds only models supported by the current channel/adaptor; All adds all available models. Both deduplicate automatically. This logic is implemented in the frontend and must be maintained.
-    - When adding models to a channel, always deduplicate and never overwrite existing selections unless explicitly cleared.
+
+  - All management tables (Users, Channels, Tokens, Redemptions, Logs) now use server-side sorting and pagination. Sorting is unified via dropdown and clickable column headers with icons. All tables fetch data in real-time from the server—no local cache is used for editing or display.
+  - "Fill Related Models" and "Fill All Models" buttons in channel editing serve distinct purposes: Related adds only models supported by the current channel/adaptor; All adds all available models. Both deduplicate automatically. This logic is implemented in the frontend and must be maintained.
+  - When adding models to a channel, always deduplicate and never overwrite existing selections unless explicitly cleared.
 
 - **Subtle Implementation Details:**
-    - All model lists for channel/adaptor editing are fetched in real-time from the backend, never from local cache. Channel-specific models are fetched via `/api/models` and mapped by channel type.
-    - Table sorting dropdowns and icons are visually unified across all management tables. Sorting is always server-side and applies to all data, not just the current page.
-    - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
+
+  - All model lists for channel/adaptor editing are fetched in real-time from the backend, never from local cache. Channel-specific models are fetched via `/api/models` and mapped by channel type.
+  - Table sorting dropdowns and icons are visually unified across all management tables. Sorting is always server-side and applies to all data, not just the current page.
+  - All bug fixes and features require updated unit tests. No temporary scripts are allowed.
 
 - **Build Issue Resolution:**
-    - Corrupted `TokensTableCompact.js` was rebuilt with proper imports, JSX, and sorting logic. Always validate file integrity after major refactors.
+
+  - Corrupted `TokensTableCompact.js` was rebuilt with proper imports, JSX, and sorting logic. Always validate file integrity after major refactors.
 
 - **Handover Best Practices:**
-    - When handing over, ensure the new assistant is aware of the pricing unit change, centralized pricing logic, table sorting/pagination patterns, and the importance of keeping documentation and UI in sync with backend logic. Remove outdated content and keep this file concise and abstract.
+
+  - When handing over, ensure the new assistant is aware of the pricing unit change, centralized pricing logic, table sorting/pagination patterns, and the importance of keeping documentation and UI in sync with backend logic. Remove outdated content and keep this file concise and abstract.
 
 - **Frontend Authentication & Testing:**
-    - Login and registration flows now enforce stricter TOTP and email validation, with improved error and success message handling. The login page now displays navigation-passed success messages and disables submission unless TOTP is valid. Registration email validation is regex-based and enforced before sending codes.
-    - The modern frontend has migrated to Vitest with `jsdom` as the default environment. All test scripts, configs, and setup files are updated. All test files must use Vitest APIs.
-    - Form error handling is now decoupled from form context, improving maintainability but requiring updates to custom forms.
+  - Login and registration flows now enforce stricter TOTP and email validation, with improved error and success message handling. The login page now displays navigation-passed success messages and disables submission unless TOTP is valid. Registration email validation is regex-based and enforced before sending codes.
+  - The modern frontend has migrated to Vitest with `jsdom` as the default environment. All test scripts, configs, and setup files are updated. All test files must use Vitest APIs.
+  - Form error handling is now decoupled from form context, improving maintainability but requiring updates to custom forms.
 
 ## Claude Messages API: Universal Conversion
 
@@ -205,48 +224,3 @@ This document contains essential, abstract, and up-to-date information about the
 - All errors are wrapped with `github.com/Laisky/errors/v2` and surfaced with context. Malformed content is handled gracefully with fallbacks.
 - New adapters should follow the Claude Messages pattern: interface method + universal conversion + context marking. Specialized adapters (e.g., DeepL, Palm, Ollama) are excluded from Claude Messages support.
 - See `relay/controller/claude_messages.go`, `relay/adaptor/interface.go`, `relay/adaptor/openai_compatible/claude_messages.go`, `relay/adaptor/gemini/adaptor.go`, `common/ctxkey/key.go`, and `docs/arch/api_convert.md` for reference.
-
-## Pricing & Billing Architecture (2025-07)
-
-- **Pricing Unit Standardization:** All model pricing, quota, and billing calculations are now standardized to use "per 1M tokens" (1 million tokens) instead of "per 1K tokens". This is reflected in all code, comments, and documentation. Double-check all user-facing messages and documentation for consistency.
-- **Centralized Model Pricing:** Each channel/adaptor now imports and uses a shared `ModelRatios` constant from its respective `constants.go` or subadaptor. Local, hardcoded pricing maps have been removed to avoid duplication and drift.
-- **Model List Generation:** Supported model lists are always derived from the keys of the shared pricing maps, ensuring pricing and support are always in sync.
-- **Default/Fallback Pricing:** All adaptors use a unified fallback (e.g., `5 * ratio.MilliTokensUsd`) for unknown models. If a model is missing from the shared map, it will use this fallback.
-- **VertexAI Aggregation:** VertexAI pricing is now aggregated from all subadaptors (Claude, Imagen, Gemini, Veo) and includes VertexAI-specific models. Any omission in a subadaptor will propagate to VertexAI.
-- **Critical Subtleties:**
-  - If any model is missing from the shared pricing map, it may become unsupported or use fallback pricing.
-  - Models with non-token-based pricing (e.g., per image/video) require special handling and may not fit the token-based pattern.
-  - All documentation and UI must be kept in sync with the new pricing unit to avoid confusion.
-
-## Gemini Adapter: Function Schema Cleaning
-
-- Gemini API rejects OpenAI-style function schemas with unsupported fields (`additionalProperties`, `description`, `strict`).
-- Recursive cleaning removes `additionalProperties` everywhere, and `description`/`strict` only at the top level. Cleaned parameters are type-asserted before assignment.
-- Only remove `description`/`strict` at the top; nested objects may require them.
-
-## General Project Practices
-
-- **Error Handling:** Always use `github.com/Laisky/errors/v2` for error wrapping; never return bare errors.
-- **Context Keys:** All context keys must be pre-defined in `common/ctxkey/key.go`.
-- **Package Management:** Use package managers (npm, pip, etc.), never edit package files by hand.
-- **Testing:** All bug fixes/features must be covered by unit tests. No temporary scripts. Unit tests must be updated to cover new issues and features.
-- **Time Handling:** Always use UTC for server, DB, and API time.
-- **Golang ORM:** Use `gorm.io/gorm` for writes; prefer SQL for reads to minimize DB load.
-
-## Handover Guidance
-
-- **Claude Messages API:** Fully production-ready, with universal conversion and billing parity. See `docs/arch/api_billing.md` and `docs/arch/api_convert.md` for details.
-- **Billing Architecture:** Four-layer pricing (channel overrides > adapter defaults > global > fallback).
-- **Adaptor Pattern:** All new API formats should follow the Claude Messages pattern: interface method + universal conversion + context marking.
-- **Critical Files:**
-  - `relay/controller/claude_messages.go`
-  - `relay/adaptor/interface.go`
-  - `common/ctxkey/key.go`
-  - `docs/arch/api_billing.md`
-  - `docs/arch/api_convert.md`
-
----
-**Recent Developments (2025-07):**
-
-- Major refactor to unify and clarify model pricing logic, reduce duplication, and standardize on "per 1M tokens" as the pricing unit. All adaptors now use shared pricing maps and fallback logic. This change is critical for maintainability and billing accuracy.
-- When handing over, ensure the new assistant is aware of the pricing unit change, the centralized pricing logic, and the importance of keeping documentation and UI in sync with backend logic.

@@ -196,6 +196,14 @@ const (
 	// Read in: controller/claude_messages to return converted responses.
 	ConvertedResponse = "converted_response"
 
+	// ResponseRewriteHandler stores a function that rewrites upstream OpenAI-compatible
+	// chat responses into another format (e.g., Response API) before returning to the client.
+	ResponseRewriteHandler = "response_rewrite_handler"
+
+	// ResponseAPIRequestOriginal keeps the original Response API request payload so that
+	// downstream converters can hydrate metadata when rewriting responses.
+	ResponseAPIRequestOriginal = "response_api_request_original"
+
 	// ResponseFormat is used by image APIs to carry desired output format when posted via JSON.
 	// Set in: image controller from request payload.
 	// Read in: image controller to format the response properly.

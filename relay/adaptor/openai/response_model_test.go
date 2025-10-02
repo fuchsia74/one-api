@@ -163,6 +163,76 @@ func TestConvertWithTools(t *testing.T) {
 	}
 }
 
+func TestConvertResponseAPIToChatCompletionRequest(t *testing.T) {
+	reasoningEffort := "medium"
+	stream := false
+	responseReq := &ResponseAPIRequest{
+		Model:  "gpt-4",
+		Stream: &stream,
+		Input: ResponseAPIInput{
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type": "input_text",
+						"text": "Hello there",
+					},
+				},
+			},
+		},
+		Instructions: func() *string { s := "You are helpful"; return &s }(),
+		Tools: []ResponseAPITool{
+			{
+				Type: "function",
+				Name: "lookup",
+				Parameters: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"city": map[string]any{"type": "string"}},
+				},
+			},
+			{
+				Type:              "web_search",
+				SearchContextSize: func() *string { s := "medium"; return &s }(),
+			},
+		},
+		ToolChoice: map[string]any{"type": "auto"},
+		Reasoning:  &model.OpenAIResponseReasoning{Effort: &reasoningEffort},
+	}
+
+	chatReq, err := ConvertResponseAPIToChatCompletionRequest(responseReq)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if chatReq.Model != "gpt-4" {
+		t.Fatalf("expected model gpt-4, got %s", chatReq.Model)
+	}
+	if len(chatReq.Messages) != 2 {
+		t.Fatalf("expected 2 messages (system + user), got %d", len(chatReq.Messages))
+	}
+	if chatReq.Messages[0].Role != "system" {
+		t.Fatalf("expected first message to be system, got %s", chatReq.Messages[0].Role)
+	}
+	if chatReq.Messages[1].StringContent() != "Hello there" {
+		t.Fatalf("expected user message content preserved, got %q", chatReq.Messages[1].StringContent())
+	}
+	if len(chatReq.Tools) != 2 {
+		t.Fatalf("expected 2 tools, got %d", len(chatReq.Tools))
+	}
+	if chatReq.Tools[0].Function == nil || chatReq.Tools[0].Function.Name != "lookup" {
+		t.Fatalf("function tool not converted correctly: %#v", chatReq.Tools[0])
+	}
+	if chatReq.Tools[1].Type != "web_search" {
+		t.Fatalf("web search tool not preserved: %#v", chatReq.Tools[1])
+	}
+	if chatReq.ToolChoice == nil {
+		t.Fatalf("expected tool choice to be set")
+	}
+	if chatReq.Reasoning == nil || chatReq.Reasoning.Effort == nil || *chatReq.Reasoning.Effort != reasoningEffort {
+		t.Fatalf("reasoning effort not preserved: %#v", chatReq.Reasoning)
+	}
+}
+
 func TestConvertChatCompletionToResponseAPISanitizesEncryptedReasoning(t *testing.T) {
 	req := &model.GeneralOpenAIRequest{
 		Model: "gpt-5",

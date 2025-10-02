@@ -1,6 +1,4 @@
----
-applyTo: "**/*"
----
+# Repository Guidelines
 
 ## General
 
