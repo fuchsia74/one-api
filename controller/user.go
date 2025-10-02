@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -246,7 +247,6 @@ func Register(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func GetAllUsers(c *gin.Context) {
@@ -321,8 +321,6 @@ func SearchUsers(c *gin.Context) {
 		"message": "",
 		"data":    users,
 	})
-
-	return
 }
 
 func GetUser(c *gin.Context) {
@@ -355,7 +353,6 @@ func GetUser(c *gin.Context) {
 		"message": "",
 		"data":    user,
 	})
-	return
 }
 
 // GetUserDashboard returns per-day per-model usage statistics and quota info.
@@ -499,7 +496,6 @@ func GetUserDashboard(c *gin.Context) {
 		"message": "",
 		"data":    response,
 	})
-	return
 }
 
 func GetDashboardUsers(c *gin.Context) {
@@ -555,7 +551,6 @@ func GetDashboardUsers(c *gin.Context) {
 		"message": "",
 		"data":    userOptions,
 	})
-	return
 }
 
 func GenerateAccessToken(c *gin.Context) {
@@ -591,7 +586,6 @@ func GenerateAccessToken(c *gin.Context) {
 		"message": "",
 		"data":    user.AccessToken,
 	})
-	return
 }
 
 func GetAffCode(c *gin.Context) {
@@ -619,7 +613,6 @@ func GetAffCode(c *gin.Context) {
 		"message": "",
 		"data":    user.AffCode,
 	})
-	return
 }
 
 // GetSelfByToken get user by openai api token
@@ -629,7 +622,6 @@ func GetSelfByToken(c *gin.Context) {
 		"token_id": c.GetInt("token_id"),
 		"username": c.GetString("username"),
 	})
-	return
 }
 
 func GetSelf(c *gin.Context) {
@@ -647,7 +639,6 @@ func GetSelf(c *gin.Context) {
 		"message": "",
 		"data":    user,
 	})
-	return
 }
 
 func UpdateUser(c *gin.Context) {
@@ -721,7 +712,6 @@ func UpdateUser(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func UpdateSelf(c *gin.Context) {
@@ -778,7 +768,6 @@ func UpdateSelf(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func DeleteUser(c *gin.Context) {
@@ -840,7 +829,6 @@ func DeleteSelf(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func CreateUser(c *gin.Context) {
@@ -899,7 +887,6 @@ func CreateUser(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 type ManageRequest struct {
@@ -1016,7 +1003,6 @@ func ManageUser(c *gin.Context) {
 		"message": "",
 		"data":    clearUser,
 	})
-	return
 }
 
 func EmailBind(c *gin.Context) {
@@ -1058,7 +1044,6 @@ func EmailBind(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 type topUpRequest struct {
@@ -1090,7 +1075,6 @@ func TopUp(c *gin.Context) {
 		"message": "",
 		"data":    quota,
 	})
-	return
 }
 
 type adminTopUpRequest struct {
@@ -1126,13 +1110,15 @@ func AdminTopUp(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 // SetupTotp generates a new TOTP secret and QR code for the user
+//
+// Note (H0llyW00dzZ): This fixes double-encoding issues where config system name when we put space on it for example "One API" it literally break the encoding
+// as I don't have repo/fork github.com/Laisky/go-utils/v5/crypto so I modified here and it default use sha1
 func SetupTotp(c *gin.Context) {
-	userId := c.GetInt(ctxkey.Id)
-	user, err := model.GetUserById(userId, true)
+	userID := c.GetInt(ctxkey.Id)
+	user, err := model.GetUserById(userID, true)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
@@ -1163,12 +1149,40 @@ func SetupTotp(c *gin.Context) {
 	session.Set("temp_totp_secret", secret)
 	session.Save()
 
-	// Generate QR code URI
-	qrCodeURI := totp.URI()
+	// Generate QR code URI from library
+	originalURI := totp.URI()
+
+	// Rebuild the URI with proper encoding to fix double-encoding issues
+	// The library's URI() may double-encode spaces in system name
+	// Parse and reconstruct: otpauth://totp/Issuer:AccountName?secret=SECRET&issuer=Issuer
+	if _, err = url.Parse(originalURI); err != nil {
+		// Fallback: build URI manually if parsing fails
+		label := fmt.Sprintf("%s:%s", url.PathEscape(config.SystemName), url.PathEscape(user.Username))
+		qrCodeURI := fmt.Sprintf("otpauth://totp/%s?secret=%s&issuer=%s",
+			label,
+			secret,
+			url.PathEscape(config.SystemName),
+		)
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data": TotpSetupResponse{
+				Secret: secret,
+				QRCode: qrCodeURI,
+			},
+		})
+		return
+	}
+
+	// Rebuild with proper encoding
+	label := fmt.Sprintf("%s:%s", url.PathEscape(config.SystemName), url.PathEscape(user.Username))
+	qrCodeURI := fmt.Sprintf("otpauth://totp/%s?secret=%s&issuer=%s",
+		label,
+		secret,
+		url.PathEscape(config.SystemName),
+	)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "",
 		"data": TotpSetupResponse{
 			Secret: secret,
 			QRCode: qrCodeURI,
