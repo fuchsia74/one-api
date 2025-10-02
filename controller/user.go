@@ -1114,8 +1114,11 @@ func AdminTopUp(c *gin.Context) {
 
 // SetupTotp generates a new TOTP secret and QR code for the user
 //
-// Note (H0llyW00dzZ): This fixes double-encoding issues where config system name when we put space on it for example "One API" it literally break the encoding
-// as I don't have repo/fork github.com/Laisky/go-utils/v5/crypto so I modified here and it default use sha1
+// Note ([H0llyW00dzZ]): This fixes double-encoding issues where config system name when we put space on it for example "One API" it literally break the encoding
+// as I don't have repo/fork [github.com/Laisky/go-utils/v5/crypto] so I modified here and it default use sha1
+//
+// [github.com/Laisky/go-utils/v5/crypto]: https://github.com/Laisky/go-utils
+// [H0llyW00dzZ]: https://github.com/H0llyW00dzZ
 func SetupTotp(c *gin.Context) {
 	userID := c.GetInt(ctxkey.Id)
 	user, err := model.GetUserById(userID, true)
