@@ -28,10 +28,10 @@ func setupModelsDisplayTestEnv(t *testing.T) {
 	anonymousModelsDisplayCache = gutils.NewExpCache[map[string]ChannelModelsDisplayInfo](context.Background(), time.Minute)
 	anonymousModelsDisplayGroup = singleflight.Group{}
 
-	originalRedisEnabled := common.RedisEnabled
-	common.RedisEnabled = false
+	originalRedisEnabled := common.IsRedisEnabled()
+	common.SetRedisEnabled(false)
 	t.Cleanup(func() {
-		common.RedisEnabled = originalRedisEnabled
+		common.SetRedisEnabled(originalRedisEnabled)
 	})
 
 	originalSQLitePath := common.SQLitePath

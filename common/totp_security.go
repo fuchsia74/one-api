@@ -25,7 +25,7 @@ func IsTotpCodeUsed(userId int, totpCode string) bool {
 
 	key := fmt.Sprintf("%s:%d:%s", TotpCodeCacheKeyPrefix, userId, totpCode)
 
-	if RedisEnabled {
+	if IsRedisEnabled() {
 		return isRedisKeyExists(key)
 	} else {
 		// For memory cache, we'll use a simple in-memory map
@@ -41,7 +41,7 @@ func MarkTotpCodeAsUsed(userId int, totpCode string) error {
 
 	key := fmt.Sprintf("%s:%d:%s", TotpCodeCacheKeyPrefix, userId, totpCode)
 
-	if RedisEnabled {
+	if IsRedisEnabled() {
 		return RedisSet(key, "1", TotpCodeCacheDuration)
 	} else {
 		// For memory cache, we'll use a simple in-memory map

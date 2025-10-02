@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Laisky/errors/v2"
@@ -15,17 +16,30 @@ import (
 )
 
 var RDB redis.Cmdable
-var RedisEnabled = true
+
+var redisEnabled atomic.Bool
+
+func init() {
+	redisEnabled.Store(true)
+}
+
+func IsRedisEnabled() bool {
+	return redisEnabled.Load()
+}
+
+func SetRedisEnabled(enabled bool) {
+	redisEnabled.Store(enabled)
+}
 
 // InitRedisClient This function is called after init()
 func InitRedisClient() (err error) {
 	if os.Getenv("REDIS_CONN_STRING") == "" {
-		RedisEnabled = false
+		SetRedisEnabled(false)
 		logger.Logger.Info("REDIS_CONN_STRING not set, Redis is not enabled")
 		return nil
 	}
 	if config.SyncFrequency == 0 {
-		RedisEnabled = false
+		SetRedisEnabled(false)
 		logger.Logger.Info("SYNC_FREQUENCY not set, Redis is disabled")
 		return nil
 	}
@@ -53,6 +67,7 @@ func InitRedisClient() (err error) {
 	if err != nil {
 		logger.Logger.Fatal("Redis ping test failed", zap.Error(err))
 	}
+	SetRedisEnabled(true)
 	return nil
 }
 

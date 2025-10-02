@@ -110,7 +110,7 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gi
 			c.Next()
 		}
 	}
-	if common.RedisEnabled {
+	if common.IsRedisEnabled() {
 		return func(c *gin.Context) {
 			redisRateLimiter(c, maxRequestNum, duration, mark)
 		}
@@ -168,7 +168,7 @@ func CheckTotpRateLimit(c *gin.Context, userId int) bool {
 
 	key := fmt.Sprintf("rateLimit:TOTP:%d", userId)
 
-	if common.RedisEnabled {
+	if common.IsRedisEnabled() {
 		return checkRedisRateLimit(c, key, 1, 1)
 	} else {
 		inMemoryRateLimiter.Init(config.RateLimitKeyExpirationDuration)
