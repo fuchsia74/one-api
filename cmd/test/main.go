@@ -350,7 +350,7 @@ func performRequest(ctx context.Context, client *http.Client, baseURL, token str
 		}
 
 		if isUnsupportedCombination(spec.Type, spec.Stream, resp.StatusCode, streamData, reason) {
-			result.Skipped = true
+			result.Skipped = false
 			result.ErrorReason = reason
 			return
 		}
@@ -379,7 +379,7 @@ func performRequest(ctx context.Context, client *http.Client, baseURL, token str
 		}
 
 		if isUnsupportedCombination(spec.Type, spec.Stream, resp.StatusCode, body, reason) {
-			result.Skipped = true
+			result.Skipped = false
 			result.ErrorReason = reason
 			return
 		}
@@ -393,7 +393,7 @@ func performRequest(ctx context.Context, client *http.Client, baseURL, token str
 
 	reason := fmt.Sprintf("status %s: %s", resp.Status, snippet(body))
 	if isUnsupportedCombination(spec.Type, spec.Stream, resp.StatusCode, body, reason) {
-		result.Skipped = true
+		result.Skipped = false
 		result.ErrorReason = reason
 		return
 	}
