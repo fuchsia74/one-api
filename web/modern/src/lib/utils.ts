@@ -106,7 +106,6 @@ export const loadSystemStatus = async (): Promise<SystemStatus | null> => {
     const { success, data } = response.data
 
     if (success && data) {
-      // Store in localStorage for future use (excluding usd_to_idr for real-time API usage)
       localStorage.setItem('status', JSON.stringify(data))
       localStorage.setItem('system_name', data.system_name || 'One API')
       localStorage.setItem('logo', data.logo || '')
