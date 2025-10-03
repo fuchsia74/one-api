@@ -859,29 +859,41 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 		requestId = ginCtx.GetString(ctxkey.RequestId)
 	}
 	traceId := tracing.GetTraceIDFromContext(ctx)
-	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
-		Ctx:                    ctx,
-		TokenId:                meta.TokenId,
-		QuotaDelta:             quotaDelta,
-		TotalQuota:             quota,
-		UserId:                 meta.UserId,
-		ChannelId:              meta.ChannelId,
-		PromptTokens:           promptTokens,
-		CompletionTokens:       completionTokens,
-		ModelRatio:             usedModelRatio,
-		GroupRatio:             groupRatio,
-		ModelName:              responseAPIRequest.Model,
-		TokenName:              meta.TokenName,
-		IsStream:               meta.IsStream,
-		StartTime:              meta.StartTime,
-		SystemPromptReset:      false,
-		CompletionRatio:        usedCompletionRatio,
-		ToolsCost:              usage.ToolsCost,
-		CachedPromptTokens:     cachedPrompt,
-		CachedCompletionTokens: 0,
-		RequestId:              requestId,
-		TraceId:                traceId,
-	})
+	if meta.TokenId > 0 && meta.UserId > 0 && meta.ChannelId > 0 {
+		billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+			Ctx:                    ctx,
+			TokenId:                meta.TokenId,
+			QuotaDelta:             quotaDelta,
+			TotalQuota:             quota,
+			UserId:                 meta.UserId,
+			ChannelId:              meta.ChannelId,
+			PromptTokens:           promptTokens,
+			CompletionTokens:       completionTokens,
+			ModelRatio:             usedModelRatio,
+			GroupRatio:             groupRatio,
+			ModelName:              responseAPIRequest.Model,
+			TokenName:              meta.TokenName,
+			IsStream:               meta.IsStream,
+			StartTime:              meta.StartTime,
+			SystemPromptReset:      false,
+			CompletionRatio:        usedCompletionRatio,
+			ToolsCost:              usage.ToolsCost,
+			CachedPromptTokens:     cachedPrompt,
+			CachedCompletionTokens: 0,
+			RequestId:              requestId,
+			TraceId:                traceId,
+		})
+	} else {
+		// Should not happen; log for investigation
+		lg := gmw.GetLogger(ctx)
+		lg.Error("postConsumeResponseAPIQuota missing essential meta information",
+			zap.Int("token_id", meta.TokenId),
+			zap.Int("user_id", meta.UserId),
+			zap.Int("channel_id", meta.ChannelId),
+			zap.String("request_id", requestId),
+			zap.String("trace_id", traceId),
+		)
+	}
 
 	return quota
 }

@@ -117,7 +117,7 @@ func recordLogHelper(_ context.Context, log *Log) {
 // recordLogHelperWithTraceID removed: callers must set IDs directly on log
 
 func RecordLog(ctx context.Context, userId int, logType int, content string) {
-	if logType == LogTypeConsume && !config.LogConsumeEnabled {
+	if logType == LogTypeConsume && !config.IsLogConsumeEnabled() {
 		return
 	}
 	log := &Log{
@@ -172,7 +172,7 @@ func RecordTopupLogWithIDs(_ context.Context, userId int, content string, quota 
 }
 
 func RecordConsumeLog(ctx context.Context, log *Log) {
-	if !config.LogConsumeEnabled {
+	if !config.IsLogConsumeEnabled() {
 		return
 	}
 	log.Username = GetUsernameById(log.UserId)

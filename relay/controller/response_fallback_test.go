@@ -95,9 +95,9 @@ func TestRelayResponseAPIHelper_FallbackAzure(t *testing.T) {
 	common.SetRedisEnabled(false)
 	t.Cleanup(func() { common.SetRedisEnabled(prevRedis) })
 
-	prevLogConsume := config.LogConsumeEnabled
-	config.LogConsumeEnabled = false
-	t.Cleanup(func() { config.LogConsumeEnabled = prevLogConsume })
+	prevLogConsume := config.IsLogConsumeEnabled()
+	config.SetLogConsumeEnabled(false)
+	t.Cleanup(func() { config.SetLogConsumeEnabled(prevLogConsume) })
 
 	upstreamCalled := false
 	var upstreamPath string
@@ -223,9 +223,9 @@ func TestRelayResponseAPIHelper_FallbackStreaming(t *testing.T) {
 	common.SetRedisEnabled(false)
 	t.Cleanup(func() { common.SetRedisEnabled(prevRedis) })
 
-	prevLogConsume := config.LogConsumeEnabled
-	config.LogConsumeEnabled = false
-	t.Cleanup(func() { config.LogConsumeEnabled = prevLogConsume })
+	prevLogConsume := config.IsLogConsumeEnabled()
+	config.SetLogConsumeEnabled(false)
+	t.Cleanup(func() { config.SetLogConsumeEnabled(prevLogConsume) })
 
 	upstreamCalled := false
 	var upstreamPath string
