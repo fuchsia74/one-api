@@ -341,10 +341,28 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	var usage relaymodel.Usage
 	var id string
+	var finalUsageSent bool
 
 	c.Stream(func(w io.Writer) bool {
 		event, ok := <-stream.Events()
 		if !ok {
+			// Send final usage chunk before [DONE] if we have usage data
+			//
+			// TODO (H0llyW00dzZ): This should be correct. If it's not, it will be improved later when I have more time,
+			// as I'm currently busy building an agent framework in Go.
+			if !finalUsageSent && (usage.PromptTokens > 0 || usage.CompletionTokens > 0 || usage.TotalTokens > 0) {
+				usageResponse := &openai.ChatCompletionsStreamResponse{
+					Id:      id,
+					Object:  "chat.completion.chunk",
+					Created: createdTime,
+					Model:   c.GetString(ctxkey.RequestModel),
+					Choices: []openai.ChatCompletionsStreamResponseChoice{},
+					Usage:   &usage,
+				}
+				if jsonStr, err := json.Marshal(usageResponse); err == nil {
+					c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
+				}
+			}
 			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
 			return false
 		}
