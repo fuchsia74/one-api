@@ -141,7 +141,7 @@ One‑API integrates seamlessly with this CLI: you can connect any One‑API end
 
 To get started, create or edit `.opencode/config.json` like this:
 
-```💻json
+```json
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
