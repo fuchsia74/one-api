@@ -63,7 +63,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Why this fork exists](#why-this-fork-exists)
     - [What’s new](#whats-new)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
-  - [›_ OpenCode CLI Support](#opencode-cli-support)
+  - [›_ OpenCode CLI Support](#_-opencode-cli-support)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
     - [Kubernetes Deployment](#kubernetes-deployment)
