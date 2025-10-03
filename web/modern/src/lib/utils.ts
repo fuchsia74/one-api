@@ -80,6 +80,7 @@ export interface SystemStatus {
   logo?: string
   footer_html?: string
   quota_per_unit?: string
+  display_in_currency?: string
   turnstile_check?: boolean
   turnstile_site_key?: string
   github_oauth?: boolean
@@ -111,6 +112,7 @@ export const loadSystemStatus = async (): Promise<SystemStatus | null> => {
       localStorage.setItem('logo', data.logo || '')
       localStorage.setItem('footer_html', data.footer_html || '')
       localStorage.setItem('quota_per_unit', data.quota_per_unit || '500000')
+      localStorage.setItem('display_in_currency', data.display_in_currency || 'true')
 
       return data
     }
