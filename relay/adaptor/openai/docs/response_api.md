@@ -27,7 +27,6 @@ Optional
 Defaults to null
 The conversation that this response belongs to. Items from this conversation are prepended to input_items for this response request. Input items and output items from this response are automatically added to this conversation after this response completes.
 
-
 Show possible types
 include
 array
@@ -110,7 +109,6 @@ object
 Optional
 Reference to a prompt template and its variables. Learn more.
 
-
 Show properties
 prompt_cache_key
 string
@@ -125,7 +123,6 @@ Optional
 gpt-5 and o-series models only
 
 Configuration options for reasoning models.
-
 
 Show properties
 safety_identifier
@@ -168,7 +165,6 @@ Optional
 Defaults to null
 Options for streaming responses. Only set this when you set stream: true.
 
-
 Show properties
 temperature
 number
@@ -192,7 +188,6 @@ string or object
 
 Optional
 How the model should select which tool (or tools) to use when generating a response. See the tools parameter to see how to specify which tools the model can call.
-
 
 Show possible types
 tools

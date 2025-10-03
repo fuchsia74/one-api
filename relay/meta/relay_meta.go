@@ -32,12 +32,13 @@ type Meta struct {
 	// OriginModelName is the model name from the raw user request
 	OriginModelName string
 	// ActualModelName is the model name after mapping
-	ActualModelName    string
-	RequestURLPath     string
-	PromptTokens       int // only for DoResponse
-	ChannelRatio       float64
-	ForcedSystemPrompt string
-	StartTime          time.Time
+	ActualModelName     string
+	RequestURLPath      string
+	ResponseAPIFallback bool
+	PromptTokens        int // only for DoResponse
+	ChannelRatio        float64
+	ForcedSystemPrompt  string
+	StartTime           time.Time
 }
 
 // GetMappedModelName returns the mapped model name and a bool indicating if the model name is mapped

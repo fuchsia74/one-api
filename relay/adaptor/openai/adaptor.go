@@ -125,7 +125,8 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		if requestPath == "/v1/messages" {
 			// For OpenAI channels, check if the model should use Response API
 			if meta.ChannelType == channeltype.OpenAI &&
-				!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+				!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+				!meta.ResponseAPIFallback {
 				responseAPIPath := "/v1/responses"
 				return GetFullRequestURL(meta.BaseURL, responseAPIPath, meta.ChannelType), nil
 			}
@@ -136,7 +137,8 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 
 		if meta.ChannelType == channeltype.OpenAI &&
 			(meta.Mode == relaymode.ChatCompletions || meta.Mode == relaymode.ClaudeMessages) &&
-			!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+			!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+			!meta.ResponseAPIFallback {
 			responseAPIPath := "/v1/responses"
 			return GetFullRequestURL(meta.BaseURL, responseAPIPath, meta.ChannelType), nil
 		}
@@ -189,7 +191,8 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
 		meta.ChannelType == channeltype.OpenAI &&
-		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+		!meta.ResponseAPIFallback {
 		responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
 		logConvertedRequest(c, meta, relayMode, responseAPIRequest)
 		return responseAPIRequest, nil
@@ -656,7 +659,8 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 
 	// For OpenAI adaptor, check if we should convert to Response API format
 	meta := meta.GetByContext(c)
-	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+		!meta.ResponseAPIFallback {
 		// Apply transformations first
 		if err := a.applyRequestTransformations(meta, openaiRequest); err != nil {
 			return nil, errors.Wrap(err, "apply request transformations for Claude conversion")

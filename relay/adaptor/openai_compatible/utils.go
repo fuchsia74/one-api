@@ -39,6 +39,29 @@ type ChatCompletionsStreamResponseChoice struct {
 	FinishReason *string       `json:"finish_reason"`
 }
 
+// StreamRewriteHandler allows controllers to intercept streaming ChatCompletion
+// chunks and rewrite them into alternative SSE formats (e.g., Response API) before
+// they are flushed to the client.
+type StreamRewriteHandler interface {
+	// HandleChunk is invoked for each parsed streaming chunk. Returning handled=true
+	// suppresses the default OpenAI-compatible forwarding logic for that chunk. When
+	// doneRendered=true the pipeline also marks the downstream stream as completed.
+	HandleChunk(c *gin.Context, chunk *ChatCompletionsStreamResponse) (handled bool, doneRendered bool)
+
+	// HandleUpstreamDone is called when the upstream emits the terminal "data: [DONE]"
+	// sentinel. Returning handled=true prevents the default handler from forwarding it.
+	HandleUpstreamDone(c *gin.Context) (handled bool, doneRendered bool)
+
+	// HandleDone runs after the upstream stream ends and usage has been finalized,
+	// allowing the rewriter to emit terminal events. Returning handled=true suppresses
+	// the default [DONE] emission.
+	HandleDone(c *gin.Context) (handled bool, doneRendered bool)
+
+	// FinalizeUsage provides the computed usage information so the rewriter can embed
+	// accurate billing metrics in the terminating payload.
+	FinalizeUsage(usage *model.Usage)
+}
+
 // SlimTextResponse represents the non-streaming response structure
 type SlimTextResponse struct {
 	Choices     []TextResponseChoice `json:"choices"`
