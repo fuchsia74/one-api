@@ -63,6 +63,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Why this fork exists](#why-this-fork-exists)
     - [What’s new](#whats-new)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
+  - [›_ OpenCode CLI Support](#opencode-cli-support)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
     - [Kubernetes Deployment](#kubernetes-deployment)
@@ -131,6 +132,39 @@ This repository is fully compatible with multi-agent frameworks and is recommend
 
 > [!TIP]
 > For optimal performance in multi-agent environments, it's recommended to use models that already have automated cached prompt capabilities, such as `grok-code-fast-1`. These models can significantly reduce latency and improve response times by leveraging cached prompts, which is especially beneficial when multiple agents are making frequent requests with similar contexts.
+
+## ›_ OpenCode CLI Support
+
+[opencode.ai](https://opencode.ai) is a modern, open-source AI terminal that lets you automate workflows, build agentic scripts, and chat—all from your terminal. It’s a powerful and cool tool for anyone working with AI models and APIs!
+
+One‑API integrates seamlessly with this CLI: you can connect any One‑API endpoint and use all your unified models through the slick OpenCode terminal UX.
+
+To get started, create or edit `.opencode/config.json` like this:
+
+```💻json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api": {
+      "npm": "@ai-sdk/openai",
+      "name": "One API",
+      "options": {
+        "baseURL": "http://localhost:3000/v1",
+        "apiKey":  "HANDLE_APIKEY_HERE"
+      },
+      "models": {
+        "gpt-4.1-2025-04-14": {
+          "name": "GPT 4.1"
+        }
+      }
+    }
+  }
+}
+```
+
+- Replace `HANDLE_APIKEY_HERE` with your One‑API key.
+- Make sure `baseURL` matches your running One‑API endpoint.
+- Now, any opencode command (like `opencode chat`, `opencode run`, and more) works with all your One‑API models directly from the terminal! 😎
 
 ## Tutorial
 
