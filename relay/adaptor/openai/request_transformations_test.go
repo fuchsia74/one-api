@@ -6,6 +6,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	relaymeta "github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
+	"github.com/songquanpeng/one-api/relay/relaymode"
 )
 
 func float64PtrRT(v float64) *float64 {
@@ -19,48 +20,67 @@ func stringPtrRT(s string) *string {
 func TestApplyRequestTransformations_ReasoningDefaults(t *testing.T) {
 	adaptor := &Adaptor{}
 
-	meta := &relaymeta.Meta{
-		ChannelType:     channeltype.OpenAI,
-		ActualModelName: "o1-preview",
+	cases := []struct {
+		name          string
+		channelType   int
+		expectNilTemp bool
+	}{
+		{name: "OpenAI Responses", channelType: channeltype.OpenAI, expectNilTemp: true},
+		{name: "Azure Chat", channelType: channeltype.Azure, expectNilTemp: false},
 	}
 
-	req := &model.GeneralOpenAIRequest{
-		Model:     "o1-preview",
-		MaxTokens: 1500,
-		Messages: []model.Message{
-			{Role: "system", Content: "be precise"},
-			{Role: "user", Content: "hi"},
-		},
-		Temperature: float64PtrRT(0.5),
-		TopP:        float64PtrRT(0.9),
-	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			meta := &relaymeta.Meta{
+				ChannelType:     tc.channelType,
+				ActualModelName: "o1-preview",
+			}
 
-	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
-		t.Fatalf("applyRequestTransformations returned error: %v", err)
-	}
+			req := &model.GeneralOpenAIRequest{
+				Model:     "o1-preview",
+				MaxTokens: 1500,
+				Messages: []model.Message{
+					{Role: "system", Content: "be precise"},
+					{Role: "user", Content: "hi"},
+				},
+				Temperature: float64PtrRT(0.5),
+				TopP:        float64PtrRT(0.9),
+			}
 
-	if req.MaxTokens != 0 {
-		t.Errorf("expected MaxTokens to be zeroed, got %d", req.MaxTokens)
-	}
+			if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+				t.Fatalf("applyRequestTransformations returned error: %v", err)
+			}
 
-	if req.MaxCompletionTokens == nil || *req.MaxCompletionTokens != 1500 {
-		t.Fatalf("expected MaxCompletionTokens to be set to 1500, got %v", req.MaxCompletionTokens)
-	}
+			if req.MaxTokens != 0 {
+				t.Errorf("expected MaxTokens to be zeroed, got %d", req.MaxTokens)
+			}
 
-	if req.Temperature == nil || *req.Temperature != 1 {
-		t.Fatalf("expected Temperature to be forced to 1 for reasoning models, got %v", req.Temperature)
-	}
+			if req.MaxCompletionTokens == nil || *req.MaxCompletionTokens != 1500 {
+				t.Fatalf("expected MaxCompletionTokens to be set to 1500, got %v", req.MaxCompletionTokens)
+			}
 
-	if req.TopP != nil {
-		t.Fatalf("expected TopP to be cleared for reasoning models, got %v", *req.TopP)
-	}
+			if tc.expectNilTemp {
+				if req.Temperature != nil {
+					t.Fatalf("expected Temperature to be removed, got %v", req.Temperature)
+				}
+			} else {
+				if req.Temperature == nil || *req.Temperature != 1 {
+					t.Fatalf("expected Temperature to be forced to 1, got %v", req.Temperature)
+				}
+			}
 
-	if req.ReasoningEffort == nil || *req.ReasoningEffort != "high" {
-		t.Fatalf("expected ReasoningEffort to default to 'high', got %v", req.ReasoningEffort)
-	}
+			if req.TopP != nil {
+				t.Fatalf("expected TopP to be cleared for reasoning models, got %v", *req.TopP)
+			}
 
-	if len(req.Messages) != 1 || req.Messages[0].Role != "user" {
-		t.Fatalf("expected system messages to be stripped for reasoning models, got %+v", req.Messages)
+			if req.ReasoningEffort == nil || *req.ReasoningEffort != "high" {
+				t.Fatalf("expected ReasoningEffort to default to 'high', got %v", req.ReasoningEffort)
+			}
+
+			if len(req.Messages) != 1 || req.Messages[0].Role != "user" {
+				t.Fatalf("expected system messages to be stripped for reasoning models, got %+v", req.Messages)
+			}
+		})
 	}
 }
 
@@ -147,5 +167,64 @@ func TestApplyRequestTransformations_DeepResearchReasoningEffort(t *testing.T) {
 
 	if req.ReasoningEffort == nil || *req.ReasoningEffort != "medium" {
 		t.Fatalf("expected ReasoningEffort to be normalized to 'medium', got %v", req.ReasoningEffort)
+	}
+}
+
+func TestApplyRequestTransformations_ResponseAPIRemovesSampling(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "gpt-5-mini",
+		Mode:            relaymode.ResponseAPI,
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-5-mini",
+		Messages: []model.Message{
+			{Role: "user", Content: "hello"},
+		},
+		Temperature: float64PtrRT(0.3),
+		TopP:        float64PtrRT(0.2),
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	if req.Temperature != nil {
+		t.Fatalf("expected Temperature to be removed for Response API reasoning models, got %v", req.Temperature)
+	}
+
+	if req.TopP != nil {
+		t.Fatalf("expected TopP to be removed for Response API reasoning models, got %v", req.TopP)
+	}
+}
+
+func TestApplyRequestTransformations_PopulatesMetaActualModel(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:  channeltype.OpenAI,
+		ModelMapping: map[string]string{"gpt-x": "gpt-x-mapped"},
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-x",
+		Messages: []model.Message{
+			{Role: "user", Content: "hi"},
+		},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	if meta.OriginModelName != "gpt-x" {
+		t.Fatalf("expected OriginModelName to be populated, got %q", meta.OriginModelName)
+	}
+
+	if meta.ActualModelName != "gpt-x-mapped" {
+		t.Fatalf("expected ActualModelName to use mapping, got %q", meta.ActualModelName)
 	}
 }

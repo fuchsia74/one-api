@@ -113,3 +113,25 @@ func TestGetByContext_NoChannelChange(t *testing.T) {
 	assert.Equal(t, "https://api.openai.com", meta2.BaseURL)
 	assert.Equal(t, 1.0, meta2.ChannelRatio)
 }
+
+func TestEnsureActualModelName(t *testing.T) {
+	meta := &Meta{
+		ModelMapping: map[string]string{"alias": "mapped"},
+	}
+
+	meta.EnsureActualModelName("alias")
+
+	if meta.OriginModelName != "alias" {
+		t.Fatalf("expected OriginModelName to be backfilled, got %q", meta.OriginModelName)
+	}
+
+	if meta.ActualModelName != "mapped" {
+		t.Fatalf("expected ActualModelName to be mapped value, got %q", meta.ActualModelName)
+	}
+
+	// Calling again with blank fallback should keep existing values
+	meta.EnsureActualModelName("")
+	if meta.ActualModelName != "mapped" {
+		t.Fatalf("expected ActualModelName to remain unchanged, got %q", meta.ActualModelName)
+	}
+}
