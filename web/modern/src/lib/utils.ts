@@ -1,5 +1,6 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
+import api from "./api"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -71,4 +72,51 @@ export function renderQuotaWithPrompt(quota: number): string {
   }
 
   return `${formatNumber(quota)} tokens`
+}
+
+// System status utility function
+export interface SystemStatus {
+  system_name?: string
+  logo?: string
+  footer_html?: string
+  quota_per_unit?: string
+  turnstile_check?: boolean
+  turnstile_site_key?: string
+  github_oauth?: boolean
+  github_client_id?: string
+  [key: string]: any
+}
+
+export const loadSystemStatus = async (): Promise<SystemStatus | null> => {
+  // First try to get from localStorage
+  const status = localStorage.getItem('status')
+  if (status) {
+    try {
+      const parsedStatus = JSON.parse(status)
+      return parsedStatus
+    } catch (error) {
+      console.error('Error parsing system status:', error)
+    }
+  }
+
+  // If not in localStorage, fetch from server
+  try {
+    const response = await api.get('/api/status')
+    const { success, data } = response.data
+
+    if (success && data) {
+      // Store in localStorage for future use (excluding usd_to_idr for real-time API usage)
+      localStorage.setItem('status', JSON.stringify(data))
+      localStorage.setItem('system_name', data.system_name || 'One API')
+      localStorage.setItem('logo', data.logo || '')
+      localStorage.setItem('footer_html', data.footer_html || '')
+      localStorage.setItem('quota_per_unit', data.quota_per_unit || '500000')
+
+      return data
+    }
+  } catch (error) {
+    console.error('Error fetching system status:', error)
+  }
+
+  return null
 }
