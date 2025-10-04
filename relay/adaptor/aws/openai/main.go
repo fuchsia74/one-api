@@ -260,6 +260,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			return true
 
 		case *types.ConverseStreamOutputMemberMessageStop:
+			// Handle message stop with OpenAI-compatible response structure
 			stopReason = convertStopReason(string(v.Value.StopReason))
 			return true
 
