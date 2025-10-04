@@ -63,7 +63,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Why this fork exists](#why-this-fork-exists)
     - [What’s new](#whats-new)
   - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
-  - [›_ OpenCode CLI Support](#_-opencode-cli-support)
+  - [›_ OpenCode Support](#_-opencode-support)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
     - [Kubernetes Deployment](#kubernetes-deployment)
@@ -133,7 +133,7 @@ This repository is fully compatible with multi-agent frameworks and is recommend
 > [!TIP]
 > For optimal performance in multi-agent environments, it's recommended to use models that already have automated cached prompt capabilities, such as `grok-code-fast-1`. These models can significantly reduce latency and improve response times by leveraging cached prompts, which is especially beneficial when multiple agents are making frequent requests with similar contexts.
 
-## ›_ OpenCode CLI Support
+## ›_ OpenCode Support
 
 <p align="center">
   <a href="https://opencode.ai">
@@ -145,9 +145,9 @@ This repository is fully compatible with multi-agent frameworks and is recommend
   </a>
 </p>
 
-[opencode.ai](https://opencode.ai) is a modern, open-source AI terminal that lets you automate workflows, build agentic scripts, and chat—all from your terminal. It’s a powerful and cool tool for anyone working with AI models and APIs!
+[opencode.ai](https://opencode.ai) is an AI coding agent built for the terminal. OpenCode is fully open source, giving you control and `freedom` to use any provider, any model, and any editor. It's available as both a CLI and TUI.
 
-One‑API integrates seamlessly with this CLI: you can connect any One‑API endpoint and use all your unified models through the slick OpenCode terminal UX.
+One‑API integrates seamlessly with OpenCode: you can connect any One‑API endpoint and use all your unified models through OpenCode's interface (both CLI and TUI).
 
 To get started, create or edit `~/.config/opencode/opencode.json` like this:
 
