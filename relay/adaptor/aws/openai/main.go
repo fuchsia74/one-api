@@ -300,6 +300,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			return true
 
 		default:
+			// Handle other event types
 			return true
 		}
 	})
