@@ -191,6 +191,37 @@ To get started, create or edit `.opencode/config.json` like this:
 - Make sure `baseURL` matches your running One‑API endpoint.
 - Now, any opencode command (like `opencode chat`, `opencode run`, and more) works with all your One‑API models directly from the terminal! 😎
 
+**Best Practice - Using Environment Variables:**
+
+For better security, use environment variables instead of hardcoding API keys:
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api": {
+      "npm": "@ai-sdk/openai",
+      "name": "One API",
+      "options": {
+        "baseURL": "http://localhost:3000/v1",
+        "apiKey": "{env:ONEAPI_API_KEY}"
+      },
+      "models": {
+        "gpt-4.1-2025-04-14": {
+          "name": "GPT 4.1"
+        }
+      }
+    }
+  }
+}
+```
+
+Then set the environment variable in your shell:
+
+```bash
+export ONEAPI_API_KEY="sk-your-actual-api-key-here"
+```
+
 ## Tutorial
 
 ### Docker Compose Deployment
