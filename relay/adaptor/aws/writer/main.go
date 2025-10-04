@@ -363,6 +363,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 				switch deltaValue := v.Value.Delta.(type) {
 				case *types.ContentBlockDeltaMemberText:
 					if textDelta := deltaValue.Value; textDelta != "" {
+						// Create OpenAI-compatible streaming response with simple string content
 						response := &openai.ChatCompletionsStreamResponse{
 							Id:      id,
 							Object:  "chat.completion.chunk",
