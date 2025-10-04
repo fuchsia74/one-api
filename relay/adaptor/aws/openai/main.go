@@ -178,28 +178,11 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	var usage relaymodel.Usage
 	var id string
-	var finalUsageSent bool
+	var stopReason *string
 
 	c.Stream(func(w io.Writer) bool {
 		event, ok := <-stream.Events()
 		if !ok {
-			// Send final usage chunk before [DONE] if we have usage data
-			//
-			// TODO (H0llyW00dzZ): This should be correct. If it's not, it will be improved later when I have more time,
-			// as I'm currently busy building an agent framework in Go.
-			if !finalUsageSent && (usage.PromptTokens > 0 || usage.CompletionTokens > 0 || usage.TotalTokens > 0) {
-				usageResponse := &openai.ChatCompletionsStreamResponse{
-					Id:      id,
-					Object:  "chat.completion.chunk",
-					Created: createdTime,
-					Model:   c.GetString(ctxkey.RequestModel),
-					Choices: []openai.ChatCompletionsStreamResponseChoice{},
-					Usage:   &usage,
-				}
-				if jsonStr, err := json.Marshal(usageResponse); err == nil {
-					c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
-				}
-			}
 			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
 			return false
 		}
@@ -238,12 +221,12 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 						}
 					}
 				case *types.ContentBlockDeltaMemberReasoningContent:
-					// Handle reasoning content delta - unified within ContentBlockDelta for OpenAI OSS
+					// Handle reasoning content delta - OpenAI OSS models support reasoning like DeepSeek
 					if deltaValue.Value != nil {
 						switch reasoningDelta := deltaValue.Value.(type) {
 						case *types.ReasoningContentBlockDeltaMemberText:
 							if reasoningText := reasoningDelta.Value; reasoningText != "" {
-								// Create OpenAI-compatible streaming response with reasoning content
+								// Create OpenAI-compatible streaming response with reasoning content as separate field
 								response = &openai.ChatCompletionsStreamResponse{
 									Id:      id,
 									Object:  "chat.completion.chunk",
@@ -277,32 +260,10 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			return true
 
 		case *types.ConverseStreamOutputMemberMessageStop:
-			// Handle message stop with OpenAI-compatible response structure
-			finishReason := convertStopReason(string(v.Value.StopReason))
-			response := &openai.ChatCompletionsStreamResponse{
-				Id:      id,
-				Object:  "chat.completion.chunk",
-				Created: createdTime,
-				Model:   c.GetString(ctxkey.RequestModel),
-				Choices: []openai.ChatCompletionsStreamResponseChoice{
-					{
-						Index:        0,
-						Delta:        relaymodel.Message{},
-						FinishReason: finishReason,
-					},
-				},
-			}
-
-			jsonStr, err := json.Marshal(response)
-			if err != nil {
-				lg.Error("error marshalling final stream response", zap.Error(err))
-				return false
-			}
-			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
+			stopReason = convertStopReason(string(v.Value.StopReason))
 			return true
 
 		case *types.ConverseStreamOutputMemberMetadata:
-			// Handle metadata (usage)
 			if streamUsage := v.Value.Usage; streamUsage != nil {
 				if streamUsage.InputTokens != nil {
 					usage.PromptTokens = int(*streamUsage.InputTokens)
@@ -314,10 +275,31 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 					usage.TotalTokens = int(*streamUsage.TotalTokens)
 				}
 			}
+
+			response := &openai.ChatCompletionsStreamResponse{
+				Id:      id,
+				Object:  "chat.completion.chunk",
+				Created: createdTime,
+				Model:   c.GetString(ctxkey.RequestModel),
+				Choices: []openai.ChatCompletionsStreamResponseChoice{
+					{
+						Index:        0,
+						Delta:        relaymodel.Message{},
+						FinishReason: stopReason,
+					},
+				},
+				Usage: &usage,
+			}
+
+			jsonStr, err := json.Marshal(response)
+			if err != nil {
+				lg.Error("error marshalling final stream response", zap.Error(err))
+				return false
+			}
+			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
 			return true
 
 		default:
-			// Handle other event types
 			return true
 		}
 	})
