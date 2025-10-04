@@ -16,33 +16,39 @@ import (
 
 var _ utils.AwsAdapter = new(Adaptor)
 
-// Adaptor implements the AWS Bedrock adapter for Qwen3 Coder language models.
+// Adaptor implements the AWS Bedrock adapter for Qwen language models.
 //
 // This struct provides the core functionality for integrating with AWS Bedrock's
-// Qwen3 Coder family models, implementing the AwsAdapter interface to ensure consistent
+// complete Qwen model family, implementing the AwsAdapter interface to ensure consistent
 // behavior across all AWS Bedrock integrations in the One API system.
+//
+// Supported Models:
+//   - Qwen3 General Models: qwen3-235b (235B flagship), qwen3-32b (32B efficient)
+//   - Qwen3 Coder Models: qwen3-coder-30b (30B code-focused), qwen3-coder-480b (480B advanced)
 //
 // The adapter handles the complete request-response lifecycle:
 //   - Converting OpenAI-compatible requests to AWS Bedrock Qwen format
 //   - Processing responses from AWS Bedrock back to OpenAI-compatible format
 //   - Managing both streaming and non-streaming response modes
-//   - Handling Qwen's code-focused features including multi-language programming support
+//   - Supporting advanced reasoning capabilities with reasoning effort control
+//   - Handling Qwen Coder's code-focused features including multi-language programming support
 //   - Managing error conditions and usage tracking
-//   - Supporting Qwen's advanced tool calling capabilities for code execution
+//   - Supporting advanced tool calling capabilities for function execution
 type Adaptor struct {
 }
 
 // ConvertRequest transforms an OpenAI-compatible request into AWS Bedrock Qwen format.
 //
 // This method performs the critical translation between the One API's unified request format
-// and the specific format expected by AWS Bedrock's Qwen3 Coder models. It handles:
+// and the specific format expected by AWS Bedrock's Qwen model family. It handles:
 //
 //   - Message format conversion from OpenAI to Qwen structure
-//   - Parameter mapping and validation for Qwen's code-focused features
-//   - Tool definitions for code execution and automation
+//   - Parameter mapping and validation (temperature, top_p, max_tokens, stop sequences)
+//   - Reasoning effort control (low, medium, high) for enhanced reasoning visibility
+//   - Tool definitions for function calling and automation
 //   - Stop sequence processing for proper generation control
-//   - Context storage for downstream processing including multi-language code support
-//   - Integration with Qwen's programming capabilities and technical accuracy
+//   - Context storage for downstream processing
+//   - Integration with Qwen's advanced reasoning and programming capabilities
 //
 // Parameters:
 //   - c: Gin context for the HTTP request, used for storing converted data
@@ -54,8 +60,8 @@ type Adaptor struct {
 //   - error: Error if the request is invalid or conversion fails
 //
 // The method stores both the original model name and converted request in the context
-// for use by downstream handlers and response processors, enabling proper code-focused
-// handling with Qwen's multi-language programming and tool calling features.
+// for use by downstream handlers and response processors, enabling proper handling
+// of all Qwen model capabilities including reasoning, tool calling, and code generation.
 func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) (any, error) {
 	if request == nil {
 		return nil, errors.New("request is nil")
@@ -83,14 +89,16 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 //
 //   - Process AWS Bedrock Qwen responses in their native format
 //   - Convert responses back to OpenAI-compatible structure
-//   - Handle Qwen's code-focused conversation features and multi-language programming responses
+//   - Handle reasoning content for transparent thought process visibility
+//   - Support all Qwen model capabilities (general conversation, code generation, reasoning)
 //   - Track token usage for billing and quota management
-//   - Manage Qwen's tool calling results and code execution outputs
+//   - Manage tool calling results and function execution outputs
 //   - Handle errors and edge cases appropriately with technical reliability
 //
 // The method automatically detects the response mode (streaming vs non-streaming) based
 // on metadata and delegates to the appropriate specialized handler that understands
-// Qwen3 Coder's code generation format and programming capabilities.
+// the complete Qwen model family's response format, including advanced reasoning,
+// code generation, and tool calling capabilities.
 //
 // Parameters:
 //   - c: Gin context containing request data and used for response writing
@@ -98,11 +106,11 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 //   - meta: Request metadata including streaming flags and model information
 //
 // Returns:
-//   - usage: Token usage statistics for billing and monitoring purposes with code generation tracking
+//   - usage: Token usage statistics for billing and monitoring purposes
 //   - err: Error with HTTP status code if processing fails, nil on success
 //
 // Error conditions include network failures, AWS API errors, response parsing issues,
-// tool calling errors, code execution failures, and context cancellation scenarios.
+// tool calling errors, reasoning processing failures, and context cancellation scenarios.
 func (a *Adaptor) DoResponse(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
 	relayModeValue, exists := c.Get("relayMode")
 	if exists {
