@@ -19,6 +19,7 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/tracing"
+	"github.com/songquanpeng/one-api/relay/adaptor/aws/internal/streamfinalizer"
 	"github.com/songquanpeng/one-api/relay/adaptor/aws/utils"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
@@ -178,11 +179,23 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 
 	var usage relaymodel.Usage
 	var id string
-	var stopReason *string
+	finalizer := streamfinalizer.NewFinalizer(
+		c.GetString(ctxkey.RequestModel),
+		createdTime,
+		&usage,
+		lg,
+		func(payload []byte) bool {
+			c.Render(-1, common.CustomEvent{Data: "data: " + string(payload)})
+			return true
+		},
+	)
 
 	c.Stream(func(w io.Writer) bool {
 		event, ok := <-stream.Events()
 		if !ok {
+			if !finalizer.FinalizeOnClose() {
+				return false
+			}
 			c.Render(-1, common.CustomEvent{Data: "data: [DONE]"})
 			return false
 		}
@@ -191,6 +204,7 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 		case *types.ConverseStreamOutputMemberMessageStart:
 			// Handle message start
 			id = fmt.Sprintf("chatcmpl-oneapi-%s", tracing.GetTraceIDFromContext(c))
+			finalizer.SetID(id)
 			return true
 
 		case *types.ConverseStreamOutputMemberContentBlockDelta:
@@ -260,45 +274,10 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			return true
 
 		case *types.ConverseStreamOutputMemberMessageStop:
-			// Handle message stop with OpenAI-compatible response structure
-			stopReason = convertStopReason(string(v.Value.StopReason))
-			return true
+			return finalizer.RecordStop(convertStopReason(string(v.Value.StopReason)))
 
 		case *types.ConverseStreamOutputMemberMetadata:
-			if streamUsage := v.Value.Usage; streamUsage != nil {
-				if streamUsage.InputTokens != nil {
-					usage.PromptTokens = int(*streamUsage.InputTokens)
-				}
-				if streamUsage.OutputTokens != nil {
-					usage.CompletionTokens = int(*streamUsage.OutputTokens)
-				}
-				if streamUsage.TotalTokens != nil {
-					usage.TotalTokens = int(*streamUsage.TotalTokens)
-				}
-			}
-
-			response := &openai.ChatCompletionsStreamResponse{
-				Id:      id,
-				Object:  "chat.completion.chunk",
-				Created: createdTime,
-				Model:   c.GetString(ctxkey.RequestModel),
-				Choices: []openai.ChatCompletionsStreamResponseChoice{
-					{
-						Index:        0,
-						Delta:        relaymodel.Message{},
-						FinishReason: stopReason,
-					},
-				},
-				Usage: &usage,
-			}
-
-			jsonStr, err := json.Marshal(response)
-			if err != nil {
-				lg.Error("error marshalling final stream response", zap.Error(err))
-				return false
-			}
-			c.Render(-1, common.CustomEvent{Data: "data: " + string(jsonStr)})
-			return true
+			return finalizer.RecordMetadata(v.Value.Usage)
 
 		default:
 			// Handle other event types
