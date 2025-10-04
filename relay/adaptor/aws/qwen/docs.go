@@ -265,5 +265,5 @@
 //
 // Qwen Model Documentation:
 //   - https://aws.amazon.com/bedrock/qwen/
-//   - https://www.alibabacloud.com/help/en/model-studio/developer-reference/qwen-models
+//   - https://www.alibabacloud.com/help/en/model-studio/what-is-qwen-llm
 package aws
