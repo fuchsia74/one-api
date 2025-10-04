@@ -135,6 +135,16 @@ This repository is fully compatible with multi-agent frameworks and is recommend
 
 ## ›_ OpenCode CLI Support
 
+<p align="center">
+  <a href="https://opencode.ai">
+    <picture>
+      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
+      <img src="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
+    </picture>
+  </a>
+</p>
+
 [opencode.ai](https://opencode.ai) is a modern, open-source AI terminal that lets you automate workflows, build agentic scripts, and chat—all from your terminal. It’s a powerful and cool tool for anyone working with AI models and APIs!
 
 One‑API integrates seamlessly with this CLI: you can connect any One‑API endpoint and use all your unified models through the slick OpenCode terminal UX.
