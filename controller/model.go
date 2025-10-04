@@ -20,6 +20,7 @@ import (
 	relay "github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/apitype"
+	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	relaymodel "github.com/songquanpeng/one-api/relay/model"
@@ -175,10 +176,11 @@ type ChannelModelsDisplayInfo struct {
 
 // ModelDisplayInfo represents display information for a single model
 type ModelDisplayInfo struct {
-	InputPrice  float64 `json:"input_price"`           // Price per 1M input tokens in USD
-	OutputPrice float64 `json:"output_price"`          // Price per 1M output tokens in USD
-	MaxTokens   int32   `json:"max_tokens"`            // Maximum tokens limit, 0 means unlimited
-	ImagePrice  float64 `json:"image_price,omitempty"` // USD per image (image models only)
+	InputPrice       float64 `json:"input_price"`           // Price per 1M input tokens in USD
+	CachedInputPrice float64 `json:"cached_input_price"`    // Price per 1M cached input tokens in USD (falls back to input price when unspecified)
+	OutputPrice      float64 `json:"output_price"`          // Price per 1M output tokens in USD
+	MaxTokens        int32   `json:"max_tokens"`            // Maximum tokens limit, 0 means unlimited
+	ImagePrice       float64 `json:"image_price,omitempty"` // USD per image (image models only)
 }
 
 // GetModelsDisplay returns models available to the current user grouped by channel/adaptor with pricing information
@@ -189,6 +191,16 @@ func GetModelsDisplay(c *gin.Context) {
 	keyword := strings.ToLower(strings.TrimSpace(c.Query("keyword")))
 
 	// Helper to build pricing info map for a channel with given model names
+	convertRatioToPrice := func(r float64) float64 {
+		if r <= 0 {
+			return 0
+		}
+		if r < 0.001 {
+			return r * 1_000_000
+		}
+		return (r * 1_000_000) / ratio.QuotaPerUsd
+	}
+
 	buildChannelModels := func(channel *model.Channel, modelNames []string) map[string]ModelDisplayInfo {
 		result := make(map[string]ModelDisplayInfo)
 		// Get adaptor for this channel type (fallback to OpenAI for unsupported/custom)
@@ -224,41 +236,44 @@ func GetModelsDisplay(c *gin.Context) {
 				}
 			}
 
-			var inputPrice, outputPrice float64
+			var inputPrice, cachedInputPrice, outputPrice float64
 			var maxTokens int32
+			var imagePrice float64
 
 			if cfg, ok := pricing[actual]; ok {
 				if cfg.ImagePriceUsd > 0 && cfg.Ratio == 0 {
 					result[modelName] = ModelDisplayInfo{
-						MaxTokens:  cfg.MaxTokens,
-						ImagePrice: cfg.ImagePriceUsd,
+						MaxTokens:        cfg.MaxTokens,
+						ImagePrice:       cfg.ImagePriceUsd,
+						InputPrice:       0,
+						CachedInputPrice: 0,
 					}
 					continue
 				}
-				if cfg.Ratio < 0.001 {
-					inputPrice = cfg.Ratio * 1000000
-				} else {
-					inputPrice = (cfg.Ratio * 1000000) / 500000
+				inputPrice = convertRatioToPrice(cfg.Ratio)
+				cachedInputPrice = inputPrice
+				if cfg.CachedInputRatio != 0 {
+					cachedInputPrice = convertRatioToPrice(cfg.CachedInputRatio)
 				}
 				outputPrice = inputPrice * cfg.CompletionRatio
 				maxTokens = cfg.MaxTokens
+				imagePrice = cfg.ImagePriceUsd
 			} else {
 				inRatio := adaptor.GetModelRatio(actual)
 				compRatio := adaptor.GetCompletionRatio(actual)
-				if inRatio < 0.001 {
-					inputPrice = inRatio * 1000000
-				} else {
-					inputPrice = (inRatio * 1000000) / 500000
-				}
+				inputPrice = convertRatioToPrice(inRatio)
+				cachedInputPrice = inputPrice
 				outputPrice = inputPrice * compRatio
 				maxTokens = 0
+				imagePrice = 0
 			}
 
 			result[modelName] = ModelDisplayInfo{
-				InputPrice:  inputPrice,
-				OutputPrice: outputPrice,
-				MaxTokens:   maxTokens,
-				ImagePrice:  pricing[actual].ImagePriceUsd,
+				InputPrice:       inputPrice,
+				CachedInputPrice: cachedInputPrice,
+				OutputPrice:      outputPrice,
+				MaxTokens:        maxTokens,
+				ImagePrice:       imagePrice,
 			}
 		}
 		return result

@@ -1,14 +1,18 @@
 package gemini
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Laisky/errors/v2"
+	gmw "github.com/Laisky/gin-middlewares/v6"
+	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
@@ -308,35 +312,20 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 		StopReason: "end_turn",
 	}
 
-	// Extract usage information if available
-	if geminiResp.UsageMetadata != nil {
-		claudeResp.Usage.InputTokens = geminiResp.UsageMetadata.PromptTokenCount
-		if geminiResp.UsageMetadata.TotalTokenCount > 0 && geminiResp.UsageMetadata.PromptTokenCount > 0 {
-			claudeResp.Usage.OutputTokens = geminiResp.UsageMetadata.TotalTokenCount - geminiResp.UsageMetadata.PromptTokenCount
-		}
-	}
+	var textBuilder strings.Builder
+	var toolArgsBuilder strings.Builder
 
 	// Convert candidates to content
 	if len(geminiResp.Candidates) > 0 {
 		candidate := geminiResp.Candidates[0]
 
 		// Set stop reason based on finish reason
-		switch candidate.FinishReason {
-		case "STOP":
-			claudeResp.StopReason = "end_turn"
-		case "MAX_TOKENS":
-			claudeResp.StopReason = "max_tokens"
-		case "SAFETY":
-			claudeResp.StopReason = "stop_sequence"
-		case "RECITATION":
-			claudeResp.StopReason = "stop_sequence"
-		default:
-			claudeResp.StopReason = "end_turn"
-		}
+		claudeResp.StopReason = mapGeminiFinishReason(candidate.FinishReason)
 
 		// Convert parts to Claude content
 		for _, part := range candidate.Content.Parts {
 			if part.Text != "" {
+				textBuilder.WriteString(part.Text)
 				claudeResp.Content = append(claudeResp.Content, model.ClaudeContent{
 					Type: "text",
 					Text: part.Text,
@@ -349,6 +338,7 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 				if part.FunctionCall.Arguments != nil {
 					if argsBytes, err := json.Marshal(part.FunctionCall.Arguments); err == nil {
 						input = json.RawMessage(argsBytes)
+						toolArgsBuilder.WriteString(string(input))
 					}
 				}
 				claudeResp.Content = append(claudeResp.Content, model.ClaudeContent{
@@ -359,6 +349,27 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 				})
 			}
 		}
+	}
+
+	// Populate usage if metadata available or fall back to local estimates
+	if geminiResp.UsageMetadata != nil {
+		claudeResp.Usage.InputTokens = geminiResp.UsageMetadata.PromptTokenCount
+		if geminiResp.UsageMetadata.TotalTokenCount > 0 && geminiResp.UsageMetadata.PromptTokenCount > 0 {
+			claudeResp.Usage.OutputTokens = geminiResp.UsageMetadata.TotalTokenCount - geminiResp.UsageMetadata.PromptTokenCount
+		} else {
+			claudeResp.Usage.OutputTokens = geminiResp.UsageMetadata.CandidatesTokenCount + geminiResp.UsageMetadata.ThoughtsTokenCount
+		}
+	}
+
+	if claudeResp.Usage.InputTokens == 0 && meta.PromptTokens > 0 {
+		claudeResp.Usage.InputTokens = meta.PromptTokens
+	}
+	if claudeResp.Usage.OutputTokens == 0 {
+		completionTokens := openai.CountTokenText(textBuilder.String(), meta.ActualModelName)
+		if toolArgs := toolArgsBuilder.String(); toolArgs != "" {
+			completionTokens += openai.CountTokenText(toolArgs, meta.ActualModelName)
+		}
+		claudeResp.Usage.OutputTokens = completionTokens
 	}
 
 	// Marshal the Claude response
@@ -386,9 +397,245 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 
 // convertStreamingToClaudeResponse converts a streaming Gemini response to Claude format
 func (a *Adaptor) convertStreamingToClaudeResponse(c *gin.Context, resp *http.Response, body []byte, meta *meta.Meta) (*http.Response, *model.ErrorWithStatusCode) {
-	// For now, return an error for streaming conversion as it's more complex
-	// This can be implemented later if needed
-	return nil, openai.ErrorWrapper(errors.New("streaming Claude Messages conversion not yet implemented for Gemini"), "streaming_conversion_not_implemented", http.StatusNotImplemented)
+	lg := gmw.GetLogger(c)
+
+	scanner := bufio.NewScanner(bytes.NewReader(body))
+	scanner.Split(bufio.ScanLines)
+	buffer := make([]byte, 1024*1024)
+	scanner.Buffer(buffer, len(buffer))
+
+	var textBuilder strings.Builder
+	type toolUse struct {
+		name  string
+		input string
+	}
+	var toolUses []toolUse
+	stopReason := "end_turn"
+	promptTokens := 0
+	completionTokens := 0
+	totalTokens := 0
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "event:") {
+			// Skip explicit event annotations from upstream
+			continue
+		}
+		if !strings.HasPrefix(line, "data:") {
+			continue
+		}
+
+		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
+		if payload == "" {
+			continue
+		}
+		if payload == "[DONE]" {
+			break
+		}
+
+		var geminiResp ChatResponse
+		if err := json.Unmarshal([]byte(payload), &geminiResp); err != nil {
+			// Handle cases where payload is a quoted JSON string
+			unquoted, uerr := strconv.Unquote(payload)
+			if uerr != nil || json.Unmarshal([]byte(unquoted), &geminiResp) != nil {
+				lg.Debug("discarding unparseable Gemini stream chunk", zap.String("chunk", payload), zap.Error(err))
+				continue
+			}
+		}
+
+		if geminiResp.UsageMetadata != nil {
+			promptTokens = geminiResp.UsageMetadata.PromptTokenCount
+			completionTokens = geminiResp.UsageMetadata.CandidatesTokenCount + geminiResp.UsageMetadata.ThoughtsTokenCount
+			if geminiResp.UsageMetadata.TotalTokenCount > 0 {
+				totalTokens = geminiResp.UsageMetadata.TotalTokenCount
+			}
+		}
+
+		if len(geminiResp.Candidates) == 0 {
+			continue
+		}
+
+		candidate := geminiResp.Candidates[0]
+		if candidate.FinishReason != "" {
+			stopReason = mapGeminiFinishReason(candidate.FinishReason)
+		}
+
+		for _, part := range candidate.Content.Parts {
+			if part.Text != "" {
+				textBuilder.WriteString(part.Text)
+			}
+
+			if part.FunctionCall != nil {
+				var argStr string
+				if part.FunctionCall.Arguments != nil {
+					if bytesValue, err := json.Marshal(part.FunctionCall.Arguments); err == nil {
+						argStr = string(bytesValue)
+					}
+				}
+				toolUses = append(toolUses, toolUse{
+					name:  part.FunctionCall.FunctionName,
+					input: argStr,
+				})
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		lg.Warn("error scanning Gemini stream for Claude conversion", zap.Error(errors.Wrap(err, "scan stream")))
+	}
+
+	var toolArgsText strings.Builder
+	for _, tool := range toolUses {
+		if tool.input != "" {
+			toolArgsText.WriteString(tool.input)
+		}
+	}
+
+	textOutput := textBuilder.String()
+	if promptTokens == 0 && meta.PromptTokens > 0 {
+		promptTokens = meta.PromptTokens
+	}
+	if completionTokens == 0 {
+		completionTokens = openai.CountTokenText(textOutput, meta.ActualModelName)
+		if toolArgs := toolArgsText.String(); toolArgs != "" {
+			completionTokens += openai.CountTokenText(toolArgs, meta.ActualModelName)
+		}
+	}
+	if totalTokens == 0 && (promptTokens > 0 || completionTokens > 0) {
+		totalTokens = promptTokens + completionTokens
+	}
+
+	output := &bytes.Buffer{}
+	messageID := fmt.Sprintf("msg_%s", random.GetRandomString(29))
+	if err := writeClaudeSSEEvent(output, "message_start", map[string]any{
+		"type": "message_start",
+		"message": map[string]any{
+			"id":      messageID,
+			"type":    "message",
+			"role":    "assistant",
+			"model":   meta.ActualModelName,
+			"content": []any{},
+		},
+	}); err != nil {
+		return nil, openai.ErrorWrapper(errors.Wrap(err, "write message_start event"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+	}
+
+	index := 0
+	if textOutput != "" {
+		if err := writeClaudeSSEEvent(output, "content_block_start", map[string]any{
+			"type":  "content_block_start",
+			"index": index,
+			"content_block": map[string]any{
+				"type": "text",
+				"text": "",
+			},
+		}); err != nil {
+			return nil, openai.ErrorWrapper(errors.Wrap(err, "write text block start"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+		}
+
+		if err := writeClaudeSSEEvent(output, "content_block_delta", map[string]any{
+			"type":  "content_block_delta",
+			"index": index,
+			"delta": map[string]any{
+				"type": "text_delta",
+				"text": textOutput,
+			},
+		}); err != nil {
+			return nil, openai.ErrorWrapper(errors.Wrap(err, "write text delta"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+		}
+
+		if err := writeClaudeSSEEvent(output, "content_block_stop", map[string]any{
+			"type":  "content_block_stop",
+			"index": index,
+		}); err != nil {
+			return nil, openai.ErrorWrapper(errors.Wrap(err, "write text block stop"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+		}
+		index++
+	}
+
+	for _, tool := range toolUses {
+		toolID := fmt.Sprintf("toolu_%s", random.GetRandomString(29))
+		if err := writeClaudeSSEEvent(output, "content_block_start", map[string]any{
+			"type":  "content_block_start",
+			"index": index,
+			"content_block": map[string]any{
+				"type":  "tool_use",
+				"id":    toolID,
+				"name":  tool.name,
+				"input": map[string]any{},
+			},
+		}); err != nil {
+			return nil, openai.ErrorWrapper(errors.Wrap(err, "write tool block start"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+		}
+
+		if tool.input != "" {
+			if err := writeClaudeSSEEvent(output, "content_block_delta", map[string]any{
+				"type":  "content_block_delta",
+				"index": index,
+				"delta": map[string]any{
+					"type":         "input_json_delta",
+					"partial_json": tool.input,
+				},
+			}); err != nil {
+				return nil, openai.ErrorWrapper(errors.Wrap(err, "write tool delta"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+			}
+		}
+
+		if err := writeClaudeSSEEvent(output, "content_block_stop", map[string]any{
+			"type":  "content_block_stop",
+			"index": index,
+		}); err != nil {
+			return nil, openai.ErrorWrapper(errors.Wrap(err, "write tool block stop"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+		}
+		index++
+	}
+
+	messageDelta := map[string]any{
+		"type": "message_delta",
+		"delta": map[string]any{
+			"stop_reason":   stopReason,
+			"stop_sequence": nil,
+		},
+	}
+	if promptTokens > 0 || completionTokens > 0 || totalTokens > 0 {
+		usageData := map[string]any{
+			"input_tokens":  promptTokens,
+			"output_tokens": completionTokens,
+		}
+		if totalTokens > 0 {
+			usageData["total_tokens"] = totalTokens
+		}
+		messageDelta["usage"] = usageData
+	}
+	if err := writeClaudeSSEEvent(output, "message_delta", messageDelta); err != nil {
+		return nil, openai.ErrorWrapper(errors.Wrap(err, "write message_delta"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+	}
+
+	if err := writeClaudeSSEEvent(output, "message_stop", map[string]any{
+		"type": "message_stop",
+	}); err != nil {
+		return nil, openai.ErrorWrapper(errors.Wrap(err, "write message_stop"), "marshal_claude_stream_failed", http.StatusInternalServerError)
+	}
+
+	output.WriteString("data: [DONE]\n\n")
+
+	outBytes := output.Bytes()
+	newResp := &http.Response{
+		StatusCode:    resp.StatusCode,
+		Header:        make(http.Header, len(resp.Header)),
+		Body:          io.NopCloser(bytes.NewReader(outBytes)),
+		ContentLength: int64(len(outBytes)),
+	}
+	for k, v := range resp.Header {
+		newResp.Header[k] = append([]string(nil), v...)
+	}
+	newResp.Header.Set("Content-Type", "text/event-stream")
+	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(outBytes)))
+
+	return newResp, nil
 }
 
 func (a *Adaptor) GetModelList() []string {
@@ -397,6 +644,35 @@ func (a *Adaptor) GetModelList() []string {
 
 func (a *Adaptor) GetChannelName() string {
 	return "google gemini"
+}
+
+func mapGeminiFinishReason(reason string) string {
+	switch reason {
+	case "MAX_TOKENS":
+		return "max_tokens"
+	case "SAFETY", "RECITATION":
+		return "stop_sequence"
+	case "STOP", "":
+		return "end_turn"
+	default:
+		return "end_turn"
+	}
+}
+
+func writeClaudeSSEEvent(buf *bytes.Buffer, event string, payload any) error {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return errors.Wrap(err, "marshal Claude SSE payload")
+	}
+	if event != "" {
+		buf.WriteString("event: ")
+		buf.WriteString(event)
+		buf.WriteString("\n")
+	}
+	buf.WriteString("data: ")
+	buf.Write(data)
+	buf.WriteString("\n\n")
+	return nil
 }
 
 // Pricing methods - Gemini adapter manages its own model pricing

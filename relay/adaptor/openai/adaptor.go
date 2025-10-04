@@ -125,7 +125,8 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		if requestPath == "/v1/messages" {
 			// For OpenAI channels, check if the model should use Response API
 			if meta.ChannelType == channeltype.OpenAI &&
-				!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+				!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+				!meta.ResponseAPIFallback {
 				responseAPIPath := "/v1/responses"
 				return GetFullRequestURL(meta.BaseURL, responseAPIPath, meta.ChannelType), nil
 			}
@@ -136,7 +137,8 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 
 		if meta.ChannelType == channeltype.OpenAI &&
 			(meta.Mode == relaymode.ChatCompletions || meta.Mode == relaymode.ClaudeMessages) &&
-			!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+			!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+			!meta.ResponseAPIFallback {
 			responseAPIPath := "/v1/responses"
 			return GetFullRequestURL(meta.BaseURL, responseAPIPath, meta.ChannelType), nil
 		}
@@ -189,7 +191,8 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
 		meta.ChannelType == channeltype.OpenAI &&
-		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+		!meta.ResponseAPIFallback {
 		responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
 		logConvertedRequest(c, meta, relayMode, responseAPIRequest)
 		return responseAPIRequest, nil
@@ -372,6 +375,10 @@ func ensureWebSearchTool(request *model.GeneralOpenAIRequest) {
 
 // applyRequestTransformations applies the existing request transformations
 func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.GeneralOpenAIRequest) error {
+	if meta != nil {
+		meta.EnsureActualModelName(request.Model)
+	}
+
 	switch meta.ChannelType {
 	case channeltype.OpenRouter:
 		includeReasoning := true
@@ -410,12 +417,25 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		request.MaxCompletionTokens = &defaultMaxCompletionTokens
 	}
 
+	actualModel := meta.ActualModelName
+	if strings.TrimSpace(actualModel) == "" {
+		actualModel = request.Model
+	}
+
 	// o1/o3/o4/gpt-5 do not support system prompt/temperature variations
-	if isModelSupportedReasoning(meta.ActualModelName) {
-		temperature := float64(1)
-		request.Temperature = &temperature // Only the default (1) value is supported
+	if isModelSupportedReasoning(actualModel) {
+		targetsResponseAPI := meta.Mode == relaymode.ResponseAPI ||
+			(meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(actualModel))
+
+		if targetsResponseAPI {
+			request.Temperature = nil
+		} else {
+			temperature := float64(1)
+			request.Temperature = &temperature // Only the default (1) value is supported
+		}
+
 		request.TopP = nil
-		request.ReasoningEffort = normalizeReasoningEffortForModel(meta.ActualModelName, request.ReasoningEffort)
+		request.ReasoningEffort = normalizeReasoningEffortForModel(actualModel, request.ReasoningEffort)
 
 		request.Messages = func(raw []model.Message) (filtered []model.Message) {
 			for i := range raw {
@@ -429,7 +449,7 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	}
 
 	// web search models do not support system prompt/max_tokens/temperature overrides
-	if isWebSearchModel(meta.ActualModelName) {
+	if isWebSearchModel(actualModel) {
 		request.Temperature = nil
 		request.TopP = nil
 		request.PresencePenalty = nil
@@ -437,10 +457,7 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		request.FrequencyPenalty = nil
 	}
 
-	modelName := meta.ActualModelName
-	if strings.TrimSpace(modelName) == "" {
-		modelName = request.Model
-	}
+	modelName := actualModel
 
 	if isDeepResearchModel(modelName) {
 		ensureWebSearchTool(request)
@@ -642,7 +659,8 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 
 	// For OpenAI adaptor, check if we should convert to Response API format
 	meta := meta.GetByContext(c)
-	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) {
+	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
+		!meta.ResponseAPIFallback {
 		// Apply transformations first
 		if err := a.applyRequestTransformations(meta, openaiRequest); err != nil {
 			return nil, errors.Wrap(err, "apply request transformations for Claude conversion")

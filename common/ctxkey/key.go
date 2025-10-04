@@ -204,6 +204,11 @@ const (
 	// downstream converters can hydrate metadata when rewriting responses.
 	ResponseAPIRequestOriginal = "response_api_request_original"
 
+	// ResponseStreamRewriteHandler stores a streaming rewrite adapter that can transform
+	// upstream chat completion SSE chunks into another streaming format (e.g., Response API)
+	// before flushing them to the client.
+	ResponseStreamRewriteHandler = "response_stream_rewrite_handler"
+
 	// ResponseFormat is used by image APIs to carry desired output format when posted via JSON.
 	// Set in: image controller from request payload.
 	// Read in: image controller to format the response properly.

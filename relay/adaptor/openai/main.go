@@ -53,6 +53,13 @@ func StreamHandler(c *gin.Context, resp *http.Response, relayMode int) (*model.E
 	reasoningText := ""
 	var usage *model.Usage
 
+	var streamRewriter openai_compatible.StreamRewriteHandler
+	if rewriteAny, exists := c.Get(ctxkey.ResponseStreamRewriteHandler); exists {
+		if rewriter, ok := rewriteAny.(openai_compatible.StreamRewriteHandler); ok {
+			streamRewriter = rewriter
+		}
+	}
+
 	// Set up scanner for reading the stream line by line
 	scanner := bufio.NewScanner(resp.Body)
 	buffer := make([]byte, 1024*1024) // 1MB buffer for large messages
@@ -96,6 +103,15 @@ streamLoop:
 
 		// Check for stream termination
 		if strings.HasPrefix(data[dataPrefixLength:], done) {
+			if streamRewriter != nil {
+				handled, handledDone := streamRewriter.HandleUpstreamDone(c)
+				if handled {
+					if handledDone {
+						doneRendered = true
+					}
+					continue
+				}
+			}
 			render.StringData(c, data)
 			doneRendered = true
 			continue
@@ -104,7 +120,7 @@ streamLoop:
 		// Process based on relay mode
 		switch relayMode {
 		case relaymode.ChatCompletions:
-			var streamResponse ChatCompletionsStreamResponse
+			var streamResponse openai_compatible.ChatCompletionsStreamResponse
 
 			// Parse the JSON response
 			err := json.Unmarshal([]byte(data[dataPrefixLength:]), &streamResponse)
@@ -159,8 +175,20 @@ streamLoop:
 				}
 			}
 
-			// Send the processed data to the client
-			render.StringData(c, data)
+			handledByRewriter := false
+			if streamRewriter != nil {
+				if handled, handledDone := streamRewriter.HandleChunk(c, &streamResponse); handled {
+					handledByRewriter = true
+					if handledDone {
+						doneRendered = true
+					}
+				}
+			}
+
+			if !handledByRewriter {
+				// Send the processed data to the client
+				render.StringData(c, data)
+			}
 
 			// Update usage information if available
 			if streamResponse.Usage != nil {
@@ -168,6 +196,10 @@ streamLoop:
 				if tracker != nil {
 					tracker.UpdateFinalUsage(streamResponse.Usage)
 				}
+			}
+
+			if handledByRewriter {
+				continue
 			}
 
 		case relaymode.Completions:
@@ -207,8 +239,20 @@ streamLoop:
 	}
 
 	// Ensure stream termination is sent to client
-	if !doneRendered {
+	if streamRewriter != nil {
+		streamRewriter.FinalizeUsage(usage)
+		handled, handledDone := streamRewriter.HandleDone(c)
+		if handled {
+			if handledDone {
+				doneRendered = true
+			}
+		} else if !doneRendered {
+			render.Done(c)
+			doneRendered = true
+		}
+	} else if !doneRendered {
 		render.Done(c)
+		doneRendered = true
 	}
 
 	// Clean up resources

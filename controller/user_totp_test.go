@@ -58,8 +58,8 @@ func setupTestEnvironment(t *testing.T) (*gorm.DB, func()) {
 	common.UsingSQLite = true
 
 	// Disable Redis for testing to use memory-based rate limiting
-	originalRedisEnabled := common.RedisEnabled
-	common.RedisEnabled = false
+	originalRedisEnabled := common.IsRedisEnabled()
+	common.SetRedisEnabled(false)
 
 	// Create a test user for TOTP tests
 	testUser := &model.User{
@@ -82,7 +82,7 @@ func setupTestEnvironment(t *testing.T) (*gorm.DB, func()) {
 		model.DB = originalDB
 		model.LOG_DB = originalLogDB
 		common.UsingSQLite = originalUsingSQLite
-		common.RedisEnabled = originalRedisEnabled
+		common.SetRedisEnabled(originalRedisEnabled)
 	}
 
 	return testDB, cleanup

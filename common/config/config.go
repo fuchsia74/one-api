@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/songquanpeng/one-api/common/env"
@@ -37,6 +38,8 @@ func init() {
 		hashed := sha256.Sum256([]byte(SessionSecret))
 		SessionSecret = base64.StdEncoding.EncodeToString(hashed[:32])
 	}
+
+	logConsumeEnabled.Store(true)
 }
 
 var SystemName = "One API"
@@ -98,7 +101,7 @@ var DebugEnabled = strings.ToLower(os.Getenv("DEBUG")) == "true"
 var DebugSQLEnabled = strings.ToLower(os.Getenv("DEBUG_SQL")) == "true"
 var MemoryCacheEnabled = strings.ToLower(os.Getenv("MEMORY_CACHE_ENABLED")) == "true"
 
-var LogConsumeEnabled = true
+var logConsumeEnabled atomic.Bool
 
 var SMTPServer = ""
 var SMTPPort = 587
@@ -241,3 +244,13 @@ var OpenrouterProviderSort = env.String("OPENROUTER_PROVIDER_SORT", "")
 var DefaultMaxToken = env.Int("DEFAULT_MAX_TOKEN", 2048)
 
 var DefaultUseMinMaxTokensModel = env.Bool("DEFAULT_USE_MIN_MAX_TOKENS_MODEL", false)
+
+// IsLogConsumeEnabled reports whether consumption logging is enabled.
+func IsLogConsumeEnabled() bool {
+	return logConsumeEnabled.Load()
+}
+
+// SetLogConsumeEnabled toggles consumption logging in a concurrency-safe way.
+func SetLogConsumeEnabled(enabled bool) {
+	logConsumeEnabled.Store(enabled)
+}

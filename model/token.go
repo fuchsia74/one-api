@@ -91,7 +91,7 @@ func (t Token) MarshalJSON() ([]byte, error) {
 }
 
 func clearTokenCache(key string) {
-	if common.RedisEnabled {
+	if common.IsRedisEnabled() {
 		err := common.RedisDel(fmt.Sprintf("token:%s", key))
 		if err != nil {
 			logger.Logger.Warn("failed to clear token cache, continuing", zap.String("key", key), zap.Error(err))
@@ -176,7 +176,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 		return nil, errors.Errorf("token %s (#%d) status is not available (status: %d)", token.Name, token.Id, token.Status)
 	}
 	if token.ExpiredTime != -1 && token.ExpiredTime < helper.GetTimestamp() {
-		if !common.RedisEnabled {
+		if !common.IsRedisEnabled() {
 			token.Status = TokenStatusExpired
 			err := token.SelectUpdate()
 			if err != nil {
@@ -193,7 +193,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 		return nil, errors.Errorf("token %s (#%d) has expired at timestamp %d", token.Name, token.Id, token.ExpiredTime)
 	}
 	if !token.UnlimitedQuota && token.RemainQuota <= 0 {
-		if !common.RedisEnabled {
+		if !common.IsRedisEnabled() {
 			// in this case, we can make sure the token is exhausted
 			token.Status = TokenStatusExhausted
 			err := token.SelectUpdate()

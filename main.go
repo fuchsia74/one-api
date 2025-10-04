@@ -86,7 +86,7 @@ func main() {
 
 	// Initialize options
 	model.InitOptionMap()
-	if common.RedisEnabled {
+	if common.IsRedisEnabled() {
 		// for compatibility with old versions
 		config.MemoryCacheEnabled = true
 	}
@@ -128,7 +128,7 @@ func main() {
 		}
 
 		// Initialize Redis monitoring if enabled
-		if common.RedisEnabled {
+		if common.IsRedisEnabled() {
 			common.InitPrometheusRedisMonitoring()
 		}
 	}

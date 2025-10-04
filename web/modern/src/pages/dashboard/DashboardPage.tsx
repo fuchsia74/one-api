@@ -325,25 +325,38 @@ export function DashboardPage() {
     // defer fetch until user clicks Apply/Refresh to avoid surprise reloads
   }
 
-  // Build time-series by day totals
-  const days = useMemo(() => Array.from(new Set(rows.map(r => r.day))).sort(), [rows])
-  const timeSeries = useMemo(() => {
-    // Aggregate across models per day
-    const quotaPerUnit = getQuotaPerUnit()
+  // Aggregate daily metrics (quota kept in raw units to avoid double conversion)
+  const dailyAgg = useMemo(() => {
     const map: Record<string, { date: string; requests: number; quota: number; tokens: number }> = {}
     for (const r of rows) {
-      if (!map[r.day]) map[r.day] = { date: r.day, requests: 0, quota: 0, tokens: 0 }
+      if (!map[r.day]) {
+        map[r.day] = { date: r.day, requests: 0, quota: 0, tokens: 0 }
+      }
       map[r.day].requests += r.request_count || 0
-      map[r.day].quota += (r.quota || 0) / quotaPerUnit // Convert to USD
+      map[r.day].quota += r.quota || 0
       map[r.day].tokens += (r.prompt_tokens || 0) + (r.completion_tokens || 0)
     }
     return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
   }, [rows])
 
+  const days = useMemo(() => dailyAgg.map(d => d.date), [dailyAgg])
+
+  const timeSeries = useMemo(() => {
+    const quotaPerUnit = getQuotaPerUnit()
+    const displayInCurrency = getDisplayInCurrency()
+    return dailyAgg.map(day => ({
+      date: day.date,
+      requests: day.requests,
+      quota: displayInCurrency ? day.quota / quotaPerUnit : day.quota,
+      tokens: day.tokens,
+    }))
+  }, [dailyAgg])
+
   // Model stacked bar per day - supports different metrics
   const uniqueModels = useMemo(() => Array.from(new Set(rows.map(r => r.model_name))), [rows])
   const stackedData = useMemo(() => {
     const quotaPerUnit = getQuotaPerUnit()
+    const displayInCurrency = getDisplayInCurrency()
     const map: Record<string, Record<string, number>> = {}
     for (const d of days) map[d] = {}
     for (const r of rows) {
@@ -353,7 +366,10 @@ export function DashboardPage() {
           value = r.request_count || 0
           break
         case 'expenses':
-          value = (r.quota || 0) / quotaPerUnit
+          value = r.quota || 0
+          if (displayInCurrency) {
+            value = value / quotaPerUnit
+          }
           break
         case 'tokens':
         default:
@@ -375,20 +391,8 @@ export function DashboardPage() {
   ]
 
   // Summaries & insights
-  const dailyAgg = useMemo(() => {
-    const quotaPerUnit = getQuotaPerUnit()
-    const m: Record<string, { date: string; requests: number; quota: number; tokens: number }> = {}
-    for (const r of rows) {
-      if (!m[r.day]) m[r.day] = { date: r.day, requests: 0, quota: 0, tokens: 0 }
-      m[r.day].requests += r.request_count || 0
-      m[r.day].quota += (r.quota || 0) / quotaPerUnit // Convert to USD
-      m[r.day].tokens += (r.prompt_tokens || 0) + (r.completion_tokens || 0)
-    }
-    return Object.values(m).sort((a, b) => a.date.localeCompare(b.date))
-  }, [rows])
-
-  const todayAgg = dailyAgg.length ? dailyAgg[dailyAgg.length - 1] : { requests: 0, quota: 0, tokens: 0 }
-  const prevAgg = dailyAgg.length > 1 ? dailyAgg[dailyAgg.length - 2] : { requests: 0, quota: 0, tokens: 0 }
+  const todayAgg = dailyAgg.length ? dailyAgg[dailyAgg.length - 1] : { date: '', requests: 0, quota: 0, tokens: 0 }
+  const prevAgg = dailyAgg.length > 1 ? dailyAgg[dailyAgg.length - 2] : { date: '', requests: 0, quota: 0, tokens: 0 }
   const pct = (cur: number, prev: number) => (prev > 0 ? ((cur - prev) / prev) * 100 : 0)
   const requestTrend = pct(todayAgg.requests, prevAgg.requests)
   const quotaTrend = pct(todayAgg.quota, prevAgg.quota)
@@ -439,8 +443,10 @@ export function DashboardPage() {
 
   // Performance metrics calculations (similar to default dashboard)
   const performanceMetrics = useMemo(() => {
+    const quotaPerUnit = getQuotaPerUnit()
+    const quotaInCurrency = todayAgg.quota / quotaPerUnit
     const avgTokensPerRequest = todayAgg.requests ? todayAgg.tokens / todayAgg.requests : 0
-    const avgCostPerRequest = todayAgg.requests ? todayAgg.quota / todayAgg.requests : 0 // quota is already in USD
+    const avgCostPerRequest = todayAgg.requests ? quotaInCurrency / todayAgg.requests : 0
 
     // Simulate avgResponseTime based on token count (in real implementation, this would come from backend)
     const avgResponseTime = todayAgg.requests > 0 ?
@@ -506,8 +512,8 @@ export function DashboardPage() {
 
     // Monthly spending projection
     const quotaPerUnit = getQuotaPerUnit()
-    const avgDailyQuota = dailyAgg.length ? (dailyAgg.reduce((s, d) => s + d.quota, 0) / dailyAgg.length) : 0
-    const avgDailySpending = avgDailyQuota / quotaPerUnit
+    const avgDailyQuotaRaw = dailyAgg.length ? (dailyAgg.reduce((s, d) => s + d.quota, 0) / dailyAgg.length) : 0
+    const avgDailySpending = avgDailyQuotaRaw / quotaPerUnit
     const monthlyProjection = avgDailySpending * 30
 
     if (monthlyProjection > 100) {
@@ -940,7 +946,9 @@ export function DashboardPage() {
                     case 'requests':
                       return formatNumber(value)
                     case 'expenses':
-                      return renderQuota(value, 2)
+                      return getDisplayInCurrency()
+                        ? `$${Number(value).toFixed(2)}`
+                        : formatNumber(value)
                     case 'tokens':
                     default:
                       return formatNumber(value)
@@ -961,7 +969,9 @@ export function DashboardPage() {
                         case 'requests':
                           return formatNumber(value)
                         case 'expenses':
-                          return renderQuota(value, 6)
+                          return getDisplayInCurrency()
+                            ? `$${value.toFixed(6)}`
+                            : formatNumber(value)
                         case 'tokens':
                         default:
                           return formatNumber(value)

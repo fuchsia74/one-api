@@ -6,6 +6,33 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 
 ![](https://s3.laisky.com/uploads/2025/07/oneapi.drawio.png)
 
+```plain
+=== One-API Regression Report ===
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│       MODEL        │ CHAT (STREAM=FALSE) │ CHAT (STREAM=TRUE) │ RESPONSE (STREAM=FALSE) │ RESPONSE (STREAM=TRUE) │ CLAUDE (STREAM=FALSE) │ CLAUDE (STREAM=TRUE) │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│ gpt-4o-mini        │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
+│                    │ 1.475s              │ 1.502s             │ 1.591s                  │ 1.115s                 │ 931ms                 │ 1.238s               │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│ gpt-5-mini         │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
+│                    │ 3.758s              │ 3.788s             │ 4.185s                  │ 7.194s                 │ 9.529s                │ 6.999s               │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│ claude-3.5-haiku   │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
+│                    │ 987ms               │ 693ms              │ 1.016s                  │ 773ms                  │ 1.266s                │ 704ms                │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│ gemini-2.5-flash   │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
+│                    │ 957ms               │ 913ms              │ 1.519s                  │ 1.369s                 │ 1.173s                │ 1.567s               │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│ openai/gpt-oss-20b │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
+│                    │ 625ms               │ 338ms              │ 476ms                   │ 506ms                  │ 567ms                 │ 537ms                │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+│ deepseek-chat      │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
+│                    │ 2.679s              │ 1.326s             │ 2.444s                  │ 1.251s                 │ 1.969s                │ 3.627s               │
+│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+
+Totals  | Requests: 36 | Passed: 36 | Failed: 0 | Skipped: 0
+```
+
 ### Why this fork exists
 
 The original author stopped maintaining the project, leaving critical PRs and new features unaddressed. As a long‑time contributor, I’ve forked the repository and rebuilt the core to keep the ecosystem alive and evolving.
@@ -62,6 +89,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support OpenAI Response API](#support-openai-response-api)
       - [Support gpt-5 family](#support-gpt-5-family)
       - [Support o3-deep-research \& o4-mini-deep-research](#support-o3-deep-research--o4-mini-deep-research)
+      - [Support Codex Cli](#support-codex-cli)
     - [Anthropic (Claude) Features](#anthropic-claude-features)
       - [(Merged) Support aws claude](#merged-support-aws-claude)
       - [Support claude-3-7-sonnet \& thinking](#support-claude-3-7-sonnet--thinking)
@@ -316,6 +344,32 @@ gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex
 #### Support o3-deep-research & o4-mini-deep-research
 
 ![](https://s3.laisky.com/uploads/2025/09/o4-mini-deep-research.png)
+
+#### Support Codex Cli
+
+```sh
+# vi $HOME/.codex/config.toml
+
+model = "gemini-2.5-flash"
+model_provider = "laisky"
+
+[model_providers.laisky]
+# Name of the provider that will be displayed in the Codex UI.
+name = "Laisky"
+# The path `/chat/completions` will be amended to this URL to make the POST
+# request for the chat completions.
+base_url = "https://oneapi.laisky.com/v1"
+# If `env_key` is set, identifies an environment variable that must be set when
+# using Codex with this provider. The value of the environment variable must be
+# non-empty and will be used in the `Bearer TOKEN` HTTP header for the POST request.
+env_key = "sk-xxxxxxx"
+# Valid values for wire_api are "chat" and "responses". Defaults to "chat" if omitted.
+wire_api = "responses"
+# If necessary, extra query params that need to be added to the URL.
+# See the Azure example below.
+query_params = {}
+
+```
 
 ### Anthropic (Claude) Features
 

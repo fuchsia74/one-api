@@ -34,7 +34,7 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 		keyCol = `"key"`
 	}
 	var token Token
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		if DB == nil {
 			return nil, errors.New("database not initialized")
 		}
@@ -74,7 +74,7 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 }
 
 func CacheGetUserGroup(id int) (group string, err error) {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return GetUserGroup(id)
 	}
 	group, err = common.RedisGet(fmt.Sprintf("user_group:%d", id))
@@ -107,7 +107,7 @@ func fetchAndUpdateUserQuota(ctx context.Context, id int) (quota int64, err erro
 }
 
 func CacheGetUserQuota(ctx context.Context, id int) (quota int64, err error) {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return GetUserQuota(id)
 	}
 	quotaString, err := common.RedisGet(fmt.Sprintf("user_quota:%d", id))
@@ -126,7 +126,7 @@ func CacheGetUserQuota(ctx context.Context, id int) (quota int64, err error) {
 }
 
 func CacheUpdateUserQuota(ctx context.Context, id int) error {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return nil
 	}
 	quota, err := CacheGetUserQuota(ctx, id)
@@ -141,7 +141,7 @@ func CacheUpdateUserQuota(ctx context.Context, id int) error {
 }
 
 func CacheDecreaseUserQuota(id int, quota int64) error {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return nil
 	}
 	err := common.RedisDecrease(fmt.Sprintf("user_quota:%d", id), int64(quota))
@@ -152,7 +152,7 @@ func CacheDecreaseUserQuota(id int, quota int64) error {
 }
 
 func CacheIsUserEnabled(userId int) (bool, error) {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return IsUserEnabled(userId)
 	}
 	enabled, err := common.RedisGet(fmt.Sprintf("user_enabled:%d", userId))
@@ -182,7 +182,7 @@ func CacheIsUserEnabled(userId int) (bool, error) {
 //
 // Deprecated: use CacheGetGroupModelsV2 instead
 func CacheGetGroupModels(ctx context.Context, group string) (models []string, err error) {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return GetGroupModels(ctx, group)
 	}
 	modelsStr, err := common.RedisGet(fmt.Sprintf("group_models:%s", group))
@@ -202,7 +202,7 @@ func CacheGetGroupModels(ctx context.Context, group string) (models []string, er
 
 // CacheGetGroupModelsV2 is a version of CacheGetGroupModels that returns EnabledAbility instead of string
 func CacheGetGroupModelsV2(ctx context.Context, group string) (models []EnabledAbility, err error) {
-	if !common.RedisEnabled {
+	if !common.IsRedisEnabled() {
 		return GetGroupModelsV2(ctx, group)
 	}
 	modelsStr, err := common.RedisGet(fmt.Sprintf("group_models_v2:%s", group))
