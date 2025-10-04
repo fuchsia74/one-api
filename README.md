@@ -141,6 +141,8 @@ One‑API integrates seamlessly with this CLI: you can connect any One‑API end
 
 To get started, create or edit `.opencode/config.json` like this:
 
+**Using OpenAI SDK:**
+
 ```json
 {
   "$schema": "https://opencode.ai/config.json",
@@ -155,6 +157,29 @@ To get started, create or edit `.opencode/config.json` like this:
       "models": {
         "gpt-4.1-2025-04-14": {
           "name": "GPT 4.1"
+        }
+      }
+    }
+  }
+}
+```
+
+**Using Anthropic SDK:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api-anthropic": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "One API (Anthropic)",
+      "options": {
+        "baseURL": "http://localhost:3000/v1",
+        "apiKey":  "HANDLE_APIKEY_HERE"
+      },
+      "models": {
+        "claude-sonnet-4-5": {
+          "name": "Claude Sonnet 4.5"
         }
       }
     }
