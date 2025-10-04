@@ -429,7 +429,7 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsFunctions:           false, // Qwen doesn't support OpenAI functions
 			SupportsLogprobs:            false,
 			SupportsResponseFormat:      false,
-			SupportsReasoningEffort:     false,
+			SupportsReasoningEffort:     true,
 			SupportsModalities:          false,
 			SupportsAudio:               false,
 			SupportsWebSearch:           false,
