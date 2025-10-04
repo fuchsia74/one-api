@@ -41,7 +41,7 @@ func InitOptionMap() {
 	config.OptionMap["AutomaticDisableChannelEnabled"] = strconv.FormatBool(config.AutomaticDisableChannelEnabled)
 	config.OptionMap["AutomaticEnableChannelEnabled"] = strconv.FormatBool(config.AutomaticEnableChannelEnabled)
 	config.OptionMap["ApproximateTokenEnabled"] = strconv.FormatBool(config.ApproximateTokenEnabled)
-	config.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(config.LogConsumeEnabled)
+	config.OptionMap["LogConsumeEnabled"] = strconv.FormatBool(config.IsLogConsumeEnabled())
 	config.OptionMap["DisplayInCurrencyEnabled"] = strconv.FormatBool(config.DisplayInCurrencyEnabled)
 	config.OptionMap["DisplayTokenStatEnabled"] = strconv.FormatBool(config.DisplayTokenStatEnabled)
 	config.OptionMap["ChannelDisableThreshold"] = strconv.FormatFloat(config.ChannelDisableThreshold, 'f', -1, 64)
@@ -153,7 +153,7 @@ func updateOptionMap(key string, value string) (err error) {
 		case "ApproximateTokenEnabled":
 			config.ApproximateTokenEnabled = boolValue
 		case "LogConsumeEnabled":
-			config.LogConsumeEnabled = boolValue
+			config.SetLogConsumeEnabled(boolValue)
 		case "DisplayInCurrencyEnabled":
 			config.DisplayInCurrencyEnabled = boolValue
 		case "DisplayTokenStatEnabled":

@@ -19,6 +19,8 @@ import (
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/model"
+	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 )
 
@@ -28,10 +30,10 @@ func setupModelsDisplayTestEnv(t *testing.T) {
 	anonymousModelsDisplayCache = gutils.NewExpCache[map[string]ChannelModelsDisplayInfo](context.Background(), time.Minute)
 	anonymousModelsDisplayGroup = singleflight.Group{}
 
-	originalRedisEnabled := common.RedisEnabled
-	common.RedisEnabled = false
+	originalRedisEnabled := common.IsRedisEnabled()
+	common.SetRedisEnabled(false)
 	t.Cleanup(func() {
-		common.RedisEnabled = originalRedisEnabled
+		common.SetRedisEnabled(originalRedisEnabled)
 	})
 
 	originalSQLitePath := common.SQLitePath
@@ -161,6 +163,36 @@ func TestGetModelsDisplay_AnonymousUsesConfiguredModels(t *testing.T) {
 			t.Fatalf("unexpected model present: %s", modelName)
 		}
 	}
+
+	convertRatioToPrice := func(r float64) float64 {
+		if r <= 0 {
+			return 0
+		}
+		if r < 0.001 {
+			return r * 1_000_000
+		}
+		return (r * 1_000_000) / ratio.QuotaPerUsd
+	}
+
+	gpt35 := info.Models["gpt-3.5-turbo"]
+	gpt35Cfg := openai.ModelRatios["gpt-3.5-turbo"]
+	expected35Input := convertRatioToPrice(gpt35Cfg.Ratio)
+	require.InDelta(t, expected35Input, gpt35.InputPrice, 1e-6)
+	expected35Cached := expected35Input
+	if gpt35Cfg.CachedInputRatio != 0 {
+		expected35Cached = convertRatioToPrice(gpt35Cfg.CachedInputRatio)
+	}
+	require.InDelta(t, expected35Cached, gpt35.CachedInputPrice, 1e-6)
+
+	gpt4o := info.Models["gpt-4o-mini"]
+	gpt4oCfg := openai.ModelRatios["gpt-4o-mini"]
+	expected4oInput := convertRatioToPrice(gpt4oCfg.Ratio)
+	require.InDelta(t, expected4oInput, gpt4o.InputPrice, 1e-6)
+	expected4oCached := expected4oInput
+	if gpt4oCfg.CachedInputRatio != 0 {
+		expected4oCached = convertRatioToPrice(gpt4oCfg.CachedInputRatio)
+	}
+	require.InDelta(t, expected4oCached, gpt4o.CachedInputPrice, 1e-6)
 }
 
 // TestGetModelsDisplay_LoggedInFiltersUnsupportedModels ensures logged-in users don't see models outside their allowed set

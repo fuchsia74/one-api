@@ -83,6 +83,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if request.ReasoningEffort != nil {
 		request.ReasoningEffort = nil
 	}
+
+	request.TopK = nil // Groq does not support TopK
+
 	return request, nil
 }
 

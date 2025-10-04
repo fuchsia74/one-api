@@ -5,9 +5,12 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Info } from 'lucide-react'
 
 interface ModelData {
   input_price: number
+  cached_input_price?: number
   output_price: number
   max_tokens: number
   image_price?: number
@@ -130,6 +133,7 @@ export function ModelsPage() {
     const models = Object.keys(channelInfo.models).map(modelName => ({
       model: modelName,
       inputPrice: channelInfo.models[modelName].input_price,
+      cachedInputPrice: channelInfo.models[modelName].cached_input_price ?? channelInfo.models[modelName].input_price,
       outputPrice: channelInfo.models[modelName].output_price,
       maxTokens: channelInfo.models[modelName].max_tokens,
       imagePrice: channelInfo.models[modelName].image_price,
@@ -149,19 +153,39 @@ export function ModelsPage() {
                 <tr className="border-b">
                   <th className="text-left py-2 px-3 font-medium">Model</th>
                   <th className="text-left py-2 px-3 font-medium">Input Price (per 1M tokens)</th>
-                  <th className="text-left py-2 px-3 font-medium">Output Price (per 1M tokens)</th>
+                  <th className="text-left py-2 px-3 font-medium">Cached Input Price</th>
+                  <th className="text-left py-2 px-3 font-medium">Output Price</th>
                   <th className="text-left py-2 px-3 font-medium">Image Price (per image)</th>
-                  <th className="text-left py-2 px-3 font-medium">Max Tokens</th>
+                  <th className="text-left py-2 px-3 font-medium">
+                    <span className="inline-flex items-center gap-1">
+                      Max Tokens
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex items-center text-muted-foreground hover:text-foreground focus:outline-none"
+                            aria-label="What does max tokens mean?"
+                          >
+                            <Info className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top" align="start" className="max-w-xs text-sm">
+                          Maximum total tokens this channel allows per request for the model, including prompt and completion tokens. A value of 0 means the provider does not advertise a fixed limit.
+                        </TooltipContent>
+                      </Tooltip>
+                    </span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {models.map(model => (
                   <tr key={model.model} className="border-b hover:bg-muted/50">
-                    <td className="py-2 px-3 font-mono text-sm">{model.model}</td>
-                    <td className="py-2 px-3">{formatPrice(model.inputPrice)}</td>
-                    <td className="py-2 px-3">{formatPrice(model.outputPrice)}</td>
-                    <td className="py-2 px-3">{model.imagePrice && model.imagePrice > 0 ? formatPrice(model.imagePrice) : '-'}</td>
-                    <td className="py-2 px-3">{formatMaxTokens(model.maxTokens)}</td>
+                    <td className="py-2 px-3 font-mono text-sm" data-label="Model">{model.model}</td>
+                    <td className="py-2 px-3" data-label="Input Price">{formatPrice(model.inputPrice)}</td>
+                    <td className="py-2 px-3" data-label="Cached Input Price">{formatPrice(model.cachedInputPrice)}</td>
+                    <td className="py-2 px-3" data-label="Output Price">{formatPrice(model.outputPrice)}</td>
+                    <td className="py-2 px-3" data-label="Image Price">{model.imagePrice && model.imagePrice > 0 ? formatPrice(model.imagePrice) : '-'}</td>
+                    <td className="py-2 px-3" data-label="Max Tokens">{formatMaxTokens(model.maxTokens)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -192,64 +216,66 @@ export function ModelsPage() {
   const channelOptions = Object.keys(modelsData).sort()
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Supported Models</CardTitle>
-          <CardDescription>
-            Browse all models supported by the server, grouped by channel/adaptor with pricing information.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <div className="md:col-span-1">
-              <Input
-                placeholder="Search models..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="md:col-span-1">
-              <div className="flex flex-wrap gap-2">
-                {channelOptions.map(channelName => (
-                  <Badge
-                    key={channelName}
-                    variant={selectedChannels.includes(channelName) ? "default" : "outline"}
-                    className="cursor-pointer"
-                    onClick={() => toggleChannelFilter(channelName)}
-                  >
-                    {formatChannelName(channelName)} ({Object.keys(modelsData[channelName].models).length})
-                  </Badge>
-                ))}
+    <TooltipProvider delayDuration={150}>
+      <div className="container mx-auto px-4 py-8">
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Supported Models</CardTitle>
+            <CardDescription>
+              Browse all models supported by the server, grouped by channel/adaptor with pricing information.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="md:col-span-1">
+                <Input
+                  placeholder="Search models..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="md:col-span-1">
+                <div className="flex flex-wrap gap-2">
+                  {channelOptions.map(channelName => (
+                    <Badge
+                      key={channelName}
+                      variant={selectedChannels.includes(channelName) ? "default" : "outline"}
+                      className="cursor-pointer"
+                      onClick={() => toggleChannelFilter(channelName)}
+                    >
+                      {formatChannelName(channelName)} ({Object.keys(modelsData[channelName].models).length})
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-1">
+                <Button variant="outline" onClick={clearFilters} className="w-full">
+                  Clear Filters
+                </Button>
               </div>
             </div>
-            <div className="md:col-span-1">
-              <Button variant="outline" onClick={clearFilters} className="w-full">
-                Clear Filters
-              </Button>
-            </div>
-          </div>
 
-          {totalModels === 0 ? (
-            <div className="text-center py-8">
-              <h3 className="text-lg font-medium mb-2">No models found</h3>
-              <p className="text-muted-foreground">Try adjusting your search terms or filters.</p>
-            </div>
-          ) : (
-            <>
-              <div className="mb-6">
-                <h3 className="text-lg font-medium">
-                  Found {totalModels} models in {Object.keys(filteredData).length} channels
-                </h3>
+            {totalModels === 0 ? (
+              <div className="text-center py-8">
+                <h3 className="text-lg font-medium mb-2">No models found</h3>
+                <p className="text-muted-foreground">Try adjusting your search terms or filters.</p>
               </div>
-              {Object.keys(filteredData)
-                .sort()
-                .map(channelName => renderChannelModels(channelName, filteredData[channelName]))}
-            </>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+            ) : (
+              <>
+                <div className="mb-6">
+                  <h3 className="text-lg font-medium">
+                    Found {totalModels} models in {Object.keys(filteredData).length} channels
+                  </h3>
+                </div>
+                {Object.keys(filteredData)
+                  .sort()
+                  .map(channelName => renderChannelModels(channelName, filteredData[channelName]))}
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </TooltipProvider>
   )
 }
 

@@ -49,16 +49,15 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		return openai.ErrorWrapper(err, "invalid_response_api_request", http.StatusBadRequest)
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
+	sanitizeResponseAPIRequest(responseAPIRequest)
 
 	// duplicated
 	// if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
 	// 	lg.Debug("get response api request", zap.ByteString("body", reqBody.([]byte)))
 	// }
 
-	// Route non-OpenAI channels through the ChatCompletion conversion fallback
-	//
-	// TODO: not only openai support response api, other channel may support it too
-	if meta.ChannelType != channeltype.OpenAI {
+	// Route channels without native Response API support through the ChatCompletion fallback
+	if !supportsNativeResponseAPI(meta) {
 		return relayResponseAPIThroughChat(c, meta, responseAPIRequest)
 	}
 
@@ -235,21 +234,33 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	lg := gmw.GetLogger(c)
 	ctx := gmw.Ctx(c)
 
-	if responseAPIRequest.Stream != nil && *responseAPIRequest.Stream {
-		return openai.ErrorWrapper(errors.New("Response API streaming is not supported for this channel yet"), "stream_not_supported", http.StatusBadRequest)
-	}
-
 	chatRequest, err := openai.ConvertResponseAPIToChatCompletionRequest(responseAPIRequest)
 	if err != nil {
 		return openai.ErrorWrapper(err, "convert_response_api_request_failed", http.StatusBadRequest)
 	}
 
 	meta.Mode = relaymode.ChatCompletions
-	meta.IsStream = false
+	meta.IsStream = chatRequest.Stream
+	sanitizeChatCompletionRequest(chatRequest)
 	meta.OriginModelName = chatRequest.Model
 	chatRequest.Model = metalib.GetMappedModelName(meta.OriginModelName, meta.ModelMapping)
 	meta.ActualModelName = chatRequest.Model
+	meta.RequestURLPath = "/v1/chat/completions"
+	meta.ResponseAPIFallback = true
+	if c.Request != nil && c.Request.URL != nil {
+		c.Request.URL.Path = "/v1/chat/completions"
+		c.Request.URL.RawPath = "/v1/chat/completions"
+	}
 	metalib.Set2Context(c, meta)
+
+	c.Set(ctxkey.ResponseAPIRequestOriginal, responseAPIRequest)
+	if chatRequest.Stream {
+		c.Set(ctxkey.ResponseStreamRewriteHandler, newChatToResponseStreamBridge(c, meta, responseAPIRequest))
+	} else {
+		c.Set(ctxkey.ResponseRewriteHandler, func(gc *gin.Context, status int, textResp *openai_compatible.SlimTextResponse) error {
+			return renderChatResponseAsResponseAPI(gc, status, textResp, responseAPIRequest, meta)
+		})
+	}
 
 	channelModelRatio, channelCompletionRatio := getChannelRatios(c)
 	pricingAdaptor := relay.GetAdaptor(meta.ChannelType)
@@ -285,12 +296,6 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 		return openai.ErrorWrapper(err, "marshal_converted_request_failed", http.StatusInternalServerError)
 	}
 	requestBody := bytes.NewBuffer(jsonData)
-
-	// Rewrite upstream chat responses into Response API format when flowing back to client
-	c.Set(ctxkey.ResponseAPIRequestOriginal, responseAPIRequest)
-	c.Set(ctxkey.ResponseRewriteHandler, func(gc *gin.Context, status int, textResp *openai_compatible.SlimTextResponse) error {
-		return renderChatResponseAsResponseAPI(gc, status, textResp, responseAPIRequest, meta)
-	})
 
 	resp, err := adaptor.DoRequest(c, meta, requestBody)
 	if err != nil {
@@ -694,6 +699,55 @@ func getResponseAPIPromptTokens(ctx context.Context, responseAPIRequest *openai.
 	return totalTokens
 }
 
+func sanitizeResponseAPIRequest(request *openai.ResponseAPIRequest) {
+	if request == nil {
+		return
+	}
+	modelName := strings.TrimSpace(strings.ToLower(request.Model))
+
+	if isReasoningModel(modelName) {
+		request.Temperature = nil
+		request.TopP = nil
+	}
+}
+
+func sanitizeChatCompletionRequest(request *relaymodel.GeneralOpenAIRequest) {
+	if request == nil {
+		return
+	}
+	modelName := strings.TrimSpace(strings.ToLower(request.Model))
+
+	if isReasoningModel(modelName) {
+		request.Temperature = nil
+		request.TopP = nil
+	}
+}
+
+func supportsNativeResponseAPI(meta *metalib.Meta) bool {
+	if meta == nil {
+		return false
+	}
+	if meta.ChannelType != channeltype.OpenAI {
+		return false
+	}
+	base := strings.TrimSpace(strings.ToLower(meta.BaseURL))
+	if base == "" {
+		return true
+	}
+	return strings.Contains(base, "api.openai.com")
+}
+
+func isReasoningModel(modelName string) bool {
+	if modelName == "" {
+		return false
+	}
+	return strings.HasPrefix(modelName, "gpt-5") ||
+		strings.HasPrefix(modelName, "o1") ||
+		strings.HasPrefix(modelName, "o3") ||
+		strings.HasPrefix(modelName, "o4") ||
+		strings.HasPrefix(modelName, "o-")
+}
+
 // preConsumeResponseAPIQuota pre-consumes quota for Response API requests
 func preConsumeResponseAPIQuota(
 	c *gin.Context,
@@ -805,29 +859,41 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 		requestId = ginCtx.GetString(ctxkey.RequestId)
 	}
 	traceId := tracing.GetTraceIDFromContext(ctx)
-	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
-		Ctx:                    ctx,
-		TokenId:                meta.TokenId,
-		QuotaDelta:             quotaDelta,
-		TotalQuota:             quota,
-		UserId:                 meta.UserId,
-		ChannelId:              meta.ChannelId,
-		PromptTokens:           promptTokens,
-		CompletionTokens:       completionTokens,
-		ModelRatio:             usedModelRatio,
-		GroupRatio:             groupRatio,
-		ModelName:              responseAPIRequest.Model,
-		TokenName:              meta.TokenName,
-		IsStream:               meta.IsStream,
-		StartTime:              meta.StartTime,
-		SystemPromptReset:      false,
-		CompletionRatio:        usedCompletionRatio,
-		ToolsCost:              usage.ToolsCost,
-		CachedPromptTokens:     cachedPrompt,
-		CachedCompletionTokens: 0,
-		RequestId:              requestId,
-		TraceId:                traceId,
-	})
+	if meta.TokenId > 0 && meta.UserId > 0 && meta.ChannelId > 0 {
+		billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+			Ctx:                    ctx,
+			TokenId:                meta.TokenId,
+			QuotaDelta:             quotaDelta,
+			TotalQuota:             quota,
+			UserId:                 meta.UserId,
+			ChannelId:              meta.ChannelId,
+			PromptTokens:           promptTokens,
+			CompletionTokens:       completionTokens,
+			ModelRatio:             usedModelRatio,
+			GroupRatio:             groupRatio,
+			ModelName:              responseAPIRequest.Model,
+			TokenName:              meta.TokenName,
+			IsStream:               meta.IsStream,
+			StartTime:              meta.StartTime,
+			SystemPromptReset:      false,
+			CompletionRatio:        usedCompletionRatio,
+			ToolsCost:              usage.ToolsCost,
+			CachedPromptTokens:     cachedPrompt,
+			CachedCompletionTokens: 0,
+			RequestId:              requestId,
+			TraceId:                traceId,
+		})
+	} else {
+		// Should not happen; log for investigation
+		lg := gmw.GetLogger(ctx)
+		lg.Error("postConsumeResponseAPIQuota missing essential meta information",
+			zap.Int("token_id", meta.TokenId),
+			zap.Int("user_id", meta.UserId),
+			zap.Int("channel_id", meta.ChannelId),
+			zap.String("request_id", requestId),
+			zap.String("trace_id", traceId),
+		)
+	}
 
 	return quota
 }
@@ -840,36 +906,58 @@ func getResponseAPIRequestBody(c *gin.Context, meta *metalib.Meta, responseAPIRe
 		return nil, errors.Wrap(err, "get raw Response API request body")
 	}
 
-	// If the mapped model name differs, patch only the top-level model field while
-	// preserving every other byte of the original payload where possible.
-	if meta.ActualModelName != meta.OriginModelName {
-		patched, err := patchResponseAPIModel(rawBody, responseAPIRequest.Model)
-		if err != nil {
-			return nil, errors.Wrap(err, "patch Response API request model")
-		}
-		rawBody = patched
+	patched, err := normalizeResponseAPIRawBody(rawBody, responseAPIRequest)
+	if err != nil {
+		return nil, errors.Wrap(err, "normalize Response API request body")
 	}
 
-	return bytes.NewReader(rawBody), nil
+	return bytes.NewReader(patched), nil
 }
 
-// patchResponseAPIModel updates the top-level "model" field while preserving
-// the rest of the payload (including vendor-specific extensions).
-func patchResponseAPIModel(rawBody []byte, mappedModel string) ([]byte, error) {
-	if len(rawBody) == 0 {
+func normalizeResponseAPIRawBody(rawBody []byte, request *openai.ResponseAPIRequest) ([]byte, error) {
+	if request == nil {
 		return rawBody, nil
+	}
+
+	if len(rawBody) == 0 {
+		return json.Marshal(request)
 	}
 
 	var root map[string]json.RawMessage
 	if err := json.Unmarshal(rawBody, &root); err != nil {
-		return nil, errors.Wrap(err, "unmarshal raw Response API request for model patch")
+		return json.Marshal(request)
 	}
 
-	modelBytes, err := json.Marshal(mappedModel)
-	if err != nil {
-		return nil, errors.Wrap(err, "marshal mapped model value")
+	changed := false
+
+	if request.Model != "" {
+		modelBytes, err := json.Marshal(request.Model)
+		if err != nil {
+			return nil, errors.Wrap(err, "marshal mapped model value")
+		}
+		if existing, ok := root["model"]; !ok || !bytes.Equal(existing, modelBytes) {
+			root["model"] = modelBytes
+			changed = true
+		}
 	}
-	root["model"] = modelBytes
+
+	if request.Temperature == nil {
+		if _, ok := root["temperature"]; ok {
+			delete(root, "temperature")
+			changed = true
+		}
+	}
+
+	if request.TopP == nil {
+		if _, ok := root["top_p"]; ok {
+			delete(root, "top_p")
+			changed = true
+		}
+	}
+
+	if !changed {
+		return rawBody, nil
+	}
 
 	patched, err := json.Marshal(root)
 	if err != nil {

@@ -193,29 +193,39 @@ func postConsumeQuota(ctx context.Context,
 		requestId = ginCtx.GetString(ctxkey.RequestId)
 	}
 	traceId := tracing.GetTraceIDFromContext(ctx)
-	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
-		Ctx:                    ctx,
-		TokenId:                meta.TokenId,
-		QuotaDelta:             quotaDelta,
-		TotalQuota:             quota,
-		UserId:                 meta.UserId,
-		ChannelId:              meta.ChannelId,
-		PromptTokens:           computeResult.PromptTokens,
-		CompletionTokens:       computeResult.CompletionTokens,
-		ModelRatio:             computeResult.UsedModelRatio,
-		GroupRatio:             groupRatio,
-		ModelName:              textRequest.Model,
-		TokenName:              meta.TokenName,
-		IsStream:               meta.IsStream,
-		StartTime:              meta.StartTime,
-		SystemPromptReset:      systemPromptReset,
-		CompletionRatio:        computeResult.UsedCompletionRatio,
-		ToolsCost:              usage.ToolsCost,
-		CachedPromptTokens:     computeResult.CachedPromptTokens,
-		CachedCompletionTokens: 0,
-		RequestId:              requestId,
-		TraceId:                traceId,
-	})
+	if meta.TokenId > 0 && meta.UserId > 0 && meta.ChannelId > 0 {
+		billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+			Ctx:                    ctx,
+			TokenId:                meta.TokenId,
+			QuotaDelta:             quotaDelta,
+			TotalQuota:             quota,
+			UserId:                 meta.UserId,
+			ChannelId:              meta.ChannelId,
+			PromptTokens:           computeResult.PromptTokens,
+			CompletionTokens:       computeResult.CompletionTokens,
+			ModelRatio:             computeResult.UsedModelRatio,
+			GroupRatio:             groupRatio,
+			ModelName:              textRequest.Model,
+			TokenName:              meta.TokenName,
+			IsStream:               meta.IsStream,
+			StartTime:              meta.StartTime,
+			SystemPromptReset:      systemPromptReset,
+			CompletionRatio:        computeResult.UsedCompletionRatio,
+			ToolsCost:              usage.ToolsCost,
+			CachedPromptTokens:     computeResult.CachedPromptTokens,
+			CachedCompletionTokens: 0,
+			RequestId:              requestId,
+			TraceId:                traceId,
+		})
+	} else {
+		gmw.GetLogger(ctx).Error("meta information incomplete, cannot post consume quota",
+			zap.Int("token_id", meta.TokenId),
+			zap.Int("user_id", meta.UserId),
+			zap.Int("channel_id", meta.ChannelId),
+			zap.String("request_id", requestId),
+			zap.String("trace_id", traceId),
+		)
+	}
 
 	return quota
 }
@@ -257,29 +267,39 @@ func postConsumeQuotaWithTraceID(ctx context.Context, traceId string,
 	if ginCtx, ok := gmw.GetGinCtxFromStdCtx(ctx); ok {
 		requestId = ginCtx.GetString(ctxkey.RequestId)
 	}
-	billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
-		Ctx:                    ctx,
-		TokenId:                meta.TokenId,
-		QuotaDelta:             quotaDelta,
-		TotalQuota:             quota,
-		UserId:                 meta.UserId,
-		ChannelId:              meta.ChannelId,
-		PromptTokens:           computeResult.PromptTokens,
-		CompletionTokens:       computeResult.CompletionTokens,
-		ModelRatio:             computeResult.UsedModelRatio,
-		GroupRatio:             groupRatio,
-		ModelName:              textRequest.Model,
-		TokenName:              meta.TokenName,
-		IsStream:               meta.IsStream,
-		StartTime:              meta.StartTime,
-		SystemPromptReset:      systemPromptReset,
-		CompletionRatio:        computeResult.UsedCompletionRatio,
-		ToolsCost:              usage.ToolsCost,
-		CachedPromptTokens:     computeResult.CachedPromptTokens,
-		CachedCompletionTokens: 0,
-		RequestId:              requestId,
-		TraceId:                traceId,
-	})
+	if meta.TokenId > 0 && meta.UserId > 0 && meta.ChannelId > 0 {
+		billing.PostConsumeQuotaDetailed(billing.QuotaConsumeDetail{
+			Ctx:                    ctx,
+			TokenId:                meta.TokenId,
+			QuotaDelta:             quotaDelta,
+			TotalQuota:             quota,
+			UserId:                 meta.UserId,
+			ChannelId:              meta.ChannelId,
+			PromptTokens:           computeResult.PromptTokens,
+			CompletionTokens:       computeResult.CompletionTokens,
+			ModelRatio:             computeResult.UsedModelRatio,
+			GroupRatio:             groupRatio,
+			ModelName:              textRequest.Model,
+			TokenName:              meta.TokenName,
+			IsStream:               meta.IsStream,
+			StartTime:              meta.StartTime,
+			SystemPromptReset:      systemPromptReset,
+			CompletionRatio:        computeResult.UsedCompletionRatio,
+			ToolsCost:              usage.ToolsCost,
+			CachedPromptTokens:     computeResult.CachedPromptTokens,
+			CachedCompletionTokens: 0,
+			RequestId:              requestId,
+			TraceId:                traceId,
+		})
+	} else {
+		gmw.GetLogger(ctx).Error("meta information incomplete, cannot post consume quota",
+			zap.Int("token_id", meta.TokenId),
+			zap.Int("user_id", meta.UserId),
+			zap.Int("channel_id", meta.ChannelId),
+			zap.String("request_id", requestId),
+			zap.String("trace_id", traceId),
+		)
+	}
 
 	return quota
 }

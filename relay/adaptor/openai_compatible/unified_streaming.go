@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/common/tracing"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -975,6 +976,13 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 
 	common.SetEventStreamHeaders(c)
 
+	var streamRewriter StreamRewriteHandler
+	if rewriteAny, exists := c.Get(ctxkey.ResponseStreamRewriteHandler); exists {
+		if rewriter, ok := rewriteAny.(StreamRewriteHandler); ok {
+			streamRewriter = rewriter
+		}
+	}
+
 	// Initialize unified streaming context
 	streamCtx := NewStreamingContext(logger, enableThinking)
 
@@ -993,6 +1001,15 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 		}
 
 		if strings.HasPrefix(data[DataPrefixLength:], Done) {
+			if streamRewriter != nil {
+				handled, doneRendered := streamRewriter.HandleUpstreamDone(c)
+				if handled {
+					if doneRendered {
+						streamCtx.doneRendered = true
+					}
+					continue
+				}
+			}
 			render.StringData(c, data)
 			streamCtx.doneRendered = true
 			continue
@@ -1013,6 +1030,16 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 
 		// Process chunk using unified logic
 		modifiedChunk := streamCtx.ProcessStreamChunk(&streamResponse)
+
+		if streamRewriter != nil {
+			handled, doneRendered := streamRewriter.HandleChunk(c, &streamResponse)
+			if handled {
+				if doneRendered {
+					streamCtx.doneRendered = true
+				}
+				continue
+			}
+		}
 
 		// Respect reasoning_format mapping when thinking is enabled by moving extracted
 		// reasoning content to the requested field and clearing the source to avoid duplication
@@ -1059,16 +1086,29 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 		return errResp, streamCtx.usage
 	}
 
-	if !streamCtx.doneRendered {
+	// Calculate final usage with unified logic before emitting terminal events so
+	// that any stream rewriter can include accurate metrics.
+	finalUsage := streamCtx.CalculateUsage(promptTokens, modelName)
+
+	if streamRewriter != nil {
+		streamRewriter.FinalizeUsage(finalUsage)
+		handled, doneRendered := streamRewriter.HandleDone(c)
+		if handled {
+			if doneRendered {
+				streamCtx.doneRendered = true
+			}
+		} else if !streamCtx.doneRendered {
+			render.StringData(c, "data: "+Done)
+			streamCtx.doneRendered = true
+		}
+	} else if !streamCtx.doneRendered {
 		render.StringData(c, "data: "+Done)
+		streamCtx.doneRendered = true
 	}
 
 	if err := resp.Body.Close(); err != nil {
-		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), streamCtx.usage
+		return ErrorWrapper(err, "close_response_body_failed", http.StatusInternalServerError), finalUsage
 	}
-
-	// Calculate final usage with unified logic
-	finalUsage := streamCtx.CalculateUsage(promptTokens, modelName)
 
 	return nil, finalUsage
 }
