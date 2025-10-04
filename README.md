@@ -149,7 +149,7 @@ This repository is fully compatible with multi-agent frameworks and is recommend
 
 One‑API integrates seamlessly with this CLI: you can connect any One‑API endpoint and use all your unified models through the slick OpenCode terminal UX.
 
-To get started, create or edit `.opencode/config.json` like this:
+To get started, create or edit `~/.config/opencode/opencode.json` like this:
 
 **Using OpenAI SDK:**
 
