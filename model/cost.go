@@ -1,6 +1,7 @@
 package model
 
 import (
+	"fmt"
 	"math/rand"
 	"sync"
 	"time"
@@ -128,46 +129,47 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	if !DB.Migrator().HasTable(&UserRequestCost{}) {
 		return nil
 	}
-	// 1) Create table if missing via AutoMigrate-esque call on a temp DB clone? We assume table exists or will be created by later AutoMigrate.
-	// 2) Deduplicate: keep the newest row (max(created_at)) per request_id, delete others.
-	// Use vendor-specific SQL where necessary.
 
-	// Dedup only if table exists
-	// We try a vendor-agnostic approach using DELETE with subquery; if it fails, we log and continue with index creation.
-	// MySQL/Postgres support DELETE using a subquery with row_number over partition; SQLite 3.25+ supports windows.
-	// To keep it simple and safe, perform dedup in Go if SQL dialect errors.
-
-	type pair struct {
-		RequestID    string
-		MaxUpdatedAt int64
+	// Dedup rows prior to creating the unique index. Depending on the legacy schema, the
+	// table may lack updated_at/created_at columns, so pick the newest available marker.
+	markerColumns := []string{"updated_at", "created_at", "created_time", "id"}
+	var dedupColumn string
+	for _, col := range markerColumns {
+		if DB.Migrator().HasColumn(&UserRequestCost{}, col) {
+			dedupColumn = col
+			break
+		}
+	}
+	if dedupColumn == "" {
+		return errors.New("user_request_costs table missing expected columns for deduplication")
 	}
 
-	// Fetch the latest record per request_id
+	logger.Logger.Info("deduplicating user_request_costs", zap.String("dedup_column", dedupColumn))
+
+	selectExpr := fmt.Sprintf("request_id, MAX(%s) as max_marker", dedupColumn)
+	type pair struct {
+		RequestID string
+		MaxMarker int64 `gorm:"column:max_marker"`
+	}
 	var latest []pair
-	// Using GORM to perform group-by selection
 	if err := DB.Table("user_request_costs").
-		Select("request_id, MAX(updated_at) as max_updated_at").
+		Select(selectExpr).
 		Group("request_id").
 		Scan(&latest).Error; err != nil {
 		return errors.Wrap(err, "scan latest user_request_costs per request_id failed")
 	}
 
 	if len(latest) > 0 {
-		// Build a map for quick lookup
 		keep := make(map[string]int64, len(latest))
 		for _, p := range latest {
-			keep[p.RequestID] = p.MaxUpdatedAt
+			keep[p.RequestID] = p.MaxMarker
 		}
 
-		// Delete duplicates where updated_at < max(updated_at) for that request_id
-		// Do it in batches to avoid large transactions
+		cond := fmt.Sprintf("%s < ?", dedupColumn)
 		batchSize := 1000
-		for reqID, maxU := range keep {
-			// small sleep to reduce lock contention in large upgrades
-			_ = maxU
-			if err := DB.Where("request_id = ? AND updated_at < ?", reqID, keep[reqID]).
+		for reqID, marker := range keep {
+			if err := DB.Where("request_id = ? AND "+cond, reqID, marker).
 				Delete(&UserRequestCost{}).Error; err != nil {
-				// Log and continue; this is best-effort
 				logger.Logger.Warn("dedup delete failed", zap.Error(err))
 			}
 			batchSize--
@@ -178,9 +180,12 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		}
 	}
 
-	// 3) Create unique index if missing. Use generic GORM API.
-	// AutoMigrate later will also set the unique index from struct tag, but we ensure here too.
-	// For safety across dialects, attempt raw SQL for each common DB.
+	indexName := "idx_user_request_costs_request_id"
+	if DB.Migrator().HasIndex(&UserRequestCost{}, indexName) {
+		return nil
+	}
+
+	// 3) Create unique index if missing. Use generic SQL with dialect-aware fallbacks.
 	if common.UsingPostgreSQL {
 		if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (postgres)")
