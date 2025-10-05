@@ -40,15 +40,19 @@ const OPTION_GROUPS: OptionGroup[] = [
     keys: [
       'GitHubOAuthEnabled',
       'GitHubClientId',
+      'GitHubClientSecret',
       'OidcEnabled',
       'OidcClientId',
+      'OidcClientSecret',
       'OidcWellKnown',
       'OidcAuthorizationEndpoint',
       'OidcTokenEndpoint',
       'OidcUserinfoEndpoint',
       'LarkClientId',
+      'LarkClientSecret',
       'WeChatAuthEnabled',
       'WeChatServerAddress',
+      'WeChatServerToken',
       'WeChatAccountQRCodeImageURL',
     ],
   },
@@ -70,6 +74,7 @@ const OPTION_GROUPS: OptionGroup[] = [
       'SMTPServer',
       'SMTPPort',
       'SMTPAccount',
+      'SMTPToken',
       'SMTPFrom',
     ],
   },
@@ -137,6 +142,15 @@ const OPTION_GROUPS: OptionGroup[] = [
   },
 ]
 
+const SENSITIVE_OPTION_KEYS = new Set<string>([
+  'SMTPToken',
+  'GitHubClientSecret',
+  'OidcClientSecret',
+  'LarkClientSecret',
+  'WeChatServerToken',
+  'MessagePusherToken',
+])
+
 const OPTION_GROUP_KEY_SET = new Set(OPTION_GROUPS.flatMap((group) => group.keys))
 
 export function SystemSettings() {
@@ -158,15 +172,19 @@ export function SystemSettings() {
       // OAuth / SSO Providers
       GitHubOAuthEnabled: 'Enable GitHub OAuth login. Requires GitHub Client ID and Secret.',
       GitHubClientId: 'GitHub OAuth Client ID used for login.',
+      GitHubClientSecret: 'GitHub OAuth Client Secret used to exchange authorization codes. Stored securely and never displayed.',
       OidcEnabled: 'Enable OpenID Connect (OIDC) login. Requires OIDC endpoints and credentials.',
       OidcClientId: 'OIDC Client ID used when initiating the OIDC login flow.',
+      OidcClientSecret: 'OIDC client secret used during the token exchange. Stored securely and never displayed.',
       OidcWellKnown: 'OIDC well-known discovery URL (e.g., https://issuer/.well-known/openid-configuration).',
       OidcAuthorizationEndpoint: 'OIDC authorization endpoint URL.',
       OidcTokenEndpoint: 'OIDC token endpoint URL.',
       OidcUserinfoEndpoint: 'OIDC userinfo endpoint URL.',
       LarkClientId: 'Lark app ID for Lark OAuth login.',
+      LarkClientSecret: 'Lark app secret used for completing the OAuth flow. Stored securely and never displayed.',
       WeChatAuthEnabled: 'Enable WeChat login. Requires WeChat server settings.',
       WeChatServerAddress: 'WeChat login forwarder/server base URL.',
+      WeChatServerToken: 'Verification token for your WeChat server integration. Stored securely and never displayed.',
       WeChatAccountQRCodeImageURL: 'URL of the WeChat account QR code image displayed to users.',
 
       // Anti-bot / Security
@@ -178,6 +196,7 @@ export function SystemSettings() {
       SMTPServer: 'SMTP server hostname for sending emails.',
       SMTPPort: 'SMTP server port (e.g., 587 for STARTTLS, 465 for SMTPS).',
       SMTPAccount: 'SMTP username or account email used to authenticate.',
+      SMTPToken: 'SMTP password or application token used to authenticate. Stored securely and never displayed.',
       SMTPFrom: 'From address used in outgoing emails (e.g., no-reply@yourdomain).',
 
       // Branding & Content
@@ -215,7 +234,7 @@ export function SystemSettings() {
       // Logging / Metrics / Integrations
       LogConsumeEnabled: 'Record usage/consumption logs. Turn off to reduce storage overhead.',
       MessagePusherAddress: 'Endpoint of the alert/notification pusher service for log events.',
-      MessagePusherToken: 'Authentication token for the alert/notification pusher. Keep this confidential.',
+      MessagePusherToken: 'Authentication token for the alert/notification pusher. Stored securely and never displayed.',
     }),
     []
   )
@@ -280,8 +299,8 @@ export function SystemSettings() {
           <div className="space-y-10">
             {OPTION_GROUPS.map((group) => {
               const groupOptions = group.keys
-                .map((key) => optionsMap[key])
-                .filter(Boolean)
+                .map((key) => optionsMap[key] ?? (SENSITIVE_OPTION_KEYS.has(key) ? { key, value: '' } : undefined))
+                .filter((opt): opt is OptionRow => Boolean(opt))
 
               if (!groupOptions.length) return null
 
@@ -299,6 +318,7 @@ export function SystemSettings() {
                         key={opt.key}
                         option={opt}
                         description={descriptions[opt.key]}
+                        isSensitive={SENSITIVE_OPTION_KEYS.has(opt.key)}
                         onSave={save}
                       />
                     ))}
@@ -319,6 +339,7 @@ export function SystemSettings() {
                       key={opt.key}
                       option={opt}
                       description={descriptions[opt.key]}
+                      isSensitive={SENSITIVE_OPTION_KEYS.has(opt.key)}
                       onSave={save}
                     />
                   ))}
@@ -342,9 +363,10 @@ interface OptionItemProps {
   option: OptionRow
   description?: string
   onSave: (key: string, value: string) => Promise<void>
+  isSensitive?: boolean
 }
 
-function OptionItem({ option, description, onSave }: OptionItemProps) {
+function OptionItem({ option, description, onSave, isSensitive }: OptionItemProps) {
   const [value, setValue] = useState(option.value)
   const [isSaving, setIsSaving] = useState(false)
 
@@ -357,17 +379,22 @@ function OptionItem({ option, description, onSave }: OptionItemProps) {
     setIsSaving(true)
     try {
       await onSave(option.key, value)
+      if (isSensitive) {
+        setValue('')
+      }
     } catch (_error) {
       setValue(option.value)
     } finally {
       setIsSaving(false)
     }
-  }, [isSaving, onSave, option.key, option.value, value])
+  }, [isSaving, isSensitive, onSave, option.key, option.value, value])
 
   const handleBlur = useCallback(async () => {
     if (value === option.value) return
     await handleSave()
   }, [handleSave, option.value, value])
+
+  const placeholder = isSensitive ? 'Value hidden; enter to update' : undefined
 
   return (
     <div className="border rounded-lg p-4 space-y-3">
@@ -394,12 +421,19 @@ function OptionItem({ option, description, onSave }: OptionItemProps) {
           onChange={(e) => setValue(e.target.value)}
           onBlur={handleBlur}
           className="flex-1"
+          aria-label={`${option.key} value`}
+          placeholder={placeholder}
           disabled={isSaving}
         />
         <Button variant="outline" onClick={handleSave} disabled={isSaving}>
           {isSaving ? 'Saving…' : 'Save'}
         </Button>
       </div>
+      {isSensitive && (
+        <p className="text-xs text-muted-foreground">
+          Stored value is hidden. Enter a new value to overwrite the existing secret.
+        </p>
+      )}
     </div>
   )
 }
