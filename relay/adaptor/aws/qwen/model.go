@@ -7,39 +7,44 @@ import (
 // Request represents a chat completion request to AWS Bedrock Qwen models.
 //
 // This structure defines all the parameters needed to send a chat completion
-// request to the Qwen3 Coder family models via AWS Bedrock. Qwen3 Coder
-// is designed for code generation, technical analysis, and programming tasks
-// with strong multi-language code support and advanced reasoning capabilities.
-// Supports both basic conversation and advanced tool calling for code execution.
+// request to the Qwen model family via AWS Bedrock. Supports both Qwen3 general
+// models (qwen3-235b, qwen3-32b) for complex reasoning and conversation, and
+// Qwen3 Coder models (qwen3-coder-30b, qwen3-coder-480b) specialized for code
+// generation and technical analysis. All models feature advanced reasoning
+// capabilities with configurable reasoning effort control.
 //
 // Based on AWS Bedrock Qwen model documentation.
 type Request struct {
 	// Messages contains the conversation history including system, user, and assistant messages.
 	// This field is required and must contain at least one message.
-	// Qwen3 Coder processes these messages to generate technically accurate, code-focused responses.
-	// Supports tool calls and tool results for advanced code execution workflows.
+	// Qwen models process these messages to generate high-quality responses across all tasks,
+	// from complex reasoning to code generation. Supports tool calls and tool results for
+	// advanced workflows including code execution, API integration, and automated reasoning.
 	Messages []Message `json:"messages"`
 
 	// MaxTokens specifies the maximum number of tokens to generate in the response.
 	// Optional field that helps control response length and API costs.
-	// Qwen3 Coder uses this to limit generation while maintaining code quality and completeness.
+	// Qwen models use this to limit generation while maintaining response quality across
+	// all task types, including complex reasoning, conversation, and code generation.
 	MaxTokens int `json:"max_tokens,omitempty"`
 
 	// Temperature controls the randomness of the model's responses.
 	// Range: 0.0 to 1.0, where 0.0 is deterministic and 1.0 is most random.
 	// Optional field, uses model default if not specified.
-	// Lower temperatures recommended for code generation to ensure accuracy.
+	// Lower temperatures (0.2-0.4) recommended for code generation and reasoning tasks,
+	// higher values (0.7-0.9) suitable for creative content and conversation.
 	Temperature *float64 `json:"temperature,omitempty"`
 
 	// TopP controls nucleus sampling, limiting the cumulative probability of token choices.
 	// Range: 0.0 to 1.0, where lower values make responses more focused.
 	// Optional field, uses model default if not specified.
-	// Optimized for Qwen's code generation quality and technical accuracy.
+	// Optimized for Qwen's response quality across reasoning, conversation, and code tasks.
 	TopP *float64 `json:"top_p,omitempty"`
 
 	// Stop contains custom strings that will stop generation when encountered.
 	// Optional field that allows fine-grained control over response termination.
-	// Useful for controlling when Qwen3 Coder stops generating in specific coding contexts.
+	// Useful for controlling when Qwen models stop generating in specific contexts,
+	// including reasoning chains, code blocks, or conversation patterns.
 	Stop []string `json:"stop,omitempty"`
 
 	// ReasoningEffort controls the reasoning capabilities for Qwen models.
@@ -51,7 +56,8 @@ type Request struct {
 
 	// Tools contains the available tool definitions for the model to use.
 	// Optional field that enables function calling capabilities.
-	// When provided, Qwen3 Coder can invoke these tools for code execution and automation.
+	// When provided, Qwen models can intelligently invoke these tools for various tasks
+	// including code execution, API integration, data processing, and automated workflows.
 	Tools []QwenTool `json:"tools,omitempty"`
 
 	// ToolChoice controls how the model decides to use tools.
@@ -64,19 +70,20 @@ type Request struct {
 //
 // Messages form the core of the chat completion request, containing the back-and-forth
 // conversation between different participants. Each message has a specific role that
-// determines its purpose and expected content format for Qwen3 Coder processing.
-// Supports both basic conversation and advanced tool calling capabilities.
+// determines its purpose and expected content format for Qwen model processing.
+// Supports basic conversation, complex reasoning, code generation, and advanced tool calling.
 type Message struct {
 	// Role identifies the sender of the message.
 	// Valid values: "system" (instructions to guide model behavior),
-	// "user" (human input), "assistant" (model response with code-focused quality).
-	// Qwen3 Coder uses role information to maintain conversation context and technical accuracy.
+	// "user" (human input), "assistant" (model response).
+	// Qwen models use role information to maintain conversation context and ensure
+	// appropriate response generation across reasoning, conversation, and code tasks.
 	Role string `json:"role"`
 
 	// Content contains the text content of the message.
 	// Required for system and user messages. For assistant messages, this contains
-	// the model's response with Qwen's code generation and technical analysis quality.
-	// Supports multi-language code content with Qwen's advanced programming understanding.
+	// the model's response with Qwen's high-quality reasoning, conversation, or code generation.
+	// Supports diverse content types including natural language, reasoning chains, and code.
 	Content string `json:"content,omitempty"`
 
 	// ToolCalls contains tool invocations made by the assistant.
@@ -93,33 +100,33 @@ type Message struct {
 // Response represents the complete response from AWS Bedrock Qwen models.
 //
 // This structure contains the model's response to a chat completion request,
-// including generated text with Qwen's code-focused and technically accurate quality.
-// Qwen3 Coder responses feature precise, contextually appropriate code and technical
-// content with strong multi-language programming support.
+// including generated text with Qwen's high-quality reasoning, conversation, or code.
+// Qwen responses feature contextually appropriate content across all capabilities:
+// complex reasoning, natural conversation, technical analysis, and code generation.
 //
 // Based on AWS Bedrock Qwen model documentation.
 type Response struct {
 	// Choices contains the possible response options generated by the model.
 	// Typically contains a single choice, but the array format maintains
 	// compatibility with OpenAI's API structure. Each choice represents
-	// high-quality code or technical content from Qwen3 Coder.
+	// high-quality content from Qwen across reasoning, conversation, and code tasks.
 	Choices []Choice `json:"choices"`
 }
 
 // Choice represents a single response option from the Qwen model.
 //
 // Each choice contains the generated content along with metadata about
-// why the generation stopped. Qwen3 Coder choices feature high-quality
-// code generation, technical analysis, and programming problem-solving
-// with advanced reasoning capabilities.
+// why the generation stopped. Qwen choices feature high-quality content
+// across all capabilities: complex reasoning, natural conversation,
+// technical analysis, code generation, and problem-solving.
 type Choice struct {
 	// Index identifies the position of this choice in the choices array.
 	// Typically 0 for the first (and usually only) choice.
 	Index int `json:"index"`
 
 	// Message contains the actual response content from the assistant.
-	// This includes Qwen3 Coder's code generation and technical response
-	// with multi-language programming support.
+	// This includes Qwen's high-quality reasoning, conversation, or code generation
+	// with comprehensive language support and advanced capabilities.
 	Message ResponseMessage `json:"message"`
 
 	// StopReason indicates why the model stopped generating tokens.
@@ -135,19 +142,19 @@ type Choice struct {
 
 // ResponseMessage represents the assistant's message in the response.
 //
-// This structure contains the model's generated content with Qwen3 Coder's
-// code-focused quality. The response includes advanced code generation,
-// technical analysis, and programming problem-solving capabilities.
+// This structure contains the model's generated content with Qwen's high-quality
+// capabilities across reasoning, conversation, and code generation. The response
+// includes advanced language understanding, technical analysis, and problem-solving.
 // The role is always "assistant" for response messages.
 type ResponseMessage struct {
 	// Role identifies the message sender, always "assistant" for responses.
 	// This maintains consistency with the conversation message format
-	// and indicates Qwen3 Coder generated content.
+	// and indicates Qwen generated content.
 	Role string `json:"role"`
 
 	// Content contains the generated text response from the model.
-	// This is Qwen3 Coder's code-focused response with technical accuracy,
-	// multi-language programming support, and advanced reasoning applied.
+	// This is Qwen's high-quality response across reasoning, conversation, or code tasks,
+	// with advanced language understanding and comprehensive problem-solving applied.
 	Content string `json:"content,omitempty"`
 }
 
@@ -155,24 +162,24 @@ type ResponseMessage struct {
 //
 // This structure contains the streaming response data when using server-sent events
 // for real-time chat completion. Each chunk represents incremental content delivery
-// from Qwen3 Coder, allowing for progressive response rendering with
-// code-focused quality maintained throughout the stream.
+// from Qwen models, allowing for progressive response rendering with high-quality
+// content maintained throughout the stream across reasoning, conversation, and code.
 //
 // Based on AWS Bedrock Qwen streaming documentation.
 type StreamResponse struct {
 	// Choices contains the streaming response options generated by the model.
 	// Similar to non-streaming responses, this typically contains a single choice
 	// but maintains array format for API compatibility. Each choice represents
-	// incremental code-focused content from Qwen3 Coder.
+	// incremental high-quality content from Qwen across reasoning, conversation, and code.
 	Choices []StreamChoice `json:"choices"`
 }
 
 // StreamChoice represents a single streaming response option from the Qwen model.
 //
 // Each streaming choice contains incremental content (delta) along with metadata
-// about the current state of generation. Qwen3 Coder streaming choices
-// deliver code-focused quality progressively, maintaining technical accuracy
-// and programming context throughout the stream.
+// about the current state of generation. Qwen streaming choices deliver high-quality
+// content progressively, maintaining reasoning coherence, conversation context,
+// or code accuracy throughout the stream.
 type StreamChoice struct {
 	// Index identifies the position of this choice in the choices array.
 	// Typically 0 for the first (and usually only) streaming choice.
@@ -180,8 +187,8 @@ type StreamChoice struct {
 
 	// Delta contains the incremental content generated by the model.
 	// This represents the new tokens added in this streaming chunk,
-	// featuring Qwen3 Coder's code-focused quality with progressive
-	// content delivery and technical accuracy.
+	// featuring Qwen's high-quality content with progressive delivery
+	// across reasoning, conversation, and code generation.
 	Delta StreamResponseMessage `json:"delta"`
 
 	// StopReason indicates why the model stopped generating tokens, if applicable.
@@ -193,51 +200,50 @@ type StreamChoice struct {
 
 // StreamResponseMessage represents the incremental delta message in a streaming response.
 //
-// This structure contains the progressive content generated by Qwen3 Coder
+// This structure contains the progressive content generated by Qwen models
 // during streaming responses. Each delta represents new tokens added to the
-// conversation, maintaining code-focused quality with advanced technical
-// understanding and programming accuracy applied progressively.
+// conversation, maintaining high-quality content with advanced capabilities
+// applied progressively across reasoning, conversation, and code generation.
 type StreamResponseMessage struct {
 	// Role identifies the message sender for the delta content.
 	// Typically "assistant" for streaming responses, indicating
-	// Qwen3 Coder generated content.
+	// Qwen generated content.
 	Role string `json:"role,omitempty"`
 
 	// Content contains the incremental text generated in this streaming chunk.
-	// This represents new tokens from Qwen3 Coder's code-focused
-	// response with progressive delivery of technical content and
-	// multi-language programming support.
+	// This represents new tokens from Qwen's high-quality response with
+	// progressive delivery of reasoning, conversation, or code content.
 	Content string `json:"content,omitempty"`
 }
 
 // QwenConverseStreamResponse represents a streaming response from AWS Bedrock Qwen Converse API.
 //
-// This structure handles streaming responses from Qwen3 Coder models through
+// This structure handles streaming responses from Qwen models through
 // the AWS Bedrock Converse API. It provides different event types during the
 // streaming process, including message initiation, content deltas, completion,
-// and usage metadata. Each streaming event delivers code-focused content
-// with Qwen's advanced programming quality and technical accuracy.
+// and usage metadata. Each streaming event delivers high-quality content
+// across reasoning, conversation, and code generation tasks.
 //
 // Based on AWS Bedrock Converse API streaming documentation.
 type QwenConverseStreamResponse struct {
 	// MessageStart indicates the beginning of a new message generation.
-	// Contains role information for the assistant response from Qwen3 Coder.
+	// Contains role information for the assistant response from Qwen models.
 	// Present only at the start of streaming to establish message context.
 	MessageStart *QwenMessageStart `json:"messageStart,omitempty"`
 
 	// ContentBlockDelta contains incremental content generated during streaming.
-	// Provides progressive text delivery from Qwen3 Coder with code-focused
-	// quality, maintaining technical accuracy throughout the stream.
+	// Provides progressive text delivery from Qwen with high-quality content
+	// across reasoning, conversation, and code tasks throughout the stream.
 	ContentBlockDelta *QwenContentBlockDelta `json:"contentBlockDelta,omitempty"`
 
 	// MessageStop indicates the completion of message generation.
 	// Contains information about why generation stopped, providing insight into
-	// Qwen3 Coder's completion logic and technical reasoning.
+	// Qwen's completion logic across reasoning, conversation, and code generation.
 	MessageStop *QwenMessageStop `json:"messageStop,omitempty"`
 
 	// Metadata provides usage information and statistics for the streaming session.
 	// Includes token counts for cost tracking and performance monitoring of
-	// Qwen3 Coder code generation and technical analysis.
+	// Qwen generation across all task types.
 	Metadata *QwenStreamMetadata `json:"metadata,omitempty"`
 }
 
@@ -623,53 +629,53 @@ type QwenBedrockStreamMessage struct {
 	Content []QwenBedrockContentBlock `json:"content,omitempty"`
 }
 
-// QwenTool represents a tool definition for Qwen3 Coder's advanced function calling capabilities.
+// QwenTool represents a tool definition for Qwen's advanced function calling capabilities.
 //
-// This structure defines individual tools that can be made available to Qwen3 Coder
+// This structure defines individual tools that can be made available to Qwen
 // models through AWS Bedrock's Converse API. Each tool represents a function that the model
-// can intelligently decide to invoke during conversation, enabling code-focused
-// automation, code execution, API integration, and interactive programming workflows
-// with Qwen's advanced reasoning and technical understanding capabilities.
+// can intelligently decide to invoke during conversation, enabling diverse workflows
+// including automation, code execution, API integration, data processing, and reasoning tasks
+// with Qwen's advanced decision-making and understanding capabilities.
 //
 // Based on AWS Bedrock Converse API tool specification format.
 type QwenTool struct {
 	// Type specifies the tool category, typically "function" for callable functions.
-	// This field categorizes the tool for Qwen3 Coder's intelligent tool selection
-	// process, ensuring appropriate invocation within code-focused contexts
-	// and maintaining compatibility with AWS Bedrock's tool calling infrastructure.
+	// This field categorizes the tool for Qwen's intelligent tool selection
+	// process, ensuring appropriate invocation across reasoning, conversation, and code contexts
+	// while maintaining compatibility with AWS Bedrock's tool calling infrastructure.
 	Type string `json:"type"`
 
 	// Function contains the detailed specification of the callable function.
-	// Provides Qwen3 Coder with comprehensive function metadata including name,
+	// Provides Qwen with comprehensive function metadata including name,
 	// description, and parameter schema for intelligent tool selection and invocation
-	// within code-focused workflows and automated programming tasks.
+	// across diverse workflows including automation, reasoning, and code tasks.
 	Function QwenToolSpec `json:"function"`
 }
 
-// QwenToolSpec represents the specification of a tool function for Qwen3 Coder integration.
+// QwenToolSpec represents the specification of a tool function for Qwen integration.
 //
-// This structure provides comprehensive metadata about a callable function that Qwen3 Coder
+// This structure provides comprehensive metadata about a callable function that Qwen
 // can intelligently invoke through AWS Bedrock's Converse API. The specification enables
 // the model to understand function capabilities, parameter requirements, and appropriate
-// usage contexts for code-focused tool calling with advanced reasoning and technical
-// considerations applied throughout the invocation process.
+// usage contexts for tool calling across reasoning, conversation, and code tasks with
+// advanced decision-making applied throughout the invocation process.
 type QwenToolSpec struct {
 	// Name identifies the unique function name for tool invocation.
-	// Used by Qwen3 Coder for precise tool selection and invocation within
-	// code-focused contexts, ensuring accurate function identification
+	// Used by Qwen for precise tool selection and invocation across
+	// reasoning, conversation, and code contexts, ensuring accurate function identification
 	// and maintaining compatibility with AWS Bedrock's tool calling mechanisms.
 	Name string `json:"name"`
 
 	// Description provides human-readable explanation of the function's purpose and behavior.
-	// Enables Qwen3 Coder's advanced reasoning capabilities to intelligently decide
-	// when and how to invoke the tool within conversation context, supporting code-focused
-	// automation workflows with technical appropriateness and programming accuracy.
+	// Enables Qwen's advanced reasoning capabilities to intelligently decide
+	// when and how to invoke the tool within conversation context, supporting diverse
+	// automation workflows with contextual appropriateness and accuracy.
 	Description string `json:"description"`
 
 	// Parameters defines the JSON schema for function input parameters.
-	// Provides Qwen3 Coder with parameter structure, types, and constraints
+	// Provides Qwen with parameter structure, types, and constraints
 	// for generating appropriate function calls with proper validation and type safety
-	// within code-focused tool calling workflows through AWS Bedrock integration.
+	// across tool calling workflows through AWS Bedrock integration.
 	Parameters any `json:"parameters"`
 }
 
