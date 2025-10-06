@@ -14,10 +14,12 @@ export default defineConfig(({ mode }) => ({
   },
   build: {
     outDir: '../build/modern',
+    // This is now correct; source maps should only be generated for development mode, not production
     sourcemap: mode === 'development',
-    chunkSizeWarningLimit: 500,
+    chunkSizeWarningLimit: 700,
     rollupOptions: {
       output: {
+        // Use both name and hash for chunk file names to aid debugging and cache busting
         chunkFileNames: '[name].[hash].js',
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
@@ -27,12 +29,12 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('react-router-dom')) {
               return 'router'
             }
-            if (id.includes('@radix-ui/react-dialog') || id.includes('@radix-ui/react-dropdown-menu') || 
-                id.includes('@radix-ui/react-popover') || id.includes('@radix-ui/react-tooltip')) {
+            if (id.includes('@radix-ui/react-dialog') || id.includes('@radix-ui/react-dropdown-menu') ||
+              id.includes('@radix-ui/react-popover') || id.includes('@radix-ui/react-tooltip')) {
               return 'ui-overlay'
             }
-            if (id.includes('@radix-ui/react-select') || id.includes('@radix-ui/react-checkbox') || 
-                id.includes('@radix-ui/react-switch') || id.includes('@radix-ui/react-slider')) {
+            if (id.includes('@radix-ui/react-select') || id.includes('@radix-ui/react-checkbox') ||
+              id.includes('@radix-ui/react-switch') || id.includes('@radix-ui/react-slider')) {
               return 'ui-form'
             }
             if (id.includes('@radix-ui')) {
