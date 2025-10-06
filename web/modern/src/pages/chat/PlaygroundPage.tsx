@@ -9,7 +9,8 @@
  * 
  * ### Security & Privacy Considerations
  * 
- * **Important: All data is stored in your browser's localStorage - it NEVER leaves your device.**
+ * **Important: All data is stored in your browser's localStorage - it NEVER leaves your device
+ * until you logout or your session is destroyed on the site.**
  * 
  * The playground uses browser localStorage to persist your conversations, settings, and preferences.
  * This design choice provides several benefits:
@@ -18,6 +19,7 @@
  *    - No server-side conversation history
  *    - No data transmitted to backend for storage
  *    - Only API requests are sent to the server (standard chat API calls)
+ *    - Data persists across sessions until you explicitly logout
  * 
  * 2. **Browser Security Model**: localStorage is protected by browser security policies
  *    - Same-origin policy: Only this domain can access the data
