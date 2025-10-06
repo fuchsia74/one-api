@@ -27,7 +27,7 @@
  *    - Protected by your browser's security mechanisms
  * 
  * 3. **Trust Model**: If you trust your browser, you can trust this storage
- *    - Modern browsers (Chrome, Firefox, Safari, Edge) have robust security
+ *    - Modern browsers (Chrome, Firefox, Safari, Edge, Brave) have robust security
  *    - localStorage is encrypted at OS level (disk encryption)
  *    - Protected by your device's security (password/biometrics)
  * 
@@ -184,7 +184,7 @@
  * 
  * ### Best Practices
  * 
- * 1. **Use a trusted browser**: Chrome, Firefox, Safari, Edge from official sources
+ * 1. **Use a trusted browser**: Chrome, Firefox, Safari, Edge, Brave from official sources
  * 2. **Keep browser updated**: Security patches are critical
  * 3. **Use device encryption**: Protects localStorage at rest
  * 4. **Review browser extensions**: Only install trusted extensions
