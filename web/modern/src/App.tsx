@@ -32,6 +32,7 @@ import { NotFoundPage } from '@/pages/NotFoundPage'
 import { api } from '@/lib/api'
 import { ResponsiveDebugger } from '@/components/dev/responsive-debugger'
 import { ResponsiveValidator } from '@/components/dev/responsive-validator'
+import { PlaygroundPage } from './pages/chat/PlaygroundPage'
 
 const queryClient = new QueryClient()
 
@@ -114,7 +115,7 @@ function App() {
                     <Route path="about" element={<AboutPage />} />
                     <Route path="settings" element={<SettingsPage />} />
                     <Route path="topup" element={<TopUpPage />} />
-                    <Route path="chat" element={<ChatPage />} />
+                    <Route path="chat" element={<PlaygroundPage />} />
                   </Route>
                 </Route>
 
