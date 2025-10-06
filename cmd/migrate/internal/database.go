@@ -71,7 +71,12 @@ func ConnectDatabase(dbType, dsn string) (*DatabaseConnection, error) {
 	case "mysql":
 		driver = "mysql"
 		oneapilogger.Logger.Info("Connecting to MySQL database")
-		db, err = gorm.Open(mysql.Open(cleanDSN), &gorm.Config{
+		normalized, normErr := common.NormalizeMySQLDSN(cleanDSN)
+		if normErr != nil {
+			return nil, errors.Wrap(normErr, "normalize MySQL DSN")
+		}
+
+		db, err = gorm.Open(mysql.Open(normalized), &gorm.Config{
 			PrepareStmt: true,
 			Logger:      logger.Default.LogMode(logger.Silent),
 		})

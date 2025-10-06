@@ -3,7 +3,7 @@ package helper
 import (
 	"fmt"
 	"html/template"
-	"log"
+
 	"net"
 	"net/http"
 	"os/exec"
@@ -15,6 +15,7 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
 )
 
@@ -30,7 +31,7 @@ func OpenBrowser(url string) {
 		err = exec.Command("open", url).Start()
 	}
 	if err != nil {
-		log.Println(err)
+		logger.Logger.Error("failed to open browser", zap.Error(err))
 	}
 }
 
@@ -47,7 +48,7 @@ func RespondError(c *gin.Context, err error) {
 func GetIp() (ip string) {
 	ips, err := net.InterfaceAddrs()
 	if err != nil {
-		log.Println(err)
+		logger.Logger.Error("failed to get IP addresses", zap.Error(err))
 		return ip
 	}
 

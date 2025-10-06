@@ -465,8 +465,14 @@ func DecreaseUserQuota(id int, quota int64) (err error) {
 }
 
 func decreaseUserQuota(id int, quota int64) (err error) {
-	if err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota - ?", quota)).Error; err != nil {
-		return errors.Wrapf(err, "decrease quota for user %d", id)
+	result := DB.Model(&User{}).
+		Where("id = ? AND quota >= ?", id, quota).
+		Update("quota", gorm.Expr("quota - ?", quota))
+	if result.Error != nil {
+		return errors.Wrapf(result.Error, "decrease quota for user %d", id)
+	}
+	if result.RowsAffected == 0 {
+		return errors.Errorf("insufficient user quota for user %d", id)
 	}
 	return nil
 }

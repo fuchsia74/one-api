@@ -186,6 +186,7 @@ func setupTestDatabase(t *testing.T) {
 	// Clean up test data
 	DB.Exec("DELETE FROM users WHERE username LIKE 'test%' OR access_token LIKE 'test%'")
 	DB.Exec("DELETE FROM tokens WHERE name LIKE 'test%'")
+	DB.Exec("DELETE FROM token_transactions WHERE transaction_id LIKE 'test%'")
 	DB.Exec("DELETE FROM channels WHERE name LIKE 'test%'")
 	DB.Exec("DELETE FROM redemptions WHERE name LIKE 'test%'")
 	DB.Exec("DELETE FROM options WHERE key LIKE 'test%'")

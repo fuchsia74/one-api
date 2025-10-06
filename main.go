@@ -184,15 +184,19 @@ func main() {
 		sessionStore = cookie.NewStore(sessionSecret, sessionSecret)
 	}
 
-	if config.DisableCookieSecret {
-		logger.Logger.Warn("DISABLE_COOKIE_SECURE is set, using insecure cookie store")
-		sessionStore.Options(sessions.Options{
-			Path:     "/",
-			MaxAge:   86400 * 30,
-			SameSite: http.SameSiteLaxMode,
-			Secure:   false,
-		})
+	cookieSecure := false
+	if config.EnableCookieSecure {
+		cookieSecure = true
+	} else {
+		logger.Logger.Warn("ENABLE_COOKIE_SECURE is not set, using insecure cookie store")
 	}
+	sessionStore.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   3600 * config.CookieMaxAgeHours,
+		HttpOnly: true,
+		Secure:   cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
 	server.Use(sessions.Sessions("session", sessionStore))
 
 	// Add Prometheus metrics endpoint if enabled
@@ -245,6 +249,10 @@ func main() {
 func isThemeValid() error {
 	if !config.ValidThemes[config.Theme] {
 		return errors.Errorf("invalid theme: %s", config.Theme)
+	}
+
+	if config.Theme != "modern" {
+		logger.Logger.Warn("recommend using the default modern theme, as the other themes are no longer being actively maintained.")
 	}
 
 	return nil
