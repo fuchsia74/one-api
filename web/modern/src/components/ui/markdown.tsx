@@ -6,7 +6,7 @@ import remarkMath from 'remark-math'
 import remarkGfm from 'remark-gfm'
 import remarkEmoji from 'remark-emoji'
 import rehypeKatex from 'rehype-katex'
-import CopyButton from "./copy-button";
+import { CopyButton } from './copy-button'
 
 // Markdown renderer component with XSS protection and syntax highlighting
 export const MarkdownRenderer = React.memo<{ content: string; className?: string }>(({ content, className }) => {
