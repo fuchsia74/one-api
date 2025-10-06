@@ -62,7 +62,6 @@ Also welcome to register and use my deployed one-api gateway, which supports var
   - [Synopsis](#synopsis)
     - [Why this fork exists](#why-this-fork-exists)
     - [What’s new](#whats-new)
-  - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
     - [Kubernetes Deployment](#kubernetes-deployment)
@@ -124,13 +123,6 @@ Also welcome to register and use my deployed one-api gateway, which supports var
     - [Black Forest Labs Features](#black-forest-labs-features)
       - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
   - [Bug Fixes \& Enterprise-Grade Improvements (Including Security Enhancements)](#bug-fixes--enterprise-grade-improvements-including-security-enhancements)
-
-## Multi Agent Framework Compatible
-
-This repository is fully compatible with multi-agent frameworks and is recommended for use with chat completion OpenAI compatible APIs. The unified interface provided by One API makes it an ideal choice for integrating multiple AI services into multi-agent systems, allowing agents to seamlessly interact with various AI models through a standardized OpenAI-compatible endpoint.
-
-> [!TIP]
-> For optimal performance in multi-agent environments, it's recommended to use models that already have automated cached prompt capabilities, such as `grok-code-fast-1`. These models can significantly reduce latency and improve response times by leveraging cached prompts, which is especially beneficial when multiple agents are making frequent requests with similar contexts.
 
 ## Tutorial
 
@@ -208,7 +200,9 @@ oneapi:
 
 The initial default account and password are `root` / `123456`.
 
-> [!TIP] > **Secret Management**: For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables:
+> [!TIP]
+>
+> For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables.
 
 ### Kubernetes Deployment
 
