@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useForm, Controller } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -65,6 +65,20 @@ interface ChannelType {
 interface Model {
   id: string
   name: string
+}
+
+export const normalizeChannelType = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (value === null || value === undefined) {
+    return null
+  }
+  if (typeof value === 'string' && value.trim() === '') {
+    return null
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : null
 }
 
 // Coercion helpers to ensure numbers are numbers (avoid Zod "expected number, received string")
@@ -265,8 +279,6 @@ export function EditChannelPage() {
   const [loading, setLoading] = useState(isEdit)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [modelsCatalog, setModelsCatalog] = useState<Record<number, string[]>>({})
-  const [availableModels, setAvailableModels] = useState<Model[]>([])
-  const [channelModels, setChannelModels] = useState<string[]>([])
   const [modelSearchTerm, setModelSearchTerm] = useState('')
   const [groups, setGroups] = useState<string[]>([])
   const [defaultPricing, setDefaultPricing] = useState<string>('')
@@ -276,20 +288,6 @@ export function EditChannelPage() {
   const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
   const [loadedChannelType, setLoadedChannelType] = useState<number | null>(null) // Track the loaded channel type
   const [autoFilledType, setAutoFilledType] = useState<number | null>(null) // Prevent repeated auto-fill per type
-
-  const syncModelsForType = useCallback((type: number | null | undefined, catalog?: Record<number, string[]>) => {
-    const numericType = typeof type === 'number' ? type : Number(type ?? NaN)
-    if (!Number.isFinite(numericType)) {
-      setChannelModels([])
-      setAvailableModels([])
-      return
-    }
-
-    const source = catalog ?? modelsCatalog
-    const rawModels = source[numericType] ?? []
-    setChannelModels(rawModels)
-    setAvailableModels(rawModels.map((model) => ({ id: model, name: model })))
-  }, [modelsCatalog])
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -324,8 +322,22 @@ export function EditChannelPage() {
 
   const watchType = form.watch('type')
   const watchConfig = form.watch('config')
-  const selectedChannelType = CHANNEL_TYPES.find(t => t.value === watchType)
-  const hasSelectedType = !!watchType && CHANNEL_TYPES.some(t => t.value === Number(watchType))
+
+  const normalizedChannelType = useMemo(() => normalizeChannelType(watchType), [watchType])
+
+  const currentCatalogModels = useMemo(() => {
+    if (normalizedChannelType === null) {
+      return [] as string[]
+    }
+    return modelsCatalog[normalizedChannelType] ?? []
+  }, [modelsCatalog, normalizedChannelType])
+
+  const availableModels = useMemo<Model[]>(() => {
+    return currentCatalogModels.map((model) => ({ id: model, name: model }))
+  }, [currentCatalogModels])
+
+  const selectedChannelType = CHANNEL_TYPES.find(t => t.value === normalizedChannelType)
+  const hasSelectedType = normalizedChannelType !== null && !!selectedChannelType
 
   // Debug logging for watchType changes
   useEffect(() => {
@@ -339,9 +351,8 @@ export function EditChannelPage() {
     const run = async () => {
       try {
         setDefaultBaseURL('')
-        const t = form.getValues('type')
-        if (!t) return
-        const res = await api.get(`/api/channel/metadata?type=${t}`)
+        if (normalizedChannelType === null) return
+        const res = await api.get(`/api/channel/metadata?type=${normalizedChannelType}`)
         const base = (res.data?.data?.default_base_url as string) || ''
         if (!cancelled) {
           setDefaultBaseURL(base)
@@ -359,16 +370,16 @@ export function EditChannelPage() {
     }
     run()
     return () => { cancelled = true }
-  }, [watchType])
+  }, [normalizedChannelType])
 
   // Additional effect to ensure type field is properly set after form initialization
   useEffect(() => {
     if (isEdit && formInitialized && loadedChannelType) {
       const currentType = form.getValues('type')
-      console.log(`[CHANNEL_TYPE_DEBUG] form init currentType=${String(currentType)} loadedType=${String(loadedChannelType)}`)
+      const numericCurrentType = typeof currentType === 'number' ? currentType : Number(currentType)
+      console.log(`[CHANNEL_TYPE_DEBUG] form init currentType=${String(currentType)} numeric=${String(numericCurrentType)} loadedType=${String(loadedChannelType)}`)
 
-      // If type is still not set correctly, force it to the loaded value
-      if (currentType !== loadedChannelType) {
+      if (!Number.isFinite(numericCurrentType) || numericCurrentType !== loadedChannelType) {
         console.log(`[CHANNEL_TYPE_DEBUG] type mismatch in effect expected=${String(loadedChannelType)} actual=${String(currentType)}`)
         form.setValue('type', loadedChannelType, { shouldValidate: true, shouldDirty: false })
       }
@@ -377,12 +388,11 @@ export function EditChannelPage() {
 
   // Effect to sync watchType with loadedChannelType
   useEffect(() => {
-    if (isEdit && loadedChannelType && watchType !== loadedChannelType) {
-      console.log(`[CHANNEL_TYPE_DEBUG] watchType sync watchType=${String(watchType)} loadedType=${String(loadedChannelType)}`)
-      // This indicates the form value and watch value are out of sync
+    if (isEdit && loadedChannelType && normalizedChannelType !== loadedChannelType) {
+      console.log(`[CHANNEL_TYPE_DEBUG] watchType sync watchType=${String(watchType)} normalized=${String(normalizedChannelType)} loadedType=${String(loadedChannelType)}`)
       form.setValue('type', loadedChannelType, { shouldValidate: true, shouldDirty: false })
     }
-  }, [isEdit, loadedChannelType, watchType, form])
+  }, [isEdit, loadedChannelType, normalizedChannelType, watchType, form])
 
   const loadChannel = async () => {
     if (!channelId) {
@@ -470,10 +480,9 @@ export function EditChannelPage() {
 
         console.log(`[CHANNEL_TYPE_DEBUG] prepared form data type=${String(formData.type)} priority=${String(formData.priority)} weight=${String(formData.weight)} ratelimit=${String(formData.ratelimit)}`)
 
-        // Load channel-specific models and default pricing
+        // Load channel-specific default pricing
         if (channelType) {
-          console.log(`[CHANNEL_TYPE_DEBUG] load models+pricing for type=${String(channelType)}`)
-          syncModelsForType(channelType)
+          console.log(`[CHANNEL_TYPE_DEBUG] load pricing for type=${String(channelType)}`)
           await loadDefaultPricing(channelType)
         }
 
@@ -530,13 +539,11 @@ export function EditChannelPage() {
             .filter((model) => typeof model === 'string' && model.trim() !== '')
         })
         setModelsCatalog(catalog)
-        const currentType = form.getValues('type')
-        syncModelsForType(currentType, catalog)
       }
     } catch (error) {
       console.error('Error loading models catalog:', error)
     }
-  }, [form, syncModelsForType])
+  }, [])
 
   const loadDefaultPricing = async (channelType: number) => {
     try {
@@ -595,18 +602,10 @@ export function EditChannelPage() {
 
   useEffect(() => {
     console.log('[CHANNEL_TYPE_DEBUG] watchType useEffect triggered:', watchType)
-    if (watchType) {
-      syncModelsForType(watchType)
-      loadDefaultPricing(watchType)
-      // Do NOT auto-populate models on type change; only explicit user actions should modify models
+    if (normalizedChannelType !== null) {
+      loadDefaultPricing(normalizedChannelType)
     }
-  }, [watchType, syncModelsForType])
-
-  useEffect(() => {
-    if (watchType) {
-      syncModelsForType(watchType)
-    }
-  }, [modelsCatalog, watchType, syncModelsForType])
+  }, [watchType, normalizedChannelType])
 
   const filteredModels = availableModels.filter(model =>
     model.name.toLowerCase().includes(modelSearchTerm.toLowerCase())
@@ -838,8 +837,11 @@ export function EditChannelPage() {
   }
 
   const fillRelatedModels = () => {
+    if (currentCatalogModels.length === 0) {
+      return
+    }
     const currentModels = form.getValues('models')
-    const uniqueModels = [...new Set([...currentModels, ...channelModels])]
+    const uniqueModels = [...new Set([...currentModels, ...currentCatalogModels])]
     form.setValue('models', uniqueModels)
   }
 
@@ -909,7 +911,7 @@ export function EditChannelPage() {
 
   // Render channel-specific configuration fields
   const renderChannelSpecificFields = () => {
-    const channelType = watchType
+    const channelType = normalizedChannelType
 
     switch (channelType) {
       case 3: // Azure OpenAI
@@ -1344,14 +1346,14 @@ export function EditChannelPage() {
 
   // Default pricing auto-fill: when Model Configs is empty, auto-populate once per type (no preview shown)
   useEffect(() => {
-    if (watchType && defaultPricing && autoFilledType !== watchType) {
+    if (normalizedChannelType !== null && defaultPricing && autoFilledType !== normalizedChannelType) {
       const current = form.getValues('model_configs') || ''
       if (!current.trim()) {
         form.setValue('model_configs', defaultPricing, { shouldDirty: true })
-        setAutoFilledType(watchType)
+        setAutoFilledType(normalizedChannelType)
       }
     }
-  }, [watchType, defaultPricing, autoFilledType])
+  }, [normalizedChannelType, defaultPricing, autoFilledType, form])
 
   if (shouldShowLoading) {
     console.log('[CHANNEL_TYPE_DEBUG] Showing loading screen')
@@ -1536,10 +1538,10 @@ export function EditChannelPage() {
                             type="button"
                             variant="outline"
                             onClick={fillRelatedModels}
-                            disabled={channelModels.length === 0}
+                            disabled={currentCatalogModels.length === 0}
                             size="sm"
                           >
-                            Fill Related Models ({channelModels.length})
+                            Fill Related Models ({currentCatalogModels.length})
                           </Button>
                           <Button
                             type="button"
