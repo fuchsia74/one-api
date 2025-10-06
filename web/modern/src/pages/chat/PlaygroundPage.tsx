@@ -1,3 +1,212 @@
+/**
+ * Playground Page - AI Chat Interface with Persistent State
+ * 
+ * A full-featured AI playground interface that provides direct access to AI models with
+ * configurable parameters. This page manages the entire chat experience, including model
+ * selection, parameter tuning, conversation management, and persistent state.
+ * 
+ * ## Local Storage Architecture
+ * 
+ * ### Security & Privacy Considerations
+ * 
+ * **Important: All data is stored in your browser's localStorage - it NEVER leaves your device.**
+ * 
+ * The playground uses browser localStorage to persist your conversations, settings, and preferences.
+ * This design choice provides several benefits:
+ * 
+ * 1. **Complete Privacy**: Your conversations are stored only on your device
+ *    - No server-side conversation history
+ *    - No data transmitted to backend for storage
+ *    - Only API requests are sent to the server (standard chat API calls)
+ * 
+ * 2. **Browser Security Model**: localStorage is protected by browser security policies
+ *    - Same-origin policy: Only this domain can access the data
+ *    - Isolated from other websites and applications
+ *    - Protected by your browser's security mechanisms
+ * 
+ * 3. **Trust Model**: If you trust your browser, you can trust this storage
+ *    - Modern browsers (Chrome, Firefox, Safari, Edge) have robust security
+ *    - localStorage is encrypted at OS level (disk encryption)
+ *    - Protected by your device's security (password/biometrics)
+ * 
+ * ### What Gets Stored in localStorage
+ * 
+ * #### 1. Conversation Data (`STORAGE_KEYS.CONVERSATION`)
+ * ```typescript
+ * {
+ *   id: string,              // UUID for the conversation
+ *   timestamp: number,       // Creation timestamp
+ *   createdBy: string,       // Username
+ *   messages: Message[]      // Full conversation history
+ * }
+ * ```
+ * 
+ * #### 2. Model Selection (`STORAGE_KEYS.MODEL`)
+ * - Last selected model name (e.g., "claude-opus-4-20250514")
+ * - Restored on page reload for continuity
+ * 
+ * #### 3. Token Selection (`STORAGE_KEYS.TOKEN`)
+ * - Last selected API token key
+ * - Automatically restored to resume work
+ * 
+ * #### 4. Model Parameters (`STORAGE_KEYS.PARAMETERS`)
+ * ```typescript
+ * {
+ *   temperature: [0.7],
+ *   maxTokens: [4096],
+ *   topP: [1.0],
+ *   topK: [40],
+ *   frequencyPenalty: [0.0],
+ *   presencePenalty: [0.0],
+ *   maxCompletionTokens: [4096],
+ *   stopSequences: '',
+ *   reasoningEffort: 'high',
+ *   thinkingEnabled: false,
+ *   thinkingBudgetTokens: [10000],
+ *   systemMessage: '',
+ *   showReasoningContent: true,
+ *   focusModeEnabled: false
+ * }
+ * ```
+ * 
+ * ### Data Lifecycle
+ * 
+ * #### On Mount (Page Load)
+ * 1. Load conversation from localStorage (lines 223-244)
+ * 2. Load model selection (line 246)
+ * 3. Load token selection (line 247)
+ * 4. Load parameters (lines 248-263)
+ * 5. Validate parameters against model capabilities (lines 265-299)
+ * 6. Restore all state to React components (lines 301-320)
+ * 
+ * #### On Change (Auto-Save)
+ * - Conversation: Saves on every message update (lines 323-334)
+ * - Model: Saves when selection changes (lines 336-340)
+ * - Token: Saves when selection changes (lines 342-346)
+ * - Parameters: Saves when any parameter changes (lines 348-370)
+ * 
+ * #### On Clear
+ * - User clicks "Clear" button → Clears conversation, generates new UUID (lines 502-508)
+ * - Preserves model selection and parameters for convenience
+ * 
+ * ### Parameter Validation
+ * 
+ * When a model is loaded from localStorage, parameters are validated against that model's
+ * capabilities (lines 265-299):
+ * - Unsupported parameters are reset to defaults
+ * - Prevents API errors from incompatible parameters
+ * - Updated validated parameters are saved back to localStorage
+ * 
+ * Example: If you had `topK` enabled for a Cohere model, then reload the page with a
+ * Claude model selected, `topK` will be reset to default since Claude doesn't support it.
+ * 
+ * ### Dynamic Model Capability Handling
+ * 
+ * The page automatically adjusts available parameters based on the selected model:
+ * - Fetches capabilities via `getModelCapabilities(selectedModel)` (lines 111-116)
+ * - Resets unsupported parameters when model changes (lines 118-199)
+ * - Shows/hides UI controls based on capabilities (via `modelCapabilities` prop)
+ * 
+ * ## Key Features
+ * 
+ * ### 1. Token & Model Management
+ * - Loads API tokens from server (only enabled tokens) (lines 470-499)
+ * - Extracts available models from selected token's configuration (lines 397-468)
+ * - Auto-selects first available token/model if none saved
+ * 
+ * ### 2. Conversation Management
+ * - Full CRUD operations: Send, Edit, Delete, Regenerate messages
+ * - Export conversations in multiple formats (JSON, Markdown, Text)
+ * - Clear conversation (generates new UUID, preserves settings)
+ * - Persistent across page reloads via localStorage
+ * 
+ * ### 3. Image Attachments
+ * - Vision model support (automatic detection via capabilities)
+ * - Base64 encoding for image transmission
+ * - Multi-image support (up to 5 images per message)
+ * 
+ * ### 4. Reasoning/Thinking Content
+ * - Expandable reasoning bubbles for supported models
+ * - Auto-collapse when main content appears (UX optimization)
+ * - Per-message expansion state tracking
+ * 
+ * ### 5. Focus Mode
+ * - Distraction-free chat interface
+ * - Toggleable via UI
+ * - State persisted in localStorage
+ * 
+ * ## State Management
+ * 
+ * The page manages extensive state through React hooks:
+ * - **Conversation State**: messages, conversationId, timestamps (lines 60-64)
+ * - **Selection State**: selectedModel, selectedToken (lines 66-67, 71-72)
+ * - **Parameter State**: All model parameters (lines 75-86)
+ * - **UI State**: Mobile sidebar, reasoning expansion, preview (lines 96-108)
+ * 
+ * ## Integration with usePlaygroundChat Hook
+ * 
+ * The page delegates all chat operations to the `usePlaygroundChat` hook (lines 202-221):
+ * - Passes all parameters and state setters
+ * - Receives: isStreaming, sendMessage, regenerateMessage, stopGeneration, addErrorMessage
+ * - Hook handles: API calls, streaming, error handling, message formatting
+ * 
+ * ## Component Hierarchy
+ * 
+ * ```
+ * PlaygroundPage
+ * ├── ParametersPanel (left sidebar)
+ * │   ├── Token selector
+ * │   ├── Model selector
+ * │   └── All parameter controls
+ * ├── ChatInterface (main area)
+ * │   ├── Header (model badge, action buttons)
+ * │   ├── MessageList (conversation display)
+ * │   └── Input area (with image attachments)
+ * └── ExportConversationDialog (modal)
+ * ```
+ * 
+ * ## Security Considerations for localStorage
+ * 
+ * ### Threat Model
+ * 
+ * **Protected Against:**
+ * - Cross-site scripting (XSS) from other domains (same-origin policy)
+ * - Other applications on your device (browser isolation)
+ * - Network interception (data never leaves device)
+ * - Server-side breaches (no server-side storage)
+ * 
+ * **Not Protected Against:**
+ * - Physical device access by attackers
+ * - Malicious browser extensions with storage access
+ * - Malware on your device
+ * 
+ * ### Best Practices
+ * 
+ * 1. **Use a trusted browser**: Chrome, Firefox, Safari, Edge from official sources
+ * 2. **Keep browser updated**: Security patches are critical
+ * 3. **Use device encryption**: Protects localStorage at rest
+ * 4. **Review browser extensions**: Only install trusted extensions
+ * 5. **Clear data when needed**: Use "Clear" button or browser settings
+ * 
+ * ### Data Retention
+ * 
+ * - Data persists until you clear it (no automatic expiration)
+ * - Clearing browser data will remove all localStorage
+ * - "Clear Conversation" button only removes messages, not settings
+ * - Each browser profile has separate storage (privacy benefit)
+ * 
+ * ## Performance Considerations
+ * 
+ * - localStorage writes are synchronous but fast (< 1ms typically)
+ * - Data is automatically serialized to JSON
+ * - No size limits in normal usage (browsers provide 5-10MB typically)
+ * - Long conversations may impact load time (loads entire history)
+ * 
+ * @see usePlaygroundChat for chat operations implementation
+ * @see getModelCapabilities for parameter compatibility
+ * @see STORAGE_KEYS for storage key definitions
+ */
+
 import React, { useState, useEffect, useCallback } from 'react'
 import { api } from '@/lib/api'
 import { useNotifications } from '@/components/ui/notifications'
