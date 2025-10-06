@@ -1,3 +1,162 @@
+/**
+ * Playground Chat Hook
+ * 
+ * Core chat functionality for the AI Playground. Manages message sending, streaming responses,
+ * and reasoning/thinking content from various AI models.
+ * 
+ * ## Purpose
+ * Provides a reusable hook that handles all chat-related operations in the playground:
+ * - Sending messages with model-specific parameters
+ * - Streaming responses with real-time updates
+ * - Multi-provider reasoning/thinking content support
+ * - Image attachment handling for vision models
+ * - Error handling and recovery
+ * - Request cancellation
+ * 
+ * ## Key Features
+ * 
+ * ### 1. Model-Aware Parameter Handling
+ * Uses `getModelCapabilities()` to dynamically include only supported parameters for each model.
+ * This prevents API errors from unsupported parameters and ensures optimal compatibility.
+ * 
+ * ### 2. Streaming Response Processing
+ * - Uses Server-Sent Events (SSE) for real-time streaming
+ * - Throttled UI updates via `requestAnimationFrame` for performance
+ * - Handles multiple content formats (string, array, mixed)
+ * 
+ * ### 3. Multi-Provider Reasoning Support
+ * Supports reasoning/thinking content from multiple providers:
+ * - **Claude**: `thinking` parameter with budget tokens
+ * - **OpenAI**: `reasoning_content` field in responses
+ * - **DeepSeek**: `reasoning_effort` parameter for v3.1+
+ * - **Mistral**: Content array format with `thinking` type
+ * - **Hyperbolic**: Thinking models (DeepSeek-R1, Qwen thinking variants)
+ * 
+ * ### 4. Auto-Collapse Reasoning Bubbles
+ * Automatically collapses reasoning/thinking bubbles when main content appears,
+ * providing a cleaner UI while keeping reasoning accessible.
+ * 
+ * ### 5. Image Attachment Support
+ * Handles vision model requirements:
+ * - Formats images as base64 with `image_url` type
+ * - Sends as content array when images present
+ * - Falls back to simple string for text-only
+ * 
+ * ## Message Flow
+ * 
+ * 1. **User Input** → `sendMessage(messageContent, images?)`
+ * 2. **Format Content** → String or array based on images
+ * 3. **Build Request** → Include only supported parameters
+ * 4. **Stream Response** → Parse SSE chunks
+ * 5. **Extract Content** → Handle provider-specific formats
+ * 6. **Update UI** → Throttled updates via RAF
+ * 7. **Finalize** → Auto-collapse reasoning if present
+ * 
+ * ## Reasoning Content Extraction
+ * 
+ * The hook supports multiple field names for reasoning content:
+ * - `delta.reasoning` - OpenAI format
+ * - `delta.reasoning_content` - Alternative format
+ * - `delta.thinking` - Direct thinking field
+ * - `delta.content` (array) - Mistral format with `type: 'thinking'`
+ * 
+ * ## Performance Optimizations
+ * 
+ * ### Throttled Updates
+ * Uses `requestAnimationFrame` to batch UI updates during streaming:
+ * - Prevents excessive re-renders (could be 100+ per second)
+ * - Maintains smooth UI even with fast streaming
+ * - Ensures final state is always applied
+ * 
+ * ### Efficient State Updates
+ * - Atomic operations for error handling
+ * - Single state update for message removal + error insertion
+ * - Prevents race conditions and batching issues
+ * 
+ * ## Error Handling
+ * 
+ * ### HTTP Errors
+ * Parses detailed error messages from multiple JSON structures:
+ * - `error.message` - Standard OpenAI format
+ * - `error` (string) - Simple error format
+ * - `message` - Alternative format
+ * - `detail` - FastAPI/Pydantic format
+ * 
+ * ### Stream Errors
+ * Handles errors during streaming:
+ * - `type: 'error'` in SSE data
+ * - Replaces assistant message with error message
+ * - Shows notification
+ * 
+ * ### Abort Errors
+ * Gracefully handles user cancellation:
+ * - Removes placeholder message
+ * - Shows cancellation notification
+ * - Cleans up abort controller
+ * 
+ * ## Usage Example
+ * 
+ * ```typescript
+ * const {
+ *   isStreaming,
+ *   sendMessage,
+ *   regenerateMessage,
+ *   stopGeneration,
+ *   addErrorMessage
+ * } = usePlaygroundChat({
+ *   selectedToken: 'sk-...',
+ *   selectedModel: 'claude-opus-4-20250514',
+ *   temperature: [0.7],
+ *   maxTokens: [4096],
+ *   thinkingEnabled: true,
+ *   thinkingBudgetTokens: [10000],
+ *   messages,
+ *   setMessages,
+ *   expandedReasonings,
+ *   setExpandedReasonings,
+ *   // ... other parameters
+ * })
+ * 
+ * // Send a message
+ * await sendMessage('Explain quantum entanglement')
+ * 
+ * // Send with images
+ * await sendMessage('What is in this image?', [imageAttachment])
+ * 
+ * // Stop generation
+ * stopGeneration()
+ * 
+ * // Regenerate last response
+ * await regenerateMessage(messages.slice(0, -1))
+ * ```
+ * 
+ * ## Integration Points
+ * 
+ * ### PlaygroundPage
+ * Main consumer that provides all parameters and state management.
+ * 
+ * ### ChatInterface
+ * Uses the hook's return values for UI state and actions.
+ * 
+ * ### ParametersPanel
+ * Parameters from this panel are passed to the hook for request building.
+ * 
+ * ### ThinkingBubble
+ * Displays reasoning content with expand/collapse state managed by the hook.
+ * 
+ * ## Important Notes
+ * 
+ * - System messages are automatically prepended if not already present
+ * - Error messages (role: 'error') are filtered from API requests
+ * - Reasoning bubbles auto-collapse when content appears (UX optimization)
+ * - Empty reasoning content is converted to `null` for consistency
+ * - All animation frames are cleaned up on unmount to prevent memory leaks
+ * 
+ * @see getModelCapabilities for parameter compatibility detection
+ * @see ThinkingBubble for reasoning content display
+ * @see PlaygroundPage for integration example
+ */
+
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useNotifications } from '@/components/ui/notifications'
 import { Message, getMessageStringContent } from '@/lib/utils'
