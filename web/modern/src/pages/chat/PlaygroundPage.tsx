@@ -681,7 +681,7 @@ export function PlaygroundPage() {
   const loadTokens = async () => {
     setIsLoadingTokens(true)
     try {
-      const res = await api.get('/api/token/?p=0&size=100')
+      const res = await api.get('/api/token/?p=0&size=5')
 
       const data = res.data
 
