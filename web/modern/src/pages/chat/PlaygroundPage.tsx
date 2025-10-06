@@ -9,8 +9,7 @@
  * 
  * ### Security & Privacy Considerations
  * 
- * **Important: All data is stored in your browser's localStorage - it NEVER leaves your device
- * until you logout or your session is destroyed on the site.**
+ * **Important: All data is stored in your browser's localStorage - it NEVER leaves your device.**
  * 
  * The playground uses browser localStorage to persist your conversations, settings, and preferences.
  * This design choice provides several benefits:
@@ -19,7 +18,6 @@
  *    - No server-side conversation history
  *    - No data transmitted to backend for storage
  *    - Only API requests are sent to the server (standard chat API calls)
- *    - Data persists across sessions until you explicitly logout
  * 
  * 2. **Browser Security Model**: localStorage is protected by browser security policies
  *    - Same-origin policy: Only this domain can access the data
@@ -27,7 +25,7 @@
  *    - Protected by your browser's security mechanisms
  * 
  * 3. **Trust Model**: If you trust your browser, you can trust this storage
- *    - Modern browsers (Chrome, Firefox, Safari, Edge, Brave) have robust security
+ *    - Modern browsers (Chrome, Firefox, Safari, Edge) have robust security
  *    - localStorage is encrypted at OS level (disk encryption)
  *    - Protected by your device's security (password/biometrics)
  * 
@@ -118,7 +116,7 @@
  * 
  * ### 2. Conversation Management
  * - Full CRUD operations: Send, Edit, Delete, Regenerate messages
- * - Export conversations (JSON format)
+ * - Export conversations in multiple formats (JSON, Markdown, Text)
  * - Clear conversation (generates new UUID, preserves settings)
  * - Persistent across page reloads via localStorage
  * 
@@ -184,7 +182,7 @@
  * 
  * ### Best Practices
  * 
- * 1. **Use a trusted browser**: Chrome, Firefox, Safari, Edge, Brave from official sources
+ * 1. **Use a trusted browser**: Chrome, Firefox, Safari, Edge from official sources
  * 2. **Keep browser updated**: Security patches are critical
  * 3. **Use device encryption**: Protects localStorage at rest
  * 4. **Review browser extensions**: Only install trusted extensions
