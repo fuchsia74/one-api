@@ -149,8 +149,8 @@ oneapi:
   environment:
     # (optional) SESSION_SECRET set a fixed session secret so that user sessions won't be invalidated after server restart
     SESSION_SECRET: xxxxxxx
-    # (optional) If you access one-api using a non-HTTPS address, you need to set DISABLE_COOKIE_SECURE to true
-    DISABLE_COOKIE_SECURE: "true"
+    # (optional) ENABLE_COOKIE_SECURE enable secure cookies, must be used with HTTPS
+    ENABLE_COOKIE_SECURE: "true"
 
     # (optional) DEBUG enable debug mode
     DEBUG: "true"
