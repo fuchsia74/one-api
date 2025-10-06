@@ -1,4 +1,106 @@
-// Model capability detection based on model names (simplified version of AWS adapter logic)
+/**
+ * Model Capabilities Detection System
+ * 
+ * This module provides runtime detection of AI model capabilities based on model names.
+ * Originally implemented by h0llyw00dzz for development with self-hosted GPU providers
+ * such as Hyperbolic and DeepInfra.
+ * 
+ * ## Purpose
+ * Different AI models and providers support different features and parameters. This system
+ * automatically detects which capabilities a model supports based on its name pattern,
+ * enabling the UI to show/hide relevant parameters and preventing API errors from
+ * unsupported parameters.
+ * 
+ * ## Architecture
+ * 1. Model Type Detection: Identifies the model family (Claude, OpenAI, Llama, etc.)
+ * 2. Capability Mapping: Returns which parameters each model type supports
+ * 3. Special Cases: Handles provider-specific implementations (Hyperbolic, DeepInfra, Vercel)
+ * 
+ * ## Supported Capabilities
+ * - `supportsTools`: Function/tool calling (e.g., Claude, OpenAI, Cohere)
+ * - `supportsThinking`: Extended reasoning mode (Claude Opus/Sonnet 4+, DeepSeek-R1, Qwen thinking models)
+ * - `supportsStop`: Custom stop sequences for generation control
+ * - `supportsReasoningEffort`: Reasoning effort parameter (DeepSeek v3.1+)
+ * - `supportsLogprobs`: Log probabilities for token generation (OpenAI, DeepInfra, Vercel)
+ * - `supportsTopK`: Top-K sampling (Cohere, Llama, Mistral, Google)
+ * - `supportsTopP`: Top-P (nucleus) sampling (most models)
+ * - `supportsFrequencyPenalty`: Penalize frequent tokens (OpenAI, Claude, most models)
+ * - `supportsPresencePenalty`: Penalize repeated topics (OpenAI, Claude, most models)
+ * - `supportsMaxCompletionTokens`: Max output tokens parameter (OpenAI, DeepInfra, Vercel, Hyperbolic)
+ * - `supportsVision`: Image/multimodal input (GPT-4 Vision, Claude 3+, Gemini, Nova, etc.)
+ * 
+ * ## Provider Detection
+ * The system detects models from these providers:
+ * - **Hyperbolic**: Models with prefixes like `openai/gpt-oss`, `qwen/qwen3-next`, `deepseek-ai/deepseek-r1`
+ * - **DeepInfra**: Models with prefixes like `deepseek-ai/`, `qwen/`, `moonshotai/`, `nvidia/`
+ * - **Vercel AI Gateway**: Models with prefix `alibaba/`
+ * - **Direct APIs**: Claude, OpenAI, Cohere, Google, AWS (Nova), Writer (Palmyra)
+ * 
+ * ## Maintenance Guide
+ * 
+ * ### Adding a New Model Type
+ * 1. Add detection logic in `getModelType()`:
+ *    ```typescript
+ *    if (lowerName.includes('newmodel')) return 'newmodel'
+ *    ```
+ * 2. Add capability mapping in `getModelCapabilities()`:
+ *    ```typescript
+ *    case 'newmodel':
+ *      return {
+ *        supportsTools: false,
+ *        supportsThinking: false,
+ *        // ... set all capabilities
+ *      }
+ *    ```
+ * 
+ * ### Adding a New Provider
+ * 1. Add provider detection in `getModelType()` before generic model checks:
+ *    ```typescript
+ *    if (lowerName.includes('provider-prefix/')) return 'provider'
+ *    ```
+ * 2. Add provider-specific capabilities with appropriate support levels
+ * 
+ * ### Adding a New Capability
+ * 1. Add to `ModelCapabilities` interface:
+ *    ```typescript
+ *    supportsNewFeature: boolean
+ *    ```
+ * 2. Update `getDefaultCapabilities()` with default value (usually `false`)
+ * 3. Set capability for each model type in `getModelCapabilities()`
+ * 4. Create helper function if capability varies within a model family
+ * 
+ * ### Adding Model-Specific Features
+ * If only certain models within a family support a feature:
+ * 1. Create a helper function like `claudeSupportsThinking()` or `hyperbolicSupportsThinking()`
+ * 2. Check for specific model name patterns
+ * 3. Call the helper in the capability mapping
+ * 
+ * ## Examples
+ * 
+ * ```typescript
+ * // Detect capabilities for Claude Opus 4
+ * const caps = getModelCapabilities('claude-opus-4-20250514')
+ * // Returns: supportsTools=true, supportsThinking=true, supportsTopP=true
+ * 
+ * // Detect capabilities for Hyperbolic DeepSeek-R1
+ * const caps = getModelCapabilities('deepseek-ai/deepseek-r1')
+ * // Returns: supportsTools=true, supportsThinking=true, supportsLogprobs=true
+ * 
+ * // Detect capabilities for GPT-4 Vision
+ * const caps = getModelCapabilities('gpt-4o')
+ * // Returns: supportsTools=true, supportsVision=true, supportsLogprobs=true
+ * ```
+ * 
+ * ## Important Notes
+ * - Model detection is case-insensitive
+ * - Provider-specific checks must come BEFORE generic model checks in `getModelType()`
+ * - Vision support is detected separately via `modelSupportsVision()` due to complex patterns
+ * - AWS OpenAI OSS models are checked before generic GPT detection to avoid misclassification
+ * - Unknown models return default (minimal) capabilities for safety
+ * 
+ * @see ModelCapabilities for capability definitions
+ * @see getModelCapabilities for usage
+ */
 
 export interface ModelCapabilities {
   supportsTools: boolean
