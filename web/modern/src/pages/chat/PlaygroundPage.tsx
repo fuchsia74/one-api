@@ -118,7 +118,7 @@
  * 
  * ### 2. Conversation Management
  * - Full CRUD operations: Send, Edit, Delete, Regenerate messages
- * - Export conversations in multiple formats (JSON, Markdown, Text)
+ * - Export conversations (JSON format)
  * - Clear conversation (generates new UUID, preserves settings)
  * - Persistent across page reloads via localStorage
  * 
