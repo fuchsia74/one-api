@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
@@ -242,13 +241,14 @@ type consumeTokenRequest struct {
 	AddUsedQuota uint `json:"add_used_quota" gorm:"-"`
 	// AddReason is the reason for adding or subtracting used quota
 	AddReason string `json:"add_reason" gorm:"-"`
+	// ElapsedTimeMs is the elapsed time in milliseconds for this request,
+	// used for logging purpose only
+	ElapsedTimeMs *int64 `json:"elapsed_time_ms,omitempty" gorm:"-"`
 }
 
 // ConsumeToken consume token from another source,
 // let one-api to gather billing from different sources.
 func ConsumeToken(c *gin.Context) {
-	// Capture request start time to compute elapsed latency for the synthetic billing log.
-	startTime := time.Now()
 	ctx := gmw.Ctx(c)
 	userID := c.GetInt(ctxkey.Id)
 	tokenID := c.GetInt(ctxkey.TokenId)
@@ -300,6 +300,12 @@ func ConsumeToken(c *gin.Context) {
 	if tid, err := gmw.TraceID(c); err == nil {
 		traceID = tid.String()
 	}
+
+	elapsedTime := int64(0)
+	if tokenPatch.ElapsedTimeMs != nil && *tokenPatch.ElapsedTimeMs > 0 {
+		elapsedTime = *tokenPatch.ElapsedTimeMs
+	}
+
 	model.RecordConsumeLog(ctx, &model.Log{
 		UserId:      userID,
 		ModelName:   tokenPatch.AddReason,
@@ -308,7 +314,7 @@ func ConsumeToken(c *gin.Context) {
 		Content:     fmt.Sprintf("External (%s) consumed %s", tokenPatch.AddReason, common.LogQuota(int64(tokenPatch.AddUsedQuota))),
 		RequestId:   c.GetString(helper.RequestIdKey),
 		TraceId:     traceID,
-		ElapsedTime: helper.CalcElapsedTime(startTime), // milliseconds
+		ElapsedTime: elapsedTime,
 	})
 
 	// Update token data
