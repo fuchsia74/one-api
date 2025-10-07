@@ -194,7 +194,7 @@ func main() {
 			SameSite: http.SameSiteStrictMode, // CSRF protection
 		})
 	} else {
-		logger.Logger.Warn("ENABLE_COOKIE_SECURE is set, using insecure cookie store")
+		logger.Logger.Warn("ENABLE_COOKIE_SECURE is set to false, using insecure cookie store")
 		sessionStore.Options(sessions.Options{
 			Path:     "/",
 			MaxAge:   3600, // 1 hour for improved security
