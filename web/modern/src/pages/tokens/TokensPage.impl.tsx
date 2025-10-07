@@ -9,10 +9,12 @@ import { api } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { renderQuota } from '@/lib/utils'
 import { ResponsiveActionGroup } from '@/components/ui/responsive-action-group'
-import { Plus, Copy, Eye, EyeOff } from 'lucide-react'
+import { Plus, Copy, Eye, EyeOff, Check } from 'lucide-react'
+import { useClipboardManager } from './useClipboardManager'
 
 interface Token {
   id: number
@@ -64,6 +66,9 @@ const getStatusBadge = (status: number) => {
   }
 }
 
+/**
+ * TokensPage renders the management interface for API tokens, including search, sorting, and key utilities.
+ */
 export function TokensPage() {
   const navigate = useNavigate()
   const { isMobile } = useResponsive()
@@ -79,6 +84,13 @@ export function TokensPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const initializedRef = useRef(false)
   const [showKeys, setShowKeys] = useState<Record<number, boolean>>({})
+  const {
+    copiedTokens,
+    manualCopyToken,
+    handleCopySuccess,
+    handleCopyFailure,
+    clearManualCopyToken
+  } = useClipboardManager()
 
   const load = async (p = 0, size = pageSize) => {
     setLoading(true)
@@ -215,11 +227,18 @@ export function TokensPage() {
     }
   }
 
-  const copyToClipboard = async (text: string) => {
+  const copyToClipboard = async (token: Token) => {
+    if (!navigator?.clipboard?.writeText) {
+      handleCopyFailure({ id: token.id, key: token.key })
+      return
+    }
+
     try {
-      await navigator.clipboard.writeText(text)
+      await navigator.clipboard.writeText(token.key)
+      handleCopySuccess(token.id)
     } catch (error) {
       console.error('Failed to copy to clipboard:', error)
+      handleCopyFailure({ id: token.id, key: token.key })
     }
   }
 
@@ -272,10 +291,16 @@ export function TokensPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => copyToClipboard(token.key)}
+              onClick={() => copyToClipboard(token)}
               className="h-6 w-6 p-0"
+              disabled={!!copiedTokens[token.id]}
+              title={copiedTokens[token.id] ? 'Copied!' : 'Copy token'}
             >
-              <Copy className="h-3 w-3" />
+              {copiedTokens[token.id] ? (
+                <Check className="h-3 w-3 text-green-600" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
             </Button>
           </div>
         )
@@ -396,55 +421,85 @@ export function TokensPage() {
   }
 
   return (
-    <ResponsivePageContainer
-      title="Tokens"
-      description="Manage your API access tokens"
-      actions={
-        <Button
-          onClick={() => navigate('/tokens/add')}
-          className={cn(
-            "gap-2",
-            isMobile ? "w-full touch-target" : ""
-          )}
-        >
-          <Plus className="h-4 w-4" />
-          {isMobile ? "Add New Token" : "Add Token"}
-        </Button>
-      }
-    >
-      <Card>
-        <CardContent className={cn(
-          isMobile ? "p-4" : "p-6"
-        )}>
-          <EnhancedDataTable
-            columns={columns}
-            data={data}
-            pageIndex={pageIndex}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={handlePageChange}
-            onPageSizeChange={handlePageSizeChange}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onSortChange={handleSortChange}
-            searchValue={searchKeyword}
-            searchOptions={searchOptions}
-            searchLoading={searchLoading}
-            onSearchChange={searchTokens}
-            onSearchValueChange={setSearchKeyword}
-            onSearchSubmit={performSearch}
-            searchPlaceholder="Search tokens by name..."
-            allowSearchAdditions={true}
-            onRefresh={refresh}
-            loading={loading}
-            emptyMessage="No tokens found. Create your first token to get started."
-            mobileCardLayout={true}
-            hideColumnsOnMobile={['created_time', 'accessed_time', 'expired_time']}
-            compactMode={isMobile}
-          />
-        </CardContent>
-      </Card>
-    </ResponsivePageContainer>
+    <>
+      <ResponsivePageContainer
+        title="Tokens"
+        description="Manage your API access tokens"
+        actions={
+          <Button
+            onClick={() => navigate('/tokens/add')}
+            className={cn(
+              "gap-2",
+              isMobile ? "w-full touch-target" : ""
+            )}
+          >
+            <Plus className="h-4 w-4" />
+            {isMobile ? "Add New Token" : "Add Token"}
+          </Button>
+        }
+      >
+        <Card>
+          <CardContent className={cn(
+            isMobile ? "p-4" : "p-6"
+          )}>
+            <EnhancedDataTable
+              columns={columns}
+              data={data}
+              pageIndex={pageIndex}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              sortBy={sortBy}
+              sortOrder={sortOrder}
+              onSortChange={handleSortChange}
+              searchValue={searchKeyword}
+              searchOptions={searchOptions}
+              searchLoading={searchLoading}
+              onSearchChange={searchTokens}
+              onSearchValueChange={setSearchKeyword}
+              onSearchSubmit={performSearch}
+              searchPlaceholder="Search tokens by name..."
+              allowSearchAdditions={true}
+              onRefresh={refresh}
+              loading={loading}
+              emptyMessage="No tokens found. Create your first token to get started."
+              mobileCardLayout={true}
+              hideColumnsOnMobile={['created_time', 'accessed_time', 'expired_time']}
+              compactMode={isMobile}
+            />
+          </CardContent>
+        </Card>
+      </ResponsivePageContainer>
+
+      <Dialog
+        open={!!manualCopyToken}
+        onOpenChange={isOpen => {
+          if (!isOpen) {
+            clearManualCopyToken()
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Manual copy required</DialogTitle>
+            <DialogDescription>
+              Clipboard access is unavailable. Copy the API key below manually to continue using it.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-md border border-dashed bg-muted/40 p-4">
+            <span className="block font-mono text-sm break-all">
+              {manualCopyToken?.key}
+            </span>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={clearManualCopyToken}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
 
