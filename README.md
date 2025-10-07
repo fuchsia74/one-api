@@ -334,7 +334,7 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 
 #### Support gpt-5 family
 
-gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex
+gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex / gpt-5-pro
 
 #### Support o3-deep-research & o4-mini-deep-research
 
