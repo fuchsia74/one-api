@@ -127,7 +127,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, request *model.ImageReques
 	a.awsAdapter = adaptor
 
 	// Store the image request in context for the Titan or Canvas adapter to use later
-	c.Set("imageRequest", *request)
+	c.Set(ctxkey.ImageRequest, *request)
 	c.Set(ctxkey.RequestModel, request.Model)
 
 	// For image generation, we need to convert to GeneralOpenAIRequest format

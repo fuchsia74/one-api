@@ -57,7 +57,6 @@ func GetSubscription(c *gin.Context) {
 		AccessUntil:        expiredTime,
 	}
 	c.JSON(200, subscription)
-	return
 }
 
 func GetUsage(c *gin.Context) {

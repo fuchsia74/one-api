@@ -99,6 +99,8 @@ func GetAdaptor(model string) utils.AwsAdapter {
 		return &mistral.Adaptor{}
 	case AwsOpenAI:
 		return &openai.Adaptor{}
+	case AwsQwen:
+		return &qwen.Adaptor{}
 	case AwsWriter:
 		return &writer.Adaptor{}
 	default:

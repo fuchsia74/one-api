@@ -420,28 +420,28 @@ type QwenConverseSystemMessage struct {
 // technical accuracy, and programming quality for optimal code generation.
 //
 // Based on AWS Bedrock Converse API inference configuration documentation.
-type QwenConverseInferenceConfig struct {
-	// MaxTokens specifies the maximum number of tokens to generate in the response.
-	// Controls response length and API costs while maintaining Qwen3 Coder's
-	// code-focused quality and technical accuracy in generation completion.
-	MaxTokens int `json:"maxTokens"`
+// type QwenConverseInferenceConfig struct {
+// 	// MaxTokens specifies the maximum number of tokens to generate in the response.
+// 	// Controls response length and API costs while maintaining Qwen3 Coder's
+// 	// code-focused quality and technical accuracy in generation completion.
+// 	MaxTokens int `json:"maxTokens"`
 
-	// Temperature controls the randomness of Qwen3 Coder's responses.
-	// Range: 0.0 to 1.0, where 0.0 is deterministic and 1.0 is most random.
-	// Optional field that balances creativity with consistency in code generation.
-	// Lower values recommended for accurate code generation.
-	Temperature *float64 `json:"temperature,omitempty"`
+// 	// Temperature controls the randomness of Qwen3 Coder's responses.
+// 	// Range: 0.0 to 1.0, where 0.0 is deterministic and 1.0 is most random.
+// 	// Optional field that balances creativity with consistency in code generation.
+// 	// Lower values recommended for accurate code generation.
+// 	Temperature *float64 `json:"temperature,omitempty"`
 
-	// TopP controls nucleus sampling, limiting cumulative probability of token choices.
-	// Range: 0.0 to 1.0, where lower values make responses more focused.
-	// Optional field optimized for Qwen's code generation quality and technical accuracy.
-	TopP *float64 `json:"topP,omitempty"`
+// 	// TopP controls nucleus sampling, limiting cumulative probability of token choices.
+// 	// Range: 0.0 to 1.0, where lower values make responses more focused.
+// 	// Optional field optimized for Qwen's code generation quality and technical accuracy.
+// 	TopP *float64 `json:"topP,omitempty"`
 
-	// StopSequences contains custom strings that will stop generation when encountered.
-	// Optional field enabling fine-grained control over Qwen3 Coder response
-	// termination for code generation management and technical dialogue flow control.
-	StopSequences []string `json:"stopSequences,omitempty"`
-}
+// 	// StopSequences contains custom strings that will stop generation when encountered.
+// 	// Optional field enabling fine-grained control over Qwen3 Coder response
+// 	// termination for code generation management and technical dialogue flow control.
+// 	StopSequences []string `json:"stopSequences,omitempty"`
+// }
 
 // QwenConverseResponse represents the complete response from AWS Bedrock Converse API.
 //
@@ -451,33 +451,33 @@ type QwenConverseInferenceConfig struct {
 // comprehensive code generation management and cost tracking.
 //
 // Based on AWS Bedrock Converse API response format documentation.
-type QwenConverseResponse struct {
-	// Message contains the assistant's response with role and content information.
-	// Features Qwen3 Coder's code-focused quality with advanced technical
-	// understanding, multi-language programming support, accurate code generation,
-	// and problem-solving applied to the generated content.
-	Message struct {
-		// Role identifies the message sender, typically "assistant" for Qwen3 Coder.
-		// Maintains conversation context and indicates code-focused generated content
-		// with advanced programming capabilities and technical accuracy applied.
-		Role string `json:"role"`
+// type QwenConverseResponse struct {
+// 	// Message contains the assistant's response with role and content information.
+// 	// Features Qwen3 Coder's code-focused quality with advanced technical
+// 	// understanding, multi-language programming support, accurate code generation,
+// 	// and problem-solving applied to the generated content.
+// 	Message struct {
+// 		// Role identifies the message sender, typically "assistant" for Qwen3 Coder.
+// 		// Maintains conversation context and indicates code-focused generated content
+// 		// with advanced programming capabilities and technical accuracy applied.
+// 		Role string `json:"role"`
 
-		// Content contains the response content as structured content blocks.
-		// Delivers Qwen3 Coder's code-focused response with technical accuracy,
-		// programming quality, and multi-language code support.
-		Content []QwenConverseContentBlock `json:"content"`
-	} `json:"message"`
+// 		// Content contains the response content as structured content blocks.
+// 		// Delivers Qwen3 Coder's code-focused response with technical accuracy,
+// 		// programming quality, and multi-language code support.
+// 		Content []QwenConverseContentBlock `json:"content"`
+// 	} `json:"message"`
 
-	// StopReason indicates why Qwen3 Coder stopped generating tokens.
-	// Valid values include "end_turn" (natural completion), "max_tokens" (limit reached),
-	// "stop_sequence" (custom sequence encountered), and code generation completion reasons.
-	StopReason string `json:"stopReason"`
+// 	// StopReason indicates why Qwen3 Coder stopped generating tokens.
+// 	// Valid values include "end_turn" (natural completion), "max_tokens" (limit reached),
+// 	// "stop_sequence" (custom sequence encountered), and code generation completion reasons.
+// 	StopReason string `json:"stopReason"`
 
-	// Usage contains detailed token consumption statistics for the request.
-	// Provides input, output, and total token counts for cost management
-	// and performance monitoring of Qwen3 Coder code generation sessions.
-	Usage QwenUsage `json:"usage"`
-}
+// 	// Usage contains detailed token consumption statistics for the request.
+// 	// Provides input, output, and total token counts for cost management
+// 	// and performance monitoring of Qwen3 Coder code generation sessions.
+// 	Usage QwenUsage `json:"usage"`
+// }
 
 // QwenBedrockResponse represents the complete response from AWS Bedrock Qwen models.
 //
@@ -487,37 +487,37 @@ type QwenConverseResponse struct {
 // and detailed usage statistics for code generation management and cost tracking.
 //
 // Based on AWS Bedrock official Converse API response format documentation.
-type QwenBedrockResponse struct {
-	// ID provides a unique identifier for this specific response.
-	// Used for request tracking, logging, and code generation session management
-	// with Qwen3 Coder models through AWS Bedrock infrastructure.
-	ID string `json:"id"`
+// type QwenBedrockResponse struct {
+// 	// ID provides a unique identifier for this specific response.
+// 	// Used for request tracking, logging, and code generation session management
+// 	// with Qwen3 Coder models through AWS Bedrock infrastructure.
+// 	ID string `json:"id"`
 
-	// Model identifies the specific Qwen3 Coder model used for generation.
-	// Optional field that indicates which code-focused model variant processed
-	// the request, useful for model performance tracking and programming analytics.
-	Model string `json:"model,omitempty"`
+// 	// Model identifies the specific Qwen3 Coder model used for generation.
+// 	// Optional field that indicates which code-focused model variant processed
+// 	// the request, useful for model performance tracking and programming analytics.
+// 	Model string `json:"model,omitempty"`
 
-	// Object specifies the response type, typically "chat.completion".
-	// Maintains compatibility with standard chat completion APIs while providing
-	// Qwen3 Coder's code-focused capabilities through AWS Bedrock.
-	Object string `json:"object"`
+// 	// Object specifies the response type, typically "chat.completion".
+// 	// Maintains compatibility with standard chat completion APIs while providing
+// 	// Qwen3 Coder's code-focused capabilities through AWS Bedrock.
+// 	Object string `json:"object"`
 
-	// Created represents the Unix timestamp when the response was generated.
-	// Provides timing information for code generation analytics, performance
-	// monitoring, and audit trails of Qwen3 Coder interactions.
-	Created int64 `json:"created"`
+// 	// Created represents the Unix timestamp when the response was generated.
+// 	// Provides timing information for code generation analytics, performance
+// 	// monitoring, and audit trails of Qwen3 Coder interactions.
+// 	Created int64 `json:"created"`
 
-	// Choices contains the response options generated by Qwen3 Coder.
-	// Typically includes a single choice featuring code-focused quality
-	// with advanced technical understanding, multi-language support, and programming accuracy.
-	Choices []QwenBedrockChoice `json:"choices"`
+// 	// Choices contains the response options generated by Qwen3 Coder.
+// 	// Typically includes a single choice featuring code-focused quality
+// 	// with advanced technical understanding, multi-language support, and programming accuracy.
+// 	Choices []QwenBedrockChoice `json:"choices"`
 
-	// Usage contains detailed token consumption statistics for cost management.
-	// Provides comprehensive input, output, and total token counts for
-	// cost tracking and performance monitoring of Qwen3 Coder code generation.
-	Usage relaymodel.Usage `json:"usage"`
-}
+// 	// Usage contains detailed token consumption statistics for cost management.
+// 	// Provides comprehensive input, output, and total token counts for
+// 	// cost tracking and performance monitoring of Qwen3 Coder code generation.
+// 	Usage relaymodel.Usage `json:"usage"`
+// }
 
 // QwenBedrockChoice represents a single response choice from AWS Bedrock Qwen.
 //

@@ -17,6 +17,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/songquanpeng/one-api/common"
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/model"
 )
 
@@ -119,7 +120,7 @@ func TestSetupTotp(t *testing.T) {
 	router := setupTestRouter()
 	router.GET("/totp/setup", func(c *gin.Context) {
 		// Mock user ID in context
-		c.Set("id", 1)
+		c.Set(ctxkey.Id, 1)
 		SetupTotp(c)
 	})
 
@@ -178,12 +179,12 @@ func TestTotpSetupRequest(t *testing.T) {
 
 	// First, set up TOTP to get a secret in session
 	router.GET("/totp/setup", func(c *gin.Context) {
-		c.Set("id", 1)
+		c.Set(ctxkey.Id, 1)
 		SetupTotp(c)
 	})
 
 	router.POST("/totp/confirm", func(c *gin.Context) {
-		c.Set("id", 1)
+		c.Set(ctxkey.Id, 1)
 		ConfirmTotp(c)
 	})
 
@@ -382,8 +383,8 @@ func TestAdminDisableUserTotp(t *testing.T) {
 	router := setupTestRouter()
 	router.POST("/admin/totp/disable/:id", func(c *gin.Context) {
 		// Mock admin user context
-		c.Set("id", 2)                     // Admin user ID
-		c.Set("role", model.RoleAdminUser) // Admin role
+		c.Set(ctxkey.Id, 2)                     // Admin user ID
+		c.Set(ctxkey.Role, model.RoleAdminUser) // Admin role
 		AdminDisableUserTotp(c)
 	})
 

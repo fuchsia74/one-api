@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
 	"github.com/songquanpeng/one-api/relay/relaymode"
@@ -61,7 +62,7 @@ func TestAdaptorIntegration(t *testing.T) {
 		BaseURL:        "https://api.openai.com",
 	}
 	testMeta.ActualModelName = chatRequest.Model
-	c.Set("meta", testMeta)
+	c.Set(ctxkey.Meta, testMeta)
 
 	// Create adaptor
 	adaptor := &Adaptor{}
@@ -150,7 +151,7 @@ func TestAdaptorNonChatCompletion(t *testing.T) {
 		Mode:        relaymode.Embeddings,
 		ChannelType: 1,
 	}
-	c.Set("meta", testMeta)
+	c.Set(ctxkey.Meta, testMeta)
 
 	adaptor := &Adaptor{}
 	adaptor.Init(testMeta)

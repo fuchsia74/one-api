@@ -285,6 +285,9 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 			if v.Value.Start != nil {
 				switch startValue := v.Value.Start.(type) {
 				case *types.ContentBlockStartMemberToolUse:
+					if v.Value.ContentBlockIndex == nil {
+						return true
+					}
 					blockIndex := *v.Value.ContentBlockIndex
 					toolUseStart := startValue.Value
 					if toolUseStart.ToolUseId != nil && toolUseStart.Name != nil {
@@ -380,8 +383,11 @@ func StreamHandler(c *gin.Context, awsCli *bedrockruntime.Client) (*relaymodel.E
 						}
 					}
 				case *types.ContentBlockDeltaMemberToolUse:
+					if v.Value.ContentBlockIndex == nil || deltaValue.Value.Input == nil {
+						break
+					}
 					blockIndex := *v.Value.ContentBlockIndex
-					if tool, exists := toolCallsMap[blockIndex]; exists && deltaValue.Value.Input != nil {
+					if tool, exists := toolCallsMap[blockIndex]; exists {
 						tool.Function.Arguments += *deltaValue.Value.Input
 
 						response = &openai.ChatCompletionsStreamResponse{
@@ -732,7 +738,7 @@ func convertQwenToConverseRequest(qwenReq *Request, modelID string) (*bedrockrun
 	}
 
 	if qwenReq.ReasoningEffort != nil {
-		reasoningConfig := map[string]any{
+		reasoningConfig := map[string]string{
 			"reasoning_config": *qwenReq.ReasoningEffort,
 		}
 		docInput := document.NewLazyDocument(reasoningConfig)
@@ -918,7 +924,7 @@ func convertQwenToConverseStreamRequest(qwenReq *Request, modelID string) (*bedr
 	}
 
 	if qwenReq.ReasoningEffort != nil {
-		reasoningConfig := map[string]any{
+		reasoningConfig := map[string]string{
 			"reasoning_config": *qwenReq.ReasoningEffort,
 		}
 		docInput := document.NewLazyDocument(reasoningConfig)
@@ -962,8 +968,13 @@ func ConvertMessages(messages []relaymodel.Message) []Message {
 			for _, toolCall := range message.ToolCalls {
 				arguments := ""
 				if toolCall.Function.Arguments != nil {
-					if argStr, ok := toolCall.Function.Arguments.(string); ok {
-						arguments = argStr
+					switch arg := toolCall.Function.Arguments.(type) {
+					case string:
+						arguments = arg
+					default:
+						if marshaled, err := json.Marshal(arg); err == nil {
+							arguments = string(marshaled)
+						}
 					}
 				}
 

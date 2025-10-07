@@ -116,7 +116,6 @@ func SearchTokens(c *gin.Context) {
 		"data":    tokens,
 		"total":   total,
 	})
-	return
 }
 
 func GetToken(c *gin.Context) {
@@ -136,7 +135,6 @@ func GetToken(c *gin.Context) {
 		"message": "",
 		"data":    token,
 	})
-	return
 }
 
 func GetTokenStatus(c *gin.Context) {
@@ -223,7 +221,6 @@ func AddToken(c *gin.Context) {
 		"message": "",
 		"data":    cleanToken,
 	})
-	return
 }
 
 func DeleteToken(c *gin.Context) {
@@ -238,7 +235,6 @@ func DeleteToken(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 type consumeTokenRequest struct {

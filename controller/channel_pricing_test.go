@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/model"
 )
 
@@ -100,7 +101,7 @@ func TestUpdateChannelPricing_UnifiedFormat(t *testing.T) {
 			c.Params = gin.Params{{Key: "id", Value: "1"}}
 
 			// Mock the channel retrieval
-			c.Set("channel", channel)
+			c.Set(ctxkey.Channel, channel)
 
 			// Note: In a real test, you would need to mock the database operations
 			// For now, we're just testing the request parsing and response structure
@@ -162,7 +163,7 @@ func TestGetChannelPricing_UnifiedFormat(t *testing.T) {
 			c.Params = gin.Params{{Key: "id", Value: "1"}}
 
 			// Mock the channel retrieval
-			c.Set("channel", tt.channel)
+			c.Set(ctxkey.Channel, tt.channel)
 
 			// Note: In a real test, you would call the actual GetChannelPricing function
 			// and verify the response structure contains all expected fields

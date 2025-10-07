@@ -78,7 +78,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 
 	c.Set(ctxkey.RequestModel, request.Model)
 	c.Set(ctxkey.ConvertedRequest, convertedReq)
-	c.Set("relayMode", relayMode)
+	c.Set(ctxkey.RelayMode, relayMode)
 	return convertedReq, nil
 }
 
@@ -112,7 +112,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 // Error conditions include network failures, AWS API errors, response parsing issues,
 // tool calling errors, reasoning processing failures, and context cancellation scenarios.
 func (a *Adaptor) DoResponse(c *gin.Context, awsCli *bedrockruntime.Client, meta *meta.Meta) (usage *model.Usage, err *model.ErrorWithStatusCode) {
-	relayModeValue, exists := c.Get("relayMode")
+	relayModeValue, exists := c.Get(ctxkey.RelayMode)
 	if exists {
 		if relayModeInt, ok := relayModeValue.(int); ok {
 			switch relayModeInt {
