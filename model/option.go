@@ -27,6 +27,7 @@ func AllOption() ([]*Option, error) {
 	return options, err
 }
 
+// InitOptionMap initializes the OptionMap from config and database
 func InitOptionMap() {
 	config.OptionMapRWMutex.Lock()
 	config.OptionMap = make(map[string]string)
@@ -61,6 +62,14 @@ func InitOptionMap() {
 	config.OptionMap["ServerAddress"] = ""
 	config.OptionMap["GitHubClientId"] = ""
 	config.OptionMap["GitHubClientSecret"] = ""
+	config.OptionMap["LarkClientId"] = config.LarkClientId
+	config.OptionMap["LarkClientSecret"] = ""
+	config.OptionMap["OidcClientId"] = config.OidcClientId
+	config.OptionMap["OidcClientSecret"] = ""
+	config.OptionMap["OidcWellKnown"] = config.OidcWellKnown
+	config.OptionMap["OidcAuthorizationEndpoint"] = config.OidcAuthorizationEndpoint
+	config.OptionMap["OidcTokenEndpoint"] = config.OidcTokenEndpoint
+	config.OptionMap["OidcUserinfoEndpoint"] = config.OidcUserinfoEndpoint
 	config.OptionMap["WeChatServerAddress"] = ""
 	config.OptionMap["WeChatServerToken"] = ""
 	config.OptionMap["WeChatAccountQRCodeImageURL"] = ""

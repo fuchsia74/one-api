@@ -243,7 +243,6 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 		// Return wrapped error; avoid duplicate logging here
 		return "", errors.Wrap(err, "failed to do request"), nil
 	}
-	defer resp.Body.Close()
 
 	// Handle nil response (e.g., AWS Bedrock uses SDK directly, not HTTP)
 	if resp != nil {

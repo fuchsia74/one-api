@@ -62,8 +62,6 @@ Also welcome to register and use my deployed one-api gateway, which supports var
   - [Synopsis](#synopsis)
     - [Why this fork exists](#why-this-fork-exists)
     - [What’s new](#whats-new)
-  - [Multi Agent Framework Compatible](#multi-agent-framework-compatible)
-  - [›_ OpenCode Support](#_-opencode-support)
   - [Tutorial](#tutorial)
     - [Docker Compose Deployment](#docker-compose-deployment)
     - [Kubernetes Deployment](#kubernetes-deployment)
@@ -108,6 +106,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support gemini-2.5-pro](#support-gemini-25-pro)
       - [Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05](#support-gcp-vertex-gloabl-region-and-gemini-25-pro-preview-06-05)
       - [Support gemini-2.5-flash-image-preview \& imagen-4 series](#support-gemini-25-flash-image-preview--imagen-4-series)
+    - [OpenCode Support](#opencode-support)
     - [AWS Features](#aws-features)
       - [Support AWS cross-region inferences](#support-aws-cross-region-inferences)
       - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
@@ -126,112 +125,6 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support black-forest-labs/flux-kontext-pro](#support-black-forest-labsflux-kontext-pro)
   - [Bug Fixes \& Enterprise-Grade Improvements (Including Security Enhancements)](#bug-fixes--enterprise-grade-improvements-including-security-enhancements)
 
-## Multi Agent Framework Compatible
-
-This repository is fully compatible with multi-agent frameworks and is recommended for use with chat completion OpenAI compatible APIs. The unified interface provided by One API makes it an ideal choice for integrating multiple AI services into multi-agent systems, allowing agents to seamlessly interact with various AI models through a standardized OpenAI-compatible endpoint.
-
-> [!TIP]
-> For optimal performance in multi-agent environments, it's recommended to use models that already have automated cached prompt capabilities, such as `grok-code-fast-1`. These models can significantly reduce latency and improve response times by leveraging cached prompts, which is especially beneficial when multiple agents are making frequent requests with similar contexts.
-
-## ›_ OpenCode Support
-
-<p align="center">
-  <a href="https://opencode.ai">
-    <picture>
-      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
-      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
-      <img src="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
-    </picture>
-  </a>
-</p>
-
-[opencode.ai](https://opencode.ai) is an AI coding agent built for the terminal. OpenCode is fully open source, giving you control and `freedom` to use any provider, any model, and any editor. It's available as both a CLI and TUI.
-
-One‑API integrates seamlessly with OpenCode: you can connect any One‑API endpoint and use all your unified models through OpenCode's interface (both CLI and TUI).
-
-To get started, create or edit `~/.config/opencode/opencode.json` like this:
-
-**Using OpenAI SDK:**
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "one-api": {
-      "npm": "@ai-sdk/openai",
-      "name": "One API",
-      "options": {
-        "baseURL": "http://localhost:3000/v1",
-        "apiKey":  "HANDLE_APIKEY_HERE"
-      },
-      "models": {
-        "gpt-4.1-2025-04-14": {
-          "name": "GPT 4.1"
-        }
-      }
-    }
-  }
-}
-```
-
-**Using Anthropic SDK:**
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "one-api-anthropic": {
-      "npm": "@ai-sdk/anthropic",
-      "name": "One API (Anthropic)",
-      "options": {
-        "baseURL": "http://localhost:3000/v1",
-        "apiKey":  "HANDLE_APIKEY_HERE"
-      },
-      "models": {
-        "claude-sonnet-4-5": {
-          "name": "Claude Sonnet 4.5"
-        }
-      }
-    }
-  }
-}
-```
-
-- Replace `HANDLE_APIKEY_HERE` with your One‑API key.
-- Make sure `baseURL` matches your running One‑API endpoint.
-- Now, any opencode command (like `opencode chat`, `opencode run`, and more) works with all your One‑API models directly from the terminal! 😎
-
-**Best Practice - Using Environment Variables:**
-
-For better security, use environment variables instead of hardcoding API keys:
-
-```json
-{
-  "$schema": "https://opencode.ai/config.json",
-  "provider": {
-    "one-api": {
-      "npm": "@ai-sdk/openai",
-      "name": "One API",
-      "options": {
-        "baseURL": "http://localhost:3000/v1",
-        "apiKey": "{env:ONEAPI_API_KEY}"
-      },
-      "models": {
-        "gpt-4.1-2025-04-14": {
-          "name": "GPT 4.1"
-        }
-      }
-    }
-  }
-}
-```
-
-Then set the environment variable in your shell:
-
-```bash
-export ONEAPI_API_KEY="sk-your-actual-api-key-here"
-```
-
 ## Tutorial
 
 ### Docker Compose Deployment
@@ -249,8 +142,8 @@ oneapi:
   environment:
     # (optional) SESSION_SECRET set a fixed session secret so that user sessions won't be invalidated after server restart
     SESSION_SECRET: xxxxxxx
-    # (optional) If you access one-api using a non-HTTPS address, you need to set DISABLE_COOKIE_SECURE to true
-    DISABLE_COOKIE_SECURE: "true"
+    # (optional) ENABLE_COOKIE_SECURE enable secure cookies, must be used with HTTPS
+    ENABLE_COOKIE_SECURE: "true"
 
     # (optional) DEBUG enable debug mode
     DEBUG: "true"
@@ -308,7 +201,9 @@ oneapi:
 
 The initial default account and password are `root` / `123456`.
 
-> [!TIP] > **Secret Management**: For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables:
+> [!TIP]
+>
+> For production environments, consider using proper secret management solutions instead of hardcoding sensitive values in environment variables.
 
 ### Kubernetes Deployment
 
@@ -550,6 +445,70 @@ You can use any model you like for Claude Code, even if the model doesn’t nati
 #### Support gemini-2.5-flash-image-preview & imagen-4 series
 
 ![](https://s3.laisky.com/uploads/2025/09/gemini-banana.png)
+
+### OpenCode Support
+
+<p align="center">
+  <a href="https://opencode.ai">
+    <picture>
+      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
+      <img src="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
+    </picture>
+  </a>
+</p>
+
+[opencode.ai](https://opencode.ai) is an AI coding agent built for the terminal. OpenCode is fully open source, giving you control and `freedom` to use any provider, any model, and any editor. It's available as both a CLI and TUI.
+
+One‑API integrates seamlessly with OpenCode: you can connect any One‑API endpoint and use all your unified models through OpenCode's interface (both CLI and TUI).
+
+To get started, create or edit `~/.config/opencode/opencode.json` like this:
+
+**Using OpenAI SDK:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api": {
+      "npm": "@ai-sdk/openai",
+      "name": "One API",
+      "options": {
+        "baseURL": "https://oneapi.laisky.com/v1",
+        "apiKey": "<ONEAPI_TOKEN_KEY>"
+      },
+      "models": {
+        "gpt-4.1-2025-04-14": {
+          "name": "GPT 4.1"
+        }
+      }
+    }
+  }
+}
+```
+
+**Using Anthropic SDK:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api-anthropic": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "One API (Anthropic)",
+      "options": {
+        "baseURL": "https://oneapi.laisky.com/v1",
+        "apiKey": "<ONEAPI_TOKEN_KEY>"
+      },
+      "models": {
+        "claude-sonnet-4-5": {
+          "name": "Claude Sonnet 4.5"
+        }
+      }
+    }
+  }
+}
+```
 
 ### AWS Features
 

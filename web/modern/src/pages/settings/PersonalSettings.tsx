@@ -11,6 +11,8 @@ import { useAuthStore } from '@/lib/stores/auth'
 import { api } from '@/lib/api'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { loadSystemStatus, type SystemStatus } from '@/lib/utils'
+import { useResponsive } from '@/hooks/useResponsive'
 
 const personalSchema = z.object({
   username: z.string().min(1, 'Username is required'),
@@ -26,6 +28,7 @@ export function PersonalSettings() {
   const [loading, setLoading] = useState(false)
   const [systemToken, setSystemToken] = useState('')
   const [affLink, setAffLink] = useState('')
+  const { isMobile } = useResponsive()
 
   // TOTP related state
   const [totpEnabled, setTotpEnabled] = useState(false)
@@ -38,6 +41,21 @@ export function PersonalSettings() {
   const [setupTotpError, setSetupTotpError] = useState('')
   const [confirmTotpError, setConfirmTotpError] = useState('')
   const [disableTotpError, setDisableTotpError] = useState('')
+
+  // System status state
+  const [systemStatus, setSystemStatus] = useState<SystemStatus>({})
+
+  // Load system status
+  const loadStatus = async () => {
+    try {
+      const status = await loadSystemStatus()
+      if (status) {
+        setSystemStatus(status)
+      }
+    } catch (error) {
+      console.error('Failed to load system status:', error)
+    }
+  }
 
   const form = useForm<PersonalForm>({
     resolver: zodResolver(personalSchema),
@@ -65,6 +83,7 @@ export function PersonalSettings() {
   }
 
   useEffect(() => {
+    loadStatus()
     loadTotpStatus()
   }, [])
 
@@ -77,8 +96,15 @@ export function PersonalSettings() {
       if (res.data.success) {
         setTotpSecret(res.data.data.secret)
         // Generate QR code from URI
-        const qrCodeDataURL = await QRCode.toDataURL(res.data.data.qr_code)
-        setTotpQRCode(qrCodeDataURL)
+        const qrCodeDataURL = await QRCode.toDataURL(res.data.data.qr_code, {
+          width: 256,
+          margin: 2,
+        })
+
+        // Create composite image with system name text on top
+        const systemName = systemStatus.system_name || 'One API'
+        const compositeImage = await createQRCodeWithText(qrCodeDataURL, systemName)
+        setTotpQRCode(compositeImage)
         setShowTotpSetup(true)
       } else {
         setSetupTotpError(res.data.message || 'Failed to setup TOTP')
@@ -87,6 +113,47 @@ export function PersonalSettings() {
       setSetupTotpError(error instanceof Error ? error.message : 'Failed to setup TOTP')
     }
     setTotpLoading(false)
+  }
+
+  // Create QR code with text overlay
+  const createQRCodeWithText = async (qrCodeDataURL: string, text: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas')
+      const ctx = canvas.getContext('2d')!
+      const img = new Image()
+
+      img.onload = () => {
+        // Set canvas size with extra space for text
+        const padding = 30
+        const textHeight = 40
+        canvas.width = img.width + (padding * 2)
+        canvas.height = img.height + textHeight + (padding * 2)
+
+        // Fill white background
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+        // Draw system name text at top
+        ctx.fillStyle = '#000000'
+        ctx.font = 'bold 18px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+        ctx.fillText(text, canvas.width / 2, padding + 10)
+
+        // Draw subtitle
+        ctx.font = '12px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        ctx.fillStyle = '#666666'
+        ctx.fillText('Two-Factor Authentication', canvas.width / 2, padding + 28)
+
+        // Draw QR code below text
+        ctx.drawImage(img, padding, padding + textHeight, img.width, img.height)
+
+        // Convert to data URL
+        resolve(canvas.toDataURL('image/png'))
+      }
+
+      img.src = qrCodeDataURL
+    })
   }
 
   // Confirm TOTP setup with verification code
@@ -412,19 +479,19 @@ export function PersonalSettings() {
 
       {/* TOTP Setup Dialog */}
       <Dialog open={showTotpSetup} onOpenChange={(open) => !totpLoading && setShowTotpSetup(open)}>
-        <DialogContent>
+        <DialogContent className={`${isMobile ? 'max-w-[95vw] p-4 max-h-[90vh] overflow-y-auto' : 'max-w-[500px]'}`}>
           <DialogHeader>
-            <DialogTitle>Setup Two-Factor Authentication</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className={isMobile ? 'text-base' : ''}>Setup Two-Factor Authentication</DialogTitle>
+            <DialogDescription className={isMobile ? 'text-xs' : ''}>
               Follow these steps to secure your account with TOTP.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            <Alert>
-              <AlertTitle>Setup Instructions</AlertTitle>
+          <div className={`space-y-${isMobile ? '3' : '4'}`}>
+            <Alert className={isMobile ? 'text-xs' : ''}>
+              <AlertTitle className={isMobile ? 'text-sm' : ''}>Setup Instructions</AlertTitle>
               <AlertDescription>
-                <ol className="pl-4 mt-2 space-y-1">
+                <ol className={`${isMobile ? 'pl-3 mt-1 space-y-0.5 text-xs' : 'pl-4 mt-2 space-y-1'}`}>
                   <li>Install an authenticator app (Google Authenticator, Authy, etc.)</li>
                   <li>Scan the QR code below or manually enter the secret key</li>
                   <li>Enter the 6-digit code from your authenticator app</li>
@@ -434,43 +501,54 @@ export function PersonalSettings() {
             </Alert>
 
             {totpQRCode && (
-              <div className="flex justify-center my-4">
-                <img src={totpQRCode} alt="TOTP QR Code" className="w-48 h-48" />
+              <div className={`flex justify-center ${isMobile ? 'my-2' : 'my-4'}`}>
+                <img
+                  src={totpQRCode}
+                  alt="TOTP QR Code"
+                  className={`rounded-lg shadow-md ${isMobile ? 'max-w-[240px] w-full h-auto' : 'max-w-full'}`}
+                />
               </div>
             )}
 
             <div className="space-y-2">
-              <FormLabel>Secret Key (manual entry)</FormLabel>
-              <Input value={totpSecret} readOnly className="font-mono" />
+              <FormLabel className={isMobile ? 'text-xs' : ''}>Secret Key (manual entry)</FormLabel>
+              <Input
+                value={totpSecret}
+                readOnly
+                className={`font-mono ${isMobile ? 'text-xs h-9' : ''}`}
+              />
             </div>
 
             <div className="space-y-2">
-              <FormLabel>Verification Code</FormLabel>
+              <FormLabel className={isMobile ? 'text-xs' : ''}>Verification Code</FormLabel>
               <Input
-                placeholder="Enter 6-digit code from your authenticator app"
+                placeholder={isMobile ? "Enter 6-digit code" : "Enter 6-digit code from your authenticator app"}
                 value={totpCode}
                 onChange={(e) => setTotpCode(e.target.value)}
                 maxLength={6}
+                className={isMobile ? 'text-base h-10' : ''}
               />
               {confirmTotpError && (
-                <div className="text-sm text-destructive font-medium mt-1">
+                <div className={`${isMobile ? 'text-xs' : 'text-sm'} text-destructive font-medium mt-1`}>
                   {confirmTotpError}
                 </div>
               )}
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className={isMobile ? 'flex-col space-y-2 sm:space-y-0' : ''}>
             <Button
               variant="outline"
               onClick={() => setShowTotpSetup(false)}
               disabled={totpLoading}
+              className={isMobile ? 'w-full h-10' : ''}
             >
               Cancel
             </Button>
             <Button
               onClick={confirmTotp}
               disabled={!totpCode || totpCode.length !== 6 || totpLoading}
+              className={isMobile ? 'w-full h-10' : ''}
             >
               {totpLoading ? 'Processing...' : 'Confirm'}
             </Button>
