@@ -347,23 +347,27 @@ func DecreaseTokenQuota(id int, quota int64) (err error) {
 }
 
 func decreaseTokenQuota(id int, quota int64) (err error) {
-	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]interface{}{
+	result := DB.Model(&Token{}).
+		Where("id = ? AND remain_quota >= ?", id, quota).
+		Updates(map[string]interface{}{
 			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
 			"used_quota":    gorm.Expr("used_quota + ?", quota),
 			"accessed_time": helper.GetTimestamp(),
-		},
-	).Error
-	if err == nil {
-		token, fetchErr := GetTokenById(id)
-		if fetchErr == nil && token != nil {
-			clearTokenCache(token.Key)
-		} else if fetchErr != nil {
-			logger.Logger.Error("failed to fetch token for cache clearing after quota decrease", zap.Int("token_id", id), zap.Error(fetchErr))
-		}
-		return nil
+		})
+	if result.Error != nil {
+		return errors.Wrapf(result.Error, "failed to decrease token quota: id=%d", id)
 	}
-	return errors.Wrapf(err, "failed to decrease token quota: id=%d", id)
+	if result.RowsAffected == 0 {
+		return errors.Errorf("insufficient token quota for token %d", id)
+	}
+
+	token, fetchErr := GetTokenById(id)
+	if fetchErr == nil && token != nil {
+		clearTokenCache(token.Key)
+	} else if fetchErr != nil {
+		logger.Logger.Error("failed to fetch token for cache clearing after quota decrease", zap.Int("token_id", id), zap.Error(fetchErr))
+	}
+	return nil
 }
 
 func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {

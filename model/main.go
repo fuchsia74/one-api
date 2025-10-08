@@ -194,6 +194,9 @@ func migrateDB() error {
 	if err = DB.AutoMigrate(&Log{}); err != nil {
 		return errors.Wrapf(err, "failed to migrate Log")
 	}
+	if err = DB.AutoMigrate(&TokenTransaction{}); err != nil {
+		return errors.Wrapf(err, "failed to migrate TokenTransaction")
+	}
 	if err = DB.AutoMigrate(&UserRequestCost{}); err != nil {
 		return errors.Wrapf(err, "failed to migrate UserRequestCost")
 	}
