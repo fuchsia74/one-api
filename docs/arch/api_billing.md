@@ -1,10 +1,13 @@
 # API Billing
 
-Refs:
+one‑api supports three different API request formats on the user side: chat completion API, response API, and Claude messages API.
 
-- [Billing system](./billing.md)
+The specific definitions and implementations of these three interfaces can be found in docs/arch/api_convert.md; this document details the billing methods for the three APIs.
+
+## Table of Contents
 
 - [API Billing](#api-billing)
+  - [Table of Contents](#table-of-contents)
   - [Chat Completion API](#chat-completion-api)
     - [Billing Architecture Overview](#billing-architecture-overview)
     - [Core Billing Components](#core-billing-components)
@@ -19,14 +22,11 @@ Refs:
       - [Layer 4: Final Default (Lowest Priority)](#layer-4-final-default-lowest-priority)
     - [Token Counting Methods](#token-counting-methods)
       - [Text Content](#text-content)
-      - [Image Content](#image-content)
-      - [Audio Content](#audio-content)
     - [Special Billing Features](#special-billing-features)
       - [1. Structured Output Billing](#1-structured-output-billing)
       - [2. Function Calling Billing](#2-function-calling-billing)
       - [3. Reasoning Model Billing](#3-reasoning-model-billing)
       - [4. Multi-modal Content Billing](#4-multi-modal-content-billing)
-    - [Pre-consumption vs Post-consumption](#pre-consumption-vs-post-consumption)
       - [Pre-consumption Phase](#pre-consumption-phase)
       - [Post-consumption Phase](#post-consumption-phase)
     - [Error Handling and Refunds](#error-handling-and-refunds)
@@ -34,15 +34,6 @@ Refs:
       - [Refund Implementation](#refund-implementation)
     - [Usage Logging and Tracking](#usage-logging-and-tracking)
       - [Log Structure](#log-structure)
-      - [Billing Metrics Tracked](#billing-metrics-tracked)
-    - [Implementation Files](#implementation-files)
-      - [Core Billing Logic](#core-billing-logic)
-      - [Token Counting](#token-counting)
-      - [Structured Output](#structured-output)
-      - [Model Pricing](#model-pricing)
-  - [OpenAI Response API](#openai-response-api)
-    - [Implementation Architecture](#implementation-architecture)
-      - [Request Processing Flow](#request-processing-flow)
       - [Dual API Support](#dual-api-support)
     - [Core Implementation Components](#core-implementation-components)
       - [Relay Mode and Routing](#relay-mode-and-routing)
@@ -51,6 +42,7 @@ Refs:
     - [Billing Integration](#billing-integration)
       - [Token Counting and Estimation](#token-counting-and-estimation)
       - [Pre-consumption and Post-consumption](#pre-consumption-and-post-consumption)
+      - [Centralized Billing Architecture](#centralized-billing-architecture)
       - [Pricing Compatibility](#pricing-compatibility)
     - [Advanced Features Support](#advanced-features-support)
       - [Streaming Implementation](#streaming-implementation)
@@ -59,6 +51,44 @@ Refs:
     - [API Endpoints and Usage](#api-endpoints-and-usage)
     - [Error Handling and Validation](#error-handling-and-validation)
     - [Implementation Benefits](#implementation-benefits)
+  - [Claude Messages API](#claude-messages-api)
+    - [Implementation Architecture](#implementation-architecture)
+      - [Universal Adapter Support](#universal-adapter-support)
+      - [Request Processing Flow](#request-processing-flow)
+      - [Claude Messages Controller](#claude-messages-controller)
+    - [Core Billing Components](#core-billing-components-1)
+      - [1. Token-Based Billing Fields](#1-token-based-billing-fields-1)
+      - [2. Additional Cost Components](#2-additional-cost-components-1)
+    - [Billing Calculation Formula](#billing-calculation-formula-1)
+      - [Detailed Breakdown](#detailed-breakdown-1)
+    - [Pricing Resolution System](#pricing-resolution-system-1)
+      - [Layer 1: Channel-Specific Overrides (Highest Priority)](#layer-1-channel-specific-overrides-highest-priority-1)
+      - [Layer 2: Adapter Default Pricing (Second Priority)](#layer-2-adapter-default-pricing-second-priority-1)
+      - [Layer 3: Global Pricing Fallback (Third Priority)](#layer-3-global-pricing-fallback-third-priority-1)
+      - [Layer 4: Final Default (Lowest Priority)](#layer-4-final-default-lowest-priority-1)
+    - [Special Billing Features](#special-billing-features-1)
+      - [1. Multimodal Content Billing](#1-multimodal-content-billing)
+      - [2. Tool Calling Billing](#2-tool-calling-billing)
+      - [3. System Prompt Billing](#3-system-prompt-billing)
+    - [Pre-consumption vs Post-consumption](#pre-consumption-vs-post-consumption)
+      - [Pre-consumption Phase](#pre-consumption-phase-1)
+      - [Post-consumption Phase](#post-consumption-phase-1)
+    - [Error Handling and Refunds](#error-handling-and-refunds-1)
+      - [Automatic Refund Scenarios](#automatic-refund-scenarios-1)
+      - [Refund Implementation](#refund-implementation-1)
+    - [Usage Logging and Tracking](#usage-logging-and-tracking-1)
+      - [Log Structure](#log-structure-1)
+      - [Billing Metrics Tracked](#billing-metrics-tracked)
+    - [Implementation Files](#implementation-files)
+      - [Core Billing Logic](#core-billing-logic)
+      - [Token Counting](#token-counting)
+      - [Adapter Integration](#adapter-integration)
+      - [Model Pricing](#model-pricing)
+    - [Billing Integration Summary](#billing-integration-summary)
+  - [External Billing](#external-billing)
+    - [Lifecycle Overview](#lifecycle-overview)
+    - [Token Transactions Table](#token-transactions-table)
+    - [Request Payload](#request-payload)
 
 ## Chat Completion API
 
@@ -209,28 +239,14 @@ Reasonable fallback pricing:
 Uses tiktoken-based encoding specific to each model:
 
 ```go
-// Message structure: <|start|>{role}\n{content}<|end|>\n
-tokensPerMessage = 3  // For most models
-tokensPerName = 1     // If name field is present
 totalTokens = messageTokens + contentTokens + 3  // Reply primer
 ```
 
-#### Image Content
-
-Token calculation based on image dimensions and detail level:
-
-```go
-// Low detail: Fixed cost
-lowDetailCost = 85 tokens
-
 // High detail: Based on image tiles
-numTiles = ceil(width/512) * ceil(height/512)
-highDetailCost = numTiles * costPerTile + additionalCost
+numTiles = ceil(width/512) _ ceil(height/512)
+highDetailCost = numTiles _ costPerTile + additionalCost
 
-// Model-specific costs:
-// GPT-4o: 170 tokens per tile + 85 base
-// GPT-4o-mini: 2833 tokens per tile + 5667 base
-```
+````
 
 #### Audio Content
 
@@ -247,7 +263,7 @@ audioCompletionTokens = audioSeconds * audioTokensPerSecond * audioCompletionRat
 audioTokensPerSecond = 10  // Conservative estimate
 audioPromptRatio = 1.0
 audioCompletionRatio = varies by model
-```
+````
 
 ### Special Billing Features
 
@@ -294,14 +310,10 @@ totalPromptTokens = textTokens + imageTokens
 // Image tokens calculated based on resolution and detail level
 ```
 
-**Text + Audio:**
-
 ```go
 totalPromptTokens = textTokens + ceil(audioTokens * audioPromptRatio)
 totalCompletionTokens = textTokens + ceil(audioTokens * audioCompletionRatio)
 ```
-
-### Pre-consumption vs Post-consumption
 
 #### Pre-consumption Phase
 
@@ -368,23 +380,16 @@ func ReturnPreConsumedQuota(ctx context.Context, quota int64, tokenId int) {
 ```go
 type Log struct {
     UserId:           int
-    ChannelId:        int
     PromptTokens:     int     // Actual prompt tokens used
     CompletionTokens: int     // Actual completion tokens generated
     ModelName:        string  // Model used for the request
     TokenName:        string  // API token name
     Quota:            int     // Total quota consumed
-    Content:          string  // Additional billing details
-}
-```
 
 #### Billing Metrics Tracked
 
 - **User-level**: Total quota used, request count
 - **Channel-level**: Channel quota consumption
-- **Model-level**: Per-model usage statistics
-- **Token-level**: API token usage tracking
-
 ### Implementation Files
 
 #### Core Billing Logic
@@ -415,9 +420,6 @@ This comprehensive billing system ensures accurate cost calculation for all Chat
 
 The OpenAI Response API represents a new interface for generating model responses with enhanced capabilities including stateful conversations, built-in tools, and advanced features. This section documents the **completed implementation** of direct Response API support with full billing integration.
 
-### Implementation Status: ✅ COMPLETE
-
-**Phase 1 Implementation Completed:**
 
 - ✅ **Direct Response API Support**: Users can send requests directly in Response API format to `/v1/responses`
 - ✅ **Native Response API Billing**: Dedicated billing path using the same pricing system as ChatCompletion
@@ -430,16 +432,9 @@ The OpenAI Response API represents a new interface for generating model response
 The system now supports both API formats simultaneously:
 
 - **ChatCompletion API** (`/v1/chat/completions`): Automatic conversion to Response API upstream, with response conversion back to ChatCompletion format
-- **Response API** (`/v1/responses`): Direct pass-through without conversion overhead, native Response API responses
-
-### Implementation Architecture
-
 #### Request Processing Flow
 
 The system supports both ChatCompletion and direct Response API requests through a unified architecture:
-
-```mermaid
-sequenceDiagram
     participant User
     participant Controller
     participant OpenAIAdapter
@@ -481,9 +476,6 @@ The implementation provides seamless support for both API formats:
 **Response API (New):**
 
 - Requests sent to `/v1/responses`
-- Direct pass-through without conversion overhead
-- Native Response API response format
-- Full feature parity with OpenAI's Response API
 
 ### Core Implementation Components
 
@@ -491,24 +483,15 @@ The implementation provides seamless support for both API formats:
 
 **Path Detection:** The system detects Response API requests by checking for `/v1/responses` path prefix in `relay/relaymode/helper.go:GetByPath()`
 
-**Routing:** New endpoints added in `router/relay.go`:
-
-- `POST /v1/responses` - Main Response API endpoint
 - `GET /v1/responses/:response_id` - Get response (placeholder)
 - `DELETE /v1/responses/:response_id` - Delete response (placeholder)
 - `POST /v1/responses/:response_id/cancel` - Cancel response (placeholder)
 
-**Controller Dispatch:** The main relay controller in `controller/relay.go:relayHelper()` routes Response API requests to `RelayResponseAPIHelper()`
-
 #### Response API Controller
-
-**Main Handler:** `RelayResponseAPIHelper()` in `relay/controller/response.go` handles Response API requests with full billing integration:
 
 **Key Functions:**
 
 - `getAndValidateResponseAPIRequest()` - Validates incoming Response API requests
-- `getResponseAPIPromptTokens()` - Estimates input tokens for pre-consumption
-- `preConsumeResponseAPIQuota()` - Reserves quota based on estimated tokens
 - `postConsumeResponseAPIQuota()` - Calculates final billing and adjusts quota
 - `getResponseAPIRequestBody()` - Prepares request for direct pass-through
 
@@ -1106,15 +1089,15 @@ External billing allows trusted upstream services to report usage directly to On
 
 All operations persist to `token_transactions`, which is covered by AutoMigrate. Key fields:
 
-| Field             | Description                                                               |
-| ----------------- | ------------------------------------------------------------------------- |
-| `transaction_id`  | Identifier generated by One-API (unique per token) and returned to callers.|
-| `status`          | Lifecycle state: `pending`, `confirmed`, `auto_confirmed`, or `canceled`. |
-| `pre_quota`       | Amount reserved during the pre phase.                                     |
-| `final_quota`     | Final reconciled amount (nil until confirmed/canceled).                   |
-| `expires_at`      | Epoch seconds when the reservation auto-confirms if still pending.        |
-| `log_id`          | Pointer to the consumption log entry for downstream reporting.            |
-| `elapsed_time_ms` | Optional latency metric passed by the caller.                             |
+| Field             | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| `transaction_id`  | Identifier generated by One-API (unique per token) and returned to callers. |
+| `status`          | Lifecycle state: `pending`, `confirmed`, `auto_confirmed`, or `canceled`.   |
+| `pre_quota`       | Amount reserved during the pre phase.                                       |
+| `final_quota`     | Final reconciled amount (nil until confirmed/canceled).                     |
+| `expires_at`      | Epoch seconds when the reservation auto-confirms if still pending.          |
+| `log_id`          | Pointer to the consumption log entry for downstream reporting.              |
+| `elapsed_time_ms` | Optional latency metric passed by the caller.                               |
 
 The helper `TokenTransactionStatusString` translates status codes into human readable names used in responses.
 

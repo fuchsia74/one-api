@@ -131,6 +131,51 @@ func TestApplyRequestTransformations_DeepResearchAddsWebSearchTool(t *testing.T)
 	}
 }
 
+func TestApplyRequestTransformations_WebSearchOptionsAddsWebSearchTool(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "gpt-4o-search-preview",
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model:            "gpt-4o-search-preview",
+		WebSearchOptions: &model.WebSearchOptions{},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	count := 0
+	for _, tool := range req.Tools {
+		if tool.Type == "web_search" {
+			count++
+		}
+	}
+
+	if count != 1 {
+		t.Fatalf("expected exactly one web_search tool when web_search_options provided, got %d", count)
+	}
+
+	// Running the transformation again should not duplicate the tool
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("second applyRequestTransformations returned error: %v", err)
+	}
+
+	count = 0
+	for _, tool := range req.Tools {
+		if tool.Type == "web_search" {
+			count++
+		}
+	}
+
+	if count != 1 {
+		t.Fatalf("expected web_search tool count to remain 1 after second pass, got %d", count)
+	}
+}
+
 func TestApplyRequestTransformations_DeepResearchReasoningEffort(t *testing.T) {
 	adaptor := &Adaptor{}
 
