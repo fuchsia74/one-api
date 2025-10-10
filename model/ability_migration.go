@@ -216,27 +216,21 @@ func parseLegacySuspendUntil(raw []byte) (time.Time, bool) {
 // mysqlColumnDataType retrieves the DATA_TYPE entry for the specified column via information_schema.
 // The migration fails fast if the current user is not permitted to read metadata for the target table.
 func mysqlColumnDataType(table, column string) (string, error) {
-	type res struct {
-		DataType string `gorm:"column:data_type"`
-	}
-	var out res
+	var dataType string
 	query := "SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
-	if err := DB.Raw(query, table, column).Scan(&out).Error; err != nil {
+	if err := DB.Raw(query, table, column).Scan(&dataType).Error; err != nil {
 		return "", err
 	}
-	return strings.ToLower(out.DataType), nil
+	return strings.ToLower(dataType), nil
 }
 
 // postgresColumnDataType retrieves the data_type entry for the specified column via information_schema.
 // The migration fails fast if the current user is not permitted to read metadata for the target table.
 func postgresColumnDataType(table, column string) (string, error) {
-	type res struct {
-		DataType string `gorm:"column:data_type"`
-	}
-	var out res
+	var dataType string
 	query := "SELECT data_type FROM information_schema.columns WHERE table_name = ? AND column_name = ?"
-	if err := DB.Raw(query, table, column).Scan(&out).Error; err != nil {
+	if err := DB.Raw(query, table, column).Scan(&dataType).Error; err != nil {
 		return "", err
 	}
-	return strings.ToLower(out.DataType), nil
+	return strings.ToLower(dataType), nil
 }

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -145,6 +146,22 @@ func TestNormalizeAbilitySuspendUntilValues(t *testing.T) {
 	require.NoError(t, DB.Table("abilities").Select("suspend_until").Where("model = ?", "m5").Scan(&r5).Error)
 	require.True(t, r5.Suspend.Valid)
 	require.Equal(t, "2024-01-02 01:04:05", r5.Suspend.String)
+}
+
+// TestMysqlColumnDataType ensures MySQL metadata queries scan into strings without type mismatches.
+func TestMysqlColumnDataType(t *testing.T) {
+	mock, closeDB := setupMySQLMockDB(t)
+
+	mock.ExpectQuery(`SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
+		WithArgs("abilities", "suspend_until").
+		WillReturnRows(sqlmock.NewRows([]string{"DATA_TYPE"}).AddRow([]byte("TIMESTAMP")))
+
+	dataType, err := mysqlColumnDataType("abilities", "suspend_until")
+	require.NoError(t, err)
+	require.Equal(t, "timestamp", dataType)
+
+	require.NoError(t, closeDB())
+	require.NoError(t, mock.ExpectationsWereMet())
 }
 
 func parseExpected(raw string) time.Time {
