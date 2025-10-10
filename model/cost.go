@@ -76,15 +76,14 @@ func UpdateUserRequestCostQuotaByRequestID(userID int, requestID string, quota i
 	}
 	if err := DB.Create(docu).Error; err == nil {
 		return nil
-	} else {
-		// If create failed (possibly due to unique race), retry update once
-		if err2 := DB.Model(&UserRequestCost{}).
-			Where("request_id = ?", requestID).
-			Update("quota", quota).Error; err2 != nil {
-			return errors.Wrap(err2, "failed to update UserRequestCost quota after create race")
-		}
-		return nil
 	}
+	// If create failed (possibly due to unique race), retry update once
+	if err2 := DB.Model(&UserRequestCost{}).
+		Where("request_id = ?", requestID).
+		Update("quota", quota).Error; err2 != nil {
+		return errors.Wrap(err2, "failed to update UserRequestCost quota after create race")
+	}
+	return nil
 }
 
 // GetCostByRequestId get cost by request id
@@ -301,19 +300,19 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		zap.String("index", indexName))
 	switch {
 	case common.UsingPostgreSQL:
-		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
+		if err = DB.Exec(fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON user_request_costs (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (postgres)")
 		}
 	case common.UsingMySQL:
-		if err = DB.Exec("ALTER TABLE user_request_costs ADD UNIQUE INDEX idx_user_request_costs_request_id (request_id)").Error; err != nil {
+		if err = DB.Exec(fmt.Sprintf("ALTER TABLE user_request_costs ADD UNIQUE INDEX %s (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (mysql)")
 		}
 	case common.UsingSQLite:
-		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
+		if err = DB.Exec(fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON user_request_costs (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (sqlite)")
 		}
 	default:
-		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
+		if err = DB.Exec(fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON user_request_costs (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed")
 		}
 	}
