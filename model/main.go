@@ -100,7 +100,12 @@ func openPostgreSQL(dsn string) (*gorm.DB, error) {
 func openMySQL(dsn string) (*gorm.DB, error) {
 	logger.Logger.Info("using MySQL as database")
 	common.UsingMySQL = true
-	return gorm.Open(mysql.Open(dsn), &gorm.Config{
+	normalized, err := common.NormalizeMySQLDSN(dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, "normalize MySQL DSN")
+	}
+
+	return gorm.Open(mysql.Open(normalized), &gorm.Config{
 		PrepareStmt: true, // precompile SQL
 	})
 }
