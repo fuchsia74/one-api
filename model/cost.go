@@ -147,6 +147,23 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		return nil
 	}
 
+	indexName := "idx_user_request_costs_request_id"
+	checkIndexExists := func() (bool, error) {
+		if common.UsingMySQL {
+			return mysqlIndexExists("user_request_costs", indexName)
+		}
+		return DB.Migrator().HasIndex(&UserRequestCost{}, indexName), nil
+	}
+
+	hasIndex, err := checkIndexExists()
+	if err != nil {
+		return errors.Wrap(err, "check user_request_costs index existence")
+	}
+	if hasIndex {
+		logger.Logger.Debug("Unique index already present on user_request_costs.request_id; skipping deduplication")
+		return nil
+	}
+
 	// Dedup rows prior to creating the unique index. Depending on the legacy schema, the
 	// table may lack updated_at/created_at columns, so pick the newest available marker.
 	markerColumns := []string{"updated_at", "created_at", "created_time", "id"}
@@ -266,15 +283,9 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		columnAltered = columnAltered || altered
 	}
 
-	indexName := "idx_user_request_costs_request_id"
-	var hasIndex bool
-	if common.UsingMySQL {
-		hasIndex, err = mysqlIndexExists("user_request_costs", indexName)
-	} else {
-		hasIndex = DB.Migrator().HasIndex(&UserRequestCost{}, indexName)
-	}
+	hasIndex, err = checkIndexExists()
 	if err != nil {
-		return errors.Wrap(err, "check user_request_costs index existence")
+		return errors.Wrap(err, "re-check user_request_costs index existence")
 	}
 	if hasIndex {
 		logger.Logger.Debug("Unique index already present on user_request_costs.request_id")
@@ -430,7 +441,7 @@ func ensureMySQLRequestIDColumnSized() (bool, error) {
 		CharLen  *int64 `gorm:"column:character_maximum_length"`
 	}
 	var res result
-	query := "SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
+	query := "SELECT DATA_TYPE AS data_type, CHARACTER_MAXIMUM_LENGTH AS character_maximum_length FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
 	if err := DB.Raw(query, "user_request_costs", "request_id").Scan(&res).Error; err != nil {
 		return false, errors.Wrap(err, "query user_request_costs.request_id column type")
 	}

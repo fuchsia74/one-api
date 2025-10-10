@@ -91,6 +91,10 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDMySQLTextColumn(t *testing.T
 		WithArgs("user_request_costs").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.statistics WHERE table_schema = DATABASE\(\) AND table_name = \? AND index_name = \?`).
+		WithArgs("user_request_costs", "idx_user_request_costs_request_id").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
 	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
 		WithArgs("user_request_costs", "updated_at").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
@@ -105,7 +109,7 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDMySQLTextColumn(t *testing.T
 	mock.ExpectExec(`DELETE FROM user_request_costs WHERE CHAR_LENGTH\(request_id\) > 32`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	mock.ExpectQuery(`SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
+	mock.ExpectQuery(`SELECT DATA_TYPE AS data_type, CHARACTER_MAXIMUM_LENGTH AS character_maximum_length FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
 		WithArgs("user_request_costs", "request_id").
 		WillReturnRows(sqlmock.NewRows([]string{"data_type", "character_maximum_length"}).AddRow("text", nil))
 
@@ -131,24 +135,6 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDMySQLNoChanges(t *testing.T)
 	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.tables WHERE table_schema = DATABASE\(\) AND table_name = \?`).
 		WithArgs("user_request_costs").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-
-	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
-		WithArgs("user_request_costs", "updated_at").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-
-	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
-		WithArgs("user_request_costs", "id").
-		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
-
-	mock.ExpectQuery(`SELECT .*FROM user_request_costs AS stale JOIN \(SELECT request_id, MAX\(updated_at\) as max_marker FROM .*user_request_costs.* GROUP BY .*request_id.*\) AS keep ON keep\.request_id = stale\.request_id WHERE stale\.updated_at < keep\.max_marker`).
-		WillReturnRows(sqlmock.NewRows([]string{"id"}))
-
-	mock.ExpectExec(`DELETE FROM user_request_costs WHERE CHAR_LENGTH\(request_id\) > 32`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-
-	mock.ExpectQuery(`SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
-		WithArgs("user_request_costs", "request_id").
-		WillReturnRows(sqlmock.NewRows([]string{"data_type", "character_maximum_length"}).AddRow("varchar", 32))
 
 	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.statistics WHERE table_schema = DATABASE\(\) AND table_name = \? AND index_name = \?`).
 		WithArgs("user_request_costs", "idx_user_request_costs_request_id").
@@ -255,6 +241,10 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDMySQLAlterPermissionError(t 
 		WithArgs("user_request_costs").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
 
+	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.statistics WHERE table_schema = DATABASE\(\) AND table_name = \? AND index_name = \?`).
+		WithArgs("user_request_costs", "idx_user_request_costs_request_id").
+		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(0))
+
 	mock.ExpectQuery(`SELECT COUNT\(\*\) AS count FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
 		WithArgs("user_request_costs", "updated_at").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(1))
@@ -269,7 +259,7 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDMySQLAlterPermissionError(t 
 	mock.ExpectExec(`DELETE FROM user_request_costs WHERE CHAR_LENGTH\(request_id\) > 32`).
 		WillReturnResult(sqlmock.NewResult(0, 0))
 
-	mock.ExpectQuery(`SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
+	mock.ExpectQuery(`SELECT DATA_TYPE AS data_type, CHARACTER_MAXIMUM_LENGTH AS character_maximum_length FROM information_schema.columns WHERE table_schema = DATABASE\(\) AND table_name = \? AND column_name = \?`).
 		WithArgs("user_request_costs", "request_id").
 		WillReturnRows(sqlmock.NewRows([]string{"data_type", "character_maximum_length"}).AddRow("text", nil))
 
