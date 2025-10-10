@@ -161,6 +161,12 @@ func InitDB() {
 	}
 	logger.Logger.Info("database schema migrated")
 
+	// Run post-migration adjustments to ensure new installs have expected schema specifics.
+	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
+		logger.Logger.Fatal("failed to finalize user_request_costs unique index", zap.Error(err))
+		return
+	}
+
 	// STEP 3: Migrate existing ModelConfigs data from old format to new format
 	// This handles data format changes after schema is correct
 	if err = MigrateAllChannelModelConfigs(); err != nil {

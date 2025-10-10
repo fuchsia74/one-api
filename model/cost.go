@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"math/rand"
+	"strings"
 	"sync"
 	"time"
 
@@ -14,12 +15,15 @@ import (
 	"github.com/songquanpeng/one-api/common/logger"
 )
 
+// RequestIDMaxLen is the maximum length of request_id column to enforce indexing
+const RequestIDMaxLen = 32
+
 type UserRequestCost struct {
 	Id          int   `json:"id"`
 	CreatedTime int64 `json:"created_time" gorm:"bigint"`
 	UserID      int   `json:"user_id"`
 	// Enforce uniqueness to avoid duplicate rows for the same request
-	RequestID string  `json:"request_id" gorm:"uniqueIndex"`
+	RequestID string  `json:"request_id" gorm:"size:32;uniqueIndex"` // size must match RequestIDMaxLen
 	Quota     int64   `json:"quota"`
 	CostUSD   float64 `json:"cost_usd" gorm:"-"`
 	CreatedAt int64   `json:"created_at" gorm:"bigint;autoCreateTime:milli"`
@@ -126,7 +130,17 @@ func removeOldRequestCost() {
 // It is safe to run multiple times and should be invoked before AutoMigrate in InitDB.
 func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	// If table does not exist yet, skip quietly; AutoMigrate will create it with the unique index from tags
-	if !DB.Migrator().HasTable(&UserRequestCost{}) {
+	tableExists := false
+	var err error
+	if common.UsingMySQL {
+		tableExists, err = mysqlTableExists("user_request_costs")
+		if err != nil {
+			return errors.Wrap(err, "check user_request_costs existence (mysql)")
+		}
+	} else {
+		tableExists = DB.Migrator().HasTable(&UserRequestCost{})
+	}
+	if !tableExists {
 		return nil
 	}
 
@@ -135,7 +149,16 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	markerColumns := []string{"updated_at", "created_at", "created_time", "id"}
 	var dedupColumn string
 	for _, col := range markerColumns {
-		if DB.Migrator().HasColumn(&UserRequestCost{}, col) {
+		var hasColumn bool
+		if common.UsingMySQL {
+			hasColumn, err = mysqlColumnExists("user_request_costs", col)
+		} else {
+			hasColumn = DB.Migrator().HasColumn(&UserRequestCost{}, col)
+		}
+		if err != nil {
+			return errors.Wrapf(err, "check column %s existence", col)
+		}
+		if hasColumn {
 			dedupColumn = col
 			break
 		}
@@ -180,26 +203,144 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		}
 	}
 
+	if err = deleteLongUserRequestCostRequestIDs(); err != nil {
+		return err
+	}
+
+	if common.UsingMySQL {
+		if err = ensureMySQLRequestIDColumnSized(); err != nil {
+			return err
+		}
+	} else if common.UsingPostgreSQL {
+		if err = ensurePostgresRequestIDColumnSized(); err != nil {
+			return err
+		}
+	}
+
 	indexName := "idx_user_request_costs_request_id"
-	if DB.Migrator().HasIndex(&UserRequestCost{}, indexName) {
+	var hasIndex bool
+	if common.UsingMySQL {
+		hasIndex, err = mysqlIndexExists("user_request_costs", indexName)
+	} else {
+		hasIndex = DB.Migrator().HasIndex(&UserRequestCost{}, indexName)
+	}
+	if err != nil {
+		return errors.Wrap(err, "check user_request_costs index existence")
+	}
+	if hasIndex {
 		return nil
 	}
 
 	// 3) Create unique index if missing. Use generic SQL with dialect-aware fallbacks.
-	if common.UsingPostgreSQL {
-		if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
+	switch {
+	case common.UsingPostgreSQL:
+		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (postgres)")
 		}
-	} else if common.UsingMySQL {
-		if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
-			// Some MySQL versions do not support IF NOT EXISTS for indexes; fallback: check existence
-			// Try create without IF NOT EXISTS and ignore duplicate error
-			_ = DB.Exec("CREATE UNIQUE INDEX idx_user_request_costs_request_id ON user_request_costs (request_id)").Error
+	case common.UsingMySQL:
+		if err = DB.Exec("ALTER TABLE user_request_costs ADD UNIQUE INDEX idx_user_request_costs_request_id (request_id)").Error; err != nil {
+			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (mysql)")
 		}
-	} else if common.UsingSQLite {
-		if err := DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
+	case common.UsingSQLite:
+		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (sqlite)")
 		}
+	default:
+		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
+			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed")
+		}
+	}
+	return nil
+}
+
+// deleteLongUserRequestCostRequestIDs removes rows whose request_id exceeds 32 characters across supported dialects.
+func deleteLongUserRequestCostRequestIDs() error {
+	var query string
+	switch {
+	case common.UsingMySQL, common.UsingPostgreSQL:
+		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE CHAR_LENGTH(request_id) > %d", RequestIDMaxLen)
+	case common.UsingSQLite:
+		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE LENGTH(request_id) > %d", RequestIDMaxLen)
+	default:
+		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE LENGTH(request_id) > %d", RequestIDMaxLen)
+	}
+
+	if err := DB.Exec(query).Error; err != nil {
+		return errors.Wrap(err, "delete user_request_costs entries with request_id longer than max len")
+	}
+
+	return nil
+}
+
+// mysqlTableExists returns whether the given table is present in the current MySQL schema.
+func mysqlTableExists(table string) (bool, error) {
+	type result struct {
+		Count int `gorm:"column:count"`
+	}
+	var res result
+	query := "SELECT COUNT(*) AS count FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?"
+	if err := DB.Raw(query, table).Scan(&res).Error; err != nil {
+		return false, err
+	}
+	return res.Count > 0, nil
+}
+
+// mysqlColumnExists reports whether the provided column exists for the table in the current MySQL schema.
+func mysqlColumnExists(table, column string) (bool, error) {
+	type result struct {
+		Count int `gorm:"column:count"`
+	}
+	var res result
+	query := "SELECT COUNT(*) AS count FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
+	if err := DB.Raw(query, table, column).Scan(&res).Error; err != nil {
+		return false, err
+	}
+	return res.Count > 0, nil
+}
+
+// mysqlIndexExists reports whether the provided index exists for the table in the current MySQL schema.
+func mysqlIndexExists(table, index string) (bool, error) {
+	type result struct {
+		Count int `gorm:"column:count"`
+	}
+	var res result
+	query := "SELECT COUNT(*) AS count FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?"
+	if err := DB.Raw(query, table, index).Scan(&res).Error; err != nil {
+		return false, err
+	}
+	return res.Count > 0, nil
+}
+
+// ensureMySQLRequestIDColumnSized converts legacy TEXT request_id columns to VARCHAR(32) for index support.
+func ensureMySQLRequestIDColumnSized() error {
+	type result struct {
+		DataType string `gorm:"column:data_type"`
+	}
+	var res result
+	query := "SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
+	if err := DB.Raw(query, "user_request_costs", "request_id").Scan(&res).Error; err != nil {
+		return errors.Wrap(err, "query user_request_costs.request_id column type")
+	}
+	dataType := strings.ToLower(res.DataType)
+	if dataType == "" {
+		return nil
+	}
+	if strings.Contains(dataType, "text") {
+		logger.Logger.Info("migrating user_request_costs.request_id to VARCHAR(%d) for unique index",
+			zap.String("column_type", dataType), zap.Int("max_len", RequestIDMaxLen))
+		alter := fmt.Sprintf("ALTER TABLE user_request_costs MODIFY request_id VARCHAR(%d) NOT NULL", RequestIDMaxLen)
+		if err := DB.Exec(alter).Error; err != nil {
+			return errors.Wrap(err, "alter user_request_costs.request_id to VARCHAR(max_len)")
+		}
+	}
+	return nil
+}
+
+// ensurePostgresRequestIDColumnSized enforces a VARCHAR(32) type for request_id in PostgreSQL deployments.
+func ensurePostgresRequestIDColumnSized() error {
+	alter := fmt.Sprintf("ALTER TABLE user_request_costs ALTER COLUMN request_id TYPE VARCHAR(%d)", RequestIDMaxLen)
+	if err := DB.Exec(alter).Error; err != nil {
+		return errors.Wrap(err, "alter user_request_costs.request_id to VARCHAR(max_len) (postgres)")
 	}
 	return nil
 }

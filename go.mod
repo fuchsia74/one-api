@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	cloud.google.com/go/iam v1.5.2
+	github.com/DATA-DOG/go-sqlmock v1.5.0
 	github.com/Laisky/errors/v2 v2.0.1
 	github.com/Laisky/gin-middlewares/v6 v6.1.1
 	github.com/Laisky/go-utils/v5 v5.1.2-0.20250801145933-70d7400d39dc
