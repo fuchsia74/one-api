@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
@@ -127,8 +126,11 @@ func removeOldRequestCost() {
 }
 
 // MigrateUserRequestCostEnsureUniqueRequestID ensures a unique index on request_id and deduplicates prior data.
-// It is safe to run multiple times and should be invoked before AutoMigrate in InitDB.
+// It is safe to run multiple times and should be invoked before AutoMigrate in InitDB. The migration depends on
+// information_schema metadata for MySQL/PostgreSQL and will fail fast when the database user lacks permission,
+// surfacing the missing privilege to operators explicitly.
 func MigrateUserRequestCostEnsureUniqueRequestID() error {
+	logger.Logger.Info("Starting user_request_costs request_id migration")
 	// If table does not exist yet, skip quietly; AutoMigrate will create it with the unique index from tags
 	tableExists := false
 	var err error
@@ -141,6 +143,7 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		tableExists = DB.Migrator().HasTable(&UserRequestCost{})
 	}
 	if !tableExists {
+		logger.Logger.Debug("user_request_costs table not found, skipping request_id migration")
 		return nil
 	}
 
@@ -167,54 +170,100 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		return errors.New("user_request_costs table missing expected columns for deduplication")
 	}
 
-	logger.Logger.Info("deduplicating user_request_costs", zap.String("dedup_column", dedupColumn))
+	logger.Logger.Debug("Deduplicating user_request_costs", zap.String("dedup_column", dedupColumn))
 
 	selectExpr := fmt.Sprintf("request_id, MAX(%s) as max_marker", dedupColumn)
-	type pair struct {
-		RequestID string
-		MaxMarker int64 `gorm:"column:max_marker"`
-	}
-	var latest []pair
-	if err := DB.Table("user_request_costs").
+	latestQuery := DB.Table("user_request_costs").
 		Select(selectExpr).
-		Group("request_id").
-		Scan(&latest).Error; err != nil {
-		return errors.Wrap(err, "scan latest user_request_costs per request_id failed")
+		Group("request_id")
+
+	hasIDColumn, err := userRequestCostHasIDColumn()
+	if err != nil {
+		return errors.Wrap(err, "check user_request_costs id column existence")
 	}
 
-	if len(latest) > 0 {
-		keep := make(map[string]int64, len(latest))
-		for _, p := range latest {
-			keep[p.RequestID] = p.MaxMarker
+	var duplicateCount int
+	if hasIDColumn {
+		staleQuery := DB.Table("user_request_costs AS stale").
+			Joins("JOIN (?) AS keep ON keep.request_id = stale.request_id", latestQuery).
+			Where(fmt.Sprintf("stale.%s < keep.max_marker", dedupColumn))
+
+		var staleIDs []int
+		if err := staleQuery.Pluck("stale.id", &staleIDs).Error; err != nil {
+			return errors.Wrap(err, "select duplicate user_request_costs ids")
 		}
+
+		duplicateCount = len(staleIDs)
+		if duplicateCount > 0 {
+			const deleteBatchSize = 1000
+			for start := 0; start < len(staleIDs); start += deleteBatchSize {
+				end := start + deleteBatchSize
+				if end > len(staleIDs) {
+					end = len(staleIDs)
+				}
+				if err := DB.Where("id IN ?", staleIDs[start:end]).Delete(&UserRequestCost{}).Error; err != nil {
+					return errors.Wrap(err, "delete duplicate user_request_costs batch")
+				}
+			}
+		}
+	} else {
+		logger.Logger.Debug("user_request_costs table missing id column, using request_id fallback for dedup")
 
 		cond := fmt.Sprintf("%s < ?", dedupColumn)
-		batchSize := 1000
-		for reqID, marker := range keep {
-			if err := DB.Where("request_id = ? AND "+cond, reqID, marker).
-				Delete(&UserRequestCost{}).Error; err != nil {
-				logger.Logger.Warn("dedup delete failed", zap.Error(err))
+		type keepRow struct {
+			RequestID string      `gorm:"column:request_id"`
+			MaxMarker interface{} `gorm:"column:max_marker"`
+		}
+
+		var keepRows []keepRow
+		if err := latestQuery.Scan(&keepRows).Error; err != nil {
+			return errors.Wrap(err, "scan latest user_request_costs per request_id")
+		}
+
+		for _, row := range keepRows {
+			result := DB.Where("request_id = ? AND "+cond, row.RequestID, row.MaxMarker).
+				Delete(&UserRequestCost{})
+			if result.Error != nil {
+				return errors.Wrap(result.Error, "delete duplicate user_request_costs row (fallback)")
 			}
-			batchSize--
-			if batchSize == 0 {
-				time.Sleep(10 * time.Millisecond)
-				batchSize = 1000
-			}
+			duplicateCount += int(result.RowsAffected)
 		}
 	}
 
-	if err = deleteLongUserRequestCostRequestIDs(); err != nil {
+	if duplicateCount > 0 {
+		logger.Logger.Debug("Removed duplicate user_request_costs rows", zap.Int("duplicate_count", duplicateCount))
+	} else {
+		logger.Logger.Debug("No duplicate user_request_costs rows detected")
+	}
+
+	deletedLongCount, err := deleteLongUserRequestCostRequestIDs()
+	if err != nil {
 		return err
 	}
+	if deletedLongCount > 0 {
+		logger.Logger.Debug("Removed user_request_costs rows with oversized request_id",
+			zap.Int64("deleted_count", deletedLongCount),
+			zap.Int("max_length", RequestIDMaxLen))
+	} else {
+		logger.Logger.Debug("No user_request_costs rows exceeded request_id length limit",
+			zap.Int("max_length", RequestIDMaxLen))
+	}
 
+	columnAltered := false
 	if common.UsingMySQL {
-		if err = ensureMySQLRequestIDColumnSized(); err != nil {
+		var altered bool
+		altered, err = ensureMySQLRequestIDColumnSized()
+		if err != nil {
 			return err
 		}
+		columnAltered = columnAltered || altered
 	} else if common.UsingPostgreSQL {
-		if err = ensurePostgresRequestIDColumnSized(); err != nil {
+		var altered bool
+		altered, err = ensurePostgresRequestIDColumnSized()
+		if err != nil {
 			return err
 		}
+		columnAltered = columnAltered || altered
 	}
 
 	indexName := "idx_user_request_costs_request_id"
@@ -228,10 +277,17 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		return errors.Wrap(err, "check user_request_costs index existence")
 	}
 	if hasIndex {
+		logger.Logger.Debug("Unique index already present on user_request_costs.request_id")
+		logger.Logger.Debug("Completed user_request_costs request_id migration",
+			zap.Int("duplicates_removed", duplicateCount),
+			zap.Int64("long_request_ids_removed", deletedLongCount),
+			zap.Bool("column_altered", columnAltered))
 		return nil
 	}
 
 	// 3) Create unique index if missing. Use generic SQL with dialect-aware fallbacks.
+	logger.Logger.Debug("Creating unique index on user_request_costs.request_id",
+		zap.String("index", indexName))
 	switch {
 	case common.UsingPostgreSQL:
 		if err = DB.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_request_costs_request_id ON user_request_costs (request_id)").Error; err != nil {
@@ -250,11 +306,17 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed")
 		}
 	}
+	logger.Logger.Debug("Unique index created on user_request_costs.request_id")
+
+	logger.Logger.Debug("Completed user_request_costs request_id migration",
+		zap.Int("duplicates_removed", duplicateCount),
+		zap.Int64("long_request_ids_removed", deletedLongCount),
+		zap.Bool("column_altered", columnAltered))
 	return nil
 }
 
 // deleteLongUserRequestCostRequestIDs removes rows whose request_id exceeds 32 characters across supported dialects.
-func deleteLongUserRequestCostRequestIDs() error {
+func deleteLongUserRequestCostRequestIDs() (int64, error) {
 	var query string
 	switch {
 	case common.UsingMySQL, common.UsingPostgreSQL:
@@ -265,11 +327,61 @@ func deleteLongUserRequestCostRequestIDs() error {
 		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE LENGTH(request_id) > %d", RequestIDMaxLen)
 	}
 
-	if err := DB.Exec(query).Error; err != nil {
-		return errors.Wrap(err, "delete user_request_costs entries with request_id longer than max len")
+	result := DB.Exec(query)
+	if result.Error != nil {
+		return 0, errors.Wrap(result.Error, "delete user_request_costs entries with request_id longer than max len")
 	}
 
-	return nil
+	return result.RowsAffected, nil
+}
+
+// userRequestCostHasIDColumn reports whether user_request_costs currently exposes an id column
+// across supported SQL dialects. SQLite requires a PRAGMA table_info scan because GORM's
+// HasColumn helper treats the implicit rowid as an id column.
+func userRequestCostHasIDColumn() (bool, error) {
+	switch {
+	case common.UsingMySQL:
+		return mysqlColumnExists("user_request_costs", "id")
+	case common.UsingPostgreSQL:
+		type result struct {
+			Count int `gorm:"column:count"`
+		}
+		var res result
+		query := "SELECT COUNT(*) AS count FROM information_schema.columns WHERE table_name = ? AND column_name = ?"
+		if err := DB.Raw(query, "user_request_costs", "id").Scan(&res).Error; err != nil {
+			return false, errors.Wrap(err, "query postgres information_schema for user_request_costs.id")
+		}
+		return res.Count > 0, nil
+	case common.UsingSQLite:
+		rows, err := DB.Raw("PRAGMA table_info(user_request_costs)").Rows()
+		if err != nil {
+			return false, errors.Wrap(err, "query sqlite table info for user_request_costs")
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var (
+				cid       int
+				name      string
+				ctype     string
+				notnull   int
+				dfltValue interface{}
+				pk        int
+			)
+			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {
+				return false, errors.Wrap(err, "scan sqlite table info row")
+			}
+			if strings.EqualFold(name, "id") {
+				return true, nil
+			}
+		}
+		if err := rows.Err(); err != nil {
+			return false, errors.Wrap(err, "iterate sqlite table info")
+		}
+		return false, nil
+	default:
+		return DB.Migrator().HasColumn("user_request_costs", "id"), nil
+	}
 }
 
 // mysqlTableExists returns whether the given table is present in the current MySQL schema.
@@ -312,35 +424,89 @@ func mysqlIndexExists(table, index string) (bool, error) {
 }
 
 // ensureMySQLRequestIDColumnSized converts legacy TEXT request_id columns to VARCHAR(32) for index support.
-func ensureMySQLRequestIDColumnSized() error {
+func ensureMySQLRequestIDColumnSized() (bool, error) {
 	type result struct {
 		DataType string `gorm:"column:data_type"`
+		CharLen  *int64 `gorm:"column:character_maximum_length"`
 	}
 	var res result
-	query := "SELECT DATA_TYPE FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
+	query := "SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?"
 	if err := DB.Raw(query, "user_request_costs", "request_id").Scan(&res).Error; err != nil {
-		return errors.Wrap(err, "query user_request_costs.request_id column type")
+		return false, errors.Wrap(err, "query user_request_costs.request_id column type")
 	}
 	dataType := strings.ToLower(res.DataType)
 	if dataType == "" {
-		return nil
+		logger.Logger.Debug("MySQL request_id column not found during sizing check - skipping alter")
+		return false, nil
 	}
 	if strings.Contains(dataType, "text") {
-		logger.Logger.Info("migrating user_request_costs.request_id to VARCHAR(%d) for unique index",
+		logger.Logger.Debug("migrating user_request_costs.request_id to VARCHAR for unique index",
 			zap.String("column_type", dataType), zap.Int("max_len", RequestIDMaxLen))
 		alter := fmt.Sprintf("ALTER TABLE user_request_costs MODIFY request_id VARCHAR(%d) NOT NULL", RequestIDMaxLen)
 		if err := DB.Exec(alter).Error; err != nil {
-			return errors.Wrap(err, "alter user_request_costs.request_id to VARCHAR(max_len)")
+			return false, errors.Wrap(err, "alter user_request_costs.request_id to VARCHAR(max_len)")
 		}
+		return true, nil
 	}
-	return nil
+	if res.CharLen != nil && *res.CharLen != int64(RequestIDMaxLen) {
+		logger.Logger.Debug("Adjusting MySQL request_id column length",
+			zap.Int64("current_length", *res.CharLen),
+			zap.Int("target_length", RequestIDMaxLen))
+		alter := fmt.Sprintf("ALTER TABLE user_request_costs MODIFY request_id VARCHAR(%d) NOT NULL", RequestIDMaxLen)
+		if err := DB.Exec(alter).Error; err != nil {
+			return false, errors.Wrap(err, "alter user_request_costs.request_id length to target size")
+		}
+		return true, nil
+	}
+
+	logger.Logger.Debug("MySQL request_id column already sized correctly",
+		zap.String("column_type", dataType),
+		zap.Any("char_length", res.CharLen))
+	return false, nil
 }
 
 // ensurePostgresRequestIDColumnSized enforces a VARCHAR(32) type for request_id in PostgreSQL deployments.
-func ensurePostgresRequestIDColumnSized() error {
-	alter := fmt.Sprintf("ALTER TABLE user_request_costs ALTER COLUMN request_id TYPE VARCHAR(%d)", RequestIDMaxLen)
-	if err := DB.Exec(alter).Error; err != nil {
-		return errors.Wrap(err, "alter user_request_costs.request_id to VARCHAR(max_len) (postgres)")
+func ensurePostgresRequestIDColumnSized() (bool, error) {
+	type result struct {
+		DataType string `gorm:"column:data_type"`
+		CharLen  *int64 `gorm:"column:character_maximum_length"`
 	}
-	return nil
+	var res result
+	query := "SELECT data_type, character_maximum_length FROM information_schema.columns WHERE table_name = 'user_request_costs' AND column_name = 'request_id'"
+	if err := DB.Raw(query).Scan(&res).Error; err != nil {
+		return false, errors.Wrap(err, "query postgres user_request_costs.request_id column type")
+	}
+	dataType := strings.ToLower(res.DataType)
+	if dataType == "" {
+		logger.Logger.Debug("PostgreSQL request_id column not found during sizing check - skipping alter")
+		return false, nil
+	}
+
+	switch {
+	case strings.Contains(dataType, "text"):
+		logger.Logger.Debug("PostgreSQL request_id column already TEXT, no sizing change required")
+		return false, nil
+	case strings.Contains(dataType, "character varying"):
+		if res.CharLen != nil && *res.CharLen == int64(RequestIDMaxLen) {
+			logger.Logger.Debug("PostgreSQL request_id column already sized correctly",
+				zap.Int("target_length", RequestIDMaxLen))
+			return false, nil
+		}
+		logger.Logger.Debug("Adjusting PostgreSQL request_id column length",
+			zap.Any("current_length", res.CharLen),
+			zap.Int("target_length", RequestIDMaxLen))
+		alter := fmt.Sprintf("ALTER TABLE user_request_costs ALTER COLUMN request_id TYPE VARCHAR(%d)", RequestIDMaxLen)
+		if err := DB.Exec(alter).Error; err != nil {
+			return false, errors.Wrap(err, "alter user_request_costs.request_id to VARCHAR(max_len) (postgres)")
+		}
+		return true, nil
+	default:
+		logger.Logger.Debug("PostgreSQL request_id column has unexpected type, attempting to coerce",
+			zap.String("data_type", dataType))
+		alter := fmt.Sprintf("ALTER TABLE user_request_costs ALTER COLUMN request_id TYPE VARCHAR(%d)", RequestIDMaxLen)
+		if err := DB.Exec(alter).Error; err != nil {
+			return false, errors.Wrap(err, "coerce user_request_costs.request_id to VARCHAR(max_len) (postgres)")
+		}
+		return true, nil
+	}
 }

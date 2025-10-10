@@ -140,14 +140,20 @@ func InitDB() {
 	logger.Logger.Info("database migration started")
 
 	// STEP 1: Pre-migrations
-	// 1a) Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
+	// 1a) Normalize legacy ability suspend_until column types before AutoMigrate touches the table
+	if err = MigrateAbilitySuspendUntilColumn(); err != nil {
+		logger.Logger.Fatal("failed to migrate ability suspend_until column", zap.Error(err))
+		return
+	}
+
+	// 1b) Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
 	// This must run BEFORE AutoMigrate to ensure schema compatibility
 	if err = MigrateChannelFieldsToText(); err != nil {
 		logger.Logger.Fatal("failed to migrate channel field types", zap.Error(err))
 		return
 	}
 
-	// 1b) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
+	// 1c) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
 	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
 		logger.Logger.Fatal("failed to migrate user_request_costs unique index", zap.Error(err))
 		return
