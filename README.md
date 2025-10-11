@@ -144,6 +144,8 @@ oneapi:
     SESSION_SECRET: xxxxxxx
     # (optional) ENABLE_COOKIE_SECURE enable secure cookies, must be used with HTTPS
     ENABLE_COOKIE_SECURE: "true"
+    # (optional) COOKIE_MAXAGE_HOURS: Sets the session cookie's max age in hours. Default is `168` (7 days). Adjust this to control how long user sessions remain valid.
+    COOKIE_MAXAGE_HOURS: 168
 
     # (optional) DEBUG enable debug mode
     DEBUG: "true"

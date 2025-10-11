@@ -184,24 +184,19 @@ func main() {
 		sessionStore = cookie.NewStore(sessionSecret, sessionSecret)
 	}
 
+	cookieSecure := false
 	if config.EnableCookieSecure {
-		// Secure session configuration following security recommendations
-		sessionStore.Options(sessions.Options{
-			Path:     "/",
-			MaxAge:   3600,                    // 1 hour for improved security
-			Secure:   true,                    // HTTPS only
-			HttpOnly: true,                    // Prevent XSS
-			SameSite: http.SameSiteStrictMode, // CSRF protection
-		})
+		cookieSecure = true
 	} else {
-		logger.Logger.Warn("ENABLE_COOKIE_SECURE is set to false, using insecure cookie store")
-		sessionStore.Options(sessions.Options{
-			Path:     "/",
-			MaxAge:   3600, // 1 hour for improved security
-			Secure:   false,
-			SameSite: http.SameSiteLaxMode,
-		})
+		logger.Logger.Warn("ENABLE_COOKIE_SECURE is not set, using insecure cookie store")
 	}
+	sessionStore.Options(sessions.Options{
+		Path:     "/",
+		MaxAge:   3600 * config.CookieMaxAgeHours,
+		HttpOnly: true,
+		Secure:   cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
 	server.Use(sessions.Sessions("session", sessionStore))
 
 	// Add Prometheus metrics endpoint if enabled

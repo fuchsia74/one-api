@@ -63,6 +63,9 @@ var ChannelSuspendSecondsForAuth = time.Second * time.Duration(env.Int("CHANNEL_
 // Any options with "Secret", "Token" in its key won't be return by GetOptions
 
 var SessionSecret = os.Getenv("SESSION_SECRET")
+
+// CookieMaxAgeHours sets the session cookie's max age in hours (default: 168 = 7 days)
+var CookieMaxAgeHours = env.Int("COOKIE_MAXAGE_HOURS", 168)
 var EnableCookieSecure = strings.ToLower(os.Getenv("ENABLE_COOKIE_SECURE")) == "true"
 
 var OptionMap map[string]string
