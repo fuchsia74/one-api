@@ -253,5 +253,9 @@ func isThemeValid() error {
 		return errors.Errorf("invalid theme: %s", config.Theme)
 	}
 
+	if config.Theme != "modern" {
+		logger.Logger.Warn("recommend using the default modern theme, as the other themes are no longer being actively maintained.")
+	}
+
 	return nil
 }

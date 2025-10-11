@@ -118,7 +118,7 @@ const ChannelsTable = () => {
 
   const loadChannels = async (page = 0, sortBy = '', sortOrder = 'desc') => {
     setLoading(true);
-    let url = `/api/channel/?p=${page}`;
+    let url = `/api/channel/?p=${page}&size=${ITEMS_PER_PAGE}`;
     if (sortBy) {
       url += `&sort=${sortBy}&order=${sortOrder}`;
     }
@@ -127,7 +127,8 @@ const ChannelsTable = () => {
     if (success) {
       const processedChannels = (data || []).map(processChannelData);
       setChannels(processedChannels);
-      setTotalPages(Math.ceil(total / ITEMS_PER_PAGE));
+      const computedTotal = typeof total === 'number' ? total : processedChannels.length;
+      setTotalPages(Math.max(1, Math.ceil(computedTotal / ITEMS_PER_PAGE)));
     } else {
       showError(message);
     }
@@ -175,10 +176,10 @@ const ChannelsTable = () => {
         res = await API.delete(`/api/channel/${id}`);
         break;
       case 'enable':
-        res = await API.put('/api/channel/', { id: id, status: 1 });
+        res = await API.put('/api/channel/?status_only=1', { id: id, status: 1 });
         break;
       case 'disable':
-        res = await API.put('/api/channel/', { id: id, status: 2 });
+        res = await API.put('/api/channel/?status_only=1', { id: id, status: 2 });
         break;
       case 'test':
         res = await API.get(`/api/channel/test/${id}`);
@@ -230,6 +231,8 @@ const ChannelsTable = () => {
     if (success) {
       const processedChannels = (data || []).map(processChannelData);
       setChannels(processedChannels);
+      const total = processedChannels.length;
+      setTotalPages(Math.max(1, Math.ceil(total / ITEMS_PER_PAGE)));
       setActivePage(1);
     } else {
       showError(message);
