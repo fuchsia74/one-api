@@ -315,10 +315,7 @@ func countImageTokens(url string, detail string, model string) (_ int, err error
 					h *= scale
 				}
 			}
-			tokens := int(math.Round((w * h) / 750.0))
-			if tokens < 0 {
-				tokens = 0
-			}
+			tokens := max(int(math.Round((w*h)/750.0)), 0)
 			return tokens, nil
 		}
 		if width > 2048 || height > 2048 { // max(width, height) > 2048

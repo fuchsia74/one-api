@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/Laisky/errors/v2"
@@ -86,12 +87,7 @@ func getRequestModel(c *gin.Context) (string, error) {
 
 func isModelInList(modelName string, models string) bool {
 	modelList := strings.Split(models, ",")
-	for _, model := range modelList {
-		if modelName == model {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(modelList, modelName)
 }
 
 // GetTokenKeyParts extracts the token key parts from the Authorization header

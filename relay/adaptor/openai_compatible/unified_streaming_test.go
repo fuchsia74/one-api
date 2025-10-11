@@ -45,7 +45,7 @@ func createTestStreamResponse(id string, content string, usage *model.Usage) *Ch
 }
 
 // Helper function to create test streaming response with tool calls
-func createTestStreamResponseWithToolCalls(id string, toolArgs interface{}) *ChatCompletionsStreamResponse {
+func createTestStreamResponseWithToolCalls(id string, toolArgs any) *ChatCompletionsStreamResponse {
 	toolCall := model.Tool{
 		Function: &model.Function{
 			Arguments: toolArgs,
@@ -322,7 +322,7 @@ func TestStreamingContext_ProcessStreamChunk(t *testing.T) {
 		{
 			name:           "Object tool call arguments",
 			enableThinking: false,
-			response:       createTestStreamResponseWithToolCalls("test-5", map[string]interface{}{"arg": "value"}),
+			response:       createTestStreamResponseWithToolCalls("test-5", map[string]any{"arg": "value"}),
 			expectModified: true,
 		},
 	}

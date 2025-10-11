@@ -30,7 +30,7 @@ func GenerateKey() string {
 	prefix := randomStringFromCharset(16, keyChars)
 	copy(key[:16], prefix)
 	uuid_ := GetUUID()
-	for i := 0; i < 32; i++ {
+	for i := range 32 {
 		c := uuid_[i]
 		if i%2 == 0 && c >= 'a' && c <= 'z' {
 			c = c - 'a' + 'A'

@@ -159,10 +159,10 @@ func TestConvertRequest_EmptyAssistantMessageWithToolCalls(t *testing.T) {
 				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get weather information",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"location": map[string]interface{}{
+						"properties": map[string]any{
+							"location": map[string]any{
 								"type":        "string",
 								"description": "The location",
 							},
@@ -272,10 +272,10 @@ func TestConvertRequest_AssistantMessageWithTextAndToolCalls(t *testing.T) {
 				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get weather information",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"location": map[string]interface{}{
+						"properties": map[string]any{
+							"location": map[string]any{
 								"type":        "string",
 								"description": "The location",
 							},
@@ -329,7 +329,7 @@ func TestConvertRequest_EmptyTextContent(t *testing.T) {
 		Messages: []model.Message{
 			{
 				Role: "user",
-				Content: []map[string]interface{}{
+				Content: []map[string]any{
 					{
 						"type": "text",
 						"text": "", // Empty text
@@ -383,9 +383,9 @@ func TestConvertRequest_ValidJSONGeneration(t *testing.T) {
 				Function: &model.Function{
 					Name:        "get_current_datetime",
 					Description: "Get current date and time",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type":       "object",
-						"properties": map[string]interface{}{},
+						"properties": map[string]any{},
 					},
 				},
 			},
@@ -417,17 +417,17 @@ func TestConvertRequest_ValidJSONGeneration(t *testing.T) {
 	assert.Equal(t, "get_current_datetime", assistantMessage.Content[0].Name)
 
 	// Verify the JSON doesn't contain empty text fields
-	var jsonObj map[string]interface{}
+	var jsonObj map[string]any
 	err = json.Unmarshal(jsonData, &jsonObj)
 	require.NoError(t, err)
 
 	// Check that no message content has empty text type
-	messages := jsonObj["messages"].([]interface{})
+	messages := jsonObj["messages"].([]any)
 	for _, msg := range messages {
-		msgMap := msg.(map[string]interface{})
-		if content, ok := msgMap["content"].([]interface{}); ok {
+		msgMap := msg.(map[string]any)
+		if content, ok := msgMap["content"].([]any); ok {
 			for _, c := range content {
-				contentMap := c.(map[string]interface{})
+				contentMap := c.(map[string]any)
 				if contentMap["type"] == "text" {
 					// If it's a text type, it must have non-empty text
 					text, exists := contentMap["text"]
@@ -529,14 +529,14 @@ func TestConvertRequest_ThinkingBlocksConversion(t *testing.T) {
 				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"operation": map[string]interface{}{
+						"properties": map[string]any{
+							"operation": map[string]any{
 								"type": "string",
 								"enum": []string{"read", "write"},
 							},
-							"filePath": map[string]interface{}{
+							"filePath": map[string]any{
 								"type": "string",
 							},
 						},
@@ -597,12 +597,12 @@ func TestConvertRequest_ThinkingBlocksConversion(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the JSON structure is correct for Claude API
-	var jsonObj map[string]interface{}
+	var jsonObj map[string]any
 	err = json.Unmarshal(jsonData, &jsonObj)
 	require.NoError(t, err)
 
 	// Check that thinking is properly set
-	thinking := jsonObj["thinking"].(map[string]interface{})
+	thinking := jsonObj["thinking"].(map[string]any)
 	assert.Equal(t, "enabled", thinking["type"])
 	assert.Equal(t, float64(1024), thinking["budget_tokens"])
 }
@@ -672,13 +672,13 @@ func TestConvertRequest_ThinkingBlocksWithComplexContent(t *testing.T) {
 				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"operation": map[string]interface{}{
+						"properties": map[string]any{
+							"operation": map[string]any{
 								"type": "string",
 							},
-							"filePath": map[string]interface{}{
+							"filePath": map[string]any{
 								"type": "string",
 							},
 						},
@@ -737,7 +737,7 @@ func TestConvertRequest_ThinkingBlocksWithComplexContent(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the JSON structure is correct for Claude API
-	var jsonObj map[string]interface{}
+	var jsonObj map[string]any
 	err = json.Unmarshal(jsonData, &jsonObj)
 	require.NoError(t, err)
 }
@@ -802,7 +802,7 @@ func TestConvertRequest_BackwardCompatibility_NoThinking(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify no thinking blocks are present in the JSON
-	var jsonObj map[string]interface{}
+	var jsonObj map[string]any
 	err = json.Unmarshal(jsonData, &jsonObj)
 	require.NoError(t, err)
 
@@ -849,14 +849,14 @@ func TestConvertRequest_BugScenario_FullWorkflow(t *testing.T) {
 				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"operation": map[string]interface{}{
+						"properties": map[string]any{
+							"operation": map[string]any{
 								"type": "string",
 								"enum": []string{"read", "write"},
 							},
-							"filePath": map[string]interface{}{
+							"filePath": map[string]any{
 								"type": "string",
 							},
 						},
@@ -928,14 +928,14 @@ func TestConvertRequest_BugScenario_FullWorkflow(t *testing.T) {
 				Function: &model.Function{
 					Name:        "fileOperation",
 					Description: "Perform file operations",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"operation": map[string]interface{}{
+						"properties": map[string]any{
+							"operation": map[string]any{
 								"type": "string",
 								"enum": []string{"read", "write"},
 							},
-							"filePath": map[string]interface{}{
+							"filePath": map[string]any{
 								"type": "string",
 							},
 						},
@@ -996,18 +996,18 @@ func TestConvertRequest_BugScenario_FullWorkflow(t *testing.T) {
 
 	// This should not produce the error from the bug report:
 	// "messages.1.content.0.type: Expected `thinking` or `redacted_thinking`, but found `text`"
-	var jsonObj map[string]interface{}
+	var jsonObj map[string]any
 	err = json.Unmarshal(jsonData, &jsonObj)
 	require.NoError(t, err)
 
 	// Verify the messages structure is correct for Claude API
-	messages := jsonObj["messages"].([]interface{})
+	messages := jsonObj["messages"].([]any)
 	for _, msg := range messages {
-		msgMap := msg.(map[string]interface{})
+		msgMap := msg.(map[string]any)
 		if msgMap["role"] == "assistant" {
-			content := msgMap["content"].([]interface{})
+			content := msgMap["content"].([]any)
 			if len(content) > 0 {
-				firstContent := content[0].(map[string]interface{})
+				firstContent := content[0].(map[string]any)
 				// The first content block should be thinking when thinking is enabled
 				// and the message has reasoning content
 				if len(content) > 1 { // If there are multiple content blocks

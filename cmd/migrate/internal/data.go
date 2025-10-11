@@ -45,7 +45,7 @@ var TableMigrationOrder = []TableInfo{
 // TableInfo holds information about a table and its corresponding model
 type TableInfo struct {
 	Name  string
-	Model interface{}
+	Model any
 }
 
 // migrateData performs the actual data migration
@@ -138,10 +138,7 @@ func (m *Migrator) migrateTableSequential(ctx context.Context, tableInfo TableIn
 		atomic.AddInt64(&stats.RecordsDone, batchCount)
 
 		// Show progress every 10% or every 10,000 records, whichever is less frequent
-		progressThreshold := totalCount / 10
-		if progressThreshold < 10000 {
-			progressThreshold = 10000
-		}
+		progressThreshold := max(totalCount/10, 10000)
 
 		if m.Verbose && (migratedCount-lastProgressReport >= progressThreshold || migratedCount == totalCount) {
 			progress := float64(migratedCount) / float64(totalCount) * 100
@@ -198,10 +195,7 @@ func (m *Migrator) migrateTableConcurrent(ctx context.Context, tableInfo TableIn
 
 			// Show progress
 			currentCount := atomic.LoadInt64(&migratedCount)
-			progressThreshold := totalCount / 10
-			if progressThreshold < 10000 {
-				progressThreshold = 10000
-			}
+			progressThreshold := max(totalCount/10, 10000)
 
 			if m.Verbose && (currentCount-lastProgressReport >= progressThreshold || currentCount >= totalCount) {
 				progress := float64(currentCount) / float64(totalCount) * 100
@@ -301,7 +295,7 @@ func (m *Migrator) migrateBatch(tableInfo TableInfo, offset int64, limit int) (i
 }
 
 // insertBatchWithConflictResolution inserts a batch with conflict resolution
-func (m *Migrator) insertBatchWithConflictResolution(batch interface{}, tableInfo TableInfo) error {
+func (m *Migrator) insertBatchWithConflictResolution(batch any, tableInfo TableInfo) error {
 	// First try a simple insert for better performance
 	err := m.targetConn.DB.Create(batch).Error
 	if err == nil {
@@ -349,7 +343,7 @@ func (m *Migrator) isConflictError(err error) bool {
 }
 
 // upsertBatch performs upsert operation for conflicting records
-func (m *Migrator) upsertBatch(batch interface{}, tableInfo TableInfo) error {
+func (m *Migrator) upsertBatch(batch any, tableInfo TableInfo) error {
 	// Get the slice value
 	batchValue := reflect.ValueOf(batch).Elem()
 	batchLen := batchValue.Len()
@@ -358,7 +352,7 @@ func (m *Migrator) upsertBatch(batch interface{}, tableInfo TableInfo) error {
 	errorCount := 0
 
 	// Process each record individually for upsert
-	for i := 0; i < batchLen; i++ {
+	for i := range batchLen {
 		record := batchValue.Index(i).Addr().Interface()
 
 		// Use GORM's Save method which performs INSERT or UPDATE
@@ -461,10 +455,10 @@ func (m *Migrator) validateResults(stats *MigrationStats) error {
 }
 
 // ExportData exports data from source database to a structured format
-func (m *Migrator) ExportData(ctx context.Context) (map[string]interface{}, error) {
+func (m *Migrator) ExportData(ctx context.Context) (map[string]any, error) {
 	logger.Logger.Info("Exporting data from source database...")
 
-	exportData := make(map[string]interface{})
+	exportData := make(map[string]any)
 
 	for _, tableInfo := range TableMigrationOrder {
 		select {
@@ -499,7 +493,7 @@ func (m *Migrator) ExportData(ctx context.Context) (map[string]interface{}, erro
 }
 
 // exportTable exports all data from a specific table
-func (m *Migrator) exportTable(tableInfo TableInfo) (interface{}, error) {
+func (m *Migrator) exportTable(tableInfo TableInfo) (any, error) {
 	// Create a slice to hold all table data
 	modelType := reflect.TypeOf(tableInfo.Model).Elem()
 	sliceType := reflect.SliceOf(modelType)

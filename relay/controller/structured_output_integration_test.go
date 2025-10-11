@@ -74,10 +74,10 @@ func TestStructuredOutputCostIntegration(t *testing.T) {
 			Type: "json_schema",
 			JsonSchema: &relaymodel.JSONSchema{
 				Name: "test_schema",
-				Schema: map[string]interface{}{
+				Schema: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"result": map[string]interface{}{
+					"properties": map[string]any{
+						"result": map[string]any{
 							"type": "string",
 						},
 					},

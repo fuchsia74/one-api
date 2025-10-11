@@ -659,7 +659,7 @@ func getResponseAPIPromptTokens(ctx context.Context, responseAPIRequest *openai.
 	// Count tokens from input array (if present)
 	for _, input := range responseAPIRequest.Input {
 		switch v := input.(type) {
-		case map[string]interface{}:
+		case map[string]any:
 			if content, ok := v["content"].(string); ok {
 				// Simple estimation: ~4 characters per token
 				totalTokens += len(content) / 4
@@ -679,7 +679,7 @@ func getResponseAPIPromptTokens(ctx context.Context, responseAPIRequest *openai.
 			switch v := value.(type) {
 			case string:
 				totalTokens += len(v) / 4
-			case map[string]interface{}:
+			case map[string]any:
 				// For complex variables like input_file, add a fixed cost
 				totalTokens += 20
 			}

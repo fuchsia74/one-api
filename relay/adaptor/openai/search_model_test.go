@@ -29,7 +29,6 @@ func TestIsWebSearchModel(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
 			if got := isWebSearchModel(tc.model); got != tc.expected {
 				t.Fatalf("isWebSearchModel(%q) = %v, want %v", tc.model, got, tc.expected)

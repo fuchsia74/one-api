@@ -123,7 +123,7 @@ func GetTokenTransactionByTokenAndID(ctx context.Context, tokenID int, transacti
 //   - updates: columns to update.
 //
 // Returns an error if the update fails.
-func UpdateTokenTransaction(ctx context.Context, transactionID int, updates map[string]interface{}) error {
+func UpdateTokenTransaction(ctx context.Context, transactionID int, updates map[string]any) error {
 	if transactionID == 0 {
 		return errors.Errorf("transaction id cannot be zero")
 	}
@@ -171,7 +171,7 @@ func AutoConfirmExpiredTokenTransactions(ctx context.Context, tokenID int, now i
 	for _, txn := range pending {
 		final := txn.PreQuota
 		confirmedAt := now
-		updates := map[string]interface{}{
+		updates := map[string]any{
 			"status":         TokenTransactionStatusAutoConfirmed,
 			"final_quota":    final,
 			"confirmed_at":   confirmedAt,

@@ -71,7 +71,7 @@ func TestResponseAPIRequestParsing(t *testing.T) {
 					t.Errorf("Expected input length 2, got %d", len(req.Input))
 				}
 				// Verify first message
-				msg1, ok := req.Input[0].(map[string]interface{})
+				msg1, ok := req.Input[0].(map[string]any)
 				if !ok {
 					t.Errorf("Expected first input to be a message object")
 				} else {
@@ -135,11 +135,11 @@ func TestResponseAPIRequestParsing(t *testing.T) {
 				if len(req.Input) != 1 {
 					t.Errorf("Expected input length 1, got %d", len(req.Input))
 				}
-				msg, ok := req.Input[0].(map[string]interface{})
+				msg, ok := req.Input[0].(map[string]any)
 				if !ok {
 					t.Fatal("Expected input to be a message object")
 				}
-				content, ok := msg["content"].([]interface{})
+				content, ok := msg["content"].([]any)
 				if !ok {
 					t.Fatal("Expected content to be an array")
 				}
@@ -170,11 +170,11 @@ func TestResponseAPIRequestParsing(t *testing.T) {
 				if len(req.Input) != 1 {
 					t.Errorf("Expected input length 1, got %d", len(req.Input))
 				}
-				msg, ok := req.Input[0].(map[string]interface{})
+				msg, ok := req.Input[0].(map[string]any)
 				if !ok {
 					t.Fatal("Expected input to be a message object")
 				}
-				content, ok := msg["content"].([]interface{})
+				content, ok := msg["content"].([]any)
 				if !ok {
 					t.Fatal("Expected content to be an array")
 				}
@@ -182,7 +182,7 @@ func TestResponseAPIRequestParsing(t *testing.T) {
 					t.Errorf("Expected content length 2, got %d", len(content))
 				}
 				// Verify image content
-				imageContent, ok := content[1].(map[string]interface{})
+				imageContent, ok := content[1].(map[string]any)
 				if !ok {
 					t.Fatal("Expected second content item to be an object")
 				}
@@ -213,16 +213,16 @@ func TestResponseAPIRequestParsing(t *testing.T) {
 				if len(req.Input) != 1 {
 					t.Errorf("Expected input length 1, got %d", len(req.Input))
 				}
-				msg, ok := req.Input[0].(map[string]interface{})
+				msg, ok := req.Input[0].(map[string]any)
 				if !ok {
 					t.Fatal("Expected input to be a message object")
 				}
-				content, ok := msg["content"].([]interface{})
+				content, ok := msg["content"].([]any)
 				if !ok {
 					t.Fatal("Expected content to be an array")
 				}
 				// Verify image content with file_id
-				imageContent, ok := content[1].(map[string]interface{})
+				imageContent, ok := content[1].(map[string]any)
 				if !ok {
 					t.Fatal("Expected second content item to be an object")
 				}
@@ -630,7 +630,7 @@ func TestResponseAPIInputMarshalUnmarshal(t *testing.T) {
 			name: "Mixed content",
 			input: ResponseAPIInput{
 				"Hello",
-				map[string]interface{}{
+				map[string]any{
 					"role":    "user",
 					"content": "world",
 				},
@@ -639,14 +639,14 @@ func TestResponseAPIInputMarshalUnmarshal(t *testing.T) {
 		{
 			name: "Complex message structure",
 			input: ResponseAPIInput{
-				map[string]interface{}{
+				map[string]any{
 					"role": "user",
-					"content": []interface{}{
-						map[string]interface{}{
+					"content": []any{
+						map[string]any{
 							"type": "input_text",
 							"text": "What's in this image?",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"type":      "input_image",
 							"image_url": "https://example.com/image.jpg",
 						},

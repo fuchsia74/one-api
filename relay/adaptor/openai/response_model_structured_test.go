@@ -21,20 +21,20 @@ func TestBidirectionalStructuredOutputConversion(t *testing.T) {
 			JsonSchema: &model.JSONSchema{
 				Name:        "person_extraction",
 				Description: "Extract person information",
-				Schema: map[string]interface{}{
+				Schema: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"name": map[string]interface{}{
+					"properties": map[string]any{
+						"name": map[string]any{
 							"type":        "string",
 							"description": "The person's full name",
 						},
-						"age": map[string]interface{}{
+						"age": map[string]any{
 							"type":        "integer",
 							"description": "The person's age",
 							"minimum":     0,
 							"maximum":     150,
 						},
-						"additional_info": map[string]interface{}{
+						"additional_info": map[string]any{
 							"type":        "string",
 							"description": "Any additional information",
 						},
@@ -78,12 +78,12 @@ func TestBidirectionalStructuredOutputConversion(t *testing.T) {
 
 	// Verify complex schema structure preservation
 	schema := responseAPI.Text.Format.Schema
-	properties, ok := schema["properties"].(map[string]interface{})
+	properties, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected properties to be preserved in schema")
 	}
 
-	nameProperty, ok := properties["name"].(map[string]interface{})
+	nameProperty, ok := properties["name"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected name property to be preserved")
 	}
@@ -94,7 +94,7 @@ func TestBidirectionalStructuredOutputConversion(t *testing.T) {
 		t.Errorf("Expected name description to be preserved, got '%v'", nameProperty["description"])
 	}
 
-	ageProperty, ok := properties["age"].(map[string]interface{})
+	ageProperty, ok := properties["age"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected age property to be preserved")
 	}
@@ -220,12 +220,12 @@ func TestStructuredOutputWithReasoningAndFunctionCalls(t *testing.T) {
 				Type:        "json_schema",
 				Name:        "person_data",
 				Description: "Person information schema",
-				Schema: map[string]interface{}{
+				Schema: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"name":       map[string]interface{}{"type": "string"},
-						"age":        map[string]interface{}{"type": "integer"},
-						"occupation": map[string]interface{}{"type": "string"},
+					"properties": map[string]any{
+						"name":       map[string]any{"type": "string"},
+						"age":        map[string]any{"type": "integer"},
+						"occupation": map[string]any{"type": "string"},
 					},
 					"required": []string{"name", "age"},
 				},
@@ -501,13 +501,13 @@ func TestJSONSchemaConversionDetailed(t *testing.T) {
 				JsonSchema: &model.JSONSchema{
 					Name:        "person_info",
 					Description: "Extract person information",
-					Schema: map[string]interface{}{
+					Schema: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"name": map[string]interface{}{
+						"properties": map[string]any{
+							"name": map[string]any{
 								"type": "string",
 							},
-							"age": map[string]interface{}{
+							"age": map[string]any{
 								"type": "integer",
 							},
 						},
@@ -544,12 +544,12 @@ func TestJSONSchemaConversionDetailed(t *testing.T) {
 			t.Errorf("Expected schema type 'object', got '%v'", schema["type"])
 		}
 
-		properties, ok := schema["properties"].(map[string]interface{})
+		properties, ok := schema["properties"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected properties to be a map")
 		}
 
-		nameProperty, ok := properties["name"].(map[string]interface{})
+		nameProperty, ok := properties["name"].(map[string]any)
 		if !ok || nameProperty["type"] != "string" {
 			t.Error("Expected name property to be string type")
 		}
@@ -599,7 +599,7 @@ func TestJSONSchemaConversionDetailed(t *testing.T) {
 		}
 
 		// Verify the structured JSON content
-		var parsed map[string]interface{}
+		var parsed map[string]any
 		if err := json.Unmarshal([]byte(content), &parsed); err != nil {
 			t.Errorf("Expected valid JSON content: %v", err)
 		}
@@ -613,22 +613,22 @@ func TestJSONSchemaConversionDetailed(t *testing.T) {
 // TestComplexNestedSchemaConversion tests complex nested schema structures
 func TestComplexNestedSchemaConversion(t *testing.T) {
 	// Create complex nested schema
-	complexSchema := map[string]interface{}{
+	complexSchema := map[string]any{
 		"type": "object",
-		"properties": map[string]interface{}{
-			"steps": map[string]interface{}{
+		"properties": map[string]any{
+			"steps": map[string]any{
 				"type": "array",
-				"items": map[string]interface{}{
+				"items": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"explanation": map[string]interface{}{"type": "string"},
-						"output":      map[string]interface{}{"type": "string"},
+					"properties": map[string]any{
+						"explanation": map[string]any{"type": "string"},
+						"output":      map[string]any{"type": "string"},
 					},
 					"required":             []string{"explanation", "output"},
 					"additionalProperties": false,
 				},
 			},
-			"final_answer": map[string]interface{}{"type": "string"},
+			"final_answer": map[string]any{"type": "string"},
 		},
 		"required":             []string{"steps", "final_answer"},
 		"additionalProperties": false,
@@ -659,12 +659,12 @@ func TestComplexNestedSchemaConversion(t *testing.T) {
 	}
 
 	schema := responseAPI.Text.Format.Schema
-	properties, ok := schema["properties"].(map[string]interface{})
+	properties, ok := schema["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected properties in complex schema")
 	}
 
-	steps, ok := properties["steps"].(map[string]interface{})
+	steps, ok := properties["steps"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected steps property in complex schema")
 	}
@@ -673,12 +673,12 @@ func TestComplexNestedSchemaConversion(t *testing.T) {
 		t.Errorf("Expected steps type 'array', got '%v'", steps["type"])
 	}
 
-	items, ok := steps["items"].(map[string]interface{})
+	items, ok := steps["items"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected items in steps array")
 	}
 
-	itemProps, ok := items["properties"].(map[string]interface{})
+	itemProps, ok := items["properties"].(map[string]any)
 	if !ok {
 		t.Fatal("Expected properties in items")
 	}
@@ -858,27 +858,27 @@ func TestStructuredOutputEdgeCases(t *testing.T) {
 func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 	t.Run("research paper extraction", func(t *testing.T) {
 		// Complex schema for research paper extraction
-		researchSchema := map[string]interface{}{
+		researchSchema := map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"title": map[string]interface{}{
+			"properties": map[string]any{
+				"title": map[string]any{
 					"type":        "string",
 					"description": "The title of the research paper",
 				},
-				"authors": map[string]interface{}{
+				"authors": map[string]any{
 					"type": "array",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"name": map[string]interface{}{
+						"properties": map[string]any{
+							"name": map[string]any{
 								"type":        "string",
 								"description": "Author's full name",
 							},
-							"affiliation": map[string]interface{}{
+							"affiliation": map[string]any{
 								"type":        "string",
 								"description": "Author's institutional affiliation",
 							},
-							"email": map[string]interface{}{
+							"email": map[string]any{
 								"type":        "string",
 								"format":      "email",
 								"description": "Author's email address",
@@ -888,36 +888,36 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 					},
 					"minItems": 1,
 				},
-				"abstract": map[string]interface{}{
+				"abstract": map[string]any{
 					"type":        "string",
 					"description": "The paper's abstract",
 					"minLength":   50,
 				},
-				"keywords": map[string]interface{}{
+				"keywords": map[string]any{
 					"type": "array",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "string",
 					},
 					"minItems": 3,
 					"maxItems": 10,
 				},
-				"sections": map[string]interface{}{
+				"sections": map[string]any{
 					"type": "array",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"title": map[string]interface{}{"type": "string"},
-							"content": map[string]interface{}{
+						"properties": map[string]any{
+							"title": map[string]any{"type": "string"},
+							"content": map[string]any{
 								"type":      "string",
 								"minLength": 100,
 							},
-							"subsections": map[string]interface{}{
+							"subsections": map[string]any{
 								"type": "array",
-								"items": map[string]interface{}{
+								"items": map[string]any{
 									"type": "object",
-									"properties": map[string]interface{}{
-										"title":   map[string]interface{}{"type": "string"},
-										"content": map[string]interface{}{"type": "string"},
+									"properties": map[string]any{
+										"title":   map[string]any{"type": "string"},
+										"content": map[string]any{"type": "string"},
 									},
 								},
 							},
@@ -925,17 +925,17 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 						"required": []string{"title", "content"},
 					},
 				},
-				"references": map[string]interface{}{
+				"references": map[string]any{
 					"type": "array",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"title":   map[string]interface{}{"type": "string"},
-							"authors": map[string]interface{}{"type": "array"},
-							"journal": map[string]interface{}{"type": "string"},
-							"year":    map[string]interface{}{"type": "integer"},
-							"doi":     map[string]interface{}{"type": "string"},
-							"url":     map[string]interface{}{"type": "string"},
+						"properties": map[string]any{
+							"title":   map[string]any{"type": "string"},
+							"authors": map[string]any{"type": "array"},
+							"journal": map[string]any{"type": "string"},
+							"year":    map[string]any{"type": "integer"},
+							"doi":     map[string]any{"type": "string"},
+							"url":     map[string]any{"type": "string"},
 						},
 						"required": []string{"title", "authors"},
 					},
@@ -971,23 +971,23 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 		}
 
 		schema := responseAPI.Text.Format.Schema
-		properties, ok := schema["properties"].(map[string]interface{})
+		properties, ok := schema["properties"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected properties in research schema")
 		}
 
 		// Verify authors array structure
-		authors, ok := properties["authors"].(map[string]interface{})
+		authors, ok := properties["authors"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected authors property")
 		}
 
-		items, ok := authors["items"].(map[string]interface{})
+		items, ok := authors["items"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected items in authors array")
 		}
 
-		authorProps, ok := items["properties"].(map[string]interface{})
+		authorProps, ok := items["properties"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected properties in author items")
 		}
@@ -997,23 +997,23 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 		}
 
 		// Verify sections nested structure
-		sections, ok := properties["sections"].(map[string]interface{})
+		sections, ok := properties["sections"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected sections property")
 		}
 
-		sectionItems, ok := sections["items"].(map[string]interface{})
+		sectionItems, ok := sections["items"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected items in sections array")
 		}
 
-		sectionProps, ok := sectionItems["properties"].(map[string]interface{})
+		sectionProps, ok := sectionItems["properties"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected properties in section items")
 		}
 
 		// Verify subsections nested array
-		subsections, ok := sectionProps["subsections"].(map[string]interface{})
+		subsections, ok := sectionProps["subsections"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected subsections property")
 		}
@@ -1080,7 +1080,7 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 		}
 
 		// Verify the complex JSON structure
-		var extracted map[string]interface{}
+		var extracted map[string]any
 		if err := json.Unmarshal([]byte(content), &extracted); err != nil {
 			t.Fatalf("Failed to parse complex JSON: %v", err)
 		}
@@ -1089,12 +1089,12 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 			t.Errorf("Expected title to match, got '%v'", extracted["title"])
 		}
 
-		authorsArray, ok := extracted["authors"].([]interface{})
+		authorsArray, ok := extracted["authors"].([]any)
 		if !ok || len(authorsArray) != 1 {
 			t.Errorf("Expected 1 author, got %v", authorsArray)
 		}
 
-		author, ok := authorsArray[0].(map[string]interface{})
+		author, ok := authorsArray[0].(map[string]any)
 		if !ok {
 			t.Fatal("Expected author to be object")
 		}
@@ -1106,34 +1106,34 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 
 	t.Run("UI component generation with recursive schema", func(t *testing.T) {
 		// Recursive UI component schema
-		uiSchema := map[string]interface{}{
+		uiSchema := map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"type": map[string]interface{}{
+			"properties": map[string]any{
+				"type": map[string]any{
 					"type":        "string",
 					"description": "The type of the UI component",
 					"enum":        []string{"div", "button", "header", "section", "field", "form"},
 				},
-				"label": map[string]interface{}{
+				"label": map[string]any{
 					"type":        "string",
 					"description": "The label of the UI component",
 				},
-				"children": map[string]interface{}{
+				"children": map[string]any{
 					"type":        "array",
 					"description": "Nested UI components",
-					"items":       map[string]interface{}{"$ref": "#"},
+					"items":       map[string]any{"$ref": "#"},
 				},
-				"attributes": map[string]interface{}{
+				"attributes": map[string]any{
 					"type":        "array",
 					"description": "Arbitrary attributes for the UI component",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"name": map[string]interface{}{
+						"properties": map[string]any{
+							"name": map[string]any{
 								"type":        "string",
 								"description": "The name of the attribute",
 							},
-							"value": map[string]interface{}{
+							"value": map[string]any{
 								"type":        "string",
 								"description": "The value of the attribute",
 							},
@@ -1168,17 +1168,17 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 
 		// Verify recursive schema handling
 		schema := responseAPI.Text.Format.Schema
-		properties, ok := schema["properties"].(map[string]interface{})
+		properties, ok := schema["properties"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected properties in UI schema")
 		}
 
-		children, ok := properties["children"].(map[string]interface{})
+		children, ok := properties["children"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected children property")
 		}
 
-		items, ok := children["items"].(map[string]interface{})
+		items, ok := children["items"].(map[string]any)
 		if !ok {
 			t.Fatal("Expected items in children")
 		}
@@ -1248,7 +1248,7 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 			t.Fatal("Expected UI content to be string")
 		}
 
-		var uiComponent map[string]interface{}
+		var uiComponent map[string]any
 		if err := json.Unmarshal([]byte(content), &uiComponent); err != nil {
 			t.Fatalf("Failed to parse UI JSON: %v", err)
 		}
@@ -1257,18 +1257,18 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 			t.Errorf("Expected type 'form', got '%v'", uiComponent["type"])
 		}
 
-		childrenArray, ok := uiComponent["children"].([]interface{})
+		childrenArray, ok := uiComponent["children"].([]any)
 		if !ok || len(childrenArray) != 2 {
 			t.Errorf("Expected 2 children, got %v", childrenArray)
 		}
 
 		// Verify nested structure
-		passwordSection, ok := childrenArray[1].(map[string]interface{})
+		passwordSection, ok := childrenArray[1].(map[string]any)
 		if !ok {
 			t.Fatal("Expected password section to be object")
 		}
 
-		nestedChildren, ok := passwordSection["children"].([]interface{})
+		nestedChildren, ok := passwordSection["children"].([]any)
 		if !ok || len(nestedChildren) != 1 {
 			t.Errorf("Expected 1 nested child, got %v", nestedChildren)
 		}
@@ -1276,27 +1276,27 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 
 	t.Run("chain of thought with structured output", func(t *testing.T) {
 		// Chain of thought with structured output
-		reasoningSchema := map[string]interface{}{
+		reasoningSchema := map[string]any{
 			"type": "object",
-			"properties": map[string]interface{}{
-				"steps": map[string]interface{}{
+			"properties": map[string]any{
+				"steps": map[string]any{
 					"type": "array",
-					"items": map[string]interface{}{
+					"items": map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"step_number": map[string]interface{}{
+						"properties": map[string]any{
+							"step_number": map[string]any{
 								"type":        "integer",
 								"description": "The step number in the reasoning process",
 							},
-							"explanation": map[string]interface{}{
+							"explanation": map[string]any{
 								"type":        "string",
 								"description": "Explanation of this step",
 							},
-							"calculation": map[string]interface{}{
+							"calculation": map[string]any{
 								"type":        "string",
 								"description": "Mathematical calculation for this step",
 							},
-							"result": map[string]interface{}{
+							"result": map[string]any{
 								"type":        "string",
 								"description": "Result of this step",
 							},
@@ -1304,22 +1304,22 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 						"required": []string{"step_number", "explanation", "result"},
 					},
 				},
-				"final_answer": map[string]interface{}{
+				"final_answer": map[string]any{
 					"type":        "string",
 					"description": "The final answer to the problem",
 				},
-				"verification": map[string]interface{}{
+				"verification": map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"method": map[string]interface{}{
+					"properties": map[string]any{
+						"method": map[string]any{
 							"type":        "string",
 							"description": "Method used to verify the answer",
 						},
-						"check": map[string]interface{}{
+						"check": map[string]any{
 							"type":        "string",
 							"description": "Verification calculation",
 						},
-						"confirmed": map[string]interface{}{
+						"confirmed": map[string]any{
 							"type":        "boolean",
 							"description": "Whether the answer is confirmed",
 						},
@@ -1438,12 +1438,12 @@ func TestAdvancedStructuredOutputScenarios(t *testing.T) {
 			t.Fatal("Expected content to be string")
 		}
 
-		var reasoning map[string]interface{}
+		var reasoning map[string]any
 		if err := json.Unmarshal([]byte(content), &reasoning); err != nil {
 			t.Fatalf("Failed to parse reasoning JSON: %v", err)
 		}
 
-		steps, ok := reasoning["steps"].([]interface{})
+		steps, ok := reasoning["steps"].([]any)
 		if !ok || len(steps) != 3 {
 			t.Errorf("Expected 3 reasoning steps, got %v", steps)
 		}

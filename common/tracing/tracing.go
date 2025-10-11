@@ -43,10 +43,7 @@ func RecordTraceStart(c *gin.Context) {
 
 	url := c.Request.URL.String()
 	method := c.Request.Method
-	bodySize := c.Request.ContentLength
-	if bodySize < 0 {
-		bodySize = 0
-	}
+	bodySize := max(c.Request.ContentLength, 0)
 
 	ctx := gmw.Ctx(c)
 	// propagate tagged logger downstream

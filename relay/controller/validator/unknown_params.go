@@ -42,7 +42,7 @@ func GetKnownParameters() map[string]bool {
 // ValidateUnknownParameters checks for unknown parameters in the raw JSON request
 func ValidateUnknownParameters(requestBody []byte) error {
 	// Parse the JSON to extract field names
-	var rawRequest map[string]interface{}
+	var rawRequest map[string]any
 	if err := json.Unmarshal(requestBody, &rawRequest); err != nil {
 		// If JSON is invalid, let the normal validation handle it
 		return nil

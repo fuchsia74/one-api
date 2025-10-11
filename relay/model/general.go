@@ -32,10 +32,10 @@ type ResponseFormat struct {
 }
 
 type JSONSchema struct {
-	Description string                 `json:"description,omitempty"`
-	Name        string                 `json:"name"`
-	Schema      map[string]interface{} `json:"schema,omitempty"`
-	Strict      *bool                  `json:"strict,omitempty"`
+	Description string         `json:"description,omitempty"`
+	Name        string         `json:"name"`
+	Schema      map[string]any `json:"schema,omitempty"`
+	Strict      *bool          `json:"strict,omitempty"`
 }
 
 type Audio struct {

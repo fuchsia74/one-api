@@ -129,8 +129,8 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 
 	for scanner.Scan() {
 		data := scanner.Text()
-		if strings.HasPrefix(data, "}") {
-			data = strings.TrimPrefix(data, "}") + "}"
+		if after, ok := strings.CutPrefix(data, "}"); ok {
+			data = after + "}"
 		}
 
 		var ollamaResponse ChatResponse

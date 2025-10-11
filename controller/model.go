@@ -86,7 +86,7 @@ func init() {
 		IsBlocking:         false,
 	})
 	// https://platform.openai.com/docs/models/model-endpoint-compatibility
-	for i := 0; i < apitype.Dummy; i++ {
+	for i := range apitype.Dummy {
 		if i == apitype.AIProxyLibrary {
 			continue
 		}
@@ -288,7 +288,7 @@ func GetModelsDisplay(c *gin.Context) {
 			return
 		}
 
-		v, err, _ := anonymousModelsDisplayGroup.Do(cacheKey, func() (interface{}, error) {
+		v, err, _ := anonymousModelsDisplayGroup.Do(cacheKey, func() (any, error) {
 			channels, err := model.GetAllEnabledChannels()
 			if err != nil {
 				return nil, errors.Wrap(err, "get all enabled channels")

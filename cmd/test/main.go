@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -119,9 +120,7 @@ func run(ctx context.Context, logger glog.Logger) error {
 		collectWg sync.WaitGroup
 	)
 
-	collectWg.Add(1)
-	go func() {
-		defer collectWg.Done()
+	collectWg.Go(func() {
 		for res := range resultsCh {
 			results = append(results, res)
 			switch {
@@ -157,11 +156,10 @@ func run(ctx context.Context, logger glog.Logger) error {
 				)
 			}
 		}
-	}()
+	})
 
 	grp, grpCtx := errgroup.WithContext(ctx)
 	for _, model := range cfg.Models {
-		model := model
 		grp.Go(func() error {
 			executeModelSweep(grpCtx, httpClient, cfg, model, resultsCh)
 			return nil
@@ -252,7 +250,6 @@ func executeModelSweep(ctx context.Context, client *http.Client, cfg config, mod
 
 	innerGrp, innerCtx := errgroup.WithContext(ctx)
 	for _, spec := range specs {
-		spec := spec
 		innerGrp.Go(func() error {
 			res := performRequest(innerCtx, client, cfg.APIBase, cfg.Token, spec, model)
 			select {
@@ -493,8 +490,8 @@ func evaluateStreamResponse(reqType requestType, data []byte) (bool, string) {
 		return false, "empty stream"
 	}
 
-	lines := bytes.Split(trimmed, []byte("\n"))
-	for _, line := range lines {
+	lines := bytes.SplitSeq(trimmed, []byte("\n"))
+	for line := range lines {
 		line = bytes.TrimSpace(line)
 		if len(line) == 0 {
 			continue
@@ -547,12 +544,7 @@ func isMeaningfulErrorValue(val any) bool {
 		}
 		return false
 	case []any:
-		for _, item := range v {
-			if isMeaningfulErrorValue(item) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(v, isMeaningfulErrorValue)
 	case bool:
 		return v
 	case float64:

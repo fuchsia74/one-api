@@ -71,7 +71,7 @@ func TestGetPromptTokens(t *testing.T) {
 			relayMode: relaymode.Embeddings,
 			request: &model.GeneralOpenAIRequest{
 				Model: "text-embedding-ada-002",
-				Input: []interface{}{"Hello", "World", "Test"},
+				Input: []any{"Hello", "World", "Test"},
 			},
 			expectError: false,
 			expectZero:  false,
@@ -141,7 +141,7 @@ func TestGetPromptTokensEmbeddingsSpecific(t *testing.T) {
 	// Test different input formats for embeddings
 	testCases := []struct {
 		name     string
-		input    interface{}
+		input    any
 		expected bool // whether we expect tokens > 0
 	}{
 		{
@@ -151,7 +151,7 @@ func TestGetPromptTokensEmbeddingsSpecific(t *testing.T) {
 		},
 		{
 			name:     "Array of strings",
-			input:    []interface{}{"Hello", "World", "Test embedding"},
+			input:    []any{"Hello", "World", "Test embedding"},
 			expected: true,
 		},
 		{

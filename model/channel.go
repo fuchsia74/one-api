@@ -347,7 +347,7 @@ func (channel *Channel) MigrateModelConfigsToModelPrice() error {
 	}
 
 	// Validate JSON format first
-	var rawData interface{}
+	var rawData any
 	if err := json.Unmarshal([]byte(*channel.ModelConfigs), &rawData); err != nil {
 		return errors.Wrapf(err, "invalid JSON in ModelConfigs for channel %d", channel.Id)
 	}
@@ -356,7 +356,7 @@ func (channel *Channel) MigrateModelConfigsToModelPrice() error {
 	switch rawData.(type) {
 	case nil:
 		return errors.Errorf("ModelConfigs cannot be parsed: null value for channel %d", channel.Id)
-	case []interface{}:
+	case []any:
 		return errors.Errorf("ModelConfigs cannot be parsed: array value for channel %d", channel.Id)
 	case string:
 		return errors.Errorf("ModelConfigs cannot be parsed: string value for channel %d", channel.Id)
@@ -709,7 +709,7 @@ func (channel *Channel) Update() error {
 	}
 	// Helper to check containment
 	contains := func(listCSV, name string) bool {
-		for _, n := range strings.Split(listCSV, ",") {
+		for n := range strings.SplitSeq(listCSV, ",") {
 			if strings.TrimSpace(n) == name {
 				return true
 			}

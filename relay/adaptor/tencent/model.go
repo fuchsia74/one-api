@@ -62,22 +62,22 @@ type Usage struct {
 
 type ResponseChoices struct {
 	FinishReason string  `json:"FinishReason,omitempty"` // Stream end flag, "stop" indicates the end packet
-	Messages     Message `json:"Message,omitempty"`      // Content, returned in synchronous mode, null in stream mode. The total content supports up to 1024 tokens.
-	Delta        Message `json:"Delta,omitempty"`        // Content, returned in stream mode, null in synchronous mode. The total content supports up to 1024 tokens.
+	Messages     Message `json:"Message"`                // Content, returned in synchronous mode, null in stream mode. The total content supports up to 1024 tokens.
+	Delta        Message `json:"Delta"`                  // Content, returned in stream mode, null in synchronous mode. The total content supports up to 1024 tokens.
 }
 
 type ChatResponse struct {
 	Choices []ResponseChoices `json:"Choices,omitempty"`   // Results
 	Created int64             `json:"Created,omitempty"`   // Unix timestamp string
 	Id      string            `json:"Id,omitempty"`        // Session id
-	Usage   Usage             `json:"Usage,omitempty"`     // Token count
-	Error   Error             `json:"Error,omitempty"`     // Error message. Note: this field may return null, indicating no valid value can be obtained
+	Usage   Usage             `json:"Usage"`               // Token count
+	Error   Error             `json:"Error"`               // Error message. Note: this field may return null, indicating no valid value can be obtained
 	Note    string            `json:"Note,omitempty"`      // Comment
 	ReqID   string            `json:"RequestId,omitempty"` // Unique request Id, returned with each request. Used for feedback interface parameters
 }
 
 type ChatResponseP struct {
-	Response ChatResponse `json:"Response,omitempty"`
+	Response ChatResponse `json:"Response"`
 }
 
 type EmbeddingRequest struct {
@@ -97,11 +97,11 @@ type EmbeddingUsage struct {
 
 type EmbeddingResponse struct {
 	Data           []EmbeddingData `json:"Data"`
-	EmbeddingUsage EmbeddingUsage  `json:"Usage,omitempty"`
+	EmbeddingUsage EmbeddingUsage  `json:"Usage"`
 	RequestId      string          `json:"RequestId,omitempty"`
-	Error          Error           `json:"Error,omitempty"`
+	Error          Error           `json:"Error"`
 }
 
 type EmbeddingResponseP struct {
-	Response EmbeddingResponse `json:"Response,omitempty"`
+	Response EmbeddingResponse `json:"Response"`
 }

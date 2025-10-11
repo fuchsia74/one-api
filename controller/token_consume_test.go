@@ -120,14 +120,14 @@ func TestConsumeTokenPreAndPostFlow(t *testing.T) {
 	ConsumeToken(c)
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var preResp map[string]interface{}
+	var preResp map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &preResp))
 	require.True(t, preResp["success"].(bool))
 
-	data := preResp["data"].(map[string]interface{})
+	data := preResp["data"].(map[string]any)
 	require.Equal(t, float64(token.RemainQuota-100), data["remain_quota"])
 
-	txnResp := preResp["transaction"].(map[string]interface{})
+	txnResp := preResp["transaction"].(map[string]any)
 	require.Equal(t, "pending", txnResp["status"])
 	transactionID := txnResp["transaction_id"].(string)
 	require.NotEmpty(t, transactionID)
@@ -148,14 +148,14 @@ func TestConsumeTokenPreAndPostFlow(t *testing.T) {
 	ConsumeToken(c)
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var postResp map[string]interface{}
+	var postResp map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &postResp))
 	require.True(t, postResp["success"].(bool))
 
-	postData := postResp["data"].(map[string]interface{})
+	postData := postResp["data"].(map[string]any)
 	require.Equal(t, float64(token.RemainQuota-80), postData["remain_quota"])
 
-	postTxnResp := postResp["transaction"].(map[string]interface{})
+	postTxnResp := postResp["transaction"].(map[string]any)
 	require.Equal(t, "confirmed", postTxnResp["status"])
 	require.EqualValues(t, 80, postTxnResp["final_quota"])
 
@@ -186,10 +186,10 @@ func TestConsumeTokenCancelFlow(t *testing.T) {
 	ConsumeToken(c)
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var preResp map[string]interface{}
+	var preResp map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &preResp))
 	require.True(t, preResp["success"].(bool))
-	txnResp := preResp["transaction"].(map[string]interface{})
+	txnResp := preResp["transaction"].(map[string]any)
 	transactionID := txnResp["transaction_id"].(string)
 	require.NotEmpty(t, transactionID)
 
@@ -198,11 +198,11 @@ func TestConsumeTokenCancelFlow(t *testing.T) {
 	ConsumeToken(c)
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var cancelResp map[string]interface{}
+	var cancelResp map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &cancelResp))
 	require.True(t, cancelResp["success"].(bool))
 
-	cancelTxn := cancelResp["transaction"].(map[string]interface{})
+	cancelTxn := cancelResp["transaction"].(map[string]any)
 	require.Equal(t, "canceled", cancelTxn["status"])
 
 	txn, err := model.GetTokenTransactionByTokenAndID(context.Background(), token.Id, transactionID)
@@ -230,10 +230,10 @@ func TestConsumeTokenAutoConfirmTimeout(t *testing.T) {
 	ConsumeToken(c)
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var preResp map[string]interface{}
+	var preResp map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &preResp))
 	require.True(t, preResp["success"].(bool))
-	txnResp := preResp["transaction"].(map[string]interface{})
+	txnResp := preResp["transaction"].(map[string]any)
 	transactionID := txnResp["transaction_id"].(string)
 	require.NotEmpty(t, transactionID)
 
@@ -266,14 +266,14 @@ func TestConsumeTokenDefaultsToSinglePhase(t *testing.T) {
 	ConsumeToken(c)
 	require.Equal(t, http.StatusOK, recorder.Code)
 
-	var resp map[string]interface{}
+	var resp map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &resp))
 	require.True(t, resp["success"].(bool))
 
-	data := resp["data"].(map[string]interface{})
+	data := resp["data"].(map[string]any)
 	require.Equal(t, float64(token.RemainQuota-120), data["remain_quota"])
 
-	transaction := resp["transaction"].(map[string]interface{})
+	transaction := resp["transaction"].(map[string]any)
 	require.Equal(t, "confirmed", transaction["status"])
 	require.EqualValues(t, 120, transaction["final_quota"])
 

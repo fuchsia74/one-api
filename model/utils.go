@@ -23,7 +23,7 @@ var batchUpdateStores []map[int]int64
 var batchUpdateLocks []sync.Mutex
 
 func init() {
-	for i := 0; i < BatchUpdateTypeCount; i++ {
+	for range BatchUpdateTypeCount {
 		batchUpdateStores = append(batchUpdateStores, make(map[int]int64))
 		batchUpdateLocks = append(batchUpdateLocks, sync.Mutex{})
 	}
@@ -50,7 +50,7 @@ func addNewRecord(type_ int, id int, value int64) {
 
 func batchUpdate() {
 	logger.Logger.Info("batch update started")
-	for i := 0; i < BatchUpdateTypeCount; i++ {
+	for i := range BatchUpdateTypeCount {
 		batchUpdateLocks[i].Lock()
 		store := batchUpdateStores[i]
 		batchUpdateStores[i] = make(map[int]int64)

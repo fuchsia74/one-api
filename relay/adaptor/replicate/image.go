@@ -105,7 +105,6 @@ func ImageHandler(c *gin.Context, resp *http.Response) (
 			}
 
 			for _, imgOut := range output {
-				imgOut := imgOut
 				pool.Go(func() error {
 					// download image
 					downloadReq, err := http.NewRequestWithContext(gmw.Ctx(c),

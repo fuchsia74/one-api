@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"math"
 	"net/http"
 	"strings"
@@ -981,9 +982,7 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 	}
 
 	// Copy headers but update content type
-	for k, v := range resp.Header {
-		newResp.Header[k] = v
-	}
+	maps.Copy(newResp.Header, resp.Header)
 	newResp.Header.Set("Content-Type", "application/json")
 	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(claudeBody)))
 
@@ -1051,9 +1050,7 @@ func (a *Adaptor) ConvertResponseAPIToClaudeResponse(c *gin.Context, resp *http.
 	}
 
 	// Copy headers but update content type
-	for k, v := range resp.Header {
-		newResp.Header[k] = v
-	}
+	maps.Copy(newResp.Header, resp.Header)
 	newResp.Header.Set("Content-Type", "application/json")
 	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(claudeBody)))
 
@@ -1076,8 +1073,8 @@ func (a *Adaptor) convertStreamingToClaudeResponse(c *gin.Context, resp *http.Re
 		for scanner.Scan() {
 			line := scanner.Text()
 
-			if strings.HasPrefix(line, "data: ") {
-				data := strings.TrimPrefix(line, "data: ")
+			if after, ok := strings.CutPrefix(line, "data: "); ok {
+				data := after
 
 				if data == "[DONE]" {
 					// Send Claude-style done event
@@ -1096,10 +1093,10 @@ func (a *Adaptor) convertStreamingToClaudeResponse(c *gin.Context, resp *http.Re
 				if len(chunk.Choices) > 0 {
 					choice := chunk.Choices[0]
 					if choice.Delta.Content != nil {
-						claudeChunk := map[string]interface{}{
+						claudeChunk := map[string]any{
 							"type":  "content_block_delta",
 							"index": 0,
-							"delta": map[string]interface{}{
+							"delta": map[string]any{
 								"type": "text_delta",
 								"text": choice.Delta.Content,
 							},
@@ -1107,7 +1104,7 @@ func (a *Adaptor) convertStreamingToClaudeResponse(c *gin.Context, resp *http.Re
 
 						claudeData, _ := json.Marshal(claudeChunk)
 						writer.Write([]byte("event: content_block_delta\n"))
-						writer.Write([]byte(fmt.Sprintf("data: %s\n\n", claudeData)))
+						writer.Write(fmt.Appendf(nil, "data: %s\n\n", claudeData))
 					}
 				}
 			}
@@ -1122,9 +1119,7 @@ func (a *Adaptor) convertStreamingToClaudeResponse(c *gin.Context, resp *http.Re
 	}
 
 	// Copy headers
-	for k, v := range resp.Header {
-		newResp.Header[k] = v
-	}
+	maps.Copy(newResp.Header, resp.Header)
 
 	return newResp, nil
 }

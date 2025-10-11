@@ -198,7 +198,7 @@ func TestExtractThinkingContent_PerformanceWithMultipleTags_SingleTagBehavior(t 
 	var expectedRegularBuilder strings.Builder
 
 	// Build input with 10 think tags
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		regularContent := "Regular content " + string(rune('A'+i))
 		thinkingContent := "Thinking content " + string(rune('1'+i))
 

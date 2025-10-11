@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -158,8 +159,8 @@ func TestModelEndpointsDifference(t *testing.T) {
 		Data    map[int][]string `json:"data"`
 	}
 	var allModelsResponse struct {
-		Object string        `json:"object"`
-		Data   []interface{} `json:"data"`
+		Object string `json:"object"`
+		Data   []any  `json:"data"`
 	}
 
 	err1 := json.Unmarshal(w1.Body.Bytes(), &dashboardResponse)
@@ -176,7 +177,7 @@ func TestModelEndpointsDifference(t *testing.T) {
 	assert.IsType(t, map[int][]string{}, dashboardResponse.Data)
 
 	// ListAllModels should return a list of model objects
-	assert.IsType(t, []interface{}{}, allModelsResponse.Data)
+	assert.IsType(t, []any{}, allModelsResponse.Data)
 
 	t.Logf("✓ Confirmed that /api/models and /api/channel/models return different data structures")
 	t.Logf("  - /api/models returns channel-type-to-models mapping with %d channel types", len(dashboardResponse.Data))
@@ -215,13 +216,7 @@ func TestDeepSeekModelsInDashboard(t *testing.T) {
 	// Verify that DeepSeek models are included
 	expectedModels := []string{"deepseek-chat", "deepseek-reasoner"}
 	for _, expectedModel := range expectedModels {
-		found := false
-		for _, model := range deepSeekModels {
-			if model == expectedModel {
-				found = true
-				break
-			}
-		}
+		found := slices.Contains(deepSeekModels, expectedModel)
 		assert.True(t, found, "Expected DeepSeek model %s should be present", expectedModel)
 	}
 

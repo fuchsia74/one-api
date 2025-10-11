@@ -26,7 +26,7 @@ func TestUpdateConsumeLogByIDFieldValidation(t *testing.T) {
 	require.NoError(t, LOG_DB.Create(logEntry).Error)
 
 	// Allowed fields should update successfully
-	err := UpdateConsumeLogByID(context.Background(), logEntry.Id, map[string]interface{}{"quota": 42, "content": "test consume log updated"})
+	err := UpdateConsumeLogByID(context.Background(), logEntry.Id, map[string]any{"quota": 42, "content": "test consume log updated"})
 	require.NoError(t, err)
 
 	var updated Log
@@ -35,7 +35,7 @@ func TestUpdateConsumeLogByIDFieldValidation(t *testing.T) {
 	assert.Equal(t, "test consume log updated", updated.Content)
 
 	// Unsupported fields should return an error
-	err = UpdateConsumeLogByID(context.Background(), logEntry.Id, map[string]interface{}{"unsupported": "value"})
+	err = UpdateConsumeLogByID(context.Background(), logEntry.Id, map[string]any{"unsupported": "value"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported consume log update field")
 }
@@ -64,14 +64,14 @@ func TestUpdateTokenTransactionFieldValidation(t *testing.T) {
 	}
 	require.NoError(t, DB.Create(txn).Error)
 
-	err := UpdateTokenTransaction(context.Background(), txn.Id, map[string]interface{}{"status": TokenTransactionStatusConfirmed})
+	err := UpdateTokenTransaction(context.Background(), txn.Id, map[string]any{"status": TokenTransactionStatusConfirmed})
 	require.NoError(t, err)
 
 	var fetched TokenTransaction
 	require.NoError(t, DB.First(&fetched, txn.Id).Error)
 	assert.Equal(t, TokenTransactionStatusConfirmed, fetched.Status)
 
-	err = UpdateTokenTransaction(context.Background(), txn.Id, map[string]interface{}{"bad_field": 1})
+	err = UpdateTokenTransaction(context.Background(), txn.Id, map[string]any{"bad_field": 1})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "unsupported token transaction update field")
 }

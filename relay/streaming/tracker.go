@@ -220,10 +220,7 @@ func (t *QuotaTracker) computeTargetQuotaLocked() int64 {
 		ChannelCompletionRatio: t.params.ChannelCompletionRatio,
 		PricingAdaptor:         t.params.PricingAdaptor,
 	})
-	target := result.TotalQuota - t.params.PreConsumedQuota
-	if target < 0 {
-		target = 0
-	}
+	target := max(result.TotalQuota-t.params.PreConsumedQuota, 0)
 	return target
 }
 

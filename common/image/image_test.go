@@ -38,7 +38,7 @@ func (r *CountingReader) Read(p []byte) (n int, err error) {
 // retryHTTPGet retries HTTP GET requests with exponential backoff to handle network issues in CI
 func retryHTTPGet(url string, maxRetries int) (*http.Response, error) {
 	var lastErr error
-	for i := 0; i < maxRetries; i++ {
+	for i := range maxRetries {
 		resp, err := http.Get(url)
 		if err == nil && resp.StatusCode == http.StatusOK {
 			return resp, nil
@@ -235,7 +235,6 @@ func TestGetImageSizeFromBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			width, height, err := img.GetImageSizeFromBase64(tt.b64)
 			require.NoError(t, err)
@@ -288,7 +287,7 @@ func TestGetImageFromUrl(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
+		// capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -415,7 +414,7 @@ func TestGenerateTextImage(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
+		// capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
@@ -490,7 +489,7 @@ func TestGenerateTextImageBase64(t *testing.T) {
 	}
 
 	for _, tt := range tests {
-		tt := tt // capture range variable
+		// capture range variable
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 

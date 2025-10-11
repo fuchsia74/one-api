@@ -104,7 +104,7 @@ func TestRandRangeDistribution(t *testing.T) {
 
 	// Count occurrences of each value
 	counts := make(map[int]int, max-min)
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		val := random.RandRange(min, max)
 		counts[val]++
 
@@ -169,7 +169,7 @@ func TestEdgeCases(t *testing.T) {
 	})
 
 	t.Run("RandRange min == max (should always return min)", func(t *testing.T) {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			v := random.RandRange(5, 5)
 			if v != 5 {
 				t.Errorf("Expected 5, got %d", v)

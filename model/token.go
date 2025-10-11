@@ -317,7 +317,7 @@ func IncreaseTokenQuota(id int, quota int64) (err error) {
 
 func increaseTokenQuota(id int, quota int64) (err error) {
 	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]interface{}{
+		map[string]any{
 			"remain_quota":  gorm.Expr("remain_quota + ?", quota),
 			"used_quota":    gorm.Expr("used_quota - ?", quota),
 			"accessed_time": helper.GetTimestamp(),
@@ -349,7 +349,7 @@ func DecreaseTokenQuota(id int, quota int64) (err error) {
 func decreaseTokenQuota(id int, quota int64) (err error) {
 	result := DB.Model(&Token{}).
 		Where("id = ? AND remain_quota >= ?", id, quota).
-		Updates(map[string]interface{}{
+		Updates(map[string]any{
 			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
 			"used_quota":    gorm.Expr("used_quota + ?", quota),
 			"accessed_time": helper.GetTimestamp(),

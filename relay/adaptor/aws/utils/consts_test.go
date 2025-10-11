@@ -120,7 +120,7 @@ func TestUpdateRegionHealthMetrics(t *testing.T) {
 	}
 
 	// Test multiple failures to trigger unhealthy status
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		UpdateRegionHealthMetrics(region, false, 0, testErr)
 	}
 	health = GetRegionHealth(region)
@@ -189,8 +189,7 @@ func BenchmarkConvertModelID2CrossRegionProfile(b *testing.B) {
 	model := "anthropic.claude-3-haiku-20240307-v1:0"
 	region := "us-east-1"
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ConvertModelID2CrossRegionProfile(ctx, model, region)
 	}
 }
@@ -198,8 +197,7 @@ func BenchmarkConvertModelID2CrossRegionProfile(b *testing.B) {
 func BenchmarkGetRegionPrefix(b *testing.B) {
 	region := "us-east-1"
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		getRegionPrefix(region)
 	}
 }

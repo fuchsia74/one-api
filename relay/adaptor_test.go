@@ -10,7 +10,7 @@ import (
 
 func TestGetAdaptor(t *testing.T) {
 	Convey("get adaptor", t, func() {
-		for i := 0; i < apitype.Dummy; i++ {
+		for i := range apitype.Dummy {
 			a := GetAdaptor(i)
 			So(a, ShouldNotBeNil)
 		}

@@ -27,7 +27,7 @@ type ChatRequest struct {
 type ChatResponse struct {
 	Model           string  `json:"model,omitempty"`
 	CreatedAt       string  `json:"created_at,omitempty"`
-	Message         Message `json:"message,omitempty"`
+	Message         Message `json:"message"`
 	Response        string  `json:"response,omitempty"` // for stream response
 	Done            bool    `json:"done,omitempty"`
 	TotalDuration   int     `json:"total_duration,omitempty"`

@@ -62,7 +62,7 @@ func TestMigrateChannelFieldsToText_Idempotency(t *testing.T) {
 	defer func() { DB = originalDB }()
 
 	// Run migration multiple times - should be idempotent
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		err := MigrateChannelFieldsToText()
 		if err != nil {
 			t.Errorf("Migration run %d failed: %v", i+1, err)

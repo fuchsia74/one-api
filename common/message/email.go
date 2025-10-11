@@ -44,20 +44,20 @@ func SendEmail(subject string, receiver string, content string) error {
 	}
 	messageId := fmt.Sprintf("<%x@%s>", buf, domain)
 
-	mail := []byte(fmt.Sprintf("To: %s\r\n"+
+	mail := fmt.Appendf(nil, "To: %s\r\n"+
 		"From: %s<%s>\r\n"+
 		"Subject: %s\r\n"+
 		"Message-ID: %s\r\n"+ // add Message-ID header to avoid being treated as spam, RFC 5322
 		"Date: %s\r\n"+
 		"Content-Type: text/html; charset=UTF-8\r\n\r\n%s\r\n",
-		receiver, config.SystemName, config.SMTPFrom, encodedSubject, messageId, time.Now().Format(time.RFC1123Z), content))
+		receiver, config.SystemName, config.SMTPFrom, encodedSubject, messageId, time.Now().Format(time.RFC1123Z), content)
 
 	auth := smtp.PlainAuth("", config.SMTPAccount, config.SMTPToken, config.SMTPServer)
 	addr := net.JoinHostPort(config.SMTPServer, fmt.Sprintf("%d", config.SMTPPort))
 
 	// Clean up recipient addresses
 	receiverEmails := []string{}
-	for _, email := range strings.Split(receiver, ";") {
+	for email := range strings.SplitSeq(receiver, ";") {
 		email = strings.TrimSpace(email)
 		if email != "" {
 			receiverEmails = append(receiverEmails, email)
