@@ -2,6 +2,8 @@ package openai
 
 import (
 	"encoding/json"
+	"io"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -1986,6 +1988,94 @@ func TestApplyWebSearchToolCostForSearchPreview(t *testing.T) {
 	}
 }
 
+func TestEnforceWebSearchTokenPolicyPreviewFreeTokens(t *testing.T) {
+	usage := &model.Usage{
+		PromptTokens:     12000,
+		CompletionTokens: 500,
+		TotalTokens:      0,
+		PromptTokensDetails: &model.UsagePromptTokensDetails{
+			TextTokens: 12000,
+		},
+	}
+
+	enforceWebSearchTokenPolicy(usage, "gpt-4o-search-preview", 2)
+
+	if usage.PromptTokens != 12000 {
+		t.Fatalf("expected prompt tokens unchanged at 12000, got %d", usage.PromptTokens)
+	}
+	if usage.TotalTokens != 12500 {
+		t.Fatalf("expected total tokens recomputed to 12500, got %d", usage.TotalTokens)
+	}
+}
+
+func TestEnforceWebSearchTokenPolicyMiniFixedBlockIncrease(t *testing.T) {
+	usage := &model.Usage{
+		PromptTokens:     5000,
+		CompletionTokens: 1000,
+		TotalTokens:      0,
+		PromptTokensDetails: &model.UsagePromptTokensDetails{
+			TextTokens: 5000,
+		},
+	}
+
+	enforceWebSearchTokenPolicy(usage, "gpt-4o-mini-search-preview", 2)
+
+	if usage.PromptTokens != 5000 {
+		t.Fatalf("expected prompt tokens unchanged at 5000, got %d", usage.PromptTokens)
+	}
+	if usage.TotalTokens != 6000 {
+		t.Fatalf("expected total tokens recomputed to 6000, got %d", usage.TotalTokens)
+	}
+	if usage.PromptTokensDetails.TextTokens != 5000 {
+		t.Fatalf("expected text tokens unchanged at 5000, got %d", usage.PromptTokensDetails.TextTokens)
+	}
+}
+
+func TestEnforceWebSearchTokenPolicyMiniFixedBlockDecrease(t *testing.T) {
+	usage := &model.Usage{
+		PromptTokens:     20000,
+		CompletionTokens: 1000,
+		TotalTokens:      0,
+		PromptTokensDetails: &model.UsagePromptTokensDetails{
+			TextTokens: 20000,
+		},
+	}
+
+	enforceWebSearchTokenPolicy(usage, "gpt-4.1-mini-search-preview", 1)
+
+	if usage.PromptTokens != 20000 {
+		t.Fatalf("expected prompt tokens unchanged at 20000, got %d", usage.PromptTokens)
+	}
+	if usage.TotalTokens != 21000 {
+		t.Fatalf("expected total tokens recomputed to 21000, got %d", usage.TotalTokens)
+	}
+	if usage.PromptTokensDetails.TextTokens != 20000 {
+		t.Fatalf("expected text tokens unchanged at 20000, got %d", usage.PromptTokensDetails.TextTokens)
+	}
+}
+
+func TestWebSearchCallUSDPerThousandPreviewTiers(t *testing.T) {
+	cases := []struct {
+		model string
+		usd   float64
+	}{
+		{"gpt-4o-search-preview", 25.0},
+		{"gpt-4o-mini-search-preview", 25.0},
+		{"gpt-4o-mini-search-preview-2025-01-01", 25.0},
+		{"gpt-5-search-preview", 10.0},
+		{"o1-preview-search", 10.0},
+		{"o3-deep-research", 10.0},
+		{"gpt-4o-web-search", 10.0},
+	}
+
+	for _, tc := range cases {
+		got := webSearchCallUSDPerThousand(tc.model)
+		if got != tc.usd {
+			t.Fatalf("model %s: expected USD %.2f, got %.2f", tc.model, tc.usd, got)
+		}
+	}
+}
+
 func TestWebSearchCallUSDPerThousandTiering(t *testing.T) {
 	cases := []struct {
 		model string
@@ -2005,6 +2095,231 @@ func TestWebSearchCallUSDPerThousandTiering(t *testing.T) {
 		if got != tc.usd {
 			t.Fatalf("model %s: expected USD %.2f, got %.2f", tc.model, tc.usd, got)
 		}
+	}
+}
+
+func TestResponseAPIUsageToModelMatchesRealLog(t *testing.T) {
+	payload := []byte(`{"input_tokens":8555,"input_tokens_details":{"cached_tokens":4224},"output_tokens":889,"output_tokens_details":{"reasoning_tokens":640},"total_tokens":9444}`)
+	var usage ResponseAPIUsage
+	if err := json.Unmarshal(payload, &usage); err != nil {
+		t.Fatalf("failed to unmarshal usage: %v", err)
+	}
+
+	modelUsage := usage.ToModelUsage()
+	if modelUsage == nil {
+		t.Fatal("expected model usage, got nil")
+	}
+	if modelUsage.PromptTokens != 8555 {
+		t.Fatalf("expected prompt tokens 8555, got %d", modelUsage.PromptTokens)
+	}
+	if modelUsage.CompletionTokens != 889 {
+		t.Fatalf("expected completion tokens 889, got %d", modelUsage.CompletionTokens)
+	}
+	if modelUsage.TotalTokens != 9444 {
+		t.Fatalf("expected total tokens 9444, got %d", modelUsage.TotalTokens)
+	}
+	if modelUsage.PromptTokensDetails == nil {
+		t.Fatal("expected prompt token details")
+	}
+	if modelUsage.PromptTokensDetails.CachedTokens != 4224 {
+		t.Fatalf("expected cached tokens 4224, got %d", modelUsage.PromptTokensDetails.CachedTokens)
+	}
+	if modelUsage.CompletionTokensDetails == nil {
+		t.Fatal("expected completion token details")
+	}
+	if modelUsage.CompletionTokensDetails.ReasoningTokens != 640 {
+		t.Fatalf("expected reasoning tokens 640, got %d", modelUsage.CompletionTokensDetails.ReasoningTokens)
+	}
+}
+
+func TestResponseAPIUsageRoundTripPreservesKnownDetails(t *testing.T) {
+	modelUsage := &model.Usage{
+		PromptTokens:     12000,
+		CompletionTokens: 900,
+		TotalTokens:      12900,
+		PromptTokensDetails: &model.UsagePromptTokensDetails{
+			CachedTokens: 4224,
+		},
+		CompletionTokensDetails: &model.UsageCompletionTokensDetails{ReasoningTokens: 640},
+	}
+
+	converted := (&ResponseAPIUsage{}).FromModelUsage(modelUsage)
+	if converted == nil {
+		t.Fatal("expected converted usage, got nil")
+	}
+	if converted.InputTokensDetails == nil {
+		t.Fatal("expected input token details in converted usage")
+	}
+	if converted.InputTokensDetails.CachedTokens != 4224 {
+		t.Fatalf("expected cached tokens 4224, got %d", converted.InputTokensDetails.CachedTokens)
+	}
+
+	encoded, err := json.Marshal(converted)
+	if err != nil {
+		t.Fatalf("failed to marshal converted usage: %v", err)
+	}
+	var generic map[string]any
+	if err := json.Unmarshal(encoded, &generic); err != nil {
+		t.Fatalf("failed to unmarshal converted usage json: %v", err)
+	}
+	inputAny, exists := generic["input_tokens_details"]
+	if !exists {
+		t.Fatal("expected input_tokens_details key in marshalled usage")
+	}
+	inputMap, ok := inputAny.(map[string]any)
+	if !ok {
+		t.Fatalf("expected input_tokens_details to be object, got %T", inputAny)
+	}
+	if _, exists := inputMap["web_search_content_tokens"]; exists {
+		t.Fatal("did not expect web_search_content_tokens to be present in marshalled usage")
+	}
+}
+
+func TestCountWebSearchSearchActionsFromLog(t *testing.T) {
+	outputs := []OutputItem{
+		{Id: "rs_1", Type: "reasoning"},
+		{Id: "ws_08eb", Type: "web_search_call", Status: "completed", Action: &WebSearchCallAction{Type: "search", Query: "positive news today October 8 2025 good news Oct 8 2025"}},
+		{Id: "msg_1", Type: "message", Role: "assistant", Content: []OutputContent{{Type: "output_text", Text: "Today positive news."}}},
+	}
+
+	if got := countWebSearchSearchActions(outputs); got != 1 {
+		t.Fatalf("expected 1 web search call, got %d", got)
+	}
+
+	seen := map[string]struct{}{"ws_08eb": {}}
+	if got := countNewWebSearchSearchActions(outputs, seen); got != 0 {
+		t.Fatalf("expected duplicate detection to yield 0 new calls, got %d", got)
+	}
+}
+
+func TestConvertChatCompletionToResponseAPIWebSearch(t *testing.T) {
+	req := &model.GeneralOpenAIRequest{
+		Model:  "gpt-4o-search-preview",
+		Stream: true,
+		Messages: []model.Message{
+			{Role: "user", Content: "What was a positive news story from today?"},
+		},
+		WebSearchOptions: &model.WebSearchOptions{},
+	}
+
+	converted := ConvertChatCompletionToResponseAPI(req)
+	if converted == nil {
+		t.Fatal("expected converted request")
+	}
+	if converted.Model != "gpt-4o-search-preview" {
+		t.Fatalf("expected model gpt-4o-search-preview, got %s", converted.Model)
+	}
+	if len(converted.Tools) != 1 {
+		t.Fatalf("expected exactly one tool, got %d", len(converted.Tools))
+	}
+	if !strings.EqualFold(converted.Tools[0].Type, "web_search") {
+		t.Fatalf("expected tool type web_search, got %s", converted.Tools[0].Type)
+	}
+	if converted.Stream == nil || !*converted.Stream {
+		t.Fatal("expected stream flag to be set to true")
+	}
+}
+
+func TestConvertResponseAPIToChatCompletionWebSearch(t *testing.T) {
+	resp := &ResponseAPIResponse{
+		Id:     "resp_08eb",
+		Object: "response",
+		Model:  "gpt-5-mini-2025-08-07",
+		Output: []OutputItem{
+			{Id: "rs_1", Type: "reasoning"},
+			{Id: "ws_08eb", Type: "web_search_call", Status: "completed", Action: &WebSearchCallAction{Type: "search", Query: "positive news today October 8 2025 good news Oct 8 2025"}},
+			{Id: "msg_1", Type: "message", Role: "assistant", Content: []OutputContent{{Type: "output_text", Text: "Today (October 8, 2025) one clear positive story was..."}}},
+		},
+		Usage: &ResponseAPIUsage{
+			InputTokens:         8555,
+			OutputTokens:        889,
+			TotalTokens:         9444,
+			InputTokensDetails:  &ResponseAPIInputTokensDetails{CachedTokens: 4224},
+			OutputTokensDetails: &ResponseAPIOutputTokensDetails{ReasoningTokens: 640},
+		},
+	}
+
+	chat := ConvertResponseAPIToChatCompletion(resp)
+	if len(chat.Choices) == 0 {
+		t.Fatal("expected chat choices")
+	}
+	choice := chat.Choices[0]
+	content, ok := choice.Message.Content.(string)
+	if !ok {
+		t.Fatalf("expected message content string, got %T", choice.Message.Content)
+	}
+	if !strings.Contains(content, "positive story") {
+		t.Fatalf("expected converted content to include summary text, got: %s", content)
+	}
+	if chat.Usage.PromptTokens != 8555 {
+		t.Fatalf("expected prompt tokens 8555, got %d", chat.Usage.PromptTokens)
+	}
+	if chat.Usage.PromptTokensDetails == nil {
+		t.Fatal("expected prompt token details in converted chat response")
+	}
+	if chat.Usage.PromptTokensDetails.CachedTokens != 4224 {
+		t.Fatalf("expected cached tokens 4224, got %d", chat.Usage.PromptTokensDetails.CachedTokens)
+	}
+	if chat.Usage.CompletionTokensDetails == nil || chat.Usage.CompletionTokensDetails.ReasoningTokens != 640 {
+		t.Fatal("expected reasoning tokens 640 in completion details")
+	}
+	if count := countWebSearchSearchActions(resp.Output); count != 1 {
+		t.Fatalf("expected web search action count 1, got %d", count)
+	}
+}
+
+func TestConvertResponseAPIToClaudeResponseWebSearch(t *testing.T) {
+	resp := &ResponseAPIResponse{
+		Id:     "resp_08eb",
+		Object: "response",
+		Model:  "gpt-5-mini-2025-08-07",
+		Output: []OutputItem{
+			{Id: "rs_1", Type: "reasoning", Summary: []OutputContent{{Type: "summary_text", Text: "analysis"}}},
+			{Id: "msg_1", Type: "message", Role: "assistant", Content: []OutputContent{{Type: "output_text", Text: "Today positive developments."}}},
+		},
+		Usage: &ResponseAPIUsage{
+			InputTokens:         8555,
+			OutputTokens:        889,
+			TotalTokens:         9444,
+			InputTokensDetails:  &ResponseAPIInputTokensDetails{CachedTokens: 4224},
+			OutputTokensDetails: &ResponseAPIOutputTokensDetails{ReasoningTokens: 640},
+		},
+	}
+
+	upstream := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header)}
+	converted, errResp := (&Adaptor{}).ConvertResponseAPIToClaudeResponse(nil, upstream, resp)
+	if errResp != nil {
+		t.Fatalf("unexpected error from conversion: %v", errResp)
+	}
+	if converted.StatusCode != http.StatusOK {
+		t.Fatalf("expected status code %d, got %d", http.StatusOK, converted.StatusCode)
+	}
+	body, err := io.ReadAll(converted.Body)
+	if err != nil {
+		t.Fatalf("failed to read converted body: %v", err)
+	}
+	if err := converted.Body.Close(); err != nil {
+		t.Fatalf("failed to close response body: %v", err)
+	}
+	var claude model.ClaudeResponse
+	if err := json.Unmarshal(body, &claude); err != nil {
+		t.Fatalf("failed to unmarshal claude response: %v", err)
+	}
+	if claude.Usage.InputTokens != 8555 || claude.Usage.OutputTokens != 889 {
+		t.Fatalf("expected usage tokens 8555/889, got %d/%d", claude.Usage.InputTokens, claude.Usage.OutputTokens)
+	}
+	if len(claude.Content) == 0 {
+		t.Fatal("expected claude content")
+	}
+	foundText := false
+	for _, content := range claude.Content {
+		if content.Type == "text" && strings.Contains(content.Text, "positive") {
+			foundText = true
+			break
+		}
+	}
+	if !foundText {
+		t.Fatalf("expected claude content to include assistant text, body: %s", string(body))
 	}
 }
 

@@ -72,6 +72,16 @@ const (
 	// Read in: adaptor DoRequest/DoResponse or signing steps that need the converted structure.
 	ConvertedRequest = "converted_request"
 
+	// RelayMode records the relay processing mode (chat, embeddings, etc.) selected for the request.
+	// Set by adaptors when branching on relay behavior.
+	// Read by downstream handlers to adjust response handling.
+	RelayMode = "relay_mode"
+
+	// ImageRequest caches the converted image generation payload for downstream handlers.
+	// Set in: AWS image adaptor when preparing provider-specific requests.
+	// Read in: response handlers that need to inspect the converted structure.
+	ImageRequest = "image_request"
+
 	// WebSearchCallCount stores the number of OpenAI web search tool invocations observed in the upstream
 	// response. Set by adaptors after parsing provider responses and consumed during billing adjustments.
 	WebSearchCallCount = "web_search_call_count"

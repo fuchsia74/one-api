@@ -164,6 +164,16 @@ var IdleTimeout = env.Int("IDLE_TIMEOUT", 30)           // unit is second
 var BillingTimeoutSec = env.Int("BILLING_TIMEOUT", 300) // unit is second
 var StreamingBillingIntervalSec = env.Int("STREAMING_BILLING_INTERVAL", 3)
 
+// External billing transaction timeout configuration.
+// ExternalBillingDefaultTimeoutSec defines how long (in seconds) a pre-consume
+// hold remains pending before it is automatically confirmed. This guards
+// against dangling holds if the upstream system never sends a post-consume
+// confirmation.
+// ExternalBillingMaxTimeoutSec caps client-provided timeouts to prevent
+// indefinite holds that could lock user quota.
+var ExternalBillingDefaultTimeoutSec = env.Int("EXTERNAL_BILLING_DEFAULT_TIMEOUT", 600)
+var ExternalBillingMaxTimeoutSec = env.Int("EXTERNAL_BILLING_MAX_TIMEOUT", 3600)
+
 // ShutdownTimeoutSec controls how long to wait for graceful shutdown and drains (seconds)
 var ShutdownTimeoutSec = env.Int("SHUTDOWN_TIMEOUT", 360)
 

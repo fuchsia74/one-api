@@ -202,6 +202,13 @@ Built-in tools: Tools that are provided by OpenAI that extend the model's capabi
 MCP Tools: Integrations with third-party systems via custom MCP servers or predefined connectors such as Google Drive and SharePoint. Learn more about MCP Tools.
 Function calls (custom tools): Functions that are defined by you, enabling the model to call your own code with strongly typed arguments and outputs. Learn more about function calling. You can also use custom tools to call your own code.
 
+## Web search tool integration
+
+- Chat Completions requests that include a `web_search_options` object now automatically inject a `{"type":"web_search"}` entry into the tool list before we forward the payload upstream. The real production logs in `errlog` showed OpenAI expecting the explicit tool declaration even when only `web_search_options` was provided, so the adaptor enforces that contract to keep behaviour consistent across channels.
+- Streaming Responses expose web search activity through dedicated events. Each call emits a `response.output_item.added` item of `type: "web_search_call"`, followed by status updates such as `response.web_search_call.searching` and `response.web_search_call.completed`. We deduplicate these by the upstream item id (or the query when OpenAI omits the id) and persist the total in `ctxkey.WebSearchCallCount` so quota and billing reflect the actual number of external searches.
+- Non-streaming Responses include the same `web_search_call` entries in the final `output` array. The adaptor scans that array, counts completed search actions, and charges the appropriate per-call quota (e.g. `gpt-5-mini` reporting three separate search queries in the sample logs resulted in a 15,000 tool-cost quota adjustment).
+- When downstream clients need a Chat Completions shaped response, the converter preserves the search metadata (query, domains, optional sources) inside the generated Response API envelope so the caller can replay or audit the exact web lookups that were performed.
+
 Show possible types
 top_logprobs
 integer

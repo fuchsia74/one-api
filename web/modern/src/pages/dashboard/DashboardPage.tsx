@@ -1,14 +1,10 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import type { ColumnDef } from '@tanstack/react-table'
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
-import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { api } from '@/lib/api'
-import { EnhancedDataTable } from '@/components/ui/enhanced-data-table'
 import { ResponsivePageContainer } from '@/components/ui/responsive-container'
-import { useResponsive } from '@/hooks/useResponsive'
 import { formatNumber, cn } from '@/lib/utils'
 
 // Quota conversion utility
@@ -104,7 +100,6 @@ const chartConfig = {
 
 export function DashboardPage() {
   const { user } = useAuthStore()
-  const { isMobile } = useResponsive()
   const isAdmin = useMemo(() => (user?.role ?? 0) >= 10, [user])
   const [filtersReady, setFiltersReady] = useState(false)
 
@@ -141,37 +136,6 @@ export function DashboardPage() {
 
   type Row = { day: string; model_name: string; request_count: number; quota: number; prompt_tokens: number; completion_tokens: number }
   const [rows, setRows] = useState<Row[]>([])
-
-  // Quota/Status panel state
-  const [quotaStats, setQuotaStats] = useState<{ totalQuota: number; usedQuota: number; status: string }>({ totalQuota: 0, usedQuota: 0, status: '-' })
-
-  // Fetch quota/status for selected user or all
-  const fetchQuotaStats = async (userId: string) => {
-    try {
-      let res
-      if (isAdmin) {
-        // Unified API call - complete URL with /api prefix
-        if (userId === 'all') {
-          res = await api.get('/api/user/dashboard')
-        } else {
-          res = await api.get(`/api/user/dashboard?user_id=${userId}`)
-        }
-      } else {
-        res = await api.get('/api/user/dashboard')
-      }
-      if (res.data?.success && res.data.data) {
-        setQuotaStats({
-          totalQuota: res.data.data.total_quota ?? 0,
-          usedQuota: res.data.data.used_quota ?? 0,
-          status: res.data.data.status ?? '-',
-        })
-      } else {
-        setQuotaStats({ totalQuota: 0, usedQuota: 0, status: '-' })
-      }
-    } catch {
-      setQuotaStats({ totalQuota: 0, usedQuota: 0, status: '-' })
-    }
-  }
 
 
 
@@ -273,16 +237,7 @@ export function DashboardPage() {
           }))
         )
 
-        // Update quota stats if available in the response
-        if (data && typeof data === 'object' && 'total_quota' in data) {
-          setQuotaStats({
-            totalQuota: data.total_quota ?? 0,
-            usedQuota: data.used_quota ?? 0,
-            status: data.status ?? '-',
-          })
-        }
-
-        setLastUpdated(new Date().toLocaleTimeString())
+        setLastUpdated(new Date().toLocaleString())
         setDateError('')
       } else {
         setDateError(message || 'Failed to fetch dashboard data')
@@ -299,20 +254,12 @@ export function DashboardPage() {
 
   useEffect(() => {
     if (isAdmin) loadUsers()
-    // load initial stats and quota
+    // load initial stats
     loadStats()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
   // Fetch quota/status when dashUser changes (but not on initial load)
-  useEffect(() => {
-    if (isAdmin) {
-      fetchQuotaStats(dashUser)
-    } else {
-      fetchQuotaStats('self')
-    }
-  }, [dashUser, isAdmin])
-
   // Presets
   const applyPreset = (preset: 'today' | '7d' | '30d') => {
     const today = new Date()
@@ -381,22 +328,53 @@ export function DashboardPage() {
     return days.map(d => ({ date: d, ...(map[d] || {}) }))
   }, [rows, days, statisticsMetric])
 
-  const columns: ColumnDef<Row>[] = [
-    { header: 'Day', accessorKey: 'day' },
-    { header: 'Model', accessorKey: 'model_name' },
-    { header: 'Requests', accessorKey: 'request_count' },
-    { header: 'Quota', accessorKey: 'quota' },
-    { header: 'Prompt Tokens', accessorKey: 'prompt_tokens' },
-    { header: 'Completion Tokens', accessorKey: 'completion_tokens' },
-  ]
+  const rangeTotals = useMemo(() => {
+    let requests = 0
+    let quota = 0
+    let tokens = 0
+    const modelSet = new Set<string>()
 
-  // Summaries & insights
-  const todayAgg = dailyAgg.length ? dailyAgg[dailyAgg.length - 1] : { date: '', requests: 0, quota: 0, tokens: 0 }
-  const prevAgg = dailyAgg.length > 1 ? dailyAgg[dailyAgg.length - 2] : { date: '', requests: 0, quota: 0, tokens: 0 }
-  const pct = (cur: number, prev: number) => (prev > 0 ? ((cur - prev) / prev) * 100 : 0)
-  const requestTrend = pct(todayAgg.requests, prevAgg.requests)
-  const quotaTrend = pct(todayAgg.quota, prevAgg.quota)
-  const tokenTrend = pct(todayAgg.tokens, prevAgg.tokens)
+    for (const row of rows) {
+      requests += row.request_count || 0
+      quota += row.quota || 0
+      tokens += (row.prompt_tokens || 0) + (row.completion_tokens || 0)
+      if (row.model_name) {
+        modelSet.add(row.model_name)
+      }
+    }
+
+    const dayCount = dailyAgg.length
+    const avgCostPerRequestRaw = requests ? quota / requests : 0
+    const avgTokensPerRequest = requests ? tokens / requests : 0
+    const avgDailyRequests = dayCount ? requests / dayCount : 0
+    const avgDailyQuotaRaw = dayCount ? quota / dayCount : 0
+    const avgDailyTokens = dayCount ? tokens / dayCount : 0
+
+    return {
+      requests,
+      quota,
+      tokens,
+      avgCostPerRequestRaw,
+      avgTokensPerRequest,
+      avgDailyRequests,
+      avgDailyQuotaRaw,
+      avgDailyTokens,
+      dayCount,
+      uniqueModels: modelSet.size,
+    }
+  }, [rows, dailyAgg])
+
+  const {
+    requests: totalRequests,
+    quota: totalQuota,
+    tokens: totalTokens,
+    avgCostPerRequestRaw,
+    avgTokensPerRequest,
+    avgDailyRequests,
+    avgDailyQuotaRaw,
+    avgDailyTokens,
+    uniqueModels: totalModels,
+  } = rangeTotals
 
   const byModel = useMemo(() => {
     const mm: Record<string, { model: string; requests: number; quota: number; tokens: number }> = {}
@@ -410,139 +388,44 @@ export function DashboardPage() {
     return Object.values(mm)
   }, [rows])
 
-  const efficiency = useMemo(() => {
-    const quotaPerUnit = getQuotaPerUnit()
-    return byModel
-      .map(m => {
-        const quotaInCurrency = m.quota / quotaPerUnit
-        return {
-          model: m.model,
-          requests: m.requests,
-          avgCost: m.requests ? quotaInCurrency / m.requests : 0,
-          avgTokens: m.requests ? m.tokens / m.requests : 0,
-          efficiency: quotaInCurrency > 0 ? m.tokens / quotaInCurrency : 0, // tokens per dollar
-        }
-      })
-      .sort((a, b) => b.requests - a.requests)
-  }, [byModel])
-
-  const topModel = efficiency.length ? efficiency[0].model : ''
-  const totalModels = efficiency.length
-
-  const usagePatterns = useMemo(() => {
-    const daily = dailyAgg
-    let peakDay = ''
-    let peakRequests = 0
-    for (const d of daily) {
-      if (d.requests > peakRequests) { peakRequests = d.requests; peakDay = d.date }
-    }
-    const avgDaily = daily.length ? Math.round(daily.reduce((s, d) => s + d.requests, 0) / daily.length) : 0
-    const trend = todayAgg.requests > avgDaily ? 'Rising' : 'Declining'
-    return { peakDay, avgDaily, trend }
-  }, [dailyAgg, todayAgg.requests])
-
-  // Performance metrics calculations (similar to default dashboard)
-  const performanceMetrics = useMemo(() => {
-    const quotaPerUnit = getQuotaPerUnit()
-    const quotaInCurrency = todayAgg.quota / quotaPerUnit
-    const avgTokensPerRequest = todayAgg.requests ? todayAgg.tokens / todayAgg.requests : 0
-    const avgCostPerRequest = todayAgg.requests ? quotaInCurrency / todayAgg.requests : 0
-
-    // Simulate avgResponseTime based on token count (in real implementation, this would come from backend)
-    const avgResponseTime = todayAgg.requests > 0 ?
-      Math.min(2000, Math.max(200, avgTokensPerRequest * 10)) : 0
-
-    // Simulate success rate based on cost (in real implementation, this would come from backend)
-    const successRate = todayAgg.requests > 0 ?
-      Math.max(85, Math.min(99.5, 100 - (avgCostPerRequest * 1000))) : 0
-
-    // Calculate throughput based on date range
-    const dateRangeLength = Math.max(1, Math.ceil((new Date(toDate).getTime() - new Date(fromDate).getTime()) / (1000 * 60 * 60 * 24)) + 1)
-    const throughput = dateRangeLength > 0 ? todayAgg.requests / (dateRangeLength * 24) : 0
-
-    return {
-      avgResponseTime,
-      successRate,
-      throughput,
-      avgTokensPerRequest,
-      avgCostPerRequest
-    }
-  }, [todayAgg, fromDate, toDate])
-
-  // Enhanced cost optimization recommendations
-  const costOptimizationInsights = useMemo(() => {
-    if (!efficiency.length) return []
-
-    const insights: Array<{
-      type: 'warning' | 'success' | 'info'
-      title: string
-      message: string
-      icon: string
-    }> = []
-
-    // Find most expensive model
-    const mostExpensive = efficiency.reduce((max, model) =>
-      model.avgCost > max.avgCost ? model : max
-    )
-
-    // Find most efficient model
-    const mostEfficient = efficiency.reduce((max, model) =>
-      model.efficiency > max.efficiency ? model : max
-    )
-
-    // High cost model warning
-    if (mostExpensive.avgCost > 0.01) {
-      insights.push({
-        type: 'warning',
-        title: 'High Cost Model Detected',
-        message: `${mostExpensive.model} has high cost per request ($${mostExpensive.avgCost.toFixed(4)}). Consider optimizing prompts or switching models.`,
-        icon: '⚠️'
-      })
-    }
-
-    // Most efficient model recommendation
-    if (mostEfficient.efficiency > 0) {
-      insights.push({
-        type: 'success',
-        title: 'Most Efficient Model',
-        message: `${mostEfficient.model} offers the best token-to-cost ratio with ${formatNumber(mostEfficient.efficiency)} tokens per quota unit. Consider using it for similar tasks.`,
-        icon: '👍'
-      })
-    }
-
-    // Monthly spending projection
-    const quotaPerUnit = getQuotaPerUnit()
-    const avgDailyQuotaRaw = dailyAgg.length ? (dailyAgg.reduce((s, d) => s + d.quota, 0) / dailyAgg.length) : 0
-    const avgDailySpending = avgDailyQuotaRaw / quotaPerUnit
-    const monthlyProjection = avgDailySpending * 30
-
-    if (monthlyProjection > 100) {
-      insights.push({
-        type: 'info',
-        title: 'Monthly Spending Projection',
-        message: `Based on recent usage, monthly spending could reach $${monthlyProjection.toFixed(2)}. Consider setting usage limits or optimizing model selection.`,
-        icon: '📊'
-      })
-    }
-
-    // Usage pattern insights
-    if (efficiency.length > 3) {
-      const topThreeUsage = efficiency.slice(0, 3).reduce((sum, m) => sum + m.requests, 0)
-      const totalUsage = efficiency.reduce((sum, m) => sum + m.requests, 0)
-      const concentration = (topThreeUsage / totalUsage) * 100
-
-      if (concentration > 80) {
-        insights.push({
-          type: 'info',
-          title: 'Model Usage Concentration',
-          message: `${concentration.toFixed(0)}% of requests use only 3 models. Consider evaluating if other models might be more cost-effective for specific tasks.`,
-          icon: '🎯'
-        })
+  const modelLeaders = useMemo(() => {
+    if (!byModel.length) {
+      return {
+        mostRequested: null,
+        mostTokens: null,
+        mostQuota: null,
       }
     }
 
-    return insights
-  }, [efficiency, dailyAgg])
+    const mostRequested = [...byModel].sort((a, b) => b.requests - a.requests)[0]
+    const mostTokens = [...byModel].sort((a, b) => b.tokens - a.tokens)[0]
+    const mostQuota = [...byModel].sort((a, b) => b.quota - a.quota)[0]
+
+    return { mostRequested, mostTokens, mostQuota }
+  }, [byModel])
+
+  const rangeInsights = useMemo(() => {
+    if (!dailyAgg.length) {
+      return {
+        busiestDay: null as { date: string; requests: number; quota: number; tokens: number } | null,
+        tokenHeavyDay: null as { date: string; requests: number; quota: number; tokens: number } | null,
+      }
+    }
+
+    let busiestDay = dailyAgg[0]
+    let tokenHeavyDay = dailyAgg[0]
+
+    for (const day of dailyAgg) {
+      if (day.requests > busiestDay.requests) {
+        busiestDay = day
+      }
+      if (day.tokens > tokenHeavyDay.tokens) {
+        tokenHeavyDay = day
+      }
+    }
+
+    return { busiestDay, tokenHeavyDay }
+  }, [dailyAgg])
 
   if (!user) {
     return <div>Please log in to access the dashboard.</div>
@@ -554,6 +437,15 @@ export function DashboardPage() {
       title="Dashboard"
       description="Monitor your API usage and account statistics"
     >
+      {loading && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3" role="status" aria-live="polite">
+            <span className="h-10 w-10 animate-spin rounded-full border-4 border-primary/20 border-t-primary" />
+            <p className="text-sm text-muted-foreground">Refreshing dashboard…</p>
+          </div>
+        </div>
+      )}
+
       {/* Filter bar - Date Range Controls */}
       {filtersReady ? (
         <div className="bg-white dark:bg-gray-900 rounded-lg border p-4 mb-6">
@@ -664,166 +556,114 @@ export function DashboardPage() {
           <p className="text-sm text-red-700 dark:text-red-300 mt-1">{dateError}</p>
         </div>
       )}
-
-      {/* Quota/Status panels below filter bar */}
+      {/* Usage Overview */}
       <div className="mb-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Quota</p>
-                  <p className="text-2xl font-bold">{renderQuota(quotaStats.totalQuota)}</p>
-                </div>
-                <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/30 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Used Quota</p>
-                  <p className="text-2xl font-bold">{renderQuota(quotaStats.usedQuota)}</p>
-                </div>
-                <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-0 shadow-sm bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-950/20 dark:to-violet-950/20">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <p className="text-2xl font-bold">{quotaStats.status}</p>
-                </div>
-                <div className="w-10 h-10 bg-purple-100 dark:bg-purple-900/30 rounded-lg flex items-center justify-center">
-                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-
-      {/* Usage Overview - Streamlined */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">Usage Overview</h2>
-            <p className="text-sm text-muted-foreground">Monitor your API usage and performance</p>
+            <p className="text-sm text-muted-foreground">Totals and leaders for the selected time range</p>
           </div>
           {lastUpdated && (
-            <span className="text-xs text-muted-foreground">
-              Updated: {lastUpdated}
-            </span>
+            <span className="text-xs text-muted-foreground">Updated: {lastUpdated}</span>
           )}
         </div>
 
-
-        {/* Key Metrics - Clean Grid */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-            <div className="text-sm text-muted-foreground">Requests</div>
-            <div className="text-2xl font-bold mt-1">{formatNumber(todayAgg.requests)}</div>
-            <div className={cn(
-              "text-xs mt-2 flex items-center gap-1",
-              requestTrend >= 0 ? 'text-green-600' : 'text-red-600'
-            )}>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d={requestTrend >= 0 ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"} />
-              </svg>
-              {Math.abs(requestTrend).toFixed(1)}%
-            </div>
+            <div className="text-sm text-muted-foreground">Total Requests</div>
+            <div className="text-2xl font-bold mt-1">{formatNumber(totalRequests)}</div>
+            <div className="text-xs text-muted-foreground mt-2">Avg daily: {formatNumber(Math.round(avgDailyRequests || 0))}</div>
           </div>
-
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
             <div className="text-sm text-muted-foreground">Quota Used</div>
-            <div className="text-2xl font-bold mt-1">{renderQuota(todayAgg.quota)}</div>
-            <div className={cn(
-              "text-xs mt-2 flex items-center gap-1",
-              quotaTrend >= 0 ? 'text-orange-600' : 'text-green-600'
-            )}>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d={quotaTrend >= 0 ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"} />
-              </svg>
-              {Math.abs(quotaTrend).toFixed(1)}%
+            <div className="text-2xl font-bold mt-1">{renderQuota(totalQuota)}</div>
+            <div className="text-xs text-muted-foreground mt-2">Avg daily: {renderQuota(avgDailyQuotaRaw)}</div>
+          </div>
+          <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
+            <div className="text-sm text-muted-foreground">Tokens Consumed</div>
+            <div className="text-2xl font-bold mt-1">{formatNumber(totalTokens)}</div>
+            <div className="text-xs text-muted-foreground mt-2">Avg daily: {formatNumber(Math.round(avgDailyTokens || 0))}</div>
+          </div>
+          <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
+            <div className="text-sm text-muted-foreground">Avg Cost / Request</div>
+            <div className="text-2xl font-bold mt-1">{renderQuota(avgCostPerRequestRaw, 4)}</div>
+            <div className="text-xs text-muted-foreground mt-2">{Math.round(avgTokensPerRequest || 0)} tokens per request</div>
+          </div>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-6">
+          <h3 className="text-lg font-semibold mb-4">Top Models This Period</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="rounded-lg border bg-white dark:bg-gray-900/70 p-4">
+              <div className="text-sm text-muted-foreground">Most Requests</div>
+              <div className="text-xl font-semibold mt-1">
+                {modelLeaders.mostRequested ? modelLeaders.mostRequested.model : 'No data'}
+              </div>
+              {modelLeaders.mostRequested && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  {formatNumber(modelLeaders.mostRequested.requests)} requests
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border bg-white dark:bg-gray-900/70 p-4">
+              <div className="text-sm text-muted-foreground">Most Tokens</div>
+              <div className="text-xl font-semibold mt-1">
+                {modelLeaders.mostTokens ? modelLeaders.mostTokens.model : 'No data'}
+              </div>
+              {modelLeaders.mostTokens && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  {formatNumber(modelLeaders.mostTokens.tokens)} tokens
+                </div>
+              )}
+            </div>
+            <div className="rounded-lg border bg-white dark:bg-gray-900/70 p-4">
+              <div className="text-sm text-muted-foreground">Highest Cost</div>
+              <div className="text-xl font-semibold mt-1">
+                {modelLeaders.mostQuota ? modelLeaders.mostQuota.model : 'No data'}
+              </div>
+              {modelLeaders.mostQuota && (
+                <div className="text-xs text-muted-foreground mt-2">
+                  {renderQuota(modelLeaders.mostQuota.quota)} consumed
+                </div>
+              )}
             </div>
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-            <div className="text-sm text-muted-foreground">Tokens</div>
-            <div className="text-2xl font-bold mt-1">{formatNumber(todayAgg.tokens)}</div>
-            <div className={cn(
-              "text-xs mt-2 flex items-center gap-1",
-              tokenTrend >= 0 ? 'text-blue-600' : 'text-gray-600'
-            )}>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                  d={tokenTrend >= 0 ? "M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" : "M13 17h8m0 0V9m0 8l-8-8-4 4-6-6"} />
-              </svg>
-              {Math.abs(tokenTrend).toFixed(1)}%
+            <div className="text-sm text-muted-foreground">Busiest Day</div>
+            <div className="text-lg font-semibold mt-1">
+              {rangeInsights.busiestDay ? rangeInsights.busiestDay.date : 'No data'}
             </div>
+            {rangeInsights.busiestDay && (
+              <div className="text-xs text-muted-foreground mt-2">
+                {formatNumber(rangeInsights.busiestDay.requests)} requests
+              </div>
+            )}
           </div>
-
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-            <div className="text-sm text-muted-foreground">Avg Cost</div>
-            <div className="text-2xl font-bold mt-1">
-              ${performanceMetrics.avgCostPerRequest ? performanceMetrics.avgCostPerRequest.toFixed(4) : '0.0000'}
+            <div className="text-sm text-muted-foreground">Peak Token Day</div>
+            <div className="text-lg font-semibold mt-1">
+              {rangeInsights.tokenHeavyDay ? rangeInsights.tokenHeavyDay.date : 'No data'}
             </div>
+            {rangeInsights.tokenHeavyDay && (
+              <div className="text-xs text-muted-foreground mt-2">
+                {formatNumber(rangeInsights.tokenHeavyDay.tokens)} tokens
+              </div>
+            )}
+          </div>
+          <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
+            <div className="text-sm text-muted-foreground">Models in Use</div>
+            <div className="text-lg font-semibold mt-1">{formatNumber(totalModels)}</div>
             <div className="text-xs text-muted-foreground mt-2">
-              {Math.round(performanceMetrics.avgTokensPerRequest)} tokens/req
+              {totalModels ? `${formatNumber(Math.round(totalRequests / totalModels))} requests per model` : '—'}
             </div>
           </div>
         </div>
 
-        {/* Quick Insights */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-            <h3 className="font-medium mb-3">Top Model</h3>
-            <div className="text-lg font-semibold text-blue-600">{topModel || 'No data'}</div>
-            <div className="text-sm text-muted-foreground mt-1">{totalModels} models active</div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-            <h3 className="font-medium mb-3">Performance</h3>
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Response Time</span>
-                <span className="text-sm font-medium">{performanceMetrics.avgResponseTime.toFixed(0)}ms</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-muted-foreground">Success Rate</span>
-                <span className="text-sm font-medium">{performanceMetrics.successRate.toFixed(1)}%</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
-            <h3 className="font-medium mb-3">Usage Trend</h3>
-            <div className="text-lg font-semibold">{usagePatterns.trend}</div>
-            <div className="text-sm text-muted-foreground mt-1">
-              Daily avg: {formatNumber(usagePatterns.avgDaily)} requests
-            </div>
-          </div>
-        </div>
-
-        {/* Usage Trends - Simplified */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+        {/* Time Series */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
             <h3 className="font-medium mb-4 text-blue-600">Requests</h3>
             <ResponsiveContainer width="100%" height={140}>
@@ -1025,100 +865,7 @@ export function DashboardPage() {
           </ResponsiveContainer>
         </div>
 
-        {/* Model Efficiency - Clean Table */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-8">
-          <h3 className="text-lg font-semibold mb-6">Model Efficiency</h3>
-          <div className="space-y-4">
-            {efficiency.slice(0, 5).map((m, i) => (
-              <div key={m.model} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                <div className="flex items-center gap-4">
-                  <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center text-sm font-semibold text-blue-600">
-                    {i + 1}
-                  </div>
-                  <div>
-                    <div className="font-medium">{m.model}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {formatNumber(m.requests)} requests • ${m.avgCost.toFixed(4)} avg cost
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-green-500 rounded-full"
-                      style={{
-                        width: Math.min(100, Math.round(m.efficiency / (efficiency[0]?.efficiency || 1) * 100)) + '%'
-                      }}
-                    />
-                  </div>
-                  <span className="text-sm font-medium min-w-[3rem] text-right">
-                    {m.efficiency ? m.efficiency.toFixed(0) : 0}
-                  </span>
-                </div>
-              </div>
-            ))}
-            {efficiency.length === 0 && (
-              <div className="py-8 text-center text-muted-foreground">
-                No efficiency data available
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Cost Optimization Recommendations */}
-        {costOptimizationInsights.length > 0 && (
-          <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-8">
-            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
-              <svg className="w-5 h-5 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-              </svg>
-              Optimization Tips
-            </h3>
-            <div className="space-y-4">
-              {costOptimizationInsights.map((insight, index) => (
-                <div
-                  key={index}
-                  className={cn(
-                    "flex items-start gap-3 p-4 rounded-lg border-l-4",
-                    insight.type === 'warning' && "bg-orange-50 border-l-orange-500 dark:bg-orange-950/20",
-                    insight.type === 'success' && "bg-green-50 border-l-green-500 dark:bg-green-950/20",
-                    insight.type === 'info' && "bg-blue-50 border-l-blue-500 dark:bg-blue-950/20"
-                  )}
-                >
-                  <div className="text-xl mt-0.5">
-                    {insight.icon}
-                  </div>
-                  <div className="flex-1">
-                    <div className="font-medium mb-1">
-                      {insight.title}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {insight.message}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Data Table */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6">
-          <h3 className="text-lg font-semibold mb-4">Detailed Data</h3>
-          <EnhancedDataTable
-            columns={columns}
-            data={rows}
-            pageIndex={0}
-            pageSize={rows.length || 10}
-            total={rows.length}
-            onPageChange={() => { }}
-            onPageSizeChange={() => { }}
-            mobileCardLayout
-            hideColumnsOnMobile={['prompt_tokens', 'completion_tokens']}
-            compactMode={isMobile}
-            emptyMessage="No usage data in this range."
-          />
-        </div>
+        {/* Additional sections removed per optimization request */}
       </div>
     </ResponsivePageContainer>
   )

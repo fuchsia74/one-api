@@ -106,6 +106,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
       - [Support gemini-2.5-pro](#support-gemini-25-pro)
       - [Support GCP Vertex gloabl region and gemini-2.5-pro-preview-06-05](#support-gcp-vertex-gloabl-region-and-gemini-25-pro-preview-06-05)
       - [Support gemini-2.5-flash-image-preview \& imagen-4 series](#support-gemini-25-flash-image-preview--imagen-4-series)
+    - [OpenCode Support](#opencode-support)
     - [AWS Features](#aws-features)
       - [Support AWS cross-region inferences](#support-aws-cross-region-inferences)
       - [Support AWS BedRock Inference Profile](#support-aws-bedrock-inference-profile)
@@ -333,7 +334,7 @@ support `gpt-4o-search-preview` & `gpt-4o-mini-search-preview`
 
 #### Support gpt-5 family
 
-gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex
+gpt-5-chat-latest / gpt-5 / gpt-5-mini / gpt-5-nano / gpt-5-codex / gpt-5-pro
 
 #### Support o3-deep-research & o4-mini-deep-research
 
@@ -444,6 +445,70 @@ You can use any model you like for Claude Code, even if the model doesn’t nati
 #### Support gemini-2.5-flash-image-preview & imagen-4 series
 
 ![](https://s3.laisky.com/uploads/2025/09/gemini-banana.png)
+
+### OpenCode Support
+
+<p align="center">
+  <a href="https://opencode.ai">
+    <picture>
+      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-dark.svg" media="(prefers-color-scheme: dark)">
+      <source srcset="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" media="(prefers-color-scheme: light)">
+      <img src="https://github.com/sst/opencode/raw/dev/packages/console/app/src/asset/logo-ornate-light.svg" alt="OpenCode logo">
+    </picture>
+  </a>
+</p>
+
+[opencode.ai](https://opencode.ai) is an AI coding agent built for the terminal. OpenCode is fully open source, giving you control and `freedom` to use any provider, any model, and any editor. It's available as both a CLI and TUI.
+
+One‑API integrates seamlessly with OpenCode: you can connect any One‑API endpoint and use all your unified models through OpenCode's interface (both CLI and TUI).
+
+To get started, create or edit `~/.config/opencode/opencode.json` like this:
+
+**Using OpenAI SDK:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api": {
+      "npm": "@ai-sdk/openai",
+      "name": "One API",
+      "options": {
+        "baseURL": "https://oneapi.laisky.com/v1",
+        "apiKey": "<ONEAPI_TOKEN_KEY>"
+      },
+      "models": {
+        "gpt-4.1-2025-04-14": {
+          "name": "GPT 4.1"
+        }
+      }
+    }
+  }
+}
+```
+
+**Using Anthropic SDK:**
+
+```json
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "one-api-anthropic": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "One API (Anthropic)",
+      "options": {
+        "baseURL": "https://oneapi.laisky.com/v1",
+        "apiKey": "<ONEAPI_TOKEN_KEY>"
+      },
+      "models": {
+        "claude-sonnet-4-5": {
+          "name": "Claude Sonnet 4.5"
+        }
+      }
+    }
+  }
+}
+```
 
 ### AWS Features
 

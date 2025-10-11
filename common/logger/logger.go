@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -48,16 +47,24 @@ func initLogger() {
 func SetupLogger() {
 	setupLogOnce.Do(func() {
 		if LogDir != "" {
+			if err := os.MkdirAll(LogDir, 0o755); err != nil {
+				Logger.Error("failed to ensure log directory", zap.String("log_dir", LogDir), zap.Error(err))
+				return
+			}
+
 			var logPath string
 			if config.OnlyOneLogFile {
 				logPath = filepath.Join(LogDir, "oneapi.log")
 			} else {
 				logPath = filepath.Join(LogDir, fmt.Sprintf("oneapi-%s.log", time.Now().Format("20060102")))
 			}
-			fd, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+			fd, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 			if err != nil {
-				log.Fatal("failed to open log file")
+				Logger.Error("failed to open log file, falling back to stdout", zap.String("log_path", logPath), zap.Error(err))
+				return
 			}
+
 			gin.DefaultWriter = io.MultiWriter(os.Stdout, fd)
 			gin.DefaultErrorWriter = io.MultiWriter(os.Stderr, fd)
 		}

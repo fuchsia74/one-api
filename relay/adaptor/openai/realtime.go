@@ -58,12 +58,15 @@ func RealtimeHandler(c *gin.Context, meta *rmeta.Meta) (*rmodel.ErrorWithStatusC
 	// Preserve query but ensure model uses mapped ActualModelName
 	rawQuery := c.Request.URL.RawQuery
 	u, _ := url.Parse(base)
+
 	u.Scheme = strings.Replace(u.Scheme, "http", "ws", 1) // http->ws, https->wss
-	if u.Scheme == "" || u.Scheme == "http" {
+	switch u.Scheme {
+	case "", "http":
 		u.Scheme = "wss"
-	} else if u.Scheme == "https" {
+	case "https":
 		u.Scheme = "wss"
 	}
+
 	u.Path = "/v1/realtime"
 	// Override model query with mapped model if provided
 	q, _ := url.ParseQuery(rawQuery)

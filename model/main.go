@@ -100,7 +100,12 @@ func openPostgreSQL(dsn string) (*gorm.DB, error) {
 func openMySQL(dsn string) (*gorm.DB, error) {
 	logger.Logger.Info("using MySQL as database")
 	common.UsingMySQL = true
-	return gorm.Open(mysql.Open(dsn), &gorm.Config{
+	normalized, err := common.NormalizeMySQLDSN(dsn)
+	if err != nil {
+		return nil, errors.Wrap(err, "normalize MySQL DSN")
+	}
+
+	return gorm.Open(mysql.Open(normalized), &gorm.Config{
 		PrepareStmt: true, // precompile SQL
 	})
 }
@@ -140,14 +145,20 @@ func InitDB() {
 	logger.Logger.Info("database migration started")
 
 	// STEP 1: Pre-migrations
-	// 1a) Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
+	// 1a) Normalize legacy ability suspend_until column types before AutoMigrate touches the table
+	if err = MigrateAbilitySuspendUntilColumn(); err != nil {
+		logger.Logger.Fatal("failed to migrate ability suspend_until column", zap.Error(err))
+		return
+	}
+
+	// 1b) Migrate ModelConfigs and ModelMapping columns from varchar(1024) to text
 	// This must run BEFORE AutoMigrate to ensure schema compatibility
 	if err = MigrateChannelFieldsToText(); err != nil {
 		logger.Logger.Fatal("failed to migrate channel field types", zap.Error(err))
 		return
 	}
 
-	// 1b) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
+	// 1c) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
 	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
 		logger.Logger.Fatal("failed to migrate user_request_costs unique index", zap.Error(err))
 		return
@@ -160,6 +171,12 @@ func InitDB() {
 		return
 	}
 	logger.Logger.Info("database schema migrated")
+
+	// Run post-migration adjustments to ensure new installs have expected schema specifics.
+	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
+		logger.Logger.Fatal("failed to finalize user_request_costs unique index", zap.Error(err))
+		return
+	}
 
 	// STEP 3: Migrate existing ModelConfigs data from old format to new format
 	// This handles data format changes after schema is correct
@@ -193,6 +210,9 @@ func migrateDB() error {
 	}
 	if err = DB.AutoMigrate(&Log{}); err != nil {
 		return errors.Wrapf(err, "failed to migrate Log")
+	}
+	if err = DB.AutoMigrate(&TokenTransaction{}); err != nil {
+		return errors.Wrapf(err, "failed to migrate TokenTransaction")
 	}
 	if err = DB.AutoMigrate(&UserRequestCost{}); err != nil {
 		return errors.Wrapf(err, "failed to migrate UserRequestCost")

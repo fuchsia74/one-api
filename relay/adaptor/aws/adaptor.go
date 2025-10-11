@@ -127,7 +127,7 @@ func (a *Adaptor) ConvertImageRequest(c *gin.Context, request *model.ImageReques
 	a.awsAdapter = adaptor
 
 	// Store the image request in context for the Titan or Canvas adapter to use later
-	c.Set("imageRequest", *request)
+	c.Set(ctxkey.ImageRequest, *request)
 	c.Set(ctxkey.RequestModel, request.Model)
 
 	// For image generation, we need to convert to GeneralOpenAIRequest format
@@ -259,6 +259,12 @@ func (a *Adaptor) GetDefaultModelPricing() map[string]adaptor.ModelConfig {
 		// Cohere Models (Supported) - Note: These are per 1K tokens, converted to 1M tokens using ratio.MilliTokensUsd
 		"command-r":      {Ratio: 0.5 * ratio.MilliTokensUsd, CompletionRatio: 3}, // $0.5/$2 per 1M tokens
 		"command-r-plus": {Ratio: 3 * ratio.MilliTokensUsd, CompletionRatio: 5},   // $3/$5 per 1M tokens
+
+		// Qwen Models (Supported) - Note: These are per 1K tokens, converted to 1M tokens using MilliTokensUsd
+		"qwen3-235b":       {Ratio: 0.22 * ratio.MilliTokensUsd, CompletionRatio: 4},    // $0.00022/$0.00088 per 1K tokens = $0.22/$0.88 per 1M tokens
+		"qwen3-32b":        {Ratio: 0.15 * ratio.MilliTokensUsd, CompletionRatio: 4},    // $0.00015/$0.0006 per 1K tokens = $0.15/$0.6 per 1M tokens
+		"qwen3-coder-30b":  {Ratio: 0.15 * ratio.MilliTokensUsd, CompletionRatio: 4},    // $0.00015/$0.0006 per 1K tokens = $0.15/$0.6 per 1M tokens
+		"qwen3-coder-480b": {Ratio: 0.22 * ratio.MilliTokensUsd, CompletionRatio: 8.18}, // $0.00022/$0.0018 per 1K tokens = $0.22/$1.8 per 1M tokens
 
 		// AI21 Models (if supported)
 		"ai21-j2-mid":    {Ratio: 12.5 * ratio.MilliTokensUsd, CompletionRatio: 1}, // $12.5 per 1M tokens
@@ -416,6 +422,27 @@ func GetModelCapabilities(modelName string) ProviderCapabilities {
 			SupportsStop:                true,  // Cohere Command R models support stop parameter
 			SupportsImageGeneration:     false, // Cohere Command R models don't support image generation
 			SupportsEmbedding:           false, // Cohere Command R models don't support embedding
+		}
+	case AwsQwen:
+		baseCapabilities = ProviderCapabilities{
+			SupportsTools:               true,  // Qwen models on AWS Bedrock support tool calling via Converse API
+			SupportsFunctions:           false, // Qwen doesn't support OpenAI functions
+			SupportsLogprobs:            false,
+			SupportsResponseFormat:      false,
+			SupportsReasoningEffort:     true,
+			SupportsModalities:          false,
+			SupportsAudio:               false,
+			SupportsWebSearch:           false,
+			SupportsThinking:            false,
+			SupportsLogitBias:           false,
+			SupportsServiceTier:         false,
+			SupportsParallelToolCalls:   false,
+			SupportsTopLogprobs:         false,
+			SupportsPrediction:          false,
+			SupportsMaxCompletionTokens: false,
+			SupportsStop:                true,  // Qwen models support stop parameter
+			SupportsImageGeneration:     false, // Qwen models don't support image generation
+			SupportsEmbedding:           false, // Qwen models don't support embedding
 		}
 	case AwsDeepSeek:
 		baseCapabilities = ProviderCapabilities{

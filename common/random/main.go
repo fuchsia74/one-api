@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/Laisky/errors/v2"
-	"github.com/google/uuid"
+	gutils "github.com/Laisky/go-utils/v5"
 )
 
 // GetUUID generates a UUID and returns it as a string without hyphens.
@@ -14,8 +14,8 @@ import (
 //
 // [github.com/google/uuid]: https://pkg.go.dev/github.com/google/uuid
 func GetUUID() string {
-	code := uuid.New().String()
-	code = strings.Replace(code, "-", "", -1)
+	code := gutils.UUID7()
+	code = strings.ReplaceAll(code, "-", "")
 	return code
 }
 

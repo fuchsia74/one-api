@@ -268,44 +268,52 @@ const ChannelsTable = () => {
     }
   };
 
-  const setChannelFormat = (channels) => {
-    for (let i = 0; i < channels.length; i++) {
-      channels[i].key = '' + channels[i].id;
-      let test_models = [];
-      channels[i].models.split(',').forEach((item, index) => {
-        test_models.push({
+  const setChannelFormat = (list, totalCount = 0) => {
+    const formatted = Array.isArray(list) ? [...list] : [];
+    for (let i = 0; i < formatted.length; i++) {
+      formatted[i].key = '' + formatted[i].id;
+      const testModels = [];
+      const modelStr = formatted[i].models || '';
+      modelStr.split(',').forEach((item) => {
+        if (!item) {
+          return;
+        }
+        testModels.push({
           node: 'item',
           name: item,
           onClick: () => {
-            testChannel(channels[i], item);
+            testChannel(formatted[i], item);
           }
         });
       });
-      channels[i].test_models = test_models;
+      formatted[i].test_models = testModels;
     }
-    // data.key = '' + data.id
-    setChannels(channels);
-    if (channels.length >= pageSize) {
-      setChannelCount(channels.length + pageSize);
-    } else {
-      setChannelCount(channels.length);
-    }
+    setChannels(formatted);
+    const resolvedTotal = totalCount > 0 ? totalCount : formatted.length;
+    setChannelCount(resolvedTotal);
   };
 
-  const loadChannels = async (startIdx, pageSize, idSort) => {
+  const loadChannels = async (startIdx, currentPageSize, sortByIdAsc) => {
     setLoading(true);
-    const res = await API.get(`/api/channel/?p=${startIdx}&page_size=${pageSize}&id_sort=${idSort}`);
-    const { success, message, data } = res.data;
-    if (success) {
-      if (startIdx === 0) {
-        setChannelFormat(data);
+    try {
+      const sortParams = sortByIdAsc ? '&sort=id&order=asc' : '&sort=id&order=desc';
+      const res = await API.get(`/api/channel/?p=${startIdx}&size=${currentPageSize}${sortParams}`);
+      const { success, message, data, total } = res.data;
+      if (success) {
+        const totalCount = typeof total === 'number' ? total : (Array.isArray(data) ? data.length : 0);
+        if (startIdx === 0) {
+          setChannelFormat(data, totalCount);
+        } else {
+          const pageData = Array.isArray(data) ? data : [];
+          const newChannels = [...channels];
+          newChannels.splice(startIdx * currentPageSize, pageData.length, ...pageData);
+          setChannelFormat(newChannels, totalCount);
+        }
       } else {
-        let newChannels = [...channels];
-        newChannels.splice(startIdx * pageSize, data.length, ...data);
-        setChannelFormat(newChannels);
+        showError(message);
       }
-    } else {
-      showError(message);
+    } catch (err) {
+      showError(err?.message || err);
     }
     setLoading(false);
   };
@@ -337,39 +345,72 @@ const ChannelsTable = () => {
         break;
       case 'enable':
         data.status = 1;
-        res = await API.put('/api/channel/', data);
+        res = await API.put('/api/channel/?status_only=1', data);
         break;
       case 'disable':
         data.status = 2;
-        res = await API.put('/api/channel/', data);
+        res = await API.put('/api/channel/?status_only=1', data);
         break;
       case 'priority':
         if (value === '') {
           return;
         }
-        data.priority = parseInt(value);
+        data.priority = parseInt(value, 10);
+        if (Number.isNaN(data.priority)) {
+          showError('优先级必须是数字');
+          return;
+        }
+        data.name = record?.name;
+        if (!data.name) {
+          const found = channels.find((item) => item.id === id);
+          data.name = found?.name;
+        }
+        if (!data.name) {
+          showError('未找到对应的渠道名称，稍后重试');
+          return;
+        }
         res = await API.put('/api/channel/', data);
         break;
       case 'weight':
         if (value === '') {
           return;
         }
-        data.weight = parseInt(value);
+        data.weight = parseInt(value, 10);
         if (data.weight < 0) {
           data.weight = 0;
         }
+        data.name = record?.name;
+        if (!data.name) {
+          const found = channels.find((item) => item.id === id);
+          data.name = found?.name;
+        }
+        if (!data.name) {
+          showError('未找到对应的渠道名称，稍后重试');
+          return;
+        }
         res = await API.put('/api/channel/', data);
         break;
+      default:
+        showError(`未知操作类型: ${action}`);
+        return;
     }
-    const { success, message } = res.data;
+    const { success, message, data: responseData } = res.data;
     if (success) {
       showSuccess('操作成功完成！');
-      let channel = res.data.data;
+      const channel = responseData || {};
       let newChannels = [...channels];
       if (action === 'delete') {
 
       } else {
-        record.status = channel.status;
+        if (action === 'enable') {
+          record.status = 1;
+        } else if (action === 'disable') {
+          record.status = 2;
+        } else if (action === 'priority') {
+          record.priority = channel.priority ?? data.priority;
+        } else if (action === 'weight') {
+          record.weight = channel.weight ?? data.weight;
+        }
       }
       setChannels(newChannels);
     } else {
@@ -426,13 +467,17 @@ const ChannelsTable = () => {
       return;
     }
     setSearching(true);
-    const res = await API.get(`/api/channel/search?keyword=${searchKeyword}&group=${searchGroup}&model=${searchModel}`);
-    const { success, message, data } = res.data;
-    if (success) {
-      setChannels(data);
-      setActivePage(1);
-    } else {
-      showError(message);
+    try {
+      const res = await API.get(`/api/channel/search?keyword=${searchKeyword}`);
+      const { success, message, data } = res.data;
+      if (success) {
+        setChannelFormat(data, Array.isArray(data) ? data.length : 0);
+        setActivePage(1);
+      } else {
+        showError(message);
+      }
+    } catch (err) {
+      showError(err?.message || err);
     }
     setSearching(false);
   };

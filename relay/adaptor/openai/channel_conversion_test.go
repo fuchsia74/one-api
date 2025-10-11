@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -60,7 +61,7 @@ func TestChannelSpecificConversion(t *testing.T) {
 			if tc.channelType == channeltype.Azure {
 				testMeta.ActualModelName = "gpt-4o-mini"
 			}
-			c.Set("meta", testMeta)
+			c.Set(ctxkey.Meta, testMeta)
 
 			// Create adaptor
 			adaptor := &Adaptor{}
@@ -146,7 +147,7 @@ func TestModelSpecificConversion(t *testing.T) {
 				BaseURL:        "https://api.openai.com",
 			}
 			testMeta.ActualModelName = tc.model
-			c.Set("meta", testMeta)
+			c.Set(ctxkey.Meta, testMeta)
 
 			// Create adaptor
 			adaptor := &Adaptor{}

@@ -198,6 +198,41 @@ func RecordTestLogWithIDs(_ context.Context, log *Log, requestId string, traceId
 	_ = LOG_DB.Create(log).Error
 }
 
+// UpdateConsumeLogByID performs a partial update on an existing consume log entry.
+// Parameters:
+//   - ctx: request context used for cancellation propagation.
+//   - logID: identifier of the log row to update.
+//   - updates: column/value pairs to apply. When empty, the function is a no-op.
+//
+// Returns an error if the update fails.
+var allowedConsumeLogUpdateFields = map[string]struct{}{
+	"quota":        {},
+	"content":      {},
+	"elapsed_time": {},
+}
+
+func UpdateConsumeLogByID(ctx context.Context, logID int, updates map[string]interface{}) error {
+	if logID <= 0 {
+		return errors.Errorf("log id must be positive: %d", logID)
+	}
+	if len(updates) == 0 {
+		return nil
+	}
+
+	for field := range updates {
+		if _, ok := allowedConsumeLogUpdateFields[field]; !ok {
+			return errors.Errorf("unsupported consume log update field: %s", field)
+		}
+	}
+
+	if err := LOG_DB.WithContext(ctx).Model(&Log{}).
+		Where("id = ?", logID).
+		Updates(updates).Error; err != nil {
+		return errors.Wrapf(err, "failed to update consume log: id=%d", logID)
+	}
+	return nil
+}
+
 func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, startIdx int, num int, channel int, sortBy string, sortOrder string) (logs []*Log, err error) {
 	var tx *gorm.DB
 	if logType == LogTypeUnknown {

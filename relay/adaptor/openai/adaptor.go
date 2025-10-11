@@ -40,22 +40,37 @@ type Adaptor struct {
 	ChannelType int
 }
 
+// webSearchCallUSDPerThousand returns the USD cost per 1000 calls for the given model name
+//
+//   - https://openai.com/api/pricing/
+//   - https://platform.openai.com/docs/pricing#built-in-tools
 func webSearchCallUSDPerThousand(modelName string) float64 {
-	lower := strings.ToLower(modelName)
-	if strings.TrimSpace(lower) == "" {
+	lower := normalizedModelName(modelName)
+
+	if isModelSupportedReasoning(lower) {
 		return 10.0
 	}
 
-	if strings.Contains(lower, "search-preview") {
-		highTier := []string{"gpt-4o-mini", "gpt-4o", "gpt-4.1-mini", "gpt-4.1"}
-		for _, key := range highTier {
-			if strings.Contains(lower, key) {
-				return 25.0
-			}
-		}
+	if isWebSearchPreviewModel(lower) {
+		return 25.0
 	}
 
-	return 10.0
+	if strings.Contains(lower, "-web-search") || strings.Contains(lower, "-search") {
+		return 10.0
+	}
+
+	return 25.0
+}
+
+func normalizedModelName(modelName string) string {
+	return strings.ToLower(strings.TrimSpace(modelName))
+}
+
+func isWebSearchPreviewModel(lower string) bool {
+	if lower == "" {
+		return false
+	}
+	return strings.Contains(lower, "search-preview") || strings.Contains(lower, "web-search-preview")
 }
 
 func webSearchCallQuotaPerInvocation(modelName string) int64 {
@@ -463,6 +478,10 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		ensureWebSearchTool(request)
 	}
 
+	if request.WebSearchOptions != nil {
+		ensureWebSearchTool(request)
+	}
+
 	if request.Stream && !config.EnforceIncludeUsage &&
 		strings.HasSuffix(request.Model, "-audio") {
 		// TODO: Since it is not clear how to implement billing in stream mode,
@@ -818,12 +837,25 @@ func applyWebSearchToolCost(c *gin.Context, usage **model.Usage, meta *meta.Meta
 		if count < 0 {
 			count = 0
 		}
-		if count > 0 && perCallQuota > 0 {
-			ensureUsage().ToolsCost += int64(count) * perCallQuota
+		if count > 0 {
+			usagePtr := ensureUsage()
+			enforceWebSearchTokenPolicy(usagePtr, modelName, count)
+			if perCallQuota > 0 {
+				usagePtr.ToolsCost += int64(count) * perCallQuota
+			}
 		}
 	}
 
 	return nil
+}
+
+func enforceWebSearchTokenPolicy(usage *model.Usage, modelName string, callCount int) {
+	if usage == nil || callCount <= 0 {
+		return
+	}
+
+	_ = modelName // model retained for possible future policy tuning
+	usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
 }
 
 // convertToClaudeResponse converts OpenAI response format to Claude Messages format
