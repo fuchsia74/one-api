@@ -3,11 +3,10 @@ package common
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -51,17 +50,22 @@ func Init() {
 		SQLitePath = os.Getenv("SQLITE_PATH")
 	}
 	if *LogDir != "" {
+		expanded := expandLogDirPath(*LogDir)
+		lg := logger.Logger.With(zap.String("log_dir", expanded))
+		lg.Debug("starting to set log dir")
+
 		var err error
-		*LogDir, err = filepath.Abs(*LogDir)
+		expanded, err = filepath.Abs(expanded)
 		if err != nil {
-			log.Fatal(errors.Wrap(err, "failed to get absolute log dir"))
+			lg.Fatal("failed to get absolute log dir", zap.Error(err))
 		}
-		if _, err := os.Stat(*LogDir); os.IsNotExist(err) {
-			err = os.Mkdir(*LogDir, 0777)
-			if err != nil {
-				log.Fatal(errors.Wrap(err, "failed to create log dir"))
-			}
+
+		if err = os.MkdirAll(expanded, 0o777); err != nil {
+			lg.Fatal("failed to create log dir", zap.Error(err))
 		}
-		logger.LogDir = *LogDir
+
+		lg.Info("set log dir", zap.String("log_dir", expanded))
+		logger.LogDir = expanded
+		*LogDir = expanded
 	}
 }
