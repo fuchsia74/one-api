@@ -79,14 +79,11 @@ export default defineConfig(({ mode }) => ({
 
           // Markdown processing and syntax highlighting - heavy libraries
           'markdown-core': ['react-markdown', 'marked'],
-          'markdown-plugins': [
-            'remark-gfm',
-            'remark-math',
-            'remark-emoji',
-            'rehype-highlight',
-            'rehype-katex',
-            'rehype-sanitize'
-          ],
+          // Split markdown plugins into smaller chunks
+          'markdown-remark': ['remark-gfm', 'remark-math', 'remark-emoji'],
+          'markdown-rehype-highlight': ['rehype-highlight'],
+          'markdown-rehype-katex': ['rehype-katex', 'katex'],
+          'markdown-rehype-sanitize': ['rehype-sanitize'],
 
           // Chart and visualization libraries
           charts: ['recharts'],
