@@ -65,13 +65,15 @@ export default defineConfig(({ mode }) => ({
           'radix-ui-forms': [
             '@radix-ui/react-checkbox',
             '@radix-ui/react-label',
-            '@radix-ui/react-select'
+            '@radix-ui/react-select',
+            '@radix-ui/react-switch'
           ],
           'radix-ui-layout': [
             '@radix-ui/react-scroll-area',
             '@radix-ui/react-separator',
             '@radix-ui/react-slot',
             '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
             '@radix-ui/react-hover-card'
           ],
 
