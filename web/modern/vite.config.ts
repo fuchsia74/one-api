@@ -87,7 +87,6 @@ export default defineConfig(({ mode }) => ({
             'rehype-katex',
             'rehype-sanitize'
           ],
-          'math-rendering': ['katex', 'markdown-it-katex'],
 
           // Chart and visualization libraries
           charts: ['recharts'],
@@ -105,6 +104,8 @@ export default defineConfig(({ mode }) => ({
           forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
 
           // Internationalization
+          //
+          // Note: This currently unused
           i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
 
           // Network and external services
