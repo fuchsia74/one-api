@@ -27,7 +27,7 @@ export default defineConfig(({ mode }) => ({
     reportCompressedSize: true, // Report compressed sizes in build output
     // Enable advanced esbuild optimizations
     esbuild: {
-      legalComments: 'none', // Remove legal comments
+      legalComments: 'eof', // This can increase chunk size when set to EOF.
       treeShaking: true,
       minifyIdentifiers: true,
       minifySyntax: true,
