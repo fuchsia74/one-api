@@ -16,74 +16,106 @@ export default defineConfig(({ mode }) => ({
     outDir: '../build/modern',
     // This is now correct; source maps should only be generated for development mode, not production
     sourcemap: mode === 'development',
-    chunkSizeWarningLimit: 700,
+    // Increase chunk size warning limit to reduce noise for legitimate large chunks
+    chunkSizeWarningLimit: 500, // Reduced from 1000 to encourage better chunking
+    // Enable advanced minification and optimization
+    minify: 'esbuild',
+    target: 'esnext',
+    // Additional build optimizations
+    cssCodeSplit: true, // Enable CSS code splitting
+    assetsInlineLimit: 4096, // Inline assets smaller than 4KB
+    reportCompressedSize: true, // Report compressed sizes in build output
+    // Enable advanced esbuild optimizations
+    esbuild: {
+      legalComments: 'none', // Remove legal comments
+      treeShaking: true,
+      minifyIdentifiers: true,
+      minifySyntax: true,
+      minifyWhitespace: true,
+    },
     rollupOptions: {
+      // Improve tree shaking and dead code elimination
+      treeshake: {
+        preset: 'recommended',
+        moduleSideEffects: false,
+        propertyReadSideEffects: false,
+        tryCatchDeoptimization: false,
+      },
+      // Optimize external dependencies
+      external: [],
       output: {
         // Use both name and hash for chunk file names to aid debugging and cache busting
         chunkFileNames: '[name].[hash].js',
-        manualChunks: (id) => {
-          if (id.includes('node_modules')) {
-            if (id.includes('react/') || id.includes('react-dom/')) {
-              return 'vendor'
-            }
-            if (id.includes('react-router-dom')) {
-              return 'router'
-            }
-            if (id.includes('@radix-ui/react-dialog') || id.includes('@radix-ui/react-dropdown-menu') ||
-              id.includes('@radix-ui/react-popover') || id.includes('@radix-ui/react-tooltip')) {
-              return 'ui-overlay'
-            }
-            if (id.includes('@radix-ui/react-select') || id.includes('@radix-ui/react-checkbox') ||
-              id.includes('@radix-ui/react-switch') || id.includes('@radix-ui/react-slider')) {
-              return 'ui-form'
-            }
-            if (id.includes('@radix-ui')) {
-              return 'ui'
-            }
-            if (id.includes('react-markdown') || id.includes('rehype') || id.includes('remark') || id.includes('marked')) {
-              return 'markdown'
-            }
-            if (id.includes('recharts') || id.includes('d3-')) {
-              return 'charts'
-            }
-            if (id.includes('@tanstack/react-query')) {
-              return 'query'
-            }
-            if (id.includes('@tanstack/react-table') || id.includes('@tanstack/table-core')) {
-              return 'table'
-            }
-            if (id.includes('katex')) {
-              return 'katex'
-            }
-            if (id.includes('react-hook-form') || id.includes('zod') || id.includes('@hookform')) {
-              return 'forms'
-            }
-            if (id.includes('axios')) {
-              return 'http'
-            }
-            if (id.includes('i18next') || id.includes('i18next-browser-languagedetector') || id.includes('react-i18next')) {
-              return 'i18n'
-            }
-            if (id.includes('highlight.js')) {
-              return 'highlight'
-            }
-            if (id.includes('lucide-react')) {
-              return 'icons'
-            }
-            if (id.includes('qrcode')) {
-              return 'qrcode'
-            }
-            if (id.includes('zustand')) {
-              return 'state'
-            }
-            if (id.includes('cmdk')) {
-              return 'command'
-            }
-            if (id.includes('scheduler')) {
-              return 'vendor'
-            }
-            return 'vendor-misc'
-          }
+        manualChunks: {
+          // Core React libraries - keep small and essential
+          vendor: ['react', 'react-dom'],
+          router: ['react-router-dom'],
+
+          // TanStack libraries split for better caching
+          'tanstack-query': ['@tanstack/react-query'],
+          'tanstack-table': ['@tanstack/react-table'],
+
+          // Split Radix UI into logical groups to reduce chunk sizes
+          'radix-ui-core': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-popover',
+            '@radix-ui/react-tooltip'
+          ],
+          'radix-ui-forms': [
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-label',
+            '@radix-ui/react-select',
+            '@radix-ui/react-switch'
+          ],
+          'radix-ui-layout': [
+            '@radix-ui/react-scroll-area',
+            '@radix-ui/react-separator',
+            '@radix-ui/react-slot',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-hover-card'
+          ],
+
+          // Markdown processing and syntax highlighting - heavy libraries
+          'markdown-core': ['react-markdown', 'marked'],
+          'markdown-plugins': [
+            'remark-gfm',
+            'remark-math',
+            'remark-emoji',
+            'rehype-highlight',
+            'rehype-katex',
+            'rehype-sanitize'
+          ],
+          'math-rendering': ['katex', 'markdown-it-katex'],
+
+          // Chart and visualization libraries
+          charts: ['recharts'],
+
+          // Icons and UI utilities
+          'ui-utils': [
+            'lucide-react',
+            'class-variance-authority',
+            'clsx',
+            'tailwind-merge',
+            'cmdk'
+          ],
+
+          // Form handling
+          forms: ['react-hook-form', '@hookform/resolvers', 'zod'],
+
+          // Internationalization
+          i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+
+          // Network and external services
+          network: ['axios'],
+
+          // Specialized utilities
+          'misc-utils': [
+            'qrcode',
+            'react-turnstile',
+            'zustand'
+          ],
         },
       },
     },
