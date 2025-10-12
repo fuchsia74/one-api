@@ -47,7 +47,6 @@
     "react-i18next": "^13.5.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.20.0",
-    "react-turnstile": "^1.1.4",
     "recharts": "^2.12.7",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
