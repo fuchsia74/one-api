@@ -80,7 +80,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 			Type:     "upstream_error",
 			Code:     "bad_response_status_code",
 			Param:    strconv.Itoa(resp.StatusCode),
-			RawError: errors.New("bad response status code" + strconv.Itoa(resp.StatusCode)),
+			RawError: errors.Errorf("bad response %d", resp.StatusCode),
 		},
 	}
 	responseBody, err := io.ReadAll(resp.Body)
@@ -120,7 +120,7 @@ func RelayErrorHandler(resp *http.Response) (ErrorWithStatusCode *model.ErrorWit
 	}
 
 	if ErrorWithStatusCode.Error.Message == "" {
-		ErrorWithStatusCode.Error.Message = fmt.Sprintf("bad response status code %d", resp.StatusCode)
+		ErrorWithStatusCode.Error.Message = fmt.Sprintf("bad response [%d] %s", resp.StatusCode, string(responseBody))
 	}
 
 	return
