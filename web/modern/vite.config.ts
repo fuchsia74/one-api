@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => ({
       // Improve tree shaking and dead code elimination
       treeshake: {
         preset: 'recommended',
-        moduleSideEffects: false,
+        moduleSideEffects: 'no-external',
         propertyReadSideEffects: false,
         tryCatchDeoptimization: false,
       },
@@ -103,7 +103,7 @@ export default defineConfig(({ mode }) => ({
           // Internationalization
           //
           // Note: This currently unused
-          i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
+          //i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
 
           // Network and external services
           network: ['axios'],
