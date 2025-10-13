@@ -8,12 +8,7 @@ assignees: ""
 
 ## Routine Check
 
-[//]: # "Remove space in brackets and fill with x"
-
-- [ ] I have confirmed there are no similar issues
-- [ ] I have confirmed I am using the latest version
-- [ ] I have thoroughly read the project README
-- [ ] I understand and am willing to follow up on this issue, assist with testing and provide feedback
+Please configure the server with the environment variable `DEBUG=true`, reproduce the problem, and supply the full server logs.
 
 ## What Version/DockerImage Are You Using?
 
@@ -21,8 +16,4 @@ assignees: ""
 
 ## Steps to Reproduce
 
-## Expected Behavior
-
-## Screenshots
-
-Delete this section if not applicable.
+## Server Log
