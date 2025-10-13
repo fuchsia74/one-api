@@ -3,10 +3,14 @@ package logger
 import (
 	"context"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/Laisky/zap"
+	"github.com/gin-gonic/gin"
 
 	"github.com/songquanpeng/one-api/common/config"
 )
@@ -124,4 +128,42 @@ func TestLoggerDebugMode(t *testing.T) {
 		// Restore original setting
 		config.DebugEnabled = originalDebugEnabled
 	})
+}
+
+func TestSetupLoggerWritesToFile(t *testing.T) {
+	dir := t.TempDir()
+
+	originalLogger := Logger
+	originalLogDir := LogDir
+	originalOnlyOne := config.OnlyOneLogFile
+	originalOnce := setupLogOnce
+	originalDefaultWriter := gin.DefaultWriter
+	originalDefaultErrorWriter := gin.DefaultErrorWriter
+
+	t.Cleanup(func() {
+		Logger = originalLogger
+		LogDir = originalLogDir
+		config.OnlyOneLogFile = originalOnlyOne
+		setupLogOnce = originalOnce
+		gin.DefaultWriter = originalDefaultWriter
+		gin.DefaultErrorWriter = originalDefaultErrorWriter
+	})
+
+	LogDir = dir
+	config.OnlyOneLogFile = true
+	setupLogOnce = sync.Once{}
+
+	SetupLogger()
+
+	Logger.Info("file logging test entry")
+	_ = Logger.Sync()
+
+	logPath := filepath.Join(dir, "oneapi.log")
+	content, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatalf("failed to read log file: %v", err)
+	}
+	if !strings.Contains(string(content), "file logging test entry") {
+		t.Fatalf("log file %s does not contain expected log entry", logPath)
+	}
 }
