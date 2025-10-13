@@ -46,6 +46,7 @@ func main() {
 
 	common.Init()
 	logger.SetupLogger()
+	logger.StartLogRetentionCleaner(ctx, config.LogRetentionDays, logger.LogDir)
 
 	// Setup enhanced logger with alertPusher integration
 	logger.SetupEnhancedLogger(ctx)

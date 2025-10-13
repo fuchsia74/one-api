@@ -232,6 +232,16 @@ var GeminiVersion = env.String("GEMINI_VERSION", "v1")
 
 var OnlyOneLogFile = env.Bool("ONLY_ONE_LOG_FILE", false)
 
+// LogRetentionDays controls the number of days to retain log files.
+// A value of 0 or less disables log retention cleanup.
+var LogRetentionDays = func() int {
+	v := env.Int("LOG_RETENTION_DAYS", 0)
+	if v < 0 {
+		return 0
+	}
+	return v
+}()
+
 // Alert pusher configuration for logging system
 var LogPushAPI = env.String("LOG_PUSH_API", "")
 var LogPushType = env.String("LOG_PUSH_TYPE", "")

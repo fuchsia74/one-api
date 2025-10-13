@@ -167,3 +167,43 @@ func TestSetupLoggerWritesToFile(t *testing.T) {
 		t.Fatalf("log file %s does not contain expected log entry", logPath)
 	}
 }
+
+func TestStartLogRetentionCleaner(t *testing.T) {
+	dir := t.TempDir()
+	oldLog := filepath.Join(dir, "oneapi-20200101.log")
+	if err := os.WriteFile(oldLog, []byte("old"), 0o644); err != nil {
+		t.Fatalf("failed to create old log file: %v", err)
+	}
+	cutoff := time.Now().Add(-48 * time.Hour)
+	if err := os.Chtimes(oldLog, cutoff, cutoff); err != nil {
+		t.Fatalf("failed to set old log file times: %v", err)
+	}
+
+	freshLog := filepath.Join(dir, "oneapi.log")
+	if err := os.WriteFile(freshLog, []byte("fresh"), 0o644); err != nil {
+		t.Fatalf("failed to create fresh log file: %v", err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	StartLogRetentionCleaner(ctx, 1, dir)
+
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		if _, err := os.Stat(oldLog); os.IsNotExist(err) {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("expired log file %s was not removed", oldLog)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if _, err := os.Stat(freshLog); err != nil {
+		if os.IsNotExist(err) {
+			t.Fatalf("fresh log file %s should not be removed", freshLog)
+		}
+		t.Fatalf("unexpected error checking fresh log file: %v", err)
+	}
+}

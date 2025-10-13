@@ -150,6 +150,9 @@ oneapi:
     # (optional) DEBUG enable debug mode
     DEBUG: "true"
 
+    # (optional) LOG_RETENTION_DAYS set log retention days, default is not to delete any logs
+    LOG_RETENTION_DAYS: 7
+
     # (optional) DEBUG_SQL display SQL logs
     DEBUG_SQL: "true"
     # (optional) REDIS_CONN_STRING set REDIS cache connection
