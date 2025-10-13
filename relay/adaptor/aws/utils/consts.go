@@ -100,6 +100,7 @@ var CrossRegionInferences = []string{
 	"us.anthropic.claude-opus-4-20250514-v1:0",
 	"us.anthropic.claude-opus-4-1-20250805-v1:0",
 	"us.anthropic.claude-sonnet-4-20250514-v1:0",
+	"us.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"us.deepseek.r1-v1:0",
 	"us.meta.llama3-1-405b-instruct-v1:0",
 	"us.meta.llama3-1-70b-instruct-v1:0",
@@ -124,6 +125,7 @@ var CrossRegionInferences = []string{
 	"eu.anthropic.claude-3-haiku-20240307-v1:0",
 	"eu.anthropic.claude-3-sonnet-20240229-v1:0",
 	"eu.anthropic.claude-sonnet-4-20250514-v1:0",
+	"eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"eu.meta.llama3-2-1b-instruct-v1:0",
 	"eu.meta.llama3-2-3b-instruct-v1:0",
 	"eu.mistral.pixtral-large-2502-v1:0",
@@ -136,6 +138,7 @@ var CrossRegionInferences = []string{
 	"apac.anthropic.claude-3-haiku-20240307-v1:0",
 	"apac.anthropic.claude-3-sonnet-20240229-v1:0",
 	"apac.anthropic.claude-sonnet-4-20250514-v1:0",
+	"apac.anthropic.claude-sonnet-4-5-20250929-v1:0",
 }
 
 // RegionMapping defines the mapping between AWS regions and their cross-region inference prefixes
