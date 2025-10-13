@@ -23,6 +23,8 @@ import (
 	_ "github.com/joho/godotenv/autoload"
 	"github.com/olekukonko/tablewriter"
 	"golang.org/x/sync/errgroup"
+
+	cfg "github.com/songquanpeng/one-api/common/config"
 )
 
 type requestType string
@@ -187,17 +189,17 @@ type config struct {
 }
 
 func loadConfig() (config, error) {
-	base := strings.TrimSpace(os.Getenv("API_BASE"))
+	base := strings.TrimSpace(cfg.APIBase)
 	if base == "" {
 		base = defaultAPIBase
 	}
 
-	token := strings.TrimSpace(os.Getenv("API_TOKEN"))
+	token := strings.TrimSpace(cfg.APIToken)
 	if token == "" {
 		return config{}, errors.Errorf("API_TOKEN must be set")
 	}
 
-	modelsRaw := os.Getenv("ONEAPI_TEST_MODELS")
+	modelsRaw := cfg.OneAPITestModels
 	models, err := parseModels(modelsRaw)
 	if err != nil {
 		return config{}, errors.Wrap(err, "parse models")

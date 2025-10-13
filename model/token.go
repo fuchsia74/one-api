@@ -390,15 +390,17 @@ func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 	}
 	quotaTooLow := userQuota >= config.QuotaRemindThreshold && userQuota-quota < config.QuotaRemindThreshold
 	noMoreQuota := userQuota-quota <= 0
+	var reminderEmail string
 	if quotaTooLow || noMoreQuota {
-		go func() {
-			email, err := GetUserEmail(token.UserId)
-			if err != nil {
-				logger.Logger.Error("failed to fetch user email", zap.Int("user_id", token.UserId), zap.Error(err))
-			}
+		var emailErr error
+		reminderEmail, emailErr = GetUserEmail(token.UserId)
+		if emailErr != nil {
+			logger.Logger.Error("failed to fetch user email", zap.Int("user_id", token.UserId), zap.Error(emailErr))
+		}
+		go func(email string, exhausted bool, quotaRemaining int64) {
 			prompt := "Quota Reminder"
 			var contentText string
-			if noMoreQuota {
+			if exhausted {
 				contentText = "Your quota has been exhausted"
 			} else {
 				contentText = "Your quota is about to be exhausted"
@@ -416,14 +418,14 @@ func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 								</p>
 								<p style="color: #666;">If the button does not work, please copy the following link and paste it into your browser:</p>
 								<p style="background-color: #f8f8f8; padding: 10px; border-radius: 4px; word-break: break-all;">%s</p>
-							`, contentText, userQuota, topUpLink, topUpLink),
+					`, contentText, quotaRemaining, topUpLink, topUpLink),
 				)
 				err = message.SendEmail(prompt, email, content)
 				if err != nil {
 					logger.Logger.Error("failed to send email", zap.String("email", email), zap.Error(err))
 				}
 			}
-		}()
+		}(reminderEmail, noMoreQuota, userQuota)
 	}
 	if !token.UnlimitedQuota {
 		if err = DecreaseTokenQuota(tokenId, quota); err != nil {

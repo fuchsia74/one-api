@@ -39,16 +39,14 @@ func Init() {
 	// 	os.Exit(0)
 	// }
 
-	if os.Getenv("SESSION_SECRET") != "" {
-		if os.Getenv("SESSION_SECRET") == "random_string" {
+	if config.SessionSecretEnvValue != "" {
+		if config.SessionSecretEnvValue == "random_string" {
 			logger.Logger.Error("SESSION_SECRET is set to an example value, please change it to a random string.")
 		} else {
-			config.SessionSecret = os.Getenv("SESSION_SECRET")
+			config.SessionSecret = config.SessionSecretEnvValue
 		}
 	}
-	if os.Getenv("SQLITE_PATH") != "" {
-		SQLitePath = os.Getenv("SQLITE_PATH")
-	}
+	SQLitePath = config.SQLitePath
 	if *LogDir != "" {
 		expanded := expandLogDirPath(*LogDir)
 		lg := logger.Logger.With(zap.String("log_dir", expanded))

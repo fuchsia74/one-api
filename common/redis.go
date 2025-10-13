@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"os"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -32,8 +31,9 @@ func SetRedisEnabled(enabled bool) {
 }
 
 // InitRedisClient This function is called after init()
+
 func InitRedisClient() (err error) {
-	if os.Getenv("REDIS_CONN_STRING") == "" {
+	if config.RedisConnString == "" {
 		SetRedisEnabled(false)
 		logger.Logger.Info("REDIS_CONN_STRING not set, Redis is not enabled")
 		return nil
@@ -43,8 +43,8 @@ func InitRedisClient() (err error) {
 		logger.Logger.Info("SYNC_FREQUENCY not set, Redis is disabled")
 		return nil
 	}
-	redisConnString := os.Getenv("REDIS_CONN_STRING")
-	if os.Getenv("REDIS_MASTER_NAME") == "" {
+	redisConnString := config.RedisConnString
+	if config.RedisMasterName == "" {
 		logger.Logger.Info("Redis is enabled")
 		opt, err := redis.ParseURL(redisConnString)
 		if err != nil {
@@ -56,8 +56,8 @@ func InitRedisClient() (err error) {
 		logger.Logger.Info("Redis cluster mode enabled")
 		RDB = redis.NewUniversalClient(&redis.UniversalOptions{
 			Addrs:      strings.Split(redisConnString, ","),
-			Password:   os.Getenv("REDIS_PASSWORD"),
-			MasterName: os.Getenv("REDIS_MASTER_NAME"),
+			Password:   config.RedisPassword,
+			MasterName: config.RedisMasterName,
 		})
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -72,7 +72,7 @@ func InitRedisClient() (err error) {
 }
 
 func ParseRedisOption() *redis.Options {
-	opt, err := redis.ParseURL(os.Getenv("REDIS_CONN_STRING"))
+	opt, err := redis.ParseURL(config.RedisConnString)
 	if err != nil {
 		logger.Logger.Fatal("failed to parse Redis connection string", zap.Error(err))
 	}
