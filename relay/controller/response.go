@@ -1075,6 +1075,8 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 			ToolsCost:              usage.ToolsCost,
 			CachedPromptTokens:     cachedPrompt,
 			CachedCompletionTokens: 0,
+			CacheWrite5mTokens:     usage.CacheWrite5mTokens,
+			CacheWrite1hTokens:     usage.CacheWrite1hTokens,
 			RequestId:              requestId,
 			TraceId:                traceId,
 		})
