@@ -80,7 +80,10 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeQuota(c, textRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeQuota failed",
+			zap.Error(bizErr.RawError),
+			zap.Int("status_code", bizErr.StatusCode),
+			zap.String("err_msg", bizErr.Message))
 		return bizErr
 	}
 

@@ -89,7 +89,10 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeResponseAPIQuota(c, responseAPIRequest, promptTokens, ratio, outputRatio, backgroundEnabled, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeResponseAPIQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeResponseAPIQuota failed",
+			zap.Error(bizErr.RawError),
+			zap.String("err_msg", bizErr.Message),
+			zap.Int("status_code", bizErr.StatusCode))
 		return bizErr
 	}
 
@@ -292,7 +295,10 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeQuota(c, chatRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeQuota failed",
+			zap.Error(bizErr.RawError),
+			zap.String("err_msg", bizErr.Message),
+			zap.Int("status_code", bizErr.StatusCode))
 		return bizErr
 	}
 
