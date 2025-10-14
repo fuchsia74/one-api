@@ -7,30 +7,21 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ![](https://s3.laisky.com/uploads/2025/07/oneapi.drawio.png)
 
 ```plain
-=== One-API Regression Report ===
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│       MODEL        │ CHAT (STREAM=FALSE) │ CHAT (STREAM=TRUE) │ RESPONSE (STREAM=FALSE) │ RESPONSE (STREAM=TRUE) │ CLAUDE (STREAM=FALSE) │ CLAUDE (STREAM=TRUE) │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ gpt-4o-mini        │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 1.475s              │ 1.502s             │ 1.591s                  │ 1.115s                 │ 931ms                 │ 1.238s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ gpt-5-mini         │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 3.758s              │ 3.788s             │ 4.185s                  │ 7.194s                 │ 9.529s                │ 6.999s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ claude-3.5-haiku   │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 987ms               │ 693ms              │ 1.016s                  │ 773ms                  │ 1.266s                │ 704ms                │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ gemini-2.5-flash   │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 957ms               │ 913ms              │ 1.519s                  │ 1.369s                 │ 1.173s                │ 1.567s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ openai/gpt-oss-20b │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 625ms               │ 338ms              │ 476ms                   │ 506ms                  │ 567ms                 │ 537ms                │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ deepseek-chat      │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 2.679s              │ 1.326s             │ 2.444s                  │ 1.251s                 │ 1.969s                │ 3.627s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+=== One-API Regression Matrix ===
 
-Totals  | Requests: 36 | Passed: 36 | Failed: 0 | Skipped: 0
+Variant                  gpt-4o-mini  gpt-5-mini   claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
+Chat (stream=false)      PASS 3.40s   PASS 11.81s  PASS 1.37s        PASS 0.96s        PASS 1.96s          PASS 1.84s
+Chat (stream=true)       PASS 1.56s   PASS 7.91s   PASS 1.60s        PASS 0.86s        PASS 0.51s          PASS 1.49s
+Chat Tools               PASS 1.75s   PASS 4.87s   PASS 1.42s        PASS 2.47s        PASS 0.70s          PASS 2.12s
+Response (stream=false)  PASS 2.58s   PASS 10.23s  PASS 1.30s        PASS 0.90s        PASS 0.64s          PASS 2.60s
+Response (stream=true)   PASS 2.08s   PASS 3.76s   PASS 1.28s        PASS 1.15s        PASS 0.49s          PASS 1.23s
+Response Tools           PASS 2.04s   PASS 2.87s   PASS 2.05s        PASS 1.49s        PASS 0.73s          PASS 3.40s
+Claude (stream=false)    PASS 1.26s   PASS 3.33s   PASS 1.71s        PASS 1.02s        PASS 0.75s          PASS 1.77s
+Claude (stream=true)     PASS 2.91s   PASS 9.68s   PASS 1.12s        PASS 1.66s        PASS 1.18s          PASS 2.65s
+Claude Tools             PASS 3.21s   PASS 9.05s   PASS 1.54s        PASS 1.68s        PASS 0.53s          PASS 2.81s
+
+Totals  | Requests: 54 | Passed: 54 | Failed: 0 | Skipped: 0
+
 ```
 
 ### Why this fork exists

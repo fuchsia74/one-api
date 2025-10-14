@@ -43,7 +43,8 @@ func TestParseModelsEmpty(t *testing.T) {
 
 func TestEvaluateResponseChatCompletionSuccess(t *testing.T) {
 	body := []byte(`{"choices":[{"message":{"role":"assistant","content":"hello"}}]}`)
-	success, reason := evaluateResponse(requestTypeChatCompletion, body)
+	spec := requestSpec{Type: requestTypeChatCompletion, Expectation: expectationDefault}
+	success, reason := evaluateResponse(spec, body)
 	if !success {
 		t.Fatalf("expected success, got failure: %s", reason)
 	}
@@ -51,7 +52,8 @@ func TestEvaluateResponseChatCompletionSuccess(t *testing.T) {
 
 func TestEvaluateResponseIgnoresEmptyErrorObject(t *testing.T) {
 	body := []byte(`{"choices":[{"message":{"role":"assistant","content":"hi"}}],"error":{"message":"","type":"","param":"","code":null}}`)
-	success, reason := evaluateResponse(requestTypeChatCompletion, body)
+	spec := requestSpec{Type: requestTypeChatCompletion, Expectation: expectationDefault}
+	success, reason := evaluateResponse(spec, body)
 	if !success {
 		t.Fatalf("expected success despite empty error object, got: %s", reason)
 	}
@@ -59,9 +61,37 @@ func TestEvaluateResponseIgnoresEmptyErrorObject(t *testing.T) {
 
 func TestEvaluateResponseResponseAPIChoicesFallback(t *testing.T) {
 	body := []byte(`{"choices":[{"message":{"role":"assistant","content":"hi"}}],"object":"chat.completion"}`)
-	success, reason := evaluateResponse(requestTypeResponseAPI, body)
+	spec := requestSpec{Type: requestTypeResponseAPI, Expectation: expectationDefault}
+	success, reason := evaluateResponse(spec, body)
 	if !success {
 		t.Fatalf("expected Response API fallback success, got: %s", reason)
+	}
+}
+
+func TestEvaluateResponseChatToolInvocation(t *testing.T) {
+	body := []byte(`{"choices":[{"message":{"tool_calls":[{"id":"tool_1","type":"function","function":{"name":"get_weather","arguments":"{\"location\":\"San Francisco\"}"}}]}}]}`)
+	spec := requestSpec{Type: requestTypeChatCompletion, Expectation: expectationToolInvocation}
+	success, reason := evaluateResponse(spec, body)
+	if !success {
+		t.Fatalf("expected tool invocation success, got: %s", reason)
+	}
+}
+
+func TestEvaluateResponseResponseAPIToolInvocation(t *testing.T) {
+	body := []byte(`{"required_action":{"type":"submit_tool_outputs","submit_tool_outputs":{"tool_calls":[{"id":"call_1","name":"get_weather","arguments":"{\"location\":\"San Francisco\"}"}]}}}`)
+	spec := requestSpec{Type: requestTypeResponseAPI, Expectation: expectationToolInvocation}
+	success, reason := evaluateResponse(spec, body)
+	if !success {
+		t.Fatalf("expected Response API tool invocation success, got: %s", reason)
+	}
+}
+
+func TestEvaluateResponseClaudeToolInvocation(t *testing.T) {
+	body := []byte(`{"content":[{"type":"tool_use","name":"get_weather","input":{"location":"San Francisco"}}]}`)
+	spec := requestSpec{Type: requestTypeClaudeMessages, Expectation: expectationToolInvocation}
+	success, reason := evaluateResponse(spec, body)
+	if !success {
+		t.Fatalf("expected Claude tool invocation success, got: %s", reason)
 	}
 }
 
@@ -74,7 +104,8 @@ func TestIsUnsupportedCombinationResponse(t *testing.T) {
 
 func TestEvaluateStreamResponseSuccess(t *testing.T) {
 	data := []byte("data: {\"id\":\"resp_123\",\"error\":null}\n\n")
-	success, reason := evaluateStreamResponse(requestTypeResponseAPI, data)
+	spec := requestSpec{Type: requestTypeResponseAPI, Expectation: expectationDefault}
+	success, reason := evaluateStreamResponse(spec, data)
 	if !success {
 		t.Fatalf("expected stream success, got failure: %s", reason)
 	}

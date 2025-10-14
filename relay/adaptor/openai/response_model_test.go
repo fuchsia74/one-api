@@ -87,6 +87,61 @@ func TestConvertChatCompletionToResponseAPI(t *testing.T) {
 	}
 }
 
+func TestNormalizeToolChoiceForResponse_Map(t *testing.T) {
+	choice := map[string]any{
+		"type": "tool",
+		"name": "get_weather",
+	}
+
+	result, changed := NormalizeToolChoiceForResponse(choice)
+	if !changed {
+		t.Fatalf("expected normalization to report changes")
+	}
+
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected result to be map, got %T", result)
+	}
+
+	typeVal, _ := resultMap["type"].(string)
+	if typeVal != "function" {
+		t.Fatalf("expected type to be 'function', got %q", typeVal)
+	}
+
+	if name := stringFromAny(resultMap["name"]); name != "get_weather" {
+		t.Fatalf("expected top-level name 'get_weather', got %q", name)
+	}
+
+	if _, exists := resultMap["function"]; exists {
+		t.Fatalf("function block should be removed after flattening")
+	}
+}
+
+func TestNormalizeToolChoiceForResponse_String(t *testing.T) {
+	result, changed := NormalizeToolChoiceForResponse(" auto ")
+	if !changed {
+		t.Fatalf("expected whitespace trimming to be considered a change")
+	}
+
+	str, _ := result.(string)
+	if str != "auto" {
+		t.Fatalf("expected trimmed value 'auto', got %q", str)
+	}
+
+	result, changed = NormalizeToolChoiceForResponse("none")
+	if changed {
+		t.Fatalf("expected already normalized value to leave changed=false")
+	}
+	if result.(string) != "none" {
+		t.Fatalf("expected unchanged string 'none', got %q", result)
+	}
+
+	result, changed = NormalizeToolChoiceForResponse("   ")
+	if !changed || result != nil {
+		t.Fatalf("expected blank string to normalize to nil with change=true")
+	}
+}
+
 func TestConvertWithSystemMessage(t *testing.T) {
 	// Test system message conversion to instructions
 	chatRequest := &model.GeneralOpenAIRequest{
@@ -156,8 +211,11 @@ func TestConvertWithTools(t *testing.T) {
 		t.Errorf("Expected 1 tool, got %d", len(responseAPI.Tools))
 	}
 
-	if responseAPI.Tools[0].Name != "get_weather" {
-		t.Errorf("Expected tool name 'get_weather', got '%s'", responseAPI.Tools[0].Name)
+	if responseAPI.Tools[0].Function == nil {
+		t.Fatalf("Expected function tool definition to be present")
+	}
+	if responseAPI.Tools[0].Function.Name != "get_weather" {
+		t.Errorf("Expected tool name 'get_weather', got '%s'", responseAPI.Tools[0].Function.Name)
 	}
 
 	if responseAPI.ToolChoice != "auto" {
@@ -522,8 +580,8 @@ func TestConvertResponseAPIToChatCompletionWithFunctionCall(t *testing.T) {
 		t.Errorf("Expected arguments '%s', got '%s'", expectedArgs, toolCall.Function.Arguments)
 	}
 
-	if choice.FinishReason != "stop" {
-		t.Errorf("Expected finish_reason 'stop', got '%s'", choice.FinishReason)
+	if choice.FinishReason != "tool_calls" {
+		t.Errorf("Expected finish_reason 'tool_calls', got '%s'", choice.FinishReason)
 	}
 
 	// Verify usage
@@ -827,8 +885,11 @@ func TestFunctionCallWorkflow(t *testing.T) {
 		t.Fatalf("Expected 1 tool in request, got %d", len(responseAPIRequest.Tools))
 	}
 
-	if responseAPIRequest.Tools[0].Name != "get_current_weather" {
-		t.Errorf("Expected tool name 'get_current_weather', got '%s'", responseAPIRequest.Tools[0].Name)
+	if responseAPIRequest.Tools[0].Function == nil {
+		t.Fatalf("Expected function definition on response tool")
+	}
+	if responseAPIRequest.Tools[0].Function.Name != "get_current_weather" {
+		t.Errorf("Expected tool name 'get_current_weather', got '%s'", responseAPIRequest.Tools[0].Function.Name)
 	}
 
 	if responseAPIRequest.ToolChoice != "auto" {
@@ -955,8 +1016,11 @@ func TestConvertWithLegacyFunctions(t *testing.T) {
 		t.Errorf("Expected tool type 'function', got '%s'", responseAPI.Tools[0].Type)
 	}
 
-	if responseAPI.Tools[0].Name != "get_current_weather" {
-		t.Errorf("Expected function name 'get_current_weather', got '%s'", responseAPI.Tools[0].Name)
+	if responseAPI.Tools[0].Function == nil {
+		t.Fatalf("Expected response tool to include function definition")
+	}
+	if responseAPI.Tools[0].Function.Name != "get_current_weather" {
+		t.Errorf("Expected function name 'get_current_weather', got '%s'", responseAPI.Tools[0].Function.Name)
 	}
 
 	if responseAPI.ToolChoice != "auto" {
@@ -1022,8 +1086,11 @@ func TestLegacyFunctionCallWorkflow(t *testing.T) {
 		t.Fatalf("Expected 1 tool in request, got %d", len(responseAPIRequest.Tools))
 	}
 
-	if responseAPIRequest.Tools[0].Name != "get_current_weather" {
-		t.Errorf("Expected tool name 'get_current_weather', got '%s'", responseAPIRequest.Tools[0].Name)
+	if responseAPIRequest.Tools[0].Function == nil {
+		t.Fatalf("Expected function definition on response tool")
+	}
+	if responseAPIRequest.Tools[0].Function.Name != "get_current_weather" {
+		t.Errorf("Expected tool name 'get_current_weather', got '%s'", responseAPIRequest.Tools[0].Function.Name)
 	}
 
 	if responseAPIRequest.ToolChoice != "auto" {
@@ -2320,6 +2387,60 @@ func TestConvertResponseAPIToClaudeResponseWebSearch(t *testing.T) {
 	}
 	if !foundText {
 		t.Fatalf("expected claude content to include assistant text, body: %s", string(body))
+	}
+}
+
+func TestConvertResponseAPIToClaudeResponseAddsToolUse(t *testing.T) {
+	resp := &ResponseAPIResponse{
+		Id:     "resp_tool",
+		Object: "response",
+		Model:  "gpt-4o-mini-2024-07-18",
+		Output: []OutputItem{
+			{Type: "function_call", Id: "fc_tool", CallId: "call_weather", Name: "get_weather", Arguments: "{\"location\":\"San Francisco, CA\"}"},
+		},
+	}
+
+	upstream := &http.Response{StatusCode: http.StatusOK, Header: make(http.Header)}
+	converted, errResp := (&Adaptor{}).ConvertResponseAPIToClaudeResponse(nil, upstream, resp)
+	if errResp != nil {
+		t.Fatalf("unexpected error from conversion: %v", errResp)
+	}
+
+	body, err := io.ReadAll(converted.Body)
+	if err != nil {
+		t.Fatalf("failed to read converted body: %v", err)
+	}
+	if err := converted.Body.Close(); err != nil {
+		t.Fatalf("failed to close response body: %v", err)
+	}
+
+	var claude model.ClaudeResponse
+	if err := json.Unmarshal(body, &claude); err != nil {
+		t.Fatalf("failed to unmarshal claude response: %v", err)
+	}
+
+	if claude.StopReason != "tool_use" {
+		t.Fatalf("expected stop reason tool_use, got %s", claude.StopReason)
+	}
+
+	foundToolUse := false
+	for _, content := range claude.Content {
+		if content.Type == "tool_use" {
+			foundToolUse = true
+			if content.ID != "call_weather" {
+				t.Fatalf("expected tool_use id call_weather, got %s", content.ID)
+			}
+			if content.Name != "get_weather" {
+				t.Fatalf("expected tool_use name get_weather, got %s", content.Name)
+			}
+			if len(content.Input) == 0 {
+				t.Fatal("expected tool_use input to be populated")
+			}
+		}
+	}
+
+	if !foundToolUse {
+		t.Fatalf("expected tool_use content block in claude response, body: %s", string(body))
 	}
 }
 

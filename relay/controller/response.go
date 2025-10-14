@@ -50,6 +50,9 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
 	sanitizeResponseAPIRequest(responseAPIRequest)
+	if normalized, changed := openai.NormalizeToolChoiceForResponse(responseAPIRequest.ToolChoice); changed {
+		responseAPIRequest.ToolChoice = normalized
+	}
 
 	// duplicated
 	// if reqBody, ok := c.Get(ctxkey.KeyRequestBody); ok {
@@ -253,11 +256,28 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	}
 	metalib.Set2Context(c, meta)
 
+	origWriter := c.Writer
+	var capture *responseCaptureWriter
+	if !meta.IsStream {
+		capture = newResponseCaptureWriter(origWriter)
+		c.Writer = capture
+		defer func() {
+			c.Writer = origWriter
+		}()
+	}
+
 	c.Set(ctxkey.ResponseAPIRequestOriginal, responseAPIRequest)
 	if chatRequest.Stream {
 		c.Set(ctxkey.ResponseStreamRewriteHandler, newChatToResponseStreamBridge(c, meta, responseAPIRequest))
 	} else {
 		c.Set(ctxkey.ResponseRewriteHandler, func(gc *gin.Context, status int, textResp *openai_compatible.SlimTextResponse) error {
+			if capture != nil {
+				prevWriter := gc.Writer
+				gc.Writer = origWriter
+				defer func() {
+					gc.Writer = prevWriter
+				}()
+			}
 			return renderChatResponseAsResponseAPI(gc, status, textResp, responseAPIRequest, meta)
 		})
 	}
@@ -326,6 +346,39 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 				billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, meta.TokenId)
 			})
 			return respErr
+		}
+	}
+
+	if respErr == nil && capture != nil {
+		c.Writer = origWriter
+		if !c.GetBool(ctxkey.ResponseRewriteApplied) {
+			body := capture.BodyBytes()
+			statusCode := capture.StatusCode()
+			if len(body) > 0 {
+				var slim openai_compatible.SlimTextResponse
+				if err := json.Unmarshal(body, &slim); err == nil && len(slim.Choices) > 0 {
+					if err := renderChatResponseAsResponseAPI(c, statusCode, &slim, responseAPIRequest, meta); err != nil {
+						billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+						return openai.ErrorWrapper(err, "response_rewrite_failed", http.StatusInternalServerError)
+					}
+				} else {
+					if statusCode > 0 {
+						c.Writer.WriteHeader(statusCode)
+					}
+					if len(body) > 0 {
+						if _, err := c.Writer.Write(body); err != nil {
+							billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
+							return openai.ErrorWrapper(err, "write_response_body_failed", http.StatusInternalServerError)
+						}
+					}
+					c.Set(ctxkey.ResponseRewriteApplied, true)
+				}
+			} else if capture.HeaderWritten() {
+				if statusCode > 0 {
+					c.Writer.WriteHeader(statusCode)
+				}
+				c.Set(ctxkey.ResponseRewriteApplied, true)
+			}
 		}
 	}
 
@@ -413,10 +466,12 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 }
 
 func renderChatResponseAsResponseAPI(c *gin.Context, status int, textResp *openai_compatible.SlimTextResponse, originalReq *openai.ResponseAPIRequest, meta *metalib.Meta) error {
+	c.Set(ctxkey.ResponseRewriteApplied, true)
 	responseID := generateResponseAPIID(c, textResp)
 	statusText, incomplete := deriveResponseStatus(textResp.Choices)
 	usage := (&openai.ResponseAPIUsage{}).FromModelUsage(&textResp.Usage)
 	output := buildResponseOutput(textResp.Choices)
+	toolCalls := buildRequiredActionToolCalls(textResp.Choices)
 
 	response := openai.ResponseAPIResponse{
 		Id:                 responseID,
@@ -442,6 +497,15 @@ func renderChatResponseAsResponseAPI(c *gin.Context, status int, textResp *opena
 		User:               originalReq.User,
 	}
 
+	if len(toolCalls) > 0 {
+		response.RequiredAction = &openai.ResponseAPIRequiredAction{
+			Type: "submit_tool_outputs",
+			SubmitToolOutputs: &openai.ResponseAPISubmitToolOutputs{
+				ToolCalls: toolCalls,
+			},
+		}
+	}
+
 	if incomplete != nil {
 		response.IncompleteDetails = incomplete
 	}
@@ -455,6 +519,78 @@ func renderChatResponseAsResponseAPI(c *gin.Context, status int, textResp *opena
 	c.Writer.WriteHeader(status)
 	_, err = c.Writer.Write(data)
 	return err
+}
+
+type responseCaptureWriter struct {
+	gin.ResponseWriter
+	body        bytes.Buffer
+	status      int
+	wroteHeader bool
+}
+
+func newResponseCaptureWriter(w gin.ResponseWriter) *responseCaptureWriter {
+	return &responseCaptureWriter{ResponseWriter: w}
+}
+
+func (w *responseCaptureWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.body.Write(data)
+}
+
+func (w *responseCaptureWriter) WriteString(s string) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.body.WriteString(s)
+}
+
+func (w *responseCaptureWriter) WriteHeader(code int) {
+	w.status = code
+	w.wroteHeader = true
+}
+
+func (w *responseCaptureWriter) WriteHeaderNow() {
+	if !w.wroteHeader {
+		w.status = w.ResponseWriter.Status()
+		if w.status == 0 {
+			w.status = http.StatusOK
+		}
+		w.wroteHeader = true
+	}
+}
+
+func (w *responseCaptureWriter) StatusCode() int {
+	if w.status > 0 {
+		return w.status
+	}
+	if code := w.ResponseWriter.Status(); code > 0 {
+		return code
+	}
+	return http.StatusOK
+}
+
+func (w *responseCaptureWriter) BodyBytes() []byte {
+	return w.body.Bytes()
+}
+
+func (w *responseCaptureWriter) HeaderWritten() bool {
+	return w.wroteHeader
+}
+
+func (w *responseCaptureWriter) Written() bool {
+	if w.wroteHeader || w.body.Len() > 0 {
+		return true
+	}
+	return w.ResponseWriter.Written()
+}
+
+func (w *responseCaptureWriter) Size() int {
+	if w.body.Len() > 0 {
+		return w.body.Len()
+	}
+	return w.ResponseWriter.Size()
 }
 
 func generateResponseAPIID(c *gin.Context, _ *openai_compatible.SlimTextResponse) string {
@@ -532,6 +668,55 @@ func buildResponseOutput(choices []openai_compatible.TextResponseChoice) []opena
 	return output
 }
 
+func buildRequiredActionToolCalls(choices []openai_compatible.TextResponseChoice) []openai.ResponseAPIToolCall {
+	toolCalls := make([]openai.ResponseAPIToolCall, 0)
+	for _, choice := range choices {
+		for _, tool := range choice.Message.ToolCalls {
+			if tool.Function == nil {
+				continue
+			}
+			callID := ensureResponseAPICallID(tool.Id)
+			if callID == "" {
+				continue
+			}
+			arguments := ""
+			if tool.Function.Arguments != nil {
+				switch v := tool.Function.Arguments.(type) {
+				case string:
+					arguments = v
+				default:
+					if b, err := json.Marshal(v); err == nil {
+						arguments = string(b)
+					}
+				}
+			}
+			toolCalls = append(toolCalls, openai.ResponseAPIToolCall{
+				Id:   callID,
+				Type: "function",
+				Function: &openai.ResponseAPIFunctionCall{
+					Name:      tool.Function.Name,
+					Arguments: arguments,
+				},
+			})
+		}
+	}
+	return toolCalls
+}
+
+func ensureResponseAPICallID(originalID string) string {
+	trimmed := strings.TrimSpace(originalID)
+	if trimmed == "" {
+		return ""
+	}
+	if strings.HasPrefix(trimmed, "call_") {
+		return trimmed
+	}
+	if strings.HasPrefix(trimmed, "fc_") {
+		return strings.Replace(trimmed, "fc_", "call_", 1)
+	}
+	return "call_" + trimmed
+}
+
 func convertMessageContent(msg relaymodel.Message) []openai.OutputContent {
 	var contents []openai.OutputContent
 	if msg.IsStringContent() {
@@ -581,12 +766,22 @@ func convertResponseAPITools(tools []openai.ResponseAPITool) []relaymodel.Tool {
 	for _, tool := range tools {
 		switch strings.ToLower(tool.Type) {
 		case "function":
-			converted = append(converted, relaymodel.Tool{
-				Type: "function",
-				Function: &relaymodel.Function{
+			fn := tool.Function
+			if fn == nil {
+				fn = &relaymodel.Function{
 					Name:        tool.Name,
 					Description: tool.Description,
 					Parameters:  tool.Parameters,
+				}
+			}
+			converted = append(converted, relaymodel.Tool{
+				Type: "function",
+				Function: &relaymodel.Function{
+					Name:        fn.Name,
+					Description: fn.Description,
+					Parameters:  fn.Parameters,
+					Required:    fn.Required,
+					Strict:      fn.Strict,
 				},
 			})
 		case "web_search":
@@ -937,6 +1132,22 @@ func normalizeResponseAPIRawBody(rawBody []byte, request *openai.ResponseAPIRequ
 		}
 		if existing, ok := root["model"]; !ok || !bytes.Equal(existing, modelBytes) {
 			root["model"] = modelBytes
+			changed = true
+		}
+	}
+
+	if request.ToolChoice == nil {
+		if _, ok := root["tool_choice"]; ok {
+			delete(root, "tool_choice")
+			changed = true
+		}
+	} else {
+		choiceBytes, err := json.Marshal(request.ToolChoice)
+		if err != nil {
+			return nil, errors.Wrap(err, "marshal request tool_choice")
+		}
+		if existing, ok := root["tool_choice"]; !ok || !bytes.Equal(existing, choiceBytes) {
+			root["tool_choice"] = choiceBytes
 			changed = true
 		}
 	}

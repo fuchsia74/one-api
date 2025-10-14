@@ -15,13 +15,13 @@ import (
 	"strings"
 	"sync"
 	"syscall"
+	"text/tabwriter"
 	"time"
 
 	"github.com/Laisky/errors/v2"
 	glog "github.com/Laisky/go-utils/v5/log"
 	"github.com/Laisky/zap"
 	_ "github.com/joho/godotenv/autoload"
-	"github.com/olekukonko/tablewriter"
 	"golang.org/x/sync/errgroup"
 
 	cfg "github.com/songquanpeng/one-api/common/config"
@@ -45,20 +45,32 @@ const (
 )
 
 type requestVariant struct {
-	Key    string
-	Header string
-	Type   requestType
-	Path   string
-	Stream bool
+	Key         string
+	Header      string
+	Type        requestType
+	Path        string
+	Stream      bool
+	Expectation expectation
 }
 
+// expectation describes what a request variant should validate in a response.
+type expectation int
+
+const (
+	expectationDefault expectation = iota
+	expectationToolInvocation
+)
+
 var requestVariants = []requestVariant{
-	{Key: "chat_stream_false", Header: "Chat (stream=false)", Type: requestTypeChatCompletion, Path: "/v1/chat/completions", Stream: false},
-	{Key: "chat_stream_true", Header: "Chat (stream=true)", Type: requestTypeChatCompletion, Path: "/v1/chat/completions", Stream: true},
-	{Key: "response_stream_false", Header: "Response (stream=false)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: false},
-	{Key: "response_stream_true", Header: "Response (stream=true)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: true},
-	{Key: "claude_stream_false", Header: "Claude (stream=false)", Type: requestTypeClaudeMessages, Path: "/v1/messages", Stream: false},
-	{Key: "claude_stream_true", Header: "Claude (stream=true)", Type: requestTypeClaudeMessages, Path: "/v1/messages", Stream: true},
+	{Key: "chat_stream_false", Header: "Chat (stream=false)", Type: requestTypeChatCompletion, Path: "/v1/chat/completions", Stream: false, Expectation: expectationDefault},
+	{Key: "chat_stream_true", Header: "Chat (stream=true)", Type: requestTypeChatCompletion, Path: "/v1/chat/completions", Stream: true, Expectation: expectationDefault},
+	{Key: "chat_tools", Header: "Chat Tools", Type: requestTypeChatCompletion, Path: "/v1/chat/completions", Stream: false, Expectation: expectationToolInvocation},
+	{Key: "response_stream_false", Header: "Response (stream=false)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: false, Expectation: expectationDefault},
+	{Key: "response_stream_true", Header: "Response (stream=true)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: true, Expectation: expectationDefault},
+	{Key: "response_tools", Header: "Response Tools", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: false, Expectation: expectationToolInvocation},
+	{Key: "claude_stream_false", Header: "Claude (stream=false)", Type: requestTypeClaudeMessages, Path: "/v1/messages", Stream: false, Expectation: expectationDefault},
+	{Key: "claude_stream_true", Header: "Claude (stream=true)", Type: requestTypeClaudeMessages, Path: "/v1/messages", Stream: true, Expectation: expectationDefault},
+	{Key: "claude_tools", Header: "Claude Tools", Type: requestTypeClaudeMessages, Path: "/v1/messages", Stream: false, Expectation: expectationToolInvocation},
 }
 
 type testResult struct {
@@ -77,12 +89,13 @@ type testResult struct {
 }
 
 type requestSpec struct {
-	Variant string
-	Label   string
-	Type    requestType
-	Path    string
-	Body    any
-	Stream  bool
+	Variant     string
+	Label       string
+	Type        requestType
+	Path        string
+	Body        any
+	Stream      bool
+	Expectation expectation
 }
 
 func main() {
@@ -109,13 +122,19 @@ func run(ctx context.Context, logger glog.Logger) error {
 		return errors.Wrap(err, "load config")
 	}
 
+	variantLabels := make([]string, 0, len(cfg.Variants))
+	for _, v := range cfg.Variants {
+		variantLabels = append(variantLabels, v.Header)
+	}
 	logger.Info("starting API regression sweep",
 		zap.String("base_url", cfg.APIBase),
 		zap.Int("model_count", len(cfg.Models)),
+		zap.Int("variant_count", len(cfg.Variants)),
+		zap.Strings("variants", variantLabels),
 	)
 
 	httpClient := &http.Client{Timeout: 60 * time.Second}
-	resultsCh := make(chan testResult, len(cfg.Models)*len(requestVariants))
+	resultsCh := make(chan testResult, len(cfg.Models)*len(cfg.Variants))
 
 	var (
 		results   []testResult
@@ -161,7 +180,8 @@ func run(ctx context.Context, logger glog.Logger) error {
 	})
 
 	grp, grpCtx := errgroup.WithContext(ctx)
-	for _, model := range cfg.Models {
+	for _, modelName := range cfg.Models {
+		model := modelName
 		grp.Go(func() error {
 			executeModelSweep(grpCtx, httpClient, cfg, model, resultsCh)
 			return nil
@@ -172,7 +192,7 @@ func run(ctx context.Context, logger glog.Logger) error {
 	close(resultsCh)
 	collectWg.Wait()
 
-	report := buildReport(cfg.Models, requestVariants, results)
+	report := buildReport(cfg.Models, cfg.Variants, results)
 	renderReport(report)
 
 	if report.failedCount > 0 {
@@ -183,18 +203,19 @@ func run(ctx context.Context, logger glog.Logger) error {
 }
 
 type config struct {
-	APIBase string
-	Token   string
-	Models  []string
+	APIBase  string
+	Token    string
+	Models   []string
+	Variants []requestVariant
 }
 
 func loadConfig() (config, error) {
-	base := strings.TrimSpace(cfg.APIBase)
+	base := strings.TrimSpace(cfg.OneAPITestAPIBase)
 	if base == "" {
 		base = defaultAPIBase
 	}
 
-	token := strings.TrimSpace(cfg.APIToken)
+	token := strings.TrimSpace(cfg.OneAPITestToken)
 	if token == "" {
 		return config{}, errors.Errorf("API_TOKEN must be set")
 	}
@@ -211,10 +232,17 @@ func loadConfig() (config, error) {
 		}
 	}
 
+	variantsRaw := cfg.OneAPITestVariants
+	variants, err := parseVariants(variantsRaw)
+	if err != nil {
+		return config{}, errors.Wrap(err, "parse variants")
+	}
+
 	return config{
-		APIBase: strings.TrimSuffix(base, "/"),
-		Token:   token,
-		Models:  models,
+		APIBase:  strings.TrimSuffix(base, "/"),
+		Token:    token,
+		Models:   models,
+		Variants: variants,
 	}, nil
 }
 
@@ -247,8 +275,80 @@ func parseModels(raw string) ([]string, error) {
 	return models, nil
 }
 
+func parseVariants(raw string) ([]requestVariant, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return requestVariants, nil
+	}
+
+	separators := []string{",", ";", "\n", "\r"}
+	normalized := raw
+	for _, sep := range separators {
+		normalized = strings.ReplaceAll(normalized, sep, ",")
+	}
+	parts := strings.Split(normalized, ",")
+	if len(parts) == 1 && !strings.Contains(raw, ",") && !strings.Contains(raw, ";") && !strings.Contains(raw, "\n") {
+		parts = strings.Fields(raw)
+	}
+
+	selected := make([]requestVariant, 0, len(requestVariants))
+	seen := make(map[string]bool, len(requestVariants))
+	typeGroups := map[string]requestType{
+		"chat":            requestTypeChatCompletion,
+		"chat_completion": requestTypeChatCompletion,
+		"response":        requestTypeResponseAPI,
+		"responses":       requestTypeResponseAPI,
+		"response_api":    requestTypeResponseAPI,
+		"claude":          requestTypeClaudeMessages,
+		"claude_messages": requestTypeClaudeMessages,
+	}
+
+	for _, part := range parts {
+		candidate := strings.TrimSpace(part)
+		if candidate == "" {
+			continue
+		}
+		lower := strings.ToLower(candidate)
+
+		matched := false
+		for _, variant := range requestVariants {
+			if strings.EqualFold(candidate, variant.Key) || strings.EqualFold(candidate, variant.Header) {
+				if !seen[variant.Key] {
+					selected = append(selected, variant)
+					seen[variant.Key] = true
+				}
+				matched = true
+				break
+			}
+		}
+		if matched {
+			continue
+		}
+
+		if groupType, ok := typeGroups[lower]; ok {
+			for _, variant := range requestVariants {
+				if variant.Type == groupType && !seen[variant.Key] {
+					selected = append(selected, variant)
+					seen[variant.Key] = true
+				}
+			}
+			matched = true
+		}
+
+		if !matched {
+			return nil, errors.Errorf("unknown variant or api format %q", candidate)
+		}
+	}
+
+	if len(selected) == 0 {
+		return nil, errors.New("no variants selected")
+	}
+
+	return selected, nil
+}
+
 func executeModelSweep(ctx context.Context, client *http.Client, cfg config, model string, results chan<- testResult) {
-	specs := buildRequestSpecs(model)
+	specs := buildRequestSpecs(model, cfg.Variants)
 
 	innerGrp, innerCtx := errgroup.WithContext(ctx)
 	for _, spec := range specs {
@@ -265,28 +365,29 @@ func executeModelSweep(ctx context.Context, client *http.Client, cfg config, mod
 	_ = innerGrp.Wait()
 }
 
-func buildRequestSpecs(model string) []requestSpec {
-	specs := make([]requestSpec, 0, len(requestVariants))
-	for _, variant := range requestVariants {
+func buildRequestSpecs(model string, variants []requestVariant) []requestSpec {
+	specs := make([]requestSpec, 0, len(variants))
+	for _, variant := range variants {
 		var body any
 		switch variant.Type {
 		case requestTypeChatCompletion:
-			body = chatCompletionPayload(model, variant.Stream)
+			body = chatCompletionPayload(model, variant.Stream, variant.Expectation)
 		case requestTypeResponseAPI:
-			body = responseAPIPayload(model, variant.Stream)
+			body = responseAPIPayload(model, variant.Stream, variant.Expectation)
 		case requestTypeClaudeMessages:
-			body = claudeMessagesPayload(model, variant.Stream)
+			body = claudeMessagesPayload(model, variant.Stream, variant.Expectation)
 		default:
 			body = nil
 		}
 
 		specs = append(specs, requestSpec{
-			Variant: variant.Key,
-			Label:   variant.Header,
-			Type:    variant.Type,
-			Path:    variant.Path,
-			Body:    body,
-			Stream:  variant.Stream,
+			Variant:     variant.Key,
+			Label:       variant.Header,
+			Type:        variant.Type,
+			Path:        variant.Path,
+			Body:        body,
+			Stream:      variant.Stream,
+			Expectation: variant.Expectation,
 		})
 	}
 
@@ -343,7 +444,7 @@ func performRequest(ctx context.Context, client *http.Client, baseURL, token str
 			return
 		}
 
-		success, reason := evaluateStreamResponse(spec.Type, streamData)
+		success, reason := evaluateStreamResponse(spec, streamData)
 		if success {
 			result.Success = true
 			return
@@ -372,7 +473,7 @@ func performRequest(ctx context.Context, client *http.Client, baseURL, token str
 	}
 
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		success, reason := evaluateResponse(spec.Type, body)
+		success, reason := evaluateResponse(spec, body)
 		if success {
 			result.Success = true
 			return
@@ -432,7 +533,7 @@ func collectStreamBody(body io.Reader, limit int) ([]byte, error) {
 	return buffer.Bytes(), nil
 }
 
-func evaluateResponse(reqType requestType, body []byte) (bool, string) {
+func evaluateResponse(spec requestSpec, body []byte) (bool, string) {
 	if len(body) == 0 {
 		return true, ""
 	}
@@ -446,47 +547,121 @@ func evaluateResponse(reqType requestType, body []byte) (bool, string) {
 		return false, snippet(body)
 	}
 
-	switch reqType {
+	switch spec.Type {
 	case requestTypeChatCompletion:
-		if choices, ok := payload["choices"].([]any); ok && len(choices) > 0 {
-			return true, ""
+		switch spec.Expectation {
+		case expectationToolInvocation:
+			if choices, ok := payload["choices"].([]any); ok {
+				for _, choice := range choices {
+					choiceMap, ok := choice.(map[string]any)
+					if !ok {
+						continue
+					}
+					message, ok := choiceMap["message"].(map[string]any)
+					if !ok {
+						continue
+					}
+					if calls, ok := message["tool_calls"].([]any); ok && len(calls) > 0 {
+						return true, ""
+					}
+				}
+			}
+			return false, "response missing tool_calls"
+		default:
+			if choices, ok := payload["choices"].([]any); ok && len(choices) > 0 {
+				return true, ""
+			}
+			return false, "response missing choices"
 		}
-		return false, "response missing choices"
 	case requestTypeResponseAPI:
-		status := stringValue(payload, "status")
-		if status == "failed" {
-			return false, snippet(body)
+		switch spec.Expectation {
+		case expectationToolInvocation:
+			if required, ok := payload["required_action"].(map[string]any); ok {
+				if stringValue(required, "type") == "submit_tool_outputs" {
+					if submit, ok := required["submit_tool_outputs"].(map[string]any); ok {
+						if calls, ok := submit["tool_calls"].([]any); ok && len(calls) > 0 {
+							return true, ""
+						}
+					}
+				}
+			}
+			if hasFunctionCallOutput(payload) {
+				return true, ""
+			}
+			return false, "response missing required_action.tool_calls"
+		default:
+			status := stringValue(payload, "status")
+			if status == "failed" {
+				return false, snippet(body)
+			}
+			if output, ok := payload["output"].([]any); ok && len(output) > 0 {
+				return true, ""
+			}
+			if choices, ok := payload["choices"].([]any); ok && len(choices) > 0 {
+				return true, ""
+			}
+			if status == "completed" || status == "in_progress" || status == "requires_action" {
+				return true, ""
+			}
+			if len(payload) == 0 {
+				return false, "empty response"
+			}
+			return false, "response missing output"
 		}
-		if output, ok := payload["output"].([]any); ok && len(output) > 0 {
-			return true, ""
-		}
-		if choices, ok := payload["choices"].([]any); ok && len(choices) > 0 {
-			return true, ""
-		}
-		if status == "completed" || status == "in_progress" || status == "requires_action" {
-			return true, ""
-		}
-		if len(payload) == 0 {
-			return false, "empty response"
-		}
-		return false, "response missing output"
 	case requestTypeClaudeMessages:
-		if content, ok := payload["content"].([]any); ok && len(content) > 0 {
+		switch spec.Expectation {
+		case expectationToolInvocation:
+			if content, ok := payload["content"].([]any); ok {
+				for _, entry := range content {
+					entryMap, ok := entry.(map[string]any)
+					if !ok {
+						continue
+					}
+					if stringValue(entryMap, "type") == "tool_use" {
+						return true, ""
+					}
+				}
+			}
+			return false, "response missing tool_use block"
+		default:
+			if content, ok := payload["content"].([]any); ok && len(content) > 0 {
+				return true, ""
+			}
+			if msgType := stringValue(payload, "type"); msgType != "" {
+				return true, ""
+			}
+			if len(payload) == 0 {
+				return false, "empty response"
+			}
 			return true, ""
 		}
-		if msgType := stringValue(payload, "type"); msgType != "" {
-			return true, ""
-		}
-		if len(payload) == 0 {
-			return false, "empty response"
-		}
-		return true, ""
 	default:
 		return true, ""
 	}
 }
 
-func evaluateStreamResponse(reqType requestType, data []byte) (bool, string) {
+// hasFunctionCallOutput reports whether the Response API payload contains a function_call entry
+// inside the output array. Recent OpenAI responses can surface tool instructions directly in
+// output when the request specifies a concrete tool_choice, bypassing required_action.
+func hasFunctionCallOutput(payload map[string]any) bool {
+	output, ok := payload["output"].([]any)
+	if !ok {
+		return false
+	}
+	for _, entry := range output {
+		entryMap, ok := entry.(map[string]any)
+		if !ok {
+			continue
+		}
+		if stringValue(entryMap, "type") == "function_call" {
+			return true
+		}
+	}
+	return false
+}
+
+func evaluateStreamResponse(spec requestSpec, data []byte) (bool, string) {
+	_ = spec
 	trimmed := bytes.TrimSpace(data)
 	if len(trimmed) == 0 {
 		return false, "empty stream"
@@ -595,62 +770,175 @@ func isUnsupportedCombination(reqType requestType, stream bool, statusCode int, 
 	return false
 }
 
-func chatCompletionPayload(model string, stream bool) any {
-	return map[string]any{
+func chatCompletionPayload(model string, stream bool, exp expectation) any {
+	base := map[string]any{
 		"model":       model,
 		"max_tokens":  defaultMaxTokens,
 		"temperature": defaultTemperature,
 		"top_p":       defaultTopP,
 		"stream":      stream,
-		"messages": []map[string]string{
+	}
+
+	if exp == expectationToolInvocation {
+		base["messages"] = []map[string]any{
+			{
+				"role":    "system",
+				"content": "You are a weather assistant that must call tools when asked for weather information.",
+			},
 			{
 				"role":    "user",
-				"content": "Say hello in one sentence.",
+				"content": "What is the weather in San Francisco, CA right now? Use the tool to find out.",
 			},
+		}
+		base["tools"] = []map[string]any{chatWeatherToolDefinition()}
+		base["tool_choice"] = map[string]any{
+			"type": "function",
+			"function": map[string]string{
+				"name": "get_weather",
+			},
+		}
+		return base
+	}
+
+	base["messages"] = []map[string]any{
+		{
+			"role":    "user",
+			"content": "Say hello in one sentence.",
 		},
 	}
+	return base
 }
 
-func responseAPIPayload(model string, stream bool) any {
-	return map[string]any{
+func responseAPIPayload(model string, stream bool, exp expectation) any {
+	base := map[string]any{
 		"model":             model,
 		"max_output_tokens": defaultMaxTokens,
 		"temperature":       defaultTemperature,
 		"top_p":             defaultTopP,
 		"stream":            stream,
-		"input": []map[string]any{
+	}
+
+	if exp == expectationToolInvocation {
+		base["input"] = []map[string]any{
 			{
 				"role": "user",
-				"content": []map[string]string{
+				"content": []map[string]any{
 					{
 						"type": "input_text",
-						"text": "Say hello in one sentence.",
+						"text": "Please call get_weather for San Francisco, CA in celsius and report the findings.",
 					},
+				},
+			},
+		}
+		base["tools"] = []map[string]any{responseWeatherToolDefinition()}
+		base["tool_choice"] = map[string]any{
+			"type": "tool",
+			"name": "get_weather",
+		}
+		return base
+	}
+
+	base["input"] = []map[string]any{
+		{
+			"role": "user",
+			"content": []map[string]any{
+				{
+					"type": "input_text",
+					"text": "Say hello in one sentence.",
 				},
 			},
 		},
 	}
+	return base
 }
 
-func claudeMessagesPayload(model string, stream bool) any {
-	return map[string]any{
+func claudeMessagesPayload(model string, stream bool, exp expectation) any {
+	base := map[string]any{
 		"model":       model,
 		"max_tokens":  defaultMaxTokens,
 		"temperature": defaultTemperature,
 		"top_p":       defaultTopP,
 		"top_k":       defaultTopK,
 		"stream":      stream,
-		"messages": []map[string]any{
+	}
+
+	if exp == expectationToolInvocation {
+		base["messages"] = []map[string]any{
 			{
 				"role": "user",
-				"content": []map[string]string{
+				"content": []map[string]any{
 					{
 						"type": "text",
-						"text": "Say hello in one sentence.",
+						"text": "Use the get_weather tool to retrieve today's weather in San Francisco, CA.",
 					},
 				},
 			},
+		}
+		base["tools"] = []map[string]any{claudeWeatherToolDefinition()}
+		base["tool_choice"] = map[string]any{
+			"type": "tool",
+			"name": "get_weather",
+		}
+		return base
+	}
+
+	base["messages"] = []map[string]any{
+		{
+			"role": "user",
+			"content": []map[string]any{
+				{
+					"type": "text",
+					"text": "Say hello in one sentence.",
+				},
+			},
 		},
+	}
+	return base
+}
+
+func chatWeatherToolDefinition() map[string]any {
+	return map[string]any{
+		"type": "function",
+		"function": map[string]any{
+			"name":        "get_weather",
+			"description": "Get the current weather for a location",
+			"parameters":  weatherFunctionSchema(),
+		},
+	}
+}
+
+func responseWeatherToolDefinition() map[string]any {
+	return map[string]any{
+		"type":        "function",
+		"name":        "get_weather",
+		"description": "Get the current weather for a location",
+		"parameters":  weatherFunctionSchema(),
+	}
+}
+
+func claudeWeatherToolDefinition() map[string]any {
+	return map[string]any{
+		"name":         "get_weather",
+		"description":  "Get the current weather for a location",
+		"input_schema": weatherFunctionSchema(),
+	}
+}
+
+func weatherFunctionSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"location": map[string]any{
+				"type":        "string",
+				"description": "City and region to look up (example: San Francisco, CA)",
+			},
+			"unit": map[string]any{
+				"type":        "string",
+				"description": "Temperature unit to use",
+				"enum":        []string{"celsius", "fahrenheit"},
+			},
+		},
+		"required": []string{"location"},
 	}
 }
 
@@ -705,40 +993,37 @@ func renderReport(rep report) {
 		fmt.Println("no models to report")
 		return
 	}
-
-	header := []string{"Model"}
-	for _, variant := range rep.variants {
-		header = append(header, variant.Header)
-	}
-
-	table := tablewriter.NewWriter(os.Stdout)
-	table.SetHeader(header)
-	table.SetAutoWrapText(false)
-	table.SetReflowDuringAutoWrap(false)
-	table.SetHeaderAlignment(tablewriter.ALIGN_CENTER)
-	table.SetAlignment(tablewriter.ALIGN_LEFT)
-	table.SetRowLine(true)
-	table.SetCenterSeparator("│")
-	table.SetColumnSeparator("│")
-	table.SetRowSeparator("─")
-	table.SetBorder(true)
-
-	for _, model := range rep.models {
-		entry := rep.resultsByModel[model]
-		row := make([]string, 0, len(rep.variants)+1)
-		row = append(row, model)
-		for _, variant := range rep.variants {
-			row = append(row, formatCell(entry[variant.Key]))
-		}
-		table.Append(row)
+	if len(rep.variants) == 0 {
+		fmt.Println("no api formats selected")
+		return
 	}
 
 	fmt.Println()
-	fmt.Println("=== One-API Regression Report ===")
-	table.Render()
+	fmt.Println("=== One-API Regression Matrix ===")
+	fmt.Println()
+
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintf(tw, "Variant")
+	for _, model := range rep.models {
+		fmt.Fprintf(tw, "\t%s", model)
+	}
+	fmt.Fprintln(tw)
+
+	for _, variant := range rep.variants {
+		fmt.Fprintf(tw, "%s", variant.Header)
+		for _, model := range rep.models {
+			entry := rep.resultsByModel[model]
+			cell := formatMatrixCell(entry[variant.Key])
+			fmt.Fprintf(tw, "\t%s", cell)
+		}
+		fmt.Fprintln(tw)
+	}
+	_ = tw.Flush()
+
+	fmt.Println()
 
 	passed := rep.totalRequests - rep.failedCount - rep.skippedCount
-	fmt.Printf("\nTotals  | Requests: %d | Passed: %d | Failed: %d | Skipped: %d\n",
+	fmt.Printf("Totals  | Requests: %d | Passed: %d | Failed: %d | Skipped: %d\n",
 		rep.totalRequests,
 		passed,
 		rep.failedCount,
@@ -747,19 +1032,45 @@ func renderReport(rep report) {
 
 	failures, skips := gatherOutcomes(rep)
 	if len(failures) > 0 {
-		fmt.Println("\nFailures:")
+		fmt.Println()
+		fmt.Println("Failures:")
 		for _, res := range failures {
 			fmt.Printf("- %s · %s → %s\n", res.Model, res.Label, shorten(res.ErrorReason, 200))
 		}
 	}
 	if len(skips) > 0 {
-		fmt.Println("\nSkipped (unsupported combinations):")
+		fmt.Println()
+		fmt.Println("Skipped (unsupported combinations):")
 		for _, res := range skips {
 			fmt.Printf("- %s · %s → %s\n", res.Model, res.Label, shorten(res.ErrorReason, 200))
 		}
 	}
 
 	fmt.Println()
+}
+
+func formatMatrixCell(res testResult) string {
+	if res.Model == "" {
+		return "—"
+	}
+
+	duration := res.Duration.Truncate(10 * time.Millisecond)
+	switch {
+	case res.Success:
+		return fmt.Sprintf("PASS %.2fs", duration.Seconds())
+	case res.Skipped:
+		reason := res.ErrorReason
+		if reason == "" {
+			reason = "skipped"
+		}
+		return fmt.Sprintf("SKIP %s", shorten(reason, 32))
+	default:
+		reason := res.ErrorReason
+		if reason == "" {
+			reason = duration.String()
+		}
+		return fmt.Sprintf("FAIL %s", shorten(reason, 32))
+	}
 }
 
 func gatherOutcomes(rep report) (failures, skips []testResult) {
@@ -794,29 +1105,6 @@ func gatherOutcomes(rep report) (failures, skips []testResult) {
 	})
 
 	return failures, skips
-}
-
-func formatCell(res testResult) string {
-	if res.Model == "" {
-		return "—"
-	}
-
-	switch {
-	case res.Success:
-		return fmt.Sprintf("PASS\n%s", res.Duration.Truncate(time.Millisecond))
-	case res.Skipped:
-		detail := res.ErrorReason
-		if detail == "" {
-			detail = "unsupported"
-		}
-		return fmt.Sprintf("SKIP\n%s", shorten(detail, 60))
-	default:
-		detail := res.ErrorReason
-		if detail == "" {
-			detail = res.Duration.String()
-		}
-		return fmt.Sprintf("FAIL\n%s", shorten(detail, 60))
-	}
 }
 
 func shorten(text string, limit int) string {

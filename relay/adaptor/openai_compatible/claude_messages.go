@@ -185,7 +185,7 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 
 	// Convert tool choice if present
 	if request.ToolChoice != nil {
-		openaiRequest.ToolChoice = request.ToolChoice
+		openaiRequest.ToolChoice = normalizeClaudeToolChoice(request.ToolChoice)
 	}
 
 	// Mark this as a Claude Messages conversion for response handling
@@ -193,6 +193,66 @@ func ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequest) (any, er
 	c.Set(ctxkey.OriginalClaudeRequest, request)
 
 	return openaiRequest, nil
+}
+
+// normalizeClaudeToolChoice adapts Claude tool_choice payloads to the OpenAI ChatCompletion schema.
+// Claude clients often set type=tool with a top-level name; OpenAI-compatible upstreams expect
+// type=function with the name nested under the function field.
+func normalizeClaudeToolChoice(choice any) any {
+	switch src := choice.(type) {
+	case map[string]any:
+		cloned := make(map[string]any, len(src))
+		for k, v := range src {
+			cloned[k] = v
+		}
+
+		typeVal, _ := cloned["type"].(string)
+		switch strings.ToLower(typeVal) {
+		case "tool":
+			name, _ := cloned["name"].(string)
+			var fn map[string]any
+			if existing, ok := cloned["function"].(map[string]any); ok {
+				fn = cloneMap(existing)
+			} else {
+				fn = map[string]any{}
+			}
+			if name != "" && fn["name"] == nil {
+				fn["name"] = name
+			}
+			if len(fn) > 0 {
+				cloned["function"] = fn
+			}
+			cloned["type"] = "function"
+			delete(cloned, "name")
+		case "function":
+			if name, ok := cloned["name"].(string); ok && name != "" {
+				fn, _ := cloned["function"].(map[string]any)
+				if fn == nil {
+					fn = map[string]any{}
+				}
+				if fn["name"] == nil {
+					fn["name"] = name
+				}
+				cloned["function"] = fn
+				delete(cloned, "name")
+			}
+		}
+		return cloned
+	default:
+		return choice
+	}
+}
+
+// cloneMap returns a shallow copy of a map[string]any. It avoids mutating caller state when normalizing payloads.
+func cloneMap(input map[string]any) map[string]any {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]any, len(input))
+	for k, v := range input {
+		cloned[k] = v
+	}
+	return cloned
 }
 
 // HandleClaudeMessagesResponse handles Claude Messages response conversion for OpenAI-compatible adapters

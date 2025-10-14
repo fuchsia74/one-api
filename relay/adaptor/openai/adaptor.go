@@ -483,6 +483,11 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 		ensureWebSearchTool(request)
 	}
 
+	if request.ToolChoice != nil {
+		normalized, _ := NormalizeToolChoice(request.ToolChoice)
+		request.ToolChoice = normalized
+	}
+
 	if request.Stream && !config.EnforceIncludeUsage &&
 		strings.HasSuffix(request.Model, "-audio") {
 		// TODO: Since it is not clear how to implement billing in stream mode,
@@ -670,7 +675,7 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 
 	// Convert tool choice
 	if request.ToolChoice != nil {
-		openaiRequest.ToolChoice = request.ToolChoice
+		openaiRequest.ToolChoice = normalizeClaudeToolChoice(request.ToolChoice)
 	}
 
 	// Mark this as a Claude Messages conversion for response handling
@@ -698,6 +703,69 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	// For non-OpenAI channels or models that only support ChatCompletion API,
 	// return the OpenAI request directly
 	return openaiRequest, nil
+}
+
+// normalizeClaudeToolChoice coerces Claude tool_choice payloads into the ChatCompletion
+// format that upstream OpenAI-compatible adapters expect (type=function with function name).
+// It preserves additional fields like disable_parallel_tool_calls while trimming the legacy
+// top-level name field that Claude clients often send alongside type=tool.
+func normalizeClaudeToolChoice(choice any) any {
+	switch src := choice.(type) {
+	case map[string]any:
+		// Clone the map so we do not mutate the original request payload.
+		cloned := make(map[string]any, len(src))
+		for k, v := range src {
+			cloned[k] = v
+		}
+
+		typeVal, _ := cloned["type"].(string)
+		switch strings.ToLower(typeVal) {
+		case "tool":
+			name, _ := cloned["name"].(string)
+			var fn map[string]any
+			if existing, ok := cloned["function"].(map[string]any); ok {
+				fn = cloneMap(existing)
+			} else {
+				fn = map[string]any{}
+			}
+			if name != "" && fn["name"] == nil {
+				fn["name"] = name
+			}
+			if len(fn) > 0 {
+				cloned["function"] = fn
+			}
+			cloned["type"] = "function"
+			delete(cloned, "name")
+		case "function":
+			// Ensure function payload keeps the name inside the nested object.
+			if name, ok := cloned["name"].(string); ok && name != "" {
+				fn, _ := cloned["function"].(map[string]any)
+				if fn == nil {
+					fn = map[string]any{}
+				}
+				if fn["name"] == nil {
+					fn["name"] = name
+				}
+				cloned["function"] = fn
+				delete(cloned, "name")
+			}
+		}
+		return cloned
+	default:
+		return choice
+	}
+}
+
+// cloneMap returns a shallow copy of the provided map.
+func cloneMap(input map[string]any) map[string]any {
+	if input == nil {
+		return nil
+	}
+	cloned := make(map[string]any, len(input))
+	for k, v := range input {
+		cloned[k] = v
+	}
+	return cloned
 }
 
 // getImageFromURLFn is injectable for tests
@@ -1001,6 +1069,8 @@ func (a *Adaptor) ConvertResponseAPIToClaudeResponse(c *gin.Context, resp *http.
 		StopReason: "end_turn",
 	}
 
+	toolUseAdded := false
+
 	// Convert usage if present
 	if responseAPIResp.Usage != nil {
 		claudeResp.Usage = model.ClaudeUsage{
@@ -1033,7 +1103,36 @@ func (a *Adaptor) ConvertResponseAPIToClaudeResponse(c *gin.Context, resp *http.
 					claudeResp.Content = append(claudeResp.Content, claudeContent)
 				}
 			}
+		} else if outputItem.Type == "function_call" {
+			name := strings.TrimSpace(outputItem.Name)
+			if name == "" {
+				continue
+			}
+			id := outputItem.CallId
+			if id == "" {
+				id = outputItem.Id
+			}
+			var input json.RawMessage
+			if args := strings.TrimSpace(outputItem.Arguments); args != "" {
+				raw := []byte(args)
+				if json.Valid(raw) {
+					input = json.RawMessage(raw)
+				} else if marshaled, err := json.Marshal(args); err == nil {
+					input = json.RawMessage(marshaled)
+				}
+			}
+			claudeResp.Content = append(claudeResp.Content, model.ClaudeContent{
+				Type:  "tool_use",
+				ID:    id,
+				Name:  name,
+				Input: input,
+			})
+			toolUseAdded = true
 		}
+	}
+
+	if toolUseAdded {
+		claudeResp.StopReason = "tool_use"
 	}
 
 	// Marshal the Claude response

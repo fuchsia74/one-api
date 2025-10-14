@@ -183,18 +183,31 @@ func TestRelayResponseAPIHelper_FallbackAzure(t *testing.T) {
 		t.Fatalf("expected api-version query parameter in upstream path: %s", upstreamPath)
 	}
 
-	var upstreamResp openai_compatible.SlimTextResponse
-	if err := json.Unmarshal(recorder.Body.Bytes(), &upstreamResp); err != nil {
-		t.Fatalf("failed to unmarshal upstream response body: %v", err)
+	var fallbackResp openai.ResponseAPIResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &fallbackResp); err != nil {
+		t.Fatalf("failed to unmarshal fallback response body: %v", err)
 	}
-	if len(upstreamResp.Choices) != 1 {
-		t.Fatalf("expected single choice, got %d", len(upstreamResp.Choices))
+	if fallbackResp.Status != "completed" {
+		t.Fatalf("expected response status completed, got %s", fallbackResp.Status)
 	}
-	if upstreamResp.Choices[0].Message.StringContent() != "Hi there!" {
-		t.Fatalf("unexpected assistant message: %#v", upstreamResp.Choices[0].Message)
+	if len(fallbackResp.Output) != 1 {
+		t.Fatalf("expected single output item, got %d", len(fallbackResp.Output))
 	}
-	if upstreamResp.Usage.TotalTokens != 13 {
-		t.Fatalf("unexpected usage: %#v", upstreamResp.Usage)
+	output := fallbackResp.Output[0]
+	if output.Type != "message" {
+		t.Fatalf("expected message output type, got %s", output.Type)
+	}
+	if len(output.Content) == 0 || output.Content[0].Text != "Hi there!" {
+		t.Fatalf("unexpected output content: %#v", output.Content)
+	}
+	if fallbackResp.Usage == nil || fallbackResp.Usage.TotalTokens != 13 {
+		t.Fatalf("unexpected usage: %#v", fallbackResp.Usage)
+	}
+	if fallbackResp.RequiredAction != nil {
+		t.Fatalf("did not expect required_action for non-tool response, got %#v", fallbackResp.RequiredAction)
+	}
+	if !fallbackResp.ParallelToolCalls {
+		t.Fatalf("expected parallel tool calls to remain true")
 	}
 
 	var chatReq relaymodel.GeneralOpenAIRequest

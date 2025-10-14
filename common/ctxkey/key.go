@@ -210,6 +210,10 @@ const (
 	// chat responses into another format (e.g., Response API) before returning to the client.
 	ResponseRewriteHandler = "response_rewrite_handler"
 
+	// ResponseRewriteApplied marks whether a rewrite handler already emitted the outbound payload,
+	// preventing duplicate bodies when fallback logic inspects captured responses.
+	ResponseRewriteApplied = "response_rewrite_applied"
+
 	// ResponseAPIRequestOriginal keeps the original Response API request payload so that
 	// downstream converters can hydrate metadata when rewriting responses.
 	ResponseAPIRequestOriginal = "response_api_request_original"

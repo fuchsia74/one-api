@@ -241,12 +241,15 @@ var (
 	// LogSQLDSN overrides the DSN used for the logging database; falls back to SQL_DSN when empty.
 	LogSQLDSN = env.String("LOG_SQL_DSN", "")
 
-	// APIBase configures the base URL used by the cmd/test smoke tester.
-	APIBase = strings.TrimSpace(env.String("API_BASE", ""))
-	// APIToken configures the API token consumed by the cmd/test smoke tester.
-	APIToken = strings.TrimSpace(env.String("API_TOKEN", ""))
+	// OneAPITestAPIBase configures the base URL used by the cmd/test smoke tester.
+	OneAPITestAPIBase = strings.TrimSpace(env.String("API_BASE", ""))
+	// OneAPITestToken configures the API token consumed by the cmd/test smoke tester.
+	OneAPITestToken = strings.TrimSpace(env.String("API_TOKEN", ""))
 	// OneAPITestModels lists comma-separated models exercised by the cmd/test smoke tester.
 	OneAPITestModels = strings.TrimSpace(env.String("ONEAPI_TEST_MODELS", ""))
+
+	// OneAPITestVariants limits the cmd/test smoke tester to specific API formats (variants).
+	OneAPITestVariants = strings.TrimSpace(env.String("ONEAPI_TEST_VARIANTS", ""))
 )
 
 // RateLimitKeyExpirationDuration controls how long Redis keys for rate limiting remain valid.
