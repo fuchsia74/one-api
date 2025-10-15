@@ -22,7 +22,7 @@ interface Token {
   created_time: number
   accessed_time: number
   expired_time: number
-  models?: string
+  models?: string | null
   subnet?: string
 }
 
@@ -30,6 +30,27 @@ interface PlaygroundModel {
   id: string
   object: string
   owned_by: string
+  label?: string
+  channels?: string[]
+}
+
+interface SuggestionOption {
+  key: string
+  label: string
+  description?: string
+}
+
+interface AutosuggestInputProps {
+  value: string
+  disabled: boolean
+  isLoading: boolean
+  placeholder: string
+  suggestions: SuggestionOption[]
+  activeKey?: string
+  emptyText: string
+  onQueryChange: (value: string) => void
+  onSelect: (optionKey: string) => void
+  onClear: () => void
 }
 
 interface ParametersPanelProps {
@@ -40,6 +61,7 @@ interface ParametersPanelProps {
   // Loading states
   isLoadingTokens: boolean
   isLoadingModels: boolean
+  isLoadingChannels: boolean
 
   // Data
   tokens: Token[]
@@ -48,8 +70,18 @@ interface ParametersPanelProps {
   // Selected values
   selectedToken: string
   selectedModel: string
+  selectedChannel: string
+  channelInputValue: string
+  channelSuggestions: SuggestionOption[]
+  modelInputValue: string
+  modelSuggestions: SuggestionOption[]
   onTokenChange: (value: string) => void
-  onModelChange: (value: string) => void
+  onChannelQueryChange: (value: string) => void
+  onChannelSelect: (value: string) => void
+  onChannelClear: () => void
+  onModelQueryChange: (value: string) => void
+  onModelSelect: (value: string) => void
+  onModelClear: () => void
 
   // Parameters
   temperature: number[]
@@ -85,17 +117,155 @@ interface ParametersPanelProps {
   modelCapabilities: Record<string, any>
 }
 
+const AutosuggestInput: React.FC<AutosuggestInputProps> = ({
+  value,
+  disabled,
+  isLoading,
+  placeholder,
+  suggestions,
+  activeKey,
+  emptyText,
+  onQueryChange,
+  onSelect,
+  onClear
+}) => {
+  const [open, setOpen] = React.useState(false)
+  const containerRef = React.useRef<HTMLDivElement | null>(null)
+
+  React.useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!containerRef.current) {
+        return
+      }
+      if (!containerRef.current.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [open])
+
+  const handleInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    onQueryChange(event.target.value)
+    if (!isLoading && !disabled) {
+      setOpen(true)
+    }
+  }
+
+  const handleFocus = () => {
+    if (!isLoading && !disabled) {
+      setOpen(true)
+    }
+  }
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Enter' && suggestions.length > 0) {
+      event.preventDefault()
+      onSelect(suggestions[0].key)
+      setOpen(false)
+    }
+    if (event.key === 'Escape') {
+      setOpen(false)
+        ; (event.target as HTMLInputElement).blur()
+    }
+  }
+
+  const handleOptionSelect = (optionKey: string) => {
+    onSelect(optionKey)
+    setOpen(false)
+  }
+
+  const handleClear = () => {
+    onClear()
+    setOpen(false)
+  }
+
+  const showDropdown = open && !disabled && !isLoading && (suggestions.length > 0 || value.trim().length > 0)
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <Input
+        value={value}
+        onChange={handleInputChange}
+        onFocus={handleFocus}
+        onKeyDown={handleKeyDown}
+        placeholder={placeholder}
+        disabled={disabled}
+        autoComplete="off"
+        className={!disabled ? 'pr-9' : undefined}
+      />
+      {!disabled && (value || activeKey) && (
+        <Button
+          variant="ghost"
+          size="icon"
+          className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={handleClear}
+        >
+          <X className="h-4 w-4" />
+        </Button>
+      )}
+      {showDropdown && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border bg-popover text-popover-foreground shadow-md">
+          {suggestions.length === 0 ? (
+            <div className="px-3 py-2 text-sm text-muted-foreground">
+              {emptyText}
+            </div>
+          ) : (
+            <ul className="max-h-60 overflow-y-auto py-1">
+              {suggestions.map((option) => {
+                const isActive = option.key === activeKey
+                return (
+                  <li key={option.key}>
+                    <button
+                      type="button"
+                      className={`flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-muted focus:bg-muted focus:outline-none ${isActive ? 'bg-muted' : ''}`}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => handleOptionSelect(option.key)}
+                    >
+                      <span>{option.label}</span>
+                      {option.description && (
+                        <span className="text-xs text-muted-foreground">{option.description}</span>
+                      )}
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function ParametersPanel({
   isMobileSidebarOpen,
   onMobileSidebarClose,
   isLoadingTokens,
   isLoadingModels,
+  isLoadingChannels,
   tokens,
   models,
   selectedToken,
   selectedModel,
+  selectedChannel,
+  channelInputValue,
+  channelSuggestions,
+  modelInputValue,
+  modelSuggestions,
   onTokenChange,
-  onModelChange,
+  onChannelQueryChange,
+  onChannelSelect,
+  onChannelClear,
+  onModelQueryChange,
+  onModelSelect,
+  onModelClear,
   temperature,
   maxTokens,
   topP,
@@ -124,11 +294,23 @@ export function ParametersPanel({
   onSystemMessageChange,
   modelCapabilities
 }: ParametersPanelProps) {
+  const modelPlaceholder = isLoadingModels
+    ? 'Loading models...'
+    : models.length === 0
+      ? 'No models available'
+      : 'Search models'
+
+  const isModelInputDisabled = isLoadingModels || models.length === 0
+
+  const modelEmptyText = models.length === 0
+    ? 'No models available for the selected token and channel.'
+    : 'No models match your search.'
+
   return (
     <div className={`
       ${isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       lg:translate-x-0 lg:relative fixed inset-y-0 left-0 z-40
-      w-80 lg:w-80 xl:w-96 border-r bg-card/95 lg:bg-card/50 backdrop-blur-sm 
+      w-80 lg:w-80 xl:w-96 border-r bg-card/95 lg:bg-card/50 backdrop-blur-sm
       p-4 space-y-4 overflow-y-auto h-screen pt-20 lg:pt-4
       transition-transform duration-300 ease-in-out
       lg:transition-none
@@ -196,6 +378,38 @@ export function ParametersPanel({
 
           <Separator />
 
+          {/* Channel Selection */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm">Channel Filter</Label>
+              {isLoadingChannels && (
+                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                  <div className="w-3 h-3 border-2 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  Loading...
+                </div>
+              )}
+            </div>
+            <AutosuggestInput
+              value={channelInputValue}
+              disabled={isLoadingChannels}
+              isLoading={isLoadingChannels}
+              placeholder={isLoadingChannels ? 'Loading channels...' : 'Filter by channel'}
+              suggestions={channelSuggestions}
+              activeKey={selectedChannel}
+              emptyText="No channels match your search."
+              onQueryChange={onChannelQueryChange}
+              onSelect={onChannelSelect}
+              onClear={onChannelClear}
+            />
+            <div className="text-xs text-muted-foreground">
+              {selectedChannel
+                ? `Showing models associated with ${channelInputValue || 'the selected channel'}.`
+                : 'Leave blank to browse models across every channel.'}
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Model Selection */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -207,24 +421,25 @@ export function ParametersPanel({
                 </div>
               )}
             </div>
-            <Select
-              value={selectedModel}
-              onValueChange={onModelChange}
-              disabled={isLoadingModels}
-            >
-              <SelectTrigger className={isLoadingModels ? "opacity-50" : ""}>
-                <SelectValue placeholder={
-                  isLoadingModels ? "Loading models..." : "Select a model"
-                } />
-              </SelectTrigger>
-              <SelectContent>
-                {models.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    {model.id}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <AutosuggestInput
+              value={modelInputValue}
+              disabled={isModelInputDisabled}
+              isLoading={isLoadingModels}
+              placeholder={modelPlaceholder}
+              suggestions={modelSuggestions}
+              activeKey={selectedModel}
+              emptyText={modelEmptyText}
+              onQueryChange={onModelQueryChange}
+              onSelect={onModelSelect}
+              onClear={onModelClear}
+            />
+            <div className="text-xs text-muted-foreground">
+              {selectedModel
+                ? `Active model: ${modelInputValue || selectedModel}.`
+                : models.length === 0
+                  ? 'No models are available for the current token and channel selection.'
+                  : 'Search to find a model, then press Enter or click to select it.'}
+            </div>
           </div>
 
           <Separator />
