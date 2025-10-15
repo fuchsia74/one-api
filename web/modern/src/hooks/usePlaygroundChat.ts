@@ -1,9 +1,9 @@
 /**
  * Playground Chat Hook
- * 
+ *
  * Core chat functionality for the AI Playground. Manages message sending, streaming responses,
  * and reasoning/thinking content from various AI models.
- * 
+ *
  * ## Purpose
  * Provides a reusable hook that handles all chat-related operations in the playground:
  * - Sending messages with model-specific parameters
@@ -12,18 +12,18 @@
  * - Image attachment handling for vision models
  * - Error handling and recovery
  * - Request cancellation
- * 
+ *
  * ## Key Features
- * 
+ *
  * ### 1. Model-Aware Parameter Handling
  * Uses `getModelCapabilities()` to dynamically include only supported parameters for each model.
  * This prevents API errors from unsupported parameters and ensures optimal compatibility.
- * 
+ *
  * ### 2. Streaming Response Processing
  * - Uses Server-Sent Events (SSE) for real-time streaming
  * - Throttled UI updates via `requestAnimationFrame` for performance
  * - Handles multiple content formats (string, array, mixed)
- * 
+ *
  * ### 3. Multi-Provider Reasoning Support
  * Supports reasoning/thinking content from multiple providers:
  * - **Claude**: `thinking` parameter with budget tokens
@@ -31,19 +31,19 @@
  * - **DeepSeek**: `reasoning_effort` parameter for v3.1+
  * - **Mistral**: Content array format with `thinking` type
  * - **Hyperbolic**: Thinking models (DeepSeek-R1, Qwen thinking variants)
- * 
+ *
  * ### 4. Auto-Collapse Reasoning Bubbles
  * Automatically collapses reasoning/thinking bubbles when main content appears,
  * providing a cleaner UI while keeping reasoning accessible.
- * 
+ *
  * ### 5. Image Attachment Support
  * Handles vision model requirements:
  * - Formats images as base64 with `image_url` type
  * - Sends as content array when images present
  * - Falls back to simple string for text-only
- * 
+ *
  * ## Message Flow
- * 
+ *
  * 1. **User Input** → `sendMessage(messageContent, images?)`
  * 2. **Format Content** → String or array based on images
  * 3. **Build Request** → Include only supported parameters
@@ -51,51 +51,51 @@
  * 5. **Extract Content** → Handle provider-specific formats
  * 6. **Update UI** → Throttled updates via RAF
  * 7. **Finalize** → Auto-collapse reasoning if present
- * 
+ *
  * ## Reasoning Content Extraction
- * 
+ *
  * The hook supports multiple field names for reasoning content:
  * - `delta.reasoning` - OpenAI format
  * - `delta.reasoning_content` - Alternative format
  * - `delta.thinking` - Direct thinking field
  * - `delta.content` (array) - Mistral format with `type: 'thinking'`
- * 
+ *
  * ## Performance Optimizations
- * 
+ *
  * ### Throttled Updates
  * Uses `requestAnimationFrame` to batch UI updates during streaming:
  * - Prevents excessive re-renders (could be 100+ per second)
  * - Maintains smooth UI even with fast streaming
  * - Ensures final state is always applied
- * 
+ *
  * ### Efficient State Updates
  * - Atomic operations for error handling
  * - Single state update for message removal + error insertion
  * - Prevents race conditions and batching issues
- * 
+ *
  * ## Error Handling
- * 
+ *
  * ### HTTP Errors
  * Parses detailed error messages from multiple JSON structures:
  * - `error.message` - Standard OpenAI format
  * - `error` (string) - Simple error format
  * - `message` - Alternative format
  * - `detail` - FastAPI/Pydantic format
- * 
+ *
  * ### Stream Errors
  * Handles errors during streaming:
  * - `type: 'error'` in SSE data
  * - Replaces assistant message with error message
  * - Shows notification
- * 
+ *
  * ### Abort Errors
  * Gracefully handles user cancellation:
  * - Removes placeholder message
  * - Shows cancellation notification
  * - Cleans up abort controller
- * 
+ *
  * ## Usage Example
- * 
+ *
  * ```typescript
  * const {
  *   isStreaming,
@@ -116,42 +116,42 @@
  *   setExpandedReasonings,
  *   // ... other parameters
  * })
- * 
+ *
  * // Send a message
  * await sendMessage('Explain quantum entanglement')
- * 
+ *
  * // Send with images
  * await sendMessage('What is in this image?', [imageAttachment])
- * 
+ *
  * // Stop generation
  * stopGeneration()
- * 
+ *
  * // Regenerate last response
  * await regenerateMessage(messages.slice(0, -1))
  * ```
- * 
+ *
  * ## Integration Points
- * 
+ *
  * ### PlaygroundPage
  * Main consumer that provides all parameters and state management.
- * 
+ *
  * ### ChatInterface
  * Uses the hook's return values for UI state and actions.
- * 
+ *
  * ### ParametersPanel
  * Parameters from this panel are passed to the hook for request building.
- * 
+ *
  * ### ThinkingBubble
  * Displays reasoning content with expand/collapse state managed by the hook.
- * 
+ *
  * ## Important Notes
- * 
+ *
  * - System messages are automatically prepended if not already present
  * - Error messages (role: 'error') are filtered from API requests
  * - Reasoning bubbles auto-collapse when content appears (UX optimization)
  * - Empty reasoning content is converted to `null` for consistency
  * - All animation frames are cleaned up on unmount to prevent memory leaks
- * 
+ *
  * @see getModelCapabilities for parameter compatibility detection
  * @see ThinkingBubble for reasoning content display
  * @see PlaygroundPage for integration example
@@ -162,6 +162,165 @@ import { useNotifications } from '@/components/ui/notifications'
 import { Message, getMessageStringContent } from '@/lib/utils'
 import { getModelCapabilities } from '@/lib/model-capabilities'
 import { ImageAttachment as ImageAttachmentType } from '@/components/chat/ImageAttachment'
+
+interface ResponseStreamSummary {
+  text: string | null
+  reasoning: string | null
+}
+
+const extractTextAndReasoningFromOutput = (output: any[] | undefined): ResponseStreamSummary => {
+  if (!Array.isArray(output)) {
+    return { text: null, reasoning: null }
+  }
+
+  const textParts: string[] = []
+  const reasoningParts: string[] = []
+
+  for (const item of output) {
+    if (!item || typeof item !== 'object') {
+      continue
+    }
+
+    const itemType = String(item.type || '').toLowerCase()
+
+    if (itemType === 'message') {
+      const contentArray = Array.isArray(item.content) ? item.content : []
+      for (const contentEntry of contentArray) {
+        if (!contentEntry || typeof contentEntry !== 'object') {
+          continue
+        }
+        const entryType = String(contentEntry.type || '').toLowerCase()
+        const entryText = typeof contentEntry.text === 'string' ? contentEntry.text : ''
+        if (entryType === 'output_text' && entryText) {
+          textParts.push(entryText)
+        }
+        if ((entryType === 'reasoning' || entryType === 'summary_text') && entryText) {
+          reasoningParts.push(entryText)
+        }
+      }
+    }
+
+    if (itemType === 'reasoning') {
+      const summaryArray = Array.isArray(item.summary) ? item.summary : []
+      for (const summaryEntry of summaryArray) {
+        if (!summaryEntry || typeof summaryEntry !== 'object') {
+          continue
+        }
+        const entryText = typeof summaryEntry.text === 'string' ? summaryEntry.text : ''
+        if (entryText) {
+          reasoningParts.push(entryText)
+        }
+      }
+    }
+  }
+
+  return {
+    text: textParts.length > 0 ? textParts.join('') : null,
+    reasoning: reasoningParts.length > 0 ? reasoningParts.join('\n') : null
+  }
+}
+
+const convertMessageToResponseInput = (message: Message): Record<string, any> | null => {
+  if (!message || message.role === 'error') {
+    return null
+  }
+
+  const role = message.role === 'assistant' ? 'assistant' : message.role === 'user' ? 'user' : message.role
+
+  if (role === 'system') {
+    return null
+  }
+
+  const textType = role === 'assistant' ? 'output_text' : 'input_text'
+  const contentParts: any[] = []
+
+  const appendText = (text: string | undefined) => {
+    if (!text) {
+      return
+    }
+    const normalized = String(text)
+    if (normalized.trim().length === 0) {
+      return
+    }
+    contentParts.push({ type: textType, text: normalized })
+  }
+
+  const appendImage = (raw: any) => {
+    if (role !== 'user' || !raw) {
+      return
+    }
+
+    if (typeof raw === 'string') {
+      contentParts.push({ type: 'input_image', image_url: raw })
+      return
+    }
+
+    if (typeof raw === 'object') {
+      const url = typeof raw.url === 'string' ? raw.url : typeof raw.image_url === 'string' ? raw.image_url : ''
+      if (!url) {
+        return
+      }
+      const part: Record<string, any> = { type: 'input_image', image_url: url }
+      const detail = typeof raw.detail === 'string' ? raw.detail : undefined
+      if (detail && detail.trim().length > 0) {
+        part.detail = detail.trim()
+      }
+      contentParts.push(part)
+    }
+  }
+
+  if (typeof message.content === 'string') {
+    appendText(message.content)
+  } else if (Array.isArray(message.content)) {
+    for (const entry of message.content) {
+      if (!entry) {
+        continue
+      }
+      if (typeof entry === 'string') {
+        appendText(entry)
+        continue
+      }
+
+      const entryType = typeof entry.type === 'string' ? entry.type.toLowerCase() : ''
+
+      if (entryType === 'text' || entryType === 'input_text') {
+        appendText(typeof entry.text === 'string' ? entry.text : undefined)
+        continue
+      }
+
+      if (entryType === 'image_url' || entryType === 'input_image') {
+        appendImage(entry.image_url ?? entry)
+        continue
+      }
+
+      if (typeof entry.text === 'string') {
+        appendText(entry.text)
+      }
+    }
+  }
+
+  if (role === 'assistant' && typeof message.reasoning_content === 'string') {
+    const trimmed = message.reasoning_content.trim()
+    if (trimmed.length > 0) {
+      contentParts.push({ type: 'reasoning', text: trimmed })
+    }
+  }
+
+  if (contentParts.length === 0) {
+    return null
+  }
+
+  return {
+    role,
+    content: contentParts
+  }
+}
+
+const buildResponseInputFromMessages = (messages: Message[]): any[] => {
+  return messages
+    .map(convertMessageToResponseInput)
+    .filter((entry): entry is Record<string, any> => entry !== null)
+}
 
 interface UsePlaygroundChatProps {
   selectedToken: string
@@ -278,6 +437,279 @@ export function usePlaygroundChat({
     }
     setMessages(prev => [...prev, errorMessage])
   }, [setMessages])
+
+  interface StreamResponseResult {
+    assistantContent: string
+    reasoningContent: string
+    status: string | null
+    incompleteDetails: any
+  }
+
+  const streamResponse = useCallback(async (requestBody: Record<string, any>, signal: AbortSignal): Promise<StreamResponseResult> => {
+    const response = await fetch('/v1/responses', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${selectedToken}`,
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream'
+      },
+      body: JSON.stringify(requestBody),
+      signal
+    })
+
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      try {
+        const errorBody = await response.text()
+        if (errorBody.trim()) {
+          try {
+            const errorJson = JSON.parse(errorBody)
+            if (errorJson.error?.message) {
+              errorMessage = errorJson.error.message
+            } else if (typeof errorJson.error === 'string') {
+              errorMessage = errorJson.error
+            } else if (errorJson.message) {
+              errorMessage = errorJson.message
+            } else if (errorJson.detail) {
+              errorMessage = errorJson.detail
+            } else {
+              errorMessage = `HTTP ${response.status}: ${JSON.stringify(errorJson, null, 2)}`
+            }
+          } catch {
+            if (errorBody && errorBody !== response.statusText) {
+              errorMessage = `HTTP ${response.status}: ${errorBody}`
+            }
+          }
+        }
+      } catch {
+        // ignore secondary errors while reading response body
+      }
+      throw new Error(errorMessage)
+    }
+
+    const reader = response.body?.getReader()
+    if (!reader) {
+      throw new Error('No response body')
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let assistantContent = ''
+    let reasoningContent = ''
+    let finalStatus: string | null = null
+    let incompleteDetails: any = null
+
+    const appendTextDelta = (delta: string | undefined) => {
+      if (!delta) {
+        return
+      }
+      assistantContent += delta
+      scheduleUpdate(assistantContent, reasoningContent)
+    }
+
+    const appendReasoningDelta = (delta: string | undefined) => {
+      if (!delta) {
+        return
+      }
+      reasoningContent += delta
+      scheduleUpdate(assistantContent, reasoningContent)
+    }
+
+    const applyResponsePayload = (payload: any) => {
+      if (!payload || typeof payload !== 'object') {
+        return
+      }
+
+      if (typeof payload.status === 'string') {
+        finalStatus = payload.status
+      }
+      if (payload.incomplete_details) {
+        incompleteDetails = payload.incomplete_details
+      }
+
+      const { text, reasoning } = extractTextAndReasoningFromOutput(payload.output)
+      if (text !== null) {
+        assistantContent = text
+        scheduleUpdate(assistantContent, reasoningContent)
+      }
+      if (reasoning !== null) {
+        reasoningContent = reasoning
+        scheduleUpdate(assistantContent, reasoningContent)
+      }
+    }
+
+    const processEvent = (rawEvent: string): boolean => {
+      const sanitized = rawEvent.replace(/\r/g, '')
+      const lines = sanitized.split('\n')
+      let eventType = ''
+      const dataLines: string[] = []
+
+      for (const line of lines) {
+        if (line.startsWith('event:')) {
+          eventType = line.slice(6).trim()
+          continue
+        }
+        if (line.startsWith('data:')) {
+          let value = line.slice(5)
+          if (value.startsWith(' ')) {
+            value = value.slice(1)
+          }
+          dataLines.push(value)
+          continue
+        }
+        if (line.startsWith(':')) {
+          continue
+        }
+      }
+
+      const dataString = dataLines.join('\n')
+      if (dataString === '') {
+        return false
+      }
+      if (dataString === '[DONE]') {
+        return true
+      }
+
+      let payload: any
+      try {
+        payload = JSON.parse(dataString)
+      } catch (parseError) {
+        console.warn('Failed to parse SSE data:', parseError)
+        return false
+      }
+
+      const resolvedType = eventType || (typeof payload?.type === 'string' ? payload.type : '')
+
+      switch (resolvedType) {
+        case 'response.output_text.delta':
+          appendTextDelta(typeof payload.delta === 'string' ? payload.delta : undefined)
+          if (payload.response) {
+            applyResponsePayload(payload.response)
+          }
+          break
+        case 'response.reasoning_summary_text.delta':
+          appendReasoningDelta(typeof payload.delta === 'string' ? payload.delta : undefined)
+          if (payload.response) {
+            applyResponsePayload(payload.response)
+          }
+          break
+        case 'response.output_text.done':
+          if (typeof payload.text === 'string') {
+            assistantContent = payload.text
+            scheduleUpdate(assistantContent, reasoningContent)
+          }
+          if (payload.response) {
+            applyResponsePayload(payload.response)
+          }
+          break
+        case 'response.reasoning_summary_text.done':
+          if (typeof payload.text === 'string') {
+            reasoningContent = payload.text
+            scheduleUpdate(assistantContent, reasoningContent)
+          }
+          if (payload.response) {
+            applyResponsePayload(payload.response)
+          }
+          break
+        case 'response.output_item.done':
+        case 'response.content_part.done':
+          if (payload.item) {
+            const { text, reasoning } = extractTextAndReasoningFromOutput([payload.item])
+            if (text !== null) {
+              assistantContent = text
+              scheduleUpdate(assistantContent, reasoningContent)
+            }
+            if (reasoning !== null) {
+              reasoningContent = reasoning
+              scheduleUpdate(assistantContent, reasoningContent)
+            }
+          }
+          if (payload.response) {
+            applyResponsePayload(payload.response)
+          }
+          break
+        case 'response.completed':
+          if (payload.response) {
+            applyResponsePayload(payload.response)
+          }
+          break
+        case 'response.error': {
+          const errorMessage = typeof payload?.error?.message === 'string'
+            ? payload.error.message
+            : typeof payload?.error === 'string'
+              ? payload.error
+              : 'Stream error'
+          throw new Error(errorMessage)
+        }
+        default:
+          if (payload?.response) {
+            applyResponsePayload(payload.response)
+          } else if (payload?.output) {
+            const { text, reasoning } = extractTextAndReasoningFromOutput(payload.output)
+            if (text !== null) {
+              assistantContent = text
+              scheduleUpdate(assistantContent, reasoningContent)
+            }
+            if (reasoning !== null) {
+              reasoningContent = reasoning
+              scheduleUpdate(assistantContent, reasoningContent)
+            }
+          }
+          break
+      }
+
+      return false
+    }
+
+    const processPendingEvents = (): boolean => {
+      let shouldStop = false
+      let boundary = buffer.indexOf('\n\n')
+      while (boundary !== -1) {
+        const rawEvent = buffer.slice(0, boundary)
+        buffer = buffer.slice(boundary + 2)
+        if (rawEvent.trim().length > 0) {
+          if (processEvent(rawEvent)) {
+            shouldStop = true
+            break
+          }
+        }
+        boundary = buffer.indexOf('\n\n')
+      }
+      return shouldStop
+    }
+
+    let reachedEnd = false
+
+    while (!reachedEnd) {
+      const { done, value } = await reader.read()
+      if (done) {
+        buffer += decoder.decode()
+        reachedEnd = true
+        processPendingEvents()
+        break
+      }
+
+      if (value) {
+        buffer += decoder.decode(value, { stream: true })
+        if (processPendingEvents()) {
+          reachedEnd = true
+          break
+        }
+      }
+    }
+
+    if (updateThrottleRef.current !== null) {
+      cancelAnimationFrame(updateThrottleRef.current)
+      throttledUpdateMessage()
+    }
+
+    return {
+      assistantContent,
+      reasoningContent,
+      status: finalStatus,
+      incompleteDetails
+    }
+  }, [selectedToken, scheduleUpdate, throttledUpdateMessage])
 
   const sendMessage = useCallback(async (messageContent: string, images?: ImageAttachmentType[]) => {
     if ((!messageContent.trim() && (!images || images.length === 0)) || !selectedModel || !selectedToken || isStreaming) {
