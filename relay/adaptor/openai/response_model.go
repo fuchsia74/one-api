@@ -3,6 +3,7 @@ package openai
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"strconv"
 	"strings"
 
@@ -55,6 +56,245 @@ func (r ResponseAPIInput) MarshalJSON() ([]byte, error) {
 	return b, nil
 }
 
+// NormalizeToolChoice rewrites tool_choice values into the canonical format expected by OpenAI.
+// Returns the normalized value and a flag indicating whether a change was applied.
+func NormalizeToolChoice(choice any) (any, bool) {
+	if choice == nil {
+		return nil, false
+	}
+
+	switch typed := choice.(type) {
+	case string:
+		trimmed := strings.TrimSpace(typed)
+		if trimmed == "" {
+			return nil, true
+		}
+		if trimmed != typed {
+			return trimmed, true
+		}
+		return typed, false
+	case map[string]any:
+		return normalizeToolChoiceMap(typed)
+	case map[string]string:
+		converted := make(map[string]any, len(typed))
+		for k, v := range typed {
+			converted[k] = v
+		}
+		return normalizeToolChoiceMap(converted)
+	default:
+		data, err := json.Marshal(choice)
+		if err != nil {
+			return choice, false
+		}
+		var asMap map[string]any
+		if err := json.Unmarshal(data, &asMap); err != nil {
+			return choice, false
+		}
+		normalized, changed := normalizeToolChoiceMap(asMap)
+		if !changed {
+			return choice, false
+		}
+		return normalized, true
+	}
+}
+
+func normalizeToolChoiceMap(choice map[string]any) (map[string]any, bool) {
+	if choice == nil {
+		return nil, false
+	}
+
+	originalType, _ := choice["type"].(string)
+	typeName := strings.ToLower(strings.TrimSpace(originalType))
+	if typeName == "" {
+		if _, ok := choice["function"].(map[string]any); ok {
+			typeName = "function"
+		} else if _, ok := choice["name"].(string); ok {
+			typeName = "tool"
+		}
+	}
+
+	if typeName == "tool" {
+		name := strings.TrimSpace(stringFromAny(choice["name"]))
+		if name == "" {
+			if fn, ok := choice["function"].(map[string]any); ok {
+				name = strings.TrimSpace(stringFromAny(fn["name"]))
+			}
+		}
+		if name == "" {
+			return choice, false
+		}
+		normalized := map[string]any{
+			"type":     "function",
+			"function": map[string]any{"name": name},
+		}
+		if mode, ok := choice["mode"]; ok {
+			normalized["mode"] = mode
+		}
+		if reason, ok := choice["reason"]; ok {
+			normalized["reason"] = reason
+		}
+		return normalized, true
+	}
+
+	changed := false
+	if typeName == "" {
+		name := strings.TrimSpace(stringFromAny(choice["name"]))
+		if name == "" {
+			return choice, false
+		}
+		return map[string]any{
+			"type":     "function",
+			"function": map[string]any{"name": name},
+		}, true
+	}
+
+	if typeName != "function" {
+		choice["type"] = "function"
+		changed = true
+	}
+
+	var fnMap map[string]any
+	switch fn := choice["function"].(type) {
+	case map[string]any:
+		fnMap = fn
+	case string:
+		fnMap = map[string]any{}
+		if trimmed := strings.TrimSpace(fn); trimmed != "" {
+			fnMap["name"] = trimmed
+		}
+		changed = true
+	case nil:
+		fnMap = map[string]any{}
+		changed = true
+	default:
+		data, err := json.Marshal(fn)
+		if err == nil {
+			_ = json.Unmarshal(data, &fnMap)
+			changed = true
+		} else {
+			fnMap = map[string]any{}
+			changed = true
+		}
+	}
+
+	if _, ok := fnMap["name"]; !ok {
+		if name := strings.TrimSpace(stringFromAny(choice["name"])); name != "" {
+			fnMap["name"] = name
+			changed = true
+		}
+	}
+
+	if len(fnMap) == 0 {
+		return choice, changed
+	}
+
+	choice["function"] = fnMap
+	if _, ok := choice["name"]; ok {
+		delete(choice, "name")
+		changed = true
+	}
+
+	return choice, changed
+}
+
+// NormalizeToolChoiceForResponse rewrites tool_choice payloads into the
+// canonical structure accepted by the OpenAI Responses API. The API expects
+// either a trimmed string ("auto"/"none") or an object shaped like
+// {"type":"function","name":"..."}. This helper funnels legacy formats
+// (e.g. {"type":"tool","name":"..."}) through NormalizeToolChoice and
+// flattens nested function blocks accordingly while preserving auxiliary
+// fields like mode or reason.
+func NormalizeToolChoiceForResponse(choice any) (any, bool) {
+	if choice == nil {
+		return nil, false
+	}
+
+	normalized, changed := NormalizeToolChoice(choice)
+
+	switch typed := normalized.(type) {
+	case nil:
+		return nil, changed
+	case string:
+		trimmed := strings.TrimSpace(typed)
+		if trimmed == "" {
+			return nil, true
+		}
+		if trimmed != typed {
+			return trimmed, true
+		}
+		return trimmed, changed
+	case map[string]any:
+		typeName := strings.ToLower(strings.TrimSpace(stringFromAny(typed["type"])))
+		if typeName == "" || typeName != "function" {
+			typed["type"] = "function"
+			typeName = "function"
+			changed = true
+		}
+
+		var name string
+		if fn, ok := typed["function"].(map[string]any); ok {
+			name = strings.TrimSpace(stringFromAny(fn["name"]))
+		}
+		if name == "" {
+			name = strings.TrimSpace(stringFromAny(typed["name"]))
+		}
+		if name == "" {
+			if originalMap, ok := choice.(map[string]any); ok {
+				if fn, ok := originalMap["function"].(map[string]any); ok {
+					name = strings.TrimSpace(stringFromAny(fn["name"]))
+				}
+				if name == "" {
+					name = strings.TrimSpace(stringFromAny(originalMap["name"]))
+				}
+			}
+		}
+
+		if name != "" {
+			if current := strings.TrimSpace(stringFromAny(typed["name"])); current != name {
+				typed["name"] = name
+				changed = true
+			} else if _, exists := typed["name"]; !exists {
+				typed["name"] = name
+				changed = true
+			}
+		} else if _, exists := typed["name"]; exists {
+			delete(typed, "name")
+			changed = true
+		}
+
+		if _, exists := typed["function"]; exists {
+			delete(typed, "function")
+			changed = true
+		}
+
+		return typed, changed
+	default:
+		data, err := json.Marshal(normalized)
+		if err != nil {
+			return normalized, changed
+		}
+		var asMap map[string]any
+		if err := json.Unmarshal(data, &asMap); err != nil {
+			return normalized, changed
+		}
+		res, innerChanged := NormalizeToolChoiceForResponse(asMap)
+		if innerChanged {
+			return res, true
+		}
+		return normalized, changed
+	}
+}
+
+func stringFromAny(value any) string {
+	if value == nil {
+		return ""
+	}
+	if str, ok := value.(string); ok {
+		return str
+	}
+	return fmt.Sprintf("%v", value)
+}
+
 // IsModelsOnlySupportedByChatCompletionAPI determines if a model only supports ChatCompletion API
 // and should not be converted to Response API format.
 // Currently returns false for all models (allowing conversion), but can be implemented later
@@ -97,19 +337,20 @@ type ResponseAPIRequest struct {
 
 // ResponseAPIPrompt represents the prompt template configuration for Response API requests
 type ResponseAPIPrompt struct {
-	Id        string                 `json:"id"`                  // Required: Unique identifier of the prompt template
-	Version   *string                `json:"version,omitempty"`   // Optional: Specific version of the prompt (defaults to "current")
-	Variables map[string]interface{} `json:"variables,omitempty"` // Optional: Map of values to substitute in for variables in the prompt
+	Id        string         `json:"id"`                  // Required: Unique identifier of the prompt template
+	Version   *string        `json:"version,omitempty"`   // Optional: Specific version of the prompt (defaults to "current")
+	Variables map[string]any `json:"variables,omitempty"` // Optional: Map of values to substitute in for variables in the prompt
 }
 
 // ResponseAPITool represents the tool format for Response API requests
 // This differs from the ChatCompletion tool format where function properties are nested
 // Supports both function tools and MCP tools
 type ResponseAPITool struct {
-	Type        string                 `json:"type"`                  // Required: "function" or "mcp"
-	Name        string                 `json:"name,omitempty"`        // Function name (for function tools)
-	Description string                 `json:"description,omitempty"` // Function description (for function tools)
-	Parameters  map[string]interface{} `json:"parameters,omitempty"`  // Function parameters (for function tools)
+	Type        string          `json:"type"`                  // Required: "function", "web_search", "mcp", etc.
+	Name        string          `json:"name,omitempty"`        // Legacy: function name when function block absent
+	Description string          `json:"description,omitempty"` // Legacy: function description when function block absent
+	Parameters  map[string]any  `json:"parameters,omitempty"`  // Legacy: function parameters when function block absent
+	Function    *model.Function `json:"function,omitempty"`    // Modern function definition (preferred for Response API)
 
 	// Web-search specific configuration
 	SearchContextSize *string                 `json:"search_context_size,omitempty"`
@@ -122,6 +363,177 @@ type ResponseAPITool struct {
 	RequireApproval any               `json:"require_approval,omitempty"`
 	AllowedTools    []string          `json:"allowed_tools,omitempty"`
 	Headers         map[string]string `json:"headers,omitempty"`
+}
+
+func (t ResponseAPITool) MarshalJSON() ([]byte, error) {
+	switch strings.ToLower(strings.TrimSpace(t.Type)) {
+	case "function":
+		fn := sanitizeFunctionForRequest(t)
+		payload := map[string]any{"type": "function"}
+		if fn != nil {
+			if name := strings.TrimSpace(fn.Name); name != "" {
+				payload["name"] = name
+			}
+			if desc := strings.TrimSpace(fn.Description); desc != "" {
+				payload["description"] = desc
+			}
+			if params, ok := fn.Parameters.(map[string]any); ok && len(params) > 0 {
+				payload["parameters"] = params
+			}
+		}
+		if fn != nil {
+			payload["function"] = fn
+		}
+		return json.Marshal(payload)
+	case "web_search":
+		payload := map[string]any{"type": t.Type}
+		if t.SearchContextSize != nil {
+			payload["search_context_size"] = t.SearchContextSize
+		}
+		if t.Filters != nil {
+			payload["filters"] = t.Filters
+		}
+		if t.UserLocation != nil {
+			payload["user_location"] = t.UserLocation
+		}
+		return json.Marshal(payload)
+	case "mcp":
+		payload := map[string]any{"type": t.Type}
+		if t.ServerLabel != "" {
+			payload["server_label"] = t.ServerLabel
+		}
+		if t.ServerUrl != "" {
+			payload["server_url"] = t.ServerUrl
+		}
+		if t.RequireApproval != nil {
+			payload["require_approval"] = t.RequireApproval
+		}
+		if len(t.AllowedTools) > 0 {
+			payload["allowed_tools"] = t.AllowedTools
+		}
+		if len(t.Headers) > 0 {
+			payload["headers"] = t.Headers
+		}
+		return json.Marshal(payload)
+	default:
+		type alias ResponseAPITool
+		return json.Marshal(alias(t))
+	}
+}
+
+func (t *ResponseAPITool) UnmarshalJSON(data []byte) error {
+	type rawTool struct {
+		Type              string                  `json:"type"`
+		Name              string                  `json:"name,omitempty"`
+		Description       string                  `json:"description,omitempty"`
+		Parameters        map[string]any          `json:"parameters,omitempty"`
+		Function          json.RawMessage         `json:"function,omitempty"`
+		SearchContextSize *string                 `json:"search_context_size,omitempty"`
+		Filters           *model.WebSearchFilters `json:"filters,omitempty"`
+		UserLocation      *model.UserLocation     `json:"user_location,omitempty"`
+		ServerLabel       string                  `json:"server_label,omitempty"`
+		ServerUrl         string                  `json:"server_url,omitempty"`
+		RequireApproval   any                     `json:"require_approval,omitempty"`
+		AllowedTools      []string                `json:"allowed_tools,omitempty"`
+		Headers           map[string]string       `json:"headers,omitempty"`
+	}
+
+	var raw rawTool
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return errors.Wrap(err, "unmarshal response api tool")
+	}
+
+	t.Type = raw.Type
+	t.Name = raw.Name
+	t.Description = raw.Description
+	t.Parameters = raw.Parameters
+	t.SearchContextSize = raw.SearchContextSize
+	t.Filters = raw.Filters
+	t.UserLocation = raw.UserLocation
+	t.ServerLabel = raw.ServerLabel
+	t.ServerUrl = raw.ServerUrl
+	t.RequireApproval = raw.RequireApproval
+	t.AllowedTools = raw.AllowedTools
+	t.Headers = raw.Headers
+	t.Function = nil
+
+	if len(raw.Function) > 0 {
+		var fn model.Function
+		if err := json.Unmarshal(raw.Function, &fn); err != nil {
+			return errors.Wrap(err, "unmarshal response api tool.function")
+		}
+		t.Function = sanitizeDecodedFunction(&fn)
+	} else if raw.Type == "function" && (raw.Name != "" || raw.Description != "" || raw.Parameters != nil) {
+		t.Function = &model.Function{
+			Name:        raw.Name,
+			Description: raw.Description,
+			Parameters:  raw.Parameters,
+		}
+	}
+
+	// Keep legacy fields in sync when function block is present
+	if t.Function != nil {
+		if t.Function.Name != "" {
+			t.Name = t.Function.Name
+		}
+		if t.Function.Description != "" {
+			t.Description = t.Function.Description
+		}
+		if params, ok := t.Function.Parameters.(map[string]any); ok {
+			t.Parameters = params
+		}
+	}
+
+	return nil
+}
+
+func sanitizeFunctionForRequest(tool ResponseAPITool) *model.Function {
+	fn := tool.Function
+	if fn == nil && (tool.Name != "" || tool.Description != "" || tool.Parameters != nil) {
+		fn = &model.Function{
+			Name:        tool.Name,
+			Description: tool.Description,
+			Parameters:  tool.Parameters,
+		}
+	}
+	if fn == nil {
+		return nil
+	}
+	clone := *fn
+	clone.Arguments = nil
+	return &clone
+}
+
+func sanitizeDecodedFunction(fn *model.Function) *model.Function {
+	if fn == nil {
+		return nil
+	}
+	// No special handling required today; keep hook for future sanitation.
+	return fn
+}
+
+// ResponseAPIRequiredAction represents the required action block in Response API responses
+type ResponseAPIRequiredAction struct {
+	Type              string                        `json:"type"`
+	SubmitToolOutputs *ResponseAPISubmitToolOutputs `json:"submit_tool_outputs,omitempty"`
+}
+
+// ResponseAPISubmitToolOutputs contains the tool calls that must be fulfilled by the client
+type ResponseAPISubmitToolOutputs struct {
+	ToolCalls []ResponseAPIToolCall `json:"tool_calls,omitempty"`
+}
+
+// ResponseAPIToolCall represents a single tool call the model wants to execute
+type ResponseAPIToolCall struct {
+	Id       string                   `json:"id"`
+	Type     string                   `json:"type"`
+	Function *ResponseAPIFunctionCall `json:"function,omitempty"`
+}
+
+// ResponseAPIFunctionCall captures the function invocation details in a tool call
+type ResponseAPIFunctionCall struct {
+	Name      string `json:"name,omitempty"`
+	Arguments string `json:"arguments,omitempty"`
 }
 
 // WebSearchCallAction captures metadata about a single web search invocation emitted by the OpenAI Responses API.
@@ -145,11 +557,11 @@ type ResponseTextConfig struct {
 
 // ResponseTextFormat represents the format configuration for Response API structured outputs
 type ResponseTextFormat struct {
-	Type        string                 `json:"type"`                  // Required: Format type (e.g., "text", "json_schema")
-	Name        string                 `json:"name,omitempty"`        // Optional: Schema name for json_schema type
-	Description string                 `json:"description,omitempty"` // Optional: Schema description
-	Schema      map[string]interface{} `json:"schema,omitempty"`      // Optional: JSON schema definition
-	Strict      *bool                  `json:"strict,omitempty"`      // Optional: Whether to use strict mode
+	Type        string         `json:"type"`                  // Required: Format type (e.g., "text", "json_schema")
+	Name        string         `json:"name,omitempty"`        // Optional: Schema name for json_schema type
+	Description string         `json:"description,omitempty"` // Optional: Schema description
+	Schema      map[string]any `json:"schema,omitempty"`      // Optional: JSON schema definition
+	Strict      *bool          `json:"strict,omitempty"`      // Optional: Whether to use strict mode
 }
 
 // MCPApprovalResponseInput represents the input structure for MCP approval responses
@@ -207,8 +619,8 @@ func findToolCallName(toolCalls []model.Tool, toolCallId string) string {
 
 // convertMessageToResponseAPIFormat converts a ChatCompletion message to Response API format
 // This function handles the content type conversion from ChatCompletion format to Response API format
-func convertMessageToResponseAPIFormat(message model.Message) map[string]interface{} {
-	responseMsg := map[string]interface{}{
+func convertMessageToResponseAPIFormat(message model.Message) map[string]any {
+	responseMsg := map[string]any{
 		"role": message.Role,
 	}
 
@@ -224,7 +636,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 	case string:
 		// Simple string content - convert to appropriate text format based on role
 		if content != "" {
-			responseMsg["content"] = []map[string]interface{}{
+			responseMsg["content"] = []map[string]any{
 				{
 					"type": textContentType,
 					"text": content,
@@ -233,12 +645,12 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 		}
 	case []model.MessageContent:
 		// Structured content - convert each part to Response API format
-		var convertedContent []map[string]interface{}
+		var convertedContent []map[string]any
 		for _, part := range content {
 			switch part.Type {
 			case model.ContentTypeText:
 				if part.Text != nil && *part.Text != "" {
-					item := map[string]interface{}{
+					item := map[string]any{
 						"type": textContentType,
 						"text": *part.Text,
 					}
@@ -246,7 +658,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 				}
 			case model.ContentTypeImageURL:
 				if part.ImageURL != nil && part.ImageURL.Url != "" {
-					item := map[string]interface{}{
+					item := map[string]any{
 						"type":      "input_image",
 						"image_url": part.ImageURL.Url,
 					}
@@ -258,7 +670,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 				}
 			case model.ContentTypeInputAudio:
 				if part.InputAudio != nil {
-					item := map[string]interface{}{
+					item := map[string]any{
 						"type":        "input_audio",
 						"input_audio": part.InputAudio,
 					}
@@ -266,7 +678,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 				}
 			default:
 				// For unknown types, try to preserve as much as possible
-				partMap := map[string]interface{}{
+				partMap := map[string]any{
 					"type": textContentType, // Use appropriate text type based on role
 				}
 				if part.Text != nil {
@@ -278,15 +690,13 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 		if len(convertedContent) > 0 {
 			responseMsg["content"] = convertedContent
 		}
-	case []interface{}:
+	case []any:
 		// Handle generic interface array (from JSON unmarshaling)
-		var convertedContent []map[string]interface{}
+		var convertedContent []map[string]any
 		for _, item := range content {
-			if itemMap, ok := item.(map[string]interface{}); ok {
-				convertedItem := make(map[string]interface{})
-				for k, v := range itemMap {
-					convertedItem[k] = v
-				}
+			if itemMap, ok := item.(map[string]any); ok {
+				convertedItem := make(map[string]any)
+				maps.Copy(convertedItem, itemMap)
 				// Convert content types to Response API format based on message role
 				if itemType, exists := itemMap["type"]; exists {
 					switch itemType {
@@ -295,7 +705,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 					case "image_url":
 						convertedItem["type"] = "input_image"
 						// Flatten image_url object to string and hoist detail per Response API spec
-						if iu, ok := itemMap["image_url"].(map[string]interface{}); ok {
+						if iu, ok := itemMap["image_url"].(map[string]any); ok {
 							if urlVal, ok2 := iu["url"].(string); ok2 {
 								convertedItem["image_url"] = urlVal
 							} else {
@@ -322,7 +732,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 	default:
 		// Fallback: convert to string and treat as appropriate text type based on role
 		if contentStr := fmt.Sprintf("%v", content); contentStr != "" && contentStr != "<nil>" {
-			responseMsg["content"] = []map[string]interface{}{
+			responseMsg["content"] = []map[string]any{
 				{
 					"type": textContentType,
 					"text": contentStr,
@@ -343,7 +753,7 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]interfa
 	return responseMsg
 }
 
-func sanitizeResponseAPIContentItem(item map[string]interface{}, textContentType string) []map[string]interface{} {
+func sanitizeResponseAPIContentItem(item map[string]any, textContentType string) []map[string]any {
 	if item == nil {
 		return nil
 	}
@@ -354,13 +764,13 @@ func sanitizeResponseAPIContentItem(item map[string]interface{}, textContentType
 	// Convert them into plain text summaries to preserve user-visible context while avoiding upstream errors.
 	if itemType == "reasoning" {
 		if summaryText := extractReasoningSummaryText(item); summaryText != "" {
-			return []map[string]interface{}{{
+			return []map[string]any{{
 				"type": textContentType,
 				"text": summaryText,
 			}}
 		}
 		if text, ok := item["text"].(string); ok && strings.TrimSpace(text) != "" {
-			return []map[string]interface{}{{
+			return []map[string]any{{
 				"type": textContentType,
 				"text": text,
 			}}
@@ -373,18 +783,18 @@ func sanitizeResponseAPIContentItem(item map[string]interface{}, textContentType
 	// could cause 400 error
 	delete(item, "encrypted_content")
 
-	return []map[string]interface{}{item}
+	return []map[string]any{item}
 }
 
-func extractReasoningSummaryText(item map[string]interface{}) string {
-	summary, ok := item["summary"].([]interface{})
+func extractReasoningSummaryText(item map[string]any) string {
+	summary, ok := item["summary"].([]any)
 	if !ok {
 		return ""
 	}
 
 	var builder strings.Builder
 	for _, entry := range summary {
-		entryMap, ok := entry.(map[string]interface{})
+		entryMap, ok := entry.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -542,9 +952,16 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 					Type:        tool.Type,
 					Name:        tool.Function.Name,
 					Description: tool.Function.Description,
+					Function: &model.Function{
+						Name:        tool.Function.Name,
+						Description: tool.Function.Description,
+						Parameters:  tool.Function.Parameters,
+						Required:    tool.Function.Required,
+						Strict:      tool.Function.Strict,
+					},
 				}
 				if tool.Function.Parameters != nil {
-					if params, ok := tool.Function.Parameters.(map[string]interface{}); ok {
+					if params, ok := tool.Function.Parameters.(map[string]any); ok {
 						responseAPITool.Parameters = params
 					}
 				}
@@ -552,7 +969,11 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 			}
 		}
 		if request.ToolChoice != nil {
-			responseReq.ToolChoice = request.ToolChoice
+			if normalized, changed := NormalizeToolChoiceForResponse(request.ToolChoice); changed {
+				responseReq.ToolChoice = normalized
+			} else {
+				responseReq.ToolChoice = request.ToolChoice
+			}
 		}
 	}
 
@@ -562,16 +983,27 @@ func ConvertChatCompletionToResponseAPI(request *model.GeneralOpenAIRequest) *Re
 				Type:        "function",
 				Name:        function.Name,
 				Description: function.Description,
+				Function: &model.Function{
+					Name:        function.Name,
+					Description: function.Description,
+					Parameters:  function.Parameters,
+					Required:    function.Required,
+					Strict:      function.Strict,
+				},
 			}
 			if function.Parameters != nil {
-				if params, ok := function.Parameters.(map[string]interface{}); ok {
+				if params, ok := function.Parameters.(map[string]any); ok {
 					responseAPITool.Parameters = params
 				}
 			}
 			responseAPITools = append(responseAPITools, responseAPITool)
 		}
 		if request.FunctionCall != nil {
-			responseReq.ToolChoice = request.FunctionCall
+			if normalized, changed := NormalizeToolChoiceForResponse(request.FunctionCall); changed {
+				responseReq.ToolChoice = normalized
+			} else {
+				responseReq.ToolChoice = request.FunctionCall
+			}
 		}
 	}
 
@@ -648,6 +1080,10 @@ func ConvertResponseAPIToChatCompletionRequest(request *ResponseAPIRequest) (*mo
 		return nil, errors.New("background responses are not supported for this channel")
 	}
 
+	if normalized, changed := NormalizeToolChoice(request.ToolChoice); changed {
+		request.ToolChoice = normalized
+	}
+
 	chatReq := &model.GeneralOpenAIRequest{
 		Model:       request.Model,
 		Store:       request.Store,
@@ -695,7 +1131,7 @@ func ConvertResponseAPIToChatCompletionRequest(request *ResponseAPIRequest) (*mo
 		switch v := item.(type) {
 		case string:
 			chatReq.Messages = append(chatReq.Messages, model.Message{Role: "user", Content: v})
-		case map[string]interface{}:
+		case map[string]any:
 			msg, err := responseContentItemToMessage(v)
 			if err != nil {
 				return nil, errors.Wrap(err, "convert response api content to chat message")
@@ -709,7 +1145,7 @@ func ConvertResponseAPIToChatCompletionRequest(request *ResponseAPIRequest) (*mo
 	return chatReq, nil
 }
 
-func responseContentItemToMessage(item map[string]interface{}) (*model.Message, error) {
+func responseContentItemToMessage(item map[string]any) (*model.Message, error) {
 	role := "user"
 	if r, ok := item["role"].(string); ok && r != "" {
 		role = r
@@ -730,12 +1166,12 @@ func responseContentItemToMessage(item map[string]interface{}) (*model.Message, 
 	switch content := contentVal.(type) {
 	case string:
 		message.Content = content
-	case []interface{}:
+	case []any:
 		parts := make([]model.MessageContent, 0, len(content))
 		textSections := make([]string, 0, len(content))
 		hasNonText := false
 		for _, raw := range content {
-			partMap, ok := raw.(map[string]interface{})
+			partMap, ok := raw.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -756,7 +1192,7 @@ func responseContentItemToMessage(item map[string]interface{}) (*model.Message, 
 					hasNonText = true
 				}
 			case "input_audio":
-				if inputAudio, ok := partMap["input_audio"].(map[string]interface{}); ok {
+				if inputAudio, ok := partMap["input_audio"].(map[string]any); ok {
 					data, _ := inputAudio["data"].(string)
 					format, _ := inputAudio["format"].(string)
 					parts = append(parts, model.MessageContent{
@@ -959,9 +1395,7 @@ func (d ResponseAPIInputTokensDetails) MarshalJSON() ([]byte, error) {
 	}
 
 	raw := make(map[string]any, len(d.additional)+6)
-	for k, v := range d.additional {
-		raw[k] = v
-	}
+	maps.Copy(raw, d.additional)
 	if d.CachedTokens != 0 {
 		raw["cached_tokens"] = d.CachedTokens
 	}
@@ -1025,9 +1459,7 @@ func (d ResponseAPIOutputTokensDetails) MarshalJSON() ([]byte, error) {
 	}
 
 	raw := make(map[string]any, len(d.additional)+6)
-	for k, v := range d.additional {
-		raw[k] = v
-	}
+	maps.Copy(raw, d.additional)
 	if d.ReasoningTokens != 0 {
 		raw["reasoning_tokens"] = d.ReasoningTokens
 	}
@@ -1239,6 +1671,7 @@ type ResponseAPIResponse struct {
 	Text               *ResponseTextConfig            `json:"text,omitempty"`                 // Configuration options for text response
 	ToolChoice         any                            `json:"tool_choice,omitempty"`          // How the model selected tools
 	Tools              []model.Tool                   `json:"tools,omitempty"`                // Array of tools the model may call
+	RequiredAction     *ResponseAPIRequiredAction     `json:"required_action,omitempty"`      // Information about next actions required by the client
 	TopP               *float64                       `json:"top_p,omitempty"`                // Alternative to sampling with temperature
 	Truncation         *string                        `json:"truncation,omitempty"`           // Truncation strategy
 	User               *string                        `json:"user,omitempty"`                 // Stable identifier for end-users
@@ -1364,6 +1797,10 @@ func ConvertResponseAPIToChatCompletion(responseAPIResp *ResponseAPIResponse) *T
 		finishReason = "stop"
 	default:
 		finishReason = "stop"
+	}
+
+	if len(tools) > 0 && finishReason == "stop" {
+		finishReason = "tool_calls"
 	}
 
 	choice := TextResponseChoice{

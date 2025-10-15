@@ -13,7 +13,7 @@ import (
 
 func splitSubnets(subnets string) []string {
 	res := strings.Split(subnets, ",")
-	for i := 0; i < len(res); i++ {
+	for i := range res {
 		res[i] = strings.TrimSpace(res[i])
 	}
 	return res

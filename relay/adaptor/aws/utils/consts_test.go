@@ -66,6 +66,18 @@ func TestConvertModelID2CrossRegionProfile(t *testing.T) {
 			expected: "apac.anthropic.claude-3-5-sonnet-20240620-v1:0",
 		},
 		{
+			name:     "Global profile when source region is allowed",
+			model:    "anthropic.claude-sonnet-4-20250514-v1:0",
+			region:   "us-west-2",
+			expected: "global.anthropic.claude-sonnet-4-20250514-v1:0",
+		},
+		{
+			name:     "Global profile falls back to geography when source region unsupported",
+			model:    "anthropic.claude-sonnet-4-20250514-v1:0",
+			region:   "eu-central-1",
+			expected: "eu.anthropic.claude-sonnet-4-20250514-v1:0",
+		},
+		{
 			name:     "Unsupported model returns original",
 			model:    "unsupported.model-v1:0",
 			region:   "us-east-1",
@@ -120,7 +132,7 @@ func TestUpdateRegionHealthMetrics(t *testing.T) {
 	}
 
 	// Test multiple failures to trigger unhealthy status
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		UpdateRegionHealthMetrics(region, false, 0, testErr)
 	}
 	health = GetRegionHealth(region)
@@ -168,6 +180,9 @@ func TestCrossRegionInferencesValidation(t *testing.T) {
 		"us-gov": true,
 		"eu":     true,
 		"apac":   true,
+		"global": true,
+		"ca":     true,
+		"jp":     true,
 	}
 
 	for _, modelID := range CrossRegionInferences {
@@ -189,8 +204,7 @@ func BenchmarkConvertModelID2CrossRegionProfile(b *testing.B) {
 	model := "anthropic.claude-3-haiku-20240307-v1:0"
 	region := "us-east-1"
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		ConvertModelID2CrossRegionProfile(ctx, model, region)
 	}
 }
@@ -198,8 +212,7 @@ func BenchmarkConvertModelID2CrossRegionProfile(b *testing.B) {
 func BenchmarkGetRegionPrefix(b *testing.B) {
 	region := "us-east-1"
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		getRegionPrefix(region)
 	}
 }

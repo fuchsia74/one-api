@@ -82,9 +82,9 @@ func TestGetModelsDisplay_Keyword(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var resp struct {
-		Success bool                   `json:"success"`
-		Message string                 `json:"message"`
-		Data    map[string]interface{} `json:"data"`
+		Success bool           `json:"success"`
+		Message string         `json:"message"`
+		Data    map[string]any `json:"data"`
 	}
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)
@@ -111,9 +111,9 @@ func TestGetModelsDisplay_Anonymous(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	var resp struct {
-		Success bool                   `json:"success"`
-		Message string                 `json:"message"`
-		Data    map[string]interface{} `json:"data"`
+		Success bool           `json:"success"`
+		Message string         `json:"message"`
+		Data    map[string]any `json:"data"`
 	}
 	err := json.Unmarshal(w.Body.Bytes(), &resp)
 	require.NoError(t, err)

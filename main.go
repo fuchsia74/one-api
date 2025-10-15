@@ -46,13 +46,14 @@ func main() {
 
 	common.Init()
 	logger.SetupLogger()
+	logger.StartLogRetentionCleaner(ctx, config.LogRetentionDays, logger.LogDir)
 
 	// Setup enhanced logger with alertPusher integration
 	logger.SetupEnhancedLogger(ctx)
 
 	logger.Logger.Info("One API started", zap.String("version", common.Version))
 
-	if os.Getenv("GIN_MODE") != gin.DebugMode {
+	if config.GinMode != gin.DebugMode {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
@@ -98,15 +99,10 @@ func main() {
 		go model.SyncOptions(config.SyncFrequency)
 		go model.SyncChannelCache(config.SyncFrequency)
 	}
-	if os.Getenv("CHANNEL_TEST_FREQUENCY") != "" {
-		frequency, err := strconv.Atoi(os.Getenv("CHANNEL_TEST_FREQUENCY"))
-		if err != nil {
-			logger.Logger.Fatal("failed to parse CHANNEL_TEST_FREQUENCY", zap.Error(err))
-		}
-		go controller.AutomaticallyTestChannels(frequency)
+	if config.ChannelTestFrequency > 0 {
+		go controller.AutomaticallyTestChannels(config.ChannelTestFrequency)
 	}
-	if os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
-		config.BatchUpdateEnabled = true
+	if config.BatchUpdateEnabled {
 		logger.Logger.Info("batch update enabled with interval " + strconv.Itoa(config.BatchUpdateInterval) + "s")
 		model.InitBatchUpdater()
 	}
@@ -206,7 +202,7 @@ func main() {
 	}
 
 	router.SetRouter(server, buildFS)
-	var port = os.Getenv("PORT")
+	port := config.ServerPort
 	if port == "" {
 		port = strconv.Itoa(*common.Port)
 	}

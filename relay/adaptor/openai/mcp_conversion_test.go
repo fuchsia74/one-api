@@ -82,7 +82,7 @@ func TestConvertChatCompletionToResponseAPIWithMCP(t *testing.T) {
 	}
 
 	// Verify the JSON contains the required server_label field
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(jsonData, &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -113,10 +113,10 @@ func TestConvertChatCompletionToResponseAPIWithMCPAndFunction(t *testing.T) {
 				Function: &model.Function{
 					Name:        "get_weather",
 					Description: "Get weather information",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"location": map[string]interface{}{
+						"properties": map[string]any{
+							"location": map[string]any{
 								"type": "string",
 							},
 						},
@@ -127,8 +127,8 @@ func TestConvertChatCompletionToResponseAPIWithMCPAndFunction(t *testing.T) {
 				Type:        "mcp",
 				ServerLabel: "stripe",
 				ServerUrl:   "https://mcp.stripe.com",
-				RequireApproval: map[string]interface{}{
-					"never": map[string]interface{}{
+				RequireApproval: map[string]any{
+					"never": map[string]any{
 						"tool_names": []string{"create_payment_link"},
 					},
 				},

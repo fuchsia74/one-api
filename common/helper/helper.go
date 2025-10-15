@@ -94,7 +94,7 @@ func Bytes2Size(num int64) string {
 	return numStr + " " + unit
 }
 
-func Interface2String(inter interface{}) string {
+func Interface2String(inter any) string {
 	switch inter := inter.(type) {
 	case string:
 		return inter
@@ -106,7 +106,7 @@ func Interface2String(inter interface{}) string {
 	return "Not Implemented"
 }
 
-func UnescapeHTML(x string) interface{} {
+func UnescapeHTML(x string) any {
 	return template.HTML(x)
 }
 

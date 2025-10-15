@@ -157,7 +157,7 @@ func AddChannel(c *gin.Context) {
 			channel.TestingModel = nil
 		} else {
 			ok := false
-			for _, name := range strings.Split(channel.Models, ",") {
+			for name := range strings.SplitSeq(channel.Models, ",") {
 				if strings.TrimSpace(name) == tm {
 					ok = true
 					break

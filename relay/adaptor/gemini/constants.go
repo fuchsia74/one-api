@@ -1,6 +1,8 @@
 package gemini
 
 import (
+	"slices"
+
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/geminiOpenaiCompatible"
 )
@@ -31,11 +33,5 @@ var ModelsSupportSystemInstruction = []string{
 //
 // Because the main version of Go is 1.20, slice.Contains cannot be used
 func IsModelSupportSystemInstruction(model string) bool {
-	for _, m := range ModelsSupportSystemInstruction {
-		if m == model {
-			return true
-		}
-	}
-
-	return false
+	return slices.Contains(ModelsSupportSystemInstruction, model)
 }

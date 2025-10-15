@@ -131,12 +131,12 @@ func TestSetupTotp(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Parse response to verify TOTP setup data
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))
 
-	data := response["data"].(map[string]interface{})
+	data := response["data"].(map[string]any)
 	secret := data["secret"].(string)
 	qrCode := data["qr_code"].(string)
 
@@ -196,12 +196,12 @@ func TestTotpSetupRequest(t *testing.T) {
 	assert.Equal(t, http.StatusOK, setupW.Code)
 
 	// Parse setup response to get the secret
-	var setupResponse map[string]interface{}
+	var setupResponse map[string]any
 	err := json.Unmarshal(setupW.Body.Bytes(), &setupResponse)
 	assert.NoError(t, err)
 	assert.True(t, setupResponse["success"].(bool))
 
-	data := setupResponse["data"].(map[string]interface{})
+	data := setupResponse["data"].(map[string]any)
 	secret := data["secret"].(string)
 
 	// Step 2: Generate a valid TOTP code using the secret from setup
@@ -232,7 +232,7 @@ func TestTotpSetupRequest(t *testing.T) {
 	assert.Equal(t, http.StatusOK, confirmW.Code)
 
 	// Parse response to verify success
-	var confirmResponse map[string]interface{}
+	var confirmResponse map[string]any
 	err = json.Unmarshal(confirmW.Body.Bytes(), &confirmResponse)
 	assert.NoError(t, err)
 	assert.True(t, confirmResponse["success"].(bool))
@@ -395,7 +395,7 @@ func TestAdminDisableUserTotp(t *testing.T) {
 	assert.Equal(t, http.StatusOK, w.Code)
 
 	// Parse response to verify success
-	var response map[string]interface{}
+	var response map[string]any
 	err = json.Unmarshal(w.Body.Bytes(), &response)
 	assert.NoError(t, err)
 	assert.True(t, response["success"].(bool))

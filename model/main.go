@@ -3,7 +3,6 @@ package model
 import (
 	"database/sql"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -16,7 +15,6 @@ import (
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/config"
-	"github.com/songquanpeng/one-api/common/env"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
@@ -69,9 +67,7 @@ func CreateRootAccountIfNeed() error {
 	return nil
 }
 
-func chooseDB(envName string) (*gorm.DB, error) {
-	dsn := os.Getenv(envName)
-
+func chooseDB(dsn string) (*gorm.DB, error) {
 	switch {
 	case strings.HasPrefix(dsn, "postgres://"):
 		// Use PostgreSQL
@@ -121,7 +117,7 @@ func openSQLite() (*gorm.DB, error) {
 
 func InitDB() {
 	var err error
-	DB, err = chooseDB("SQL_DSN")
+	DB, err = chooseDB(config.SQLDSN)
 	if err != nil {
 		logger.Logger.Fatal("failed to initialize database", zap.Error(err))
 		return
@@ -224,14 +220,14 @@ func migrateDB() error {
 }
 
 func InitLogDB() {
-	if os.Getenv("LOG_SQL_DSN") == "" {
+	if config.LogSQLDSN == "" {
 		LOG_DB = DB
 		return
 	}
 
 	logger.Logger.Info("using secondary database for table logs")
 	var err error
-	LOG_DB, err = chooseDB("LOG_SQL_DSN")
+	LOG_DB, err = chooseDB(config.LogSQLDSN)
 	if err != nil {
 		logger.Logger.Fatal("failed to initialize secondary database", zap.Error(err))
 		return
@@ -268,9 +264,9 @@ func setDBConns(db *gorm.DB) *sql.DB {
 	}
 
 	// Increase default connection pool sizes to handle billing load better
-	maxIdleConns := env.Int("SQL_MAX_IDLE_CONNS", 200)  // Increased from 100
-	maxOpenConns := env.Int("SQL_MAX_OPEN_CONNS", 2000) // Increased from 1000
-	maxLifetime := env.Int("SQL_MAX_LIFETIME", 300)     // Increased from 60 seconds
+	maxIdleConns := config.SQLMaxIdleConns      // Increased from 100
+	maxOpenConns := config.SQLMaxOpenConns      // Increased from 1000
+	maxLifetime := config.SQLMaxLifetimeSeconds // Increased from 60 seconds
 
 	sqlDB.SetMaxIdleConns(maxIdleConns)
 	sqlDB.SetMaxOpenConns(maxOpenConns)

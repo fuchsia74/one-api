@@ -35,7 +35,7 @@ func TestConvertClaudeRequest_ToOpenAI(t *testing.T) {
 			{Role: "user", Content: []any{map[string]any{"type": "tool_result", "tool_call_id": "c1", "content": []any{map[string]any{"type": "text", "text": "ok"}}}}},
 		},
 		Tools:      []relaymodel.ClaudeTool{{Name: "get_weather", Description: "Get weather", InputSchema: map[string]any{"type": "object"}}},
-		ToolChoice: map[string]any{"type": "auto"},
+		ToolChoice: map[string]any{"type": "tool", "name": "get_weather"},
 	}
 
 	out, err := ConvertClaudeRequest(c, req)
@@ -57,6 +57,15 @@ func TestConvertClaudeRequest_ToOpenAI(t *testing.T) {
 	assert.GreaterOrEqual(t, len(goReq.Messages), 2)
 	assert.NotNil(t, goReq.Tools)
 	assert.NotNil(t, goReq.ToolChoice)
+	if choiceMap, ok := goReq.ToolChoice.(map[string]any); ok {
+		assert.Equal(t, "function", choiceMap["type"])
+		fn, _ := choiceMap["function"].(map[string]any)
+		assert.Equal(t, "get_weather", fn["name"])
+		_, hasName := choiceMap["name"]
+		assert.False(t, hasName)
+	} else {
+		t.Fatalf("expected map tool_choice, got %T", goReq.ToolChoice)
+	}
 }
 
 func TestHandleClaudeMessagesResponse_NonStream_ConvertedResponse(t *testing.T) {

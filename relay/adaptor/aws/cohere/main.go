@@ -61,7 +61,7 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 	}
 
 	if textRequest.Stop != nil {
-		if stopSlice, ok := textRequest.Stop.([]interface{}); ok {
+		if stopSlice, ok := textRequest.Stop.([]any); ok {
 			stopSequences := make([]string, len(stopSlice))
 			for i, stop := range stopSlice {
 				if stopStr, ok := stop.(string); ok {
@@ -335,7 +335,7 @@ func convertMessages(messages []Message) ([]types.Message, []types.SystemContent
 			// Handle tool calls from assistant messages
 			for _, toolCall := range msg.ToolCalls {
 				// Parse tool call arguments
-				var inputData map[string]interface{}
+				var inputData map[string]any
 				if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &inputData); err != nil {
 					return nil, nil, errors.Wrapf(err, "unmarshal tool call arguments for tool %s", toolCall.Function.Name)
 				}
@@ -391,7 +391,7 @@ func createInferenceConfig(cohereReq *Request) *types.InferenceConfiguration {
 }
 
 // createToolConfig creates AWS tool configuration from Cohere tools
-func createToolConfig(cohereTools []CohereTool, toolChoice interface{}) *types.ToolConfiguration {
+func createToolConfig(cohereTools []CohereTool, toolChoice any) *types.ToolConfiguration {
 	if len(cohereTools) == 0 {
 		return nil // Return nil when no tools - this optimizes for normal Converse API
 	}
@@ -422,8 +422,8 @@ func createToolConfig(cohereTools []CohereTool, toolChoice interface{}) *types.T
 
 	// Handle tool choice
 	if toolChoice != nil {
-		if toolChoiceMap, ok := toolChoice.(map[string]interface{}); ok {
-			if funcMap, ok := toolChoiceMap["function"].(map[string]interface{}); ok {
+		if toolChoiceMap, ok := toolChoice.(map[string]any); ok {
+			if funcMap, ok := toolChoiceMap["function"].(map[string]any); ok {
 				if funcName, ok := funcMap["name"].(string); ok {
 					toolConfig.ToolChoice = &types.ToolChoiceMemberTool{
 						Value: types.SpecificToolChoice{

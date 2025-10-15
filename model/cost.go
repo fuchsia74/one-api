@@ -213,10 +213,7 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 		if duplicateCount > 0 {
 			const deleteBatchSize = 1000
 			for start := 0; start < len(staleIDs); start += deleteBatchSize {
-				end := start + deleteBatchSize
-				if end > len(staleIDs) {
-					end = len(staleIDs)
-				}
+				end := min(start+deleteBatchSize, len(staleIDs))
 				if err := DB.Where("id IN ?", staleIDs[start:end]).Delete(&UserRequestCost{}).Error; err != nil {
 					return errors.Wrap(err, "delete duplicate user_request_costs batch")
 				}
@@ -227,8 +224,8 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 
 		cond := fmt.Sprintf("%s < ?", dedupColumn)
 		type keepRow struct {
-			RequestID string      `gorm:"column:request_id"`
-			MaxMarker interface{} `gorm:"column:max_marker"`
+			RequestID string `gorm:"column:request_id"`
+			MaxMarker any    `gorm:"column:max_marker"`
 		}
 
 		var keepRows []keepRow
@@ -375,7 +372,7 @@ func userRequestCostHasIDColumn() (bool, error) {
 				name      string
 				ctype     string
 				notnull   int
-				dfltValue interface{}
+				dfltValue any
 				pk        int
 			)
 			if err := rows.Scan(&cid, &name, &ctype, &notnull, &dfltValue, &pk); err != nil {

@@ -15,8 +15,7 @@ func BenchmarkStringConcatenation(b *testing.B) {
 		"Final chunk with additional text",
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		responseText := ""
 		for _, chunk := range chunks {
 			responseText += chunk
@@ -35,8 +34,7 @@ func BenchmarkStringBuilder(b *testing.B) {
 		"Final chunk with additional text",
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var responseTextBuilder strings.Builder
 		responseTextBuilder.Grow(DefaultBuilderCapacity)
 		for _, chunk := range chunks {
@@ -53,8 +51,7 @@ func BenchmarkStringConcatenationLarge(b *testing.B) {
 		chunks[i] = "This is a repetitive chunk of text that simulates streaming data "
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		responseText := ""
 		for _, chunk := range chunks {
 			responseText += chunk
@@ -70,8 +67,7 @@ func BenchmarkStringBuilderLarge(b *testing.B) {
 		chunks[i] = "This is a repetitive chunk of text that simulates streaming data "
 	}
 
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		var responseTextBuilder strings.Builder
 		responseTextBuilder.Grow(LargeBuilderCapacity)
 		for _, chunk := range chunks {
@@ -87,9 +83,9 @@ func BenchmarkMemoryAllocations(b *testing.B) {
 		b.ReportAllocs()
 		chunk := "test chunk data"
 
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			responseText := ""
-			for j := 0; j < 50; j++ {
+			for range 50 {
 				responseText += chunk
 			}
 			_ = responseText
@@ -100,10 +96,10 @@ func BenchmarkMemoryAllocations(b *testing.B) {
 		b.ReportAllocs()
 		chunk := "test chunk data"
 
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			var responseTextBuilder strings.Builder
 			responseTextBuilder.Grow(DefaultBuilderCapacity)
-			for j := 0; j < 50; j++ {
+			for range 50 {
 				responseTextBuilder.WriteString(chunk)
 			}
 			_ = responseTextBuilder.String()
@@ -123,7 +119,7 @@ func BenchmarkEnhancedUnifiedStreamHandler(b *testing.B) {
 			"Final chunk with additional text",
 		}
 
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			var responseTextBuilder strings.Builder
 			responseTextBuilder.Grow(DefaultBuilderCapacity)
 
@@ -144,7 +140,7 @@ func BenchmarkEnhancedUnifiedStreamHandler(b *testing.B) {
 			"Final content chunk",
 		}
 
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			var responseTextBuilder strings.Builder
 			responseTextBuilder.Grow(DefaultBuilderCapacity)
 
@@ -176,7 +172,7 @@ func BenchmarkEnhancedVsOriginal(b *testing.B) {
 
 	b.Run("OriginalStringConcatenation", func(b *testing.B) {
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			responseText := ""
 			for _, chunk := range chunks {
 				responseText += chunk
@@ -187,7 +183,7 @@ func BenchmarkEnhancedVsOriginal(b *testing.B) {
 
 	b.Run("EnhancedUnifiedStringBuilder", func(b *testing.B) {
 		b.ReportAllocs()
-		for i := 0; i < b.N; i++ {
+		for b.Loop() {
 			var responseTextBuilder strings.Builder
 			responseTextBuilder.Grow(LargeBuilderCapacity)
 

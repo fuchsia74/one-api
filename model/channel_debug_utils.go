@@ -2,6 +2,7 @@ package model
 
 import (
 	"encoding/json"
+	"slices"
 
 	"github.com/Laisky/errors/v2"
 	"github.com/Laisky/zap"
@@ -197,7 +198,7 @@ func FixChannelModelConfigs(channelId int) error {
 	}
 
 	// Save changes
-	err = DB.Model(&channel).Updates(map[string]interface{}{
+	err = DB.Model(&channel).Updates(map[string]any{
 		"model_configs":    channel.ModelConfigs,
 		"model_ratio":      channel.ModelRatio,
 		"completion_ratio": channel.CompletionRatio,
@@ -265,12 +266,7 @@ func CleanAllMixedModelData() error {
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }
 
 // Helper function to get expected models for a channel type

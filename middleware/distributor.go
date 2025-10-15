@@ -91,7 +91,7 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	// and each groud has individual ratio,
 	// set minimal group ratio as channel_ratio
 	var minimalRatio float64 = -1
-	for _, grp := range strings.Split(channel.Group, ",") {
+	for grp := range strings.SplitSeq(channel.Group, ",") {
 		v := ratio.GetGroupRatio(grp)
 		if minimalRatio < 0 || v < minimalRatio {
 			minimalRatio = v

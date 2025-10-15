@@ -25,7 +25,7 @@ func TestGenerateVerificationCodeLength(t *testing.T) {
 // TestGenerateVerificationCodeUniqueness tests that GenerateVerificationCode generates unique codes.
 func TestGenerateVerificationCodeUniqueness(t *testing.T) {
 	codes := make(map[string]struct{})
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		code := GenerateVerificationCode(8)
 		if _, exists := codes[code]; exists {
 			t.Errorf("Duplicate code generated: %s", code)

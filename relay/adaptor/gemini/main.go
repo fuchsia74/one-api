@@ -36,10 +36,10 @@ var mimeTypeMap = map[string]string{
 }
 
 // cleanJsonSchemaForGemini removes unsupported fields and converts types for Gemini API compatibility
-func cleanJsonSchemaForGemini(schema interface{}) interface{} {
+func cleanJsonSchemaForGemini(schema any) any {
 	switch v := schema.(type) {
-	case map[string]interface{}:
-		cleaned := make(map[string]interface{})
+	case map[string]any:
+		cleaned := make(map[string]any)
 
 		// List of supported fields in Gemini (from official documentation)
 		supportedFields := map[string]bool{
@@ -98,8 +98,8 @@ func cleanJsonSchemaForGemini(schema interface{}) interface{} {
 				}
 			case "properties":
 				// Handle properties object - recursively clean each property
-				if props, ok := value.(map[string]interface{}); ok {
-					cleanedProps := make(map[string]interface{})
+				if props, ok := value.(map[string]any); ok {
+					cleanedProps := make(map[string]any)
 					for propKey, propValue := range props {
 						cleanedProps[propKey] = cleanJsonSchemaForGemini(propValue)
 					}
@@ -116,9 +116,9 @@ func cleanJsonSchemaForGemini(schema interface{}) interface{} {
 			}
 		}
 		return cleaned
-	case []interface{}:
+	case []any:
 		// Clean arrays recursively
-		cleaned := make([]interface{}, len(v))
+		cleaned := make([]any, len(v))
 		for i, item := range v {
 			cleaned[i] = cleanJsonSchemaForGemini(item)
 		}
@@ -130,16 +130,16 @@ func cleanJsonSchemaForGemini(schema interface{}) interface{} {
 }
 
 // cleanFunctionParameters recursively removes additionalProperties and other unsupported fields from function parameters
-func cleanFunctionParameters(params interface{}) interface{} {
+func cleanFunctionParameters(params any) any {
 	return cleanFunctionParametersInternal(params, true)
 }
 
 // cleanFunctionParametersInternal recursively removes additionalProperties and other unsupported fields from function parameters
 // isTopLevel indicates if we're at the top level where description and strict should be removed
-func cleanFunctionParametersInternal(params interface{}, isTopLevel bool) interface{} {
+func cleanFunctionParametersInternal(params any, isTopLevel bool) any {
 	switch v := params.(type) {
-	case map[string]interface{}:
-		cleaned := make(map[string]interface{})
+	case map[string]any:
+		cleaned := make(map[string]any)
 
 		// Format mapping from OpenAI to Gemini supported formats
 		// Based on error message: only 'enum' and 'date-time' are supported for STRING type
@@ -176,9 +176,9 @@ func cleanFunctionParametersInternal(params interface{}, isTopLevel bool) interf
 			cleaned[key] = cleanFunctionParametersInternal(value, false)
 		}
 		return cleaned
-	case []interface{}:
+	case []any:
 		// Clean arrays recursively
-		cleaned := make([]interface{}, len(v))
+		cleaned := make([]any, len(v))
 		for i, item := range v {
 			cleaned[i] = cleanFunctionParametersInternal(item, false)
 		}
@@ -254,11 +254,11 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			// Use the helper function to recursively clean function parameters
 			cleanedParams := cleanFunctionParameters(tool.Function.Parameters)
 			// Type assert to map[string]any
-			cleanedParamsMap, ok := cleanedParams.(map[string]interface{})
+			cleanedParamsMap, ok := cleanedParams.(map[string]any)
 			if !ok {
 				// If type assertion fails, fallback to original parameters without additionalProperties
-				cleanedParamsMap = make(map[string]interface{})
-				if originalParams, ok := tool.Function.Parameters.(map[string]interface{}); ok {
+				cleanedParamsMap = make(map[string]any)
+				if originalParams, ok := tool.Function.Parameters.(map[string]any); ok {
 					for k, v := range originalParams {
 						if k != "additionalProperties" && k != "description" && k != "strict" {
 							cleanedParamsMap[k] = v
@@ -283,11 +283,11 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 			// Use the helper function to recursively clean function parameters
 			cleanedParams := cleanFunctionParameters(function.Parameters)
 			// Type assert to map[string]any
-			cleanedParamsMap, ok := cleanedParams.(map[string]interface{})
+			cleanedParamsMap, ok := cleanedParams.(map[string]any)
 			if !ok {
 				// If type assertion fails, fallback to original parameters without additionalProperties
-				cleanedParamsMap = make(map[string]interface{})
-				if originalParams, ok := function.Parameters.(map[string]interface{}); ok {
+				cleanedParamsMap = make(map[string]any)
+				if originalParams, ok := function.Parameters.(map[string]any); ok {
 					for k, v := range originalParams {
 						if k != "additionalProperties" && k != "description" && k != "strict" {
 							cleanedParamsMap[k] = v
@@ -330,7 +330,7 @@ func ConvertRequest(textRequest model.GeneralOpenAIRequest) *ChatRequest {
 		if len(message.ToolCalls) > 0 {
 			for _, toolCall := range message.ToolCalls {
 				// Parse the arguments from JSON string to interface{}
-				var args interface{}
+				var args any
 				if err := json.Unmarshal([]byte(toolCall.Function.Arguments.(string)), &args); err != nil {
 					// If parsing fails, use the raw string
 					args = toolCall.Function.Arguments

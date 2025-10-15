@@ -2,6 +2,7 @@ package pricing
 
 import (
 	"fmt"
+	"maps"
 	"sync"
 
 	"github.com/Laisky/zap"
@@ -226,9 +227,7 @@ func GetGlobalModelPricing() map[string]adaptor.ModelConfig {
 
 	// Return a copy to prevent external modification
 	result := make(map[string]adaptor.ModelConfig)
-	for k, v := range globalPricingManager.globalModelPricing {
-		result[k] = v
-	}
+	maps.Copy(result, globalPricingManager.globalModelPricing)
 
 	return result
 }

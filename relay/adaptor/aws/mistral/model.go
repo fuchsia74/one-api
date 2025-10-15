@@ -19,7 +19,7 @@ type Request struct {
 	// ToolChoice controls how the model should use the available tools.
 	// Can be "auto" (model decides), "any" (must use a tool), "none" (no tools),
 	// or a specific tool choice object. Optional field.
-	ToolChoice interface{} `json:"tool_choice,omitempty"`
+	ToolChoice any `json:"tool_choice,omitempty"`
 
 	// MaxTokens specifies the maximum number of tokens to generate in the response.
 	// Optional field that helps control response length and API costs.
@@ -123,7 +123,7 @@ type ToolSpec struct {
 
 	// Parameters defines the JSON schema for the function's input parameters.
 	// Should be a valid JSON Schema object describing expected arguments.
-	Parameters interface{} `json:"parameters"`
+	Parameters any `json:"parameters"`
 }
 
 // Response represents the complete response from AWS Bedrock Mistral Large.

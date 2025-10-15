@@ -19,9 +19,9 @@ func TestEmbeddingHandler_Success(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	// Create a valid embedding response
-	embeddingResponse := map[string]interface{}{
+	embeddingResponse := map[string]any{
 		"object": "list",
-		"data": []map[string]interface{}{
+		"data": []map[string]any{
 			{
 				"object":    "embedding",
 				"index":     0,
@@ -34,7 +34,7 @@ func TestEmbeddingHandler_Success(t *testing.T) {
 			},
 		},
 		"model": "text-embedding-ada-002",
-		"usage": map[string]interface{}{
+		"usage": map[string]any{
 			"prompt_tokens":     10,
 			"completion_tokens": 0,
 			"total_tokens":      10,
@@ -67,18 +67,18 @@ func TestEmbeddingHandler_Success(t *testing.T) {
 	assert.Equal(t, "application/json", w.Header().Get("Content-Type"))
 
 	// Verify response body was written correctly
-	var responseData map[string]interface{}
+	var responseData map[string]any
 	err = json.Unmarshal(w.Body.Bytes(), &responseData)
 	require.NoError(t, err)
 	assert.Equal(t, "list", responseData["object"])
 	assert.Equal(t, "text-embedding-ada-002", responseData["model"])
 
 	// Verify embedding data
-	data, ok := responseData["data"].([]interface{})
+	data, ok := responseData["data"].([]any)
 	require.True(t, ok)
 	assert.Len(t, data, 2)
 
-	firstEmbedding := data[0].(map[string]interface{})
+	firstEmbedding := data[0].(map[string]any)
 	assert.Equal(t, "embedding", firstEmbedding["object"])
 	assert.Equal(t, float64(0), firstEmbedding["index"])
 }
@@ -89,8 +89,8 @@ func TestEmbeddingHandler_ErrorResponse(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	// Create an error response
-	errorResponse := map[string]interface{}{
-		"error": map[string]interface{}{
+	errorResponse := map[string]any{
+		"error": map[string]any{
 			"message": "Invalid API key",
 			"type":    "authentication_error",
 			"code":    "invalid_api_key",
@@ -165,11 +165,11 @@ func TestEmbeddingHandler_NoEmbeddingData(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	// Create response with no embedding data
-	embeddingResponse := map[string]interface{}{
+	embeddingResponse := map[string]any{
 		"object": "list",
-		"data":   []interface{}{}, // Empty data array
+		"data":   []any{}, // Empty data array
 		"model":  "text-embedding-ada-002",
-		"usage": map[string]interface{}{
+		"usage": map[string]any{
 			"prompt_tokens":     0,
 			"completion_tokens": 0,
 			"total_tokens":      0,
@@ -201,9 +201,9 @@ func TestEmbeddingHandler_UsageTotalTokensCalculation(t *testing.T) {
 	c, _ := gin.CreateTestContext(w)
 
 	// Create a response with usage that needs total tokens calculation
-	embeddingResponse := map[string]interface{}{
+	embeddingResponse := map[string]any{
 		"object": "list",
-		"data": []map[string]interface{}{
+		"data": []map[string]any{
 			{
 				"object":    "embedding",
 				"index":     0,
@@ -211,7 +211,7 @@ func TestEmbeddingHandler_UsageTotalTokensCalculation(t *testing.T) {
 			},
 		},
 		"model": "text-embedding-ada-002",
-		"usage": map[string]interface{}{
+		"usage": map[string]any{
 			"prompt_tokens":     15,
 			"completion_tokens": 5,
 			"total_tokens":      0, // Missing total tokens

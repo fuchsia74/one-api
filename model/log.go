@@ -211,7 +211,7 @@ var allowedConsumeLogUpdateFields = map[string]struct{}{
 	"elapsed_time": {},
 }
 
-func UpdateConsumeLogByID(ctx context.Context, logID int, updates map[string]interface{}) error {
+func UpdateConsumeLogByID(ctx context.Context, logID int, updates map[string]any) error {
 	if logID <= 0 {
 		return errors.Errorf("log id must be positive: %d", logID)
 	}
@@ -471,7 +471,7 @@ func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*
 
 	// If userId is 0, query all users (site-wide statistics)
 	var query string
-	var args []interface{}
+	var args []any
 
 	// We switch to explicit >= start AND < endExclusive to avoid relying on BETWEEN inclusive semantics.
 	if userId == 0 {
@@ -487,7 +487,7 @@ func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*
 			GROUP BY day, model_name
 			ORDER BY day, model_name
 		`
-		args = []interface{}{start, endExclusive}
+		args = []any{start, endExclusive}
 	} else {
 		query = `
 			SELECT ` + groupSelect + `,
@@ -502,7 +502,7 @@ func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*
 			GROUP BY day, model_name
 			ORDER BY day, model_name
 		`
-		args = []interface{}{userId, start, endExclusive}
+		args = []any{userId, start, endExclusive}
 	}
 
 	err = LOG_DB.Raw(query, args...).Scan(&LogStatistics).Error

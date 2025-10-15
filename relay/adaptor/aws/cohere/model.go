@@ -50,7 +50,7 @@ type Request struct {
 	// ToolChoice controls how the model decides to use tools.
 	// Can be "auto" (model decides), "any" (must use a tool), or specify a particular tool.
 	// Optional field that provides fine-grained control over tool invocation behavior.
-	ToolChoice interface{} `json:"tool_choice,omitempty"`
+	ToolChoice any `json:"tool_choice,omitempty"`
 }
 
 // Message represents a single message in the conversation history.
@@ -631,7 +631,7 @@ type CohereToolSpec struct {
 	// Provides Cohere Command R with parameter structure, types, and constraints
 	// for generating appropriate function calls with proper validation and type safety
 	// within enterprise-grade tool calling workflows through AWS Bedrock integration.
-	Parameters interface{} `json:"parameters"`
+	Parameters any `json:"parameters"`
 }
 
 // CohereToolCall represents a tool invocation made by Cohere Command R during conversation.

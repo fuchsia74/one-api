@@ -21,8 +21,7 @@ func TestUpdateUserRequestCostQuotaByRequestID_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 
 	// Start N-1 concurrent updates first to exercise contention
-	for i := 0; i < goroutines-1; i++ {
-		i := i
+	for i := range goroutines - 1 {
 		wg.Go(func() {
 			_ = UpdateUserRequestCostQuotaByRequestID(userID, reqID, int64(i))
 		})

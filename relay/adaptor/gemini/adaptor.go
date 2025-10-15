@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strconv"
 	"strings"
@@ -386,9 +387,7 @@ func (a *Adaptor) convertNonStreamingToClaudeResponse(c *gin.Context, resp *http
 	}
 
 	// Copy headers but update content type
-	for k, v := range resp.Header {
-		newResp.Header[k] = v
-	}
+	maps.Copy(newResp.Header, resp.Header)
 	newResp.Header.Set("Content-Type", "application/json")
 	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(claudeBody)))
 

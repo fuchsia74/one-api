@@ -73,7 +73,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeClaudeMessagesQuota(c, claudeRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeClaudeMessagesQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeClaudeMessagesQuota failed",
+			zap.Int("status_code", bizErr.StatusCode),
+			zap.Error(bizErr.RawError))
 		return bizErr
 	}
 
@@ -316,7 +318,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 					ct := resp.Header.Get("Content-Type")
 					if strings.Contains(strings.ToLower(ct), "text/event-stream") || bytes.HasPrefix(body, []byte("data:")) || bytes.Contains(body, []byte("\ndata:")) {
 						accumulated := ""
-						for _, line := range bytes.Split(body, []byte("\n")) {
+						for line := range bytes.SplitSeq(body, []byte("\n")) {
 							line = bytes.TrimSpace(line)
 							if !bytes.HasPrefix(line, []byte("data:")) {
 								continue
@@ -383,7 +385,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 
 	if respErr != nil {
-		lg.Error("Claude native response handler failed", zap.Any("error", *respErr))
+		lg.Error("Claude native response handler failed",
+			zap.Int("status_code", respErr.StatusCode),
+			zap.Error(respErr.RawError))
 		// If usage is available (e.g., client disconnected after upstream response),
 		// proceed with billing; otherwise, refund pre-consumed quota and return error.
 		if usage == nil {
@@ -777,13 +781,7 @@ func calculateSingleImageTokens(ctx context.Context, imageBlock map[string]any) 
 	case "base64":
 		if data, exists := sourceMap["data"]; exists {
 			if dataStr, ok := data.(string); ok {
-				estimatedTokens := len(dataStr) / 1000
-				if estimatedTokens < 50 {
-					estimatedTokens = 50
-				}
-				if estimatedTokens > 2000 {
-					estimatedTokens = 2000
-				}
+				estimatedTokens := min(max(len(dataStr)/1000, 50), 2000)
 				logger.Debug("estimated tokens for base64 image",
 					zap.Int("tokens", estimatedTokens),
 					zap.Int("data_length", len(dataStr)),

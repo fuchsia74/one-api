@@ -210,7 +210,7 @@ func ConvertRequest(c *gin.Context, textRequest model.GeneralOpenAIRequest) (*Re
 			return nil, errors.New("tool function is nil")
 		}
 
-		params, ok := tool.Function.Parameters.(map[string]interface{})
+		params, ok := tool.Function.Parameters.(map[string]any)
 		if !ok {
 			return nil, errors.New("tool function parameters is not a map")
 		}

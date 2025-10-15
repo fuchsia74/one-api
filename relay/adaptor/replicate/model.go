@@ -192,7 +192,7 @@ func (r *ImageResponse) GetOutput() ([]string, error) {
 		return v, nil
 	case nil:
 		return nil, nil
-	case []interface{}:
+	case []any:
 		// convert []interface{} to []string
 		ret := make([]string, len(v))
 		for idx, vv := range v {

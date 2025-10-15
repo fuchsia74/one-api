@@ -556,27 +556,12 @@ func computeGptImage1TokenQuota(usage *relaymodel.Usage, groupRatio float64) flo
 	cachedText := 0
 	cachedImage := 0
 	if cachedIn > 0 && totalIn > 0 {
-		cachedText = int(math.Round(float64(cachedIn) * (float64(textIn) / float64(totalIn))))
-		if cachedText < 0 {
-			cachedText = 0
-		}
-		if cachedText > cachedIn {
-			cachedText = cachedIn
-		}
+		cachedText = min(max(int(math.Round(float64(cachedIn)*(float64(textIn)/float64(totalIn)))), 0), cachedIn)
 		cachedImage = cachedIn - cachedText
 	}
-	normalText := textIn - cachedText
-	if normalText < 0 {
-		normalText = 0
-	}
-	normalImage := imageIn - cachedImage
-	if normalImage < 0 {
-		normalImage = 0
-	}
-	outTokens := usage.CompletionTokens
-	if outTokens < 0 {
-		outTokens = 0
-	}
+	normalText := max(textIn-cachedText, 0)
+	normalImage := max(imageIn-cachedImage, 0)
+	outTokens := max(usage.CompletionTokens, 0)
 
 	// USD per 1M tokens
 	const (

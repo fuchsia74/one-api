@@ -306,8 +306,8 @@ func ValidateDSN(dsn string) error {
 func validateSQLiteDSN(dsn string) error {
 	// Handle sqlite:// scheme
 	path := dsn
-	if strings.HasPrefix(dsn, "sqlite://") {
-		path = strings.TrimPrefix(dsn, "sqlite://")
+	if after, ok := strings.CutPrefix(dsn, "sqlite://"); ok {
+		path = after
 	}
 
 	// Remove query parameters for path validation

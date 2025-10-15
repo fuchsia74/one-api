@@ -59,10 +59,10 @@ func TestConvertTools(t *testing.T) {
 			Function: &relaymodel.Function{
 				Name:        "get_weather",
 				Description: "Get weather information",
-				Parameters: map[string]interface{}{
+				Parameters: map[string]any{
 					"type": "object",
-					"properties": map[string]interface{}{
-						"location": map[string]interface{}{
+					"properties": map[string]any{
+						"location": map[string]any{
 							"type":        "string",
 							"description": "The city name",
 						},

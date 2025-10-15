@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
 	"strings"
 
@@ -180,9 +181,7 @@ func marshalClaudeHTTPResponse(orig *http.Response, payload relaymodel.ClaudeRes
 		Body:       io.NopCloser(bytes.NewReader(b)),
 	}
 	// Copy headers and set content type/length
-	for k, v := range orig.Header {
-		newResp.Header[k] = v
-	}
+	maps.Copy(newResp.Header, orig.Header)
 	newResp.Header.Set("Content-Type", "application/json")
 	newResp.Header.Set("Content-Length", fmt.Sprintf("%d", len(b)))
 	return newResp, nil
@@ -500,15 +499,15 @@ type responseAPIUsage struct {
 }
 
 type responseAPIOutput struct {
-	Type      string                 `json:"type"`
-	Role      string                 `json:"role,omitempty"`
-	Content   []responseAPIContent   `json:"content,omitempty"`
-	Summary   []responseAPIContent   `json:"summary,omitempty"`
-	CallId    string                 `json:"call_id,omitempty"`
-	Name      string                 `json:"name,omitempty"`
-	Arguments string                 `json:"arguments,omitempty"`
-	Tools     []relaymodel.Tool      `json:"tools,omitempty"`
-	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+	Type      string               `json:"type"`
+	Role      string               `json:"role,omitempty"`
+	Content   []responseAPIContent `json:"content,omitempty"`
+	Summary   []responseAPIContent `json:"summary,omitempty"`
+	CallId    string               `json:"call_id,omitempty"`
+	Name      string               `json:"name,omitempty"`
+	Arguments string               `json:"arguments,omitempty"`
+	Tools     []relaymodel.Tool    `json:"tools,omitempty"`
+	Metadata  map[string]any       `json:"metadata,omitempty"`
 }
 
 type responseAPIContent struct {

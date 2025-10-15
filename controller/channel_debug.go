@@ -136,7 +136,7 @@ func GetChannelMigrationStatus(c *gin.Context) {
 		return
 	}
 
-	status := map[string]interface{}{
+	status := map[string]any{
 		"channel_id":           channel.Id,
 		"channel_name":         channel.Name,
 		"channel_type":         channel.Type,

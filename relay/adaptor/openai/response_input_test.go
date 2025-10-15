@@ -24,7 +24,7 @@ func TestResponseAPIInputUnmarshaling(t *testing.T) {
 		{
 			name:     "Array input with message object",
 			jsonData: `{"input": [{"role": "user", "content": "Hello"}]}`,
-			expected: ResponseAPIInput{map[string]interface{}{
+			expected: ResponseAPIInput{map[string]any{
 				"role":    "user",
 				"content": "Hello",
 			}},
@@ -34,7 +34,7 @@ func TestResponseAPIInputUnmarshaling(t *testing.T) {
 			jsonData: `{"input": ["Hello", {"role": "user", "content": "World"}]}`,
 			expected: ResponseAPIInput{
 				"Hello",
-				map[string]interface{}{
+				map[string]any{
 					"role":    "user",
 					"content": "World",
 				},
@@ -74,8 +74,8 @@ func TestResponseAPIInputUnmarshaling(t *testing.T) {
 				}
 
 				// For map comparison (simplified)
-				if expectedMap, ok := expectedItem.(map[string]interface{}); ok {
-					if actualMap, ok := actualItem.(map[string]interface{}); ok {
+				if expectedMap, ok := expectedItem.(map[string]any); ok {
+					if actualMap, ok := actualItem.(map[string]any); ok {
 						for key, expectedValue := range expectedMap {
 							if actualValue, exists := actualMap[key]; !exists || actualValue != expectedValue {
 								t.Errorf("Expected input[%d][%s] to be %v, got %v", i, key, expectedValue, actualValue)

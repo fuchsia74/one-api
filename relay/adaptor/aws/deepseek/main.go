@@ -77,7 +77,7 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 	}
 
 	if textRequest.Stop != nil {
-		if stopSlice, ok := textRequest.Stop.([]interface{}); ok {
+		if stopSlice, ok := textRequest.Stop.([]any); ok {
 			stopSequences := make([]string, len(stopSlice))
 			for i, stop := range stopSlice {
 				if stopStr, ok := stop.(string); ok {
@@ -397,7 +397,7 @@ func convertDeepSeekToConverseRequest(deepseekReq *Request, modelID string) (*be
 		// When set to "high", it displays the reasoning content.
 		// This implementation supports the reasoning_effort parameter and converts it into the reasoning_config design
 		// for non-explicit cases (e.g., setting hardcoded it to "high").
-		reasoningConfig := map[string]interface{}{
+		reasoningConfig := map[string]any{
 			"reasoning_config": *deepseekReq.ReasoningEffort,
 		}
 		// Convert to document.Interface using bedrockruntime document package
@@ -573,7 +573,7 @@ func convertDeepSeekToConverseStreamRequest(deepseekReq *Request, modelID string
 		// When set to "high", it displays the reasoning content.
 		// This implementation supports the reasoning_effort parameter and converts it into the reasoning_config design
 		// for non-explicit cases (e.g., setting hardcoded it to "high").
-		reasoningConfig := map[string]interface{}{
+		reasoningConfig := map[string]any{
 			"reasoning_config": *deepseekReq.ReasoningEffort,
 		}
 		// Convert to document.Interface using bedrockruntime document package

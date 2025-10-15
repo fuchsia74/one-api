@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -324,13 +325,7 @@ func TestChannel(c *gin.Context) {
 		if channel.TestingModel != nil && *channel.TestingModel != "" {
 			// ensure still supported; if not, clear per requirement
 			tm := *channel.TestingModel
-			supported := false
-			for _, name := range channel.GetSupportedModelNames() {
-				if name == tm {
-					supported = true
-					break
-				}
-			}
+			supported := slices.Contains(channel.GetSupportedModelNames(), tm)
 
 			if supported {
 				modelName = tm
@@ -418,13 +413,7 @@ func testChannels(ctx context.Context, notify bool, scope string) error {
 			chosenModel := ""
 			if channel.TestingModel != nil && *channel.TestingModel != "" {
 				tm := *channel.TestingModel
-				valid := false
-				for _, name := range channel.GetSupportedModelNames() {
-					if name == tm {
-						valid = true
-						break
-					}
-				}
+				valid := slices.Contains(channel.GetSupportedModelNames(), tm)
 				if valid {
 					chosenModel = tm
 				} else {

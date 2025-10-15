@@ -17,7 +17,7 @@ func StringData(c *gin.Context, str string) {
 	c.Writer.Flush()
 }
 
-func ObjectData(c *gin.Context, object interface{}) error {
+func ObjectData(c *gin.Context, object any) error {
 	jsonData, err := json.Marshal(object)
 	if err != nil {
 		return errors.Wrapf(err, "error marshalling object")

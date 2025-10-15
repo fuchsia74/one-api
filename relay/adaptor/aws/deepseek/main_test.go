@@ -63,7 +63,7 @@ func TestConvertRequestWithStopSequence(t *testing.T) {
 				Content: "Hello",
 			},
 		},
-		Stop: []interface{}{"STOP", "END"},
+		Stop: []any{"STOP", "END"},
 	}
 
 	deepseekReq := aws.ConvertRequest(request)

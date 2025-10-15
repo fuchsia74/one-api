@@ -424,7 +424,7 @@ func processPreConsume(ctx context.Context, c *gin.Context, token *model.Token, 
 	if err = model.CreateTokenTransaction(ctx, transaction); err != nil {
 		_ = model.PostConsumeTokenQuota(token.Id, -preQuota)
 		if logEntry.Id > 0 {
-			_ = model.UpdateConsumeLogByID(ctx, logEntry.Id, map[string]interface{}{
+			_ = model.UpdateConsumeLogByID(ctx, logEntry.Id, map[string]any{
 				"quota":   0,
 				"content": fmt.Sprintf("External (%s) pre-consume aborted (transaction %s)", req.AddReason, transactionID),
 			})
@@ -485,7 +485,7 @@ func processPostConsume(ctx context.Context, c *gin.Context, token *model.Token,
 	}
 
 	confirmedAt := helper.GetTimestamp()
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"status":         model.TokenTransactionStatusConfirmed,
 		"final_quota":    finalQuota,
 		"confirmed_at":   confirmedAt,
@@ -518,7 +518,7 @@ func processPostConsume(ctx context.Context, c *gin.Context, token *model.Token,
 
 	if existingTxn.LogId != nil {
 		logContent := buildPostConsumeLogContent(req.AddReason, existingTxn.PreQuota, finalQuota, transactionID)
-		logUpdates := map[string]interface{}{
+		logUpdates := map[string]any{
 			"quota":   clampQuotaToInt(finalQuota),
 			"content": logContent,
 		}
@@ -565,7 +565,7 @@ func processCancelConsume(ctx context.Context, c *gin.Context, token *model.Toke
 	}
 
 	canceledAt := helper.GetTimestamp()
-	updates := map[string]interface{}{
+	updates := map[string]any{
 		"status":      model.TokenTransactionStatusCanceled,
 		"canceled_at": canceledAt,
 		"final_quota": int64(0),
@@ -584,7 +584,7 @@ func processCancelConsume(ctx context.Context, c *gin.Context, token *model.Toke
 	txn.AutoConfirmed = false
 
 	if txn.LogId != nil {
-		logUpdates := map[string]interface{}{
+		logUpdates := map[string]any{
 			"quota":   0,
 			"content": buildCancelConsumeLogContent(txn.Reason, txn.PreQuota, transactionID),
 		}
@@ -658,7 +658,7 @@ func autoConfirmExpiredTokenTransactions(ctx context.Context, c *gin.Context, to
 		if txn.LogId == nil {
 			continue
 		}
-		updates := map[string]interface{}{
+		updates := map[string]any{
 			"quota":   clampQuotaToInt(txn.PreQuota),
 			"content": buildAutoConfirmLogContent(txn),
 		}
@@ -741,7 +741,7 @@ func buildAutoConfirmLogContent(txn *model.TokenTransaction) string {
 // provided token. It guarantees standard formatting and avoids collisions with
 // existing transactions for the same token.
 func generateTransactionID(ctx context.Context, tokenID int) (string, error) {
-	for attempt := 0; attempt < 5; attempt++ {
+	for range 5 {
 		candidate := random.GetUUID()
 		_, err := model.GetTokenTransactionByTokenAndID(ctx, tokenID, candidate)
 		if err != nil {

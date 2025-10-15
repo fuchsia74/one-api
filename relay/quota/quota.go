@@ -69,13 +69,7 @@ func Compute(input ComputeInput) ComputeResult {
 
 	cachedPrompt := 0
 	if usage.PromptTokensDetails != nil {
-		cachedPrompt = usage.PromptTokensDetails.CachedTokens
-		if cachedPrompt < 0 {
-			cachedPrompt = 0
-		}
-		if cachedPrompt > promptTokens {
-			cachedPrompt = promptTokens
-		}
+		cachedPrompt = min(max(usage.PromptTokensDetails.CachedTokens, 0), promptTokens)
 	}
 	nonCachedPrompt := promptTokens - cachedPrompt
 	nonCachedCompletion := completionTokens

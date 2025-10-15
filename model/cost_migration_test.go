@@ -153,7 +153,7 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDLargeDataset(t *testing.T) {
 	require.NoError(t, DB.Exec("CREATE TABLE user_request_costs (id INTEGER PRIMARY KEY AUTOINCREMENT, request_id TEXT NOT NULL, updated_at INTEGER NOT NULL)").Error)
 
 	const totalRows = 1500
-	for i := 0; i < totalRows; i++ {
+	for i := range totalRows {
 		requestID := fmt.Sprintf("req-%d", i/3)
 		require.NoError(t, DB.Exec("INSERT INTO user_request_costs (request_id, updated_at) VALUES (?, ?)", requestID, i).Error)
 	}
@@ -202,11 +202,11 @@ func TestMigrateUserRequestCostEnsureUniqueRequestIDWithoutIDColumn(t *testing.T
 		require.NoError(t, DB.Exec("INSERT INTO user_request_costs (request_id, updated_at) VALUES (?, ?)", requestID, updatedAt).Error)
 	}
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		insert("req-a", i)
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		insert("req-b", 100+i)
 	}
 

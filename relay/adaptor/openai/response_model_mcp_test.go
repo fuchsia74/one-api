@@ -22,10 +22,10 @@ func TestMCPOutputItemSerialization(t *testing.T) {
 				Function: &model.Function{
 					Name:        "read_wiki_structure",
 					Description: "Read repository structure",
-					Parameters: map[string]interface{}{
+					Parameters: map[string]any{
 						"type": "object",
-						"properties": map[string]interface{}{
-							"repoName": map[string]interface{}{
+						"properties": map[string]any{
+							"repoName": map[string]any{
 								"type":        "string",
 								"description": "GitHub repository: owner/repo (e.g. \"facebook/react\")",
 							},
@@ -42,7 +42,7 @@ func TestMCPOutputItemSerialization(t *testing.T) {
 		t.Fatalf("Failed to marshal mcp_list_tools: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(jsonData, &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -55,7 +55,7 @@ func TestMCPOutputItemSerialization(t *testing.T) {
 	if result["server_label"] != "deepwiki" {
 		t.Errorf("Expected server_label 'deepwiki', got %v", result["server_label"])
 	}
-	if tools, ok := result["tools"].([]interface{}); !ok || len(tools) != 1 {
+	if tools, ok := result["tools"].([]any); !ok || len(tools) != 1 {
 		t.Errorf("Expected tools array with 1 item, got %v", result["tools"])
 	}
 }
@@ -77,7 +77,7 @@ func TestMCPCallOutputItem(t *testing.T) {
 		t.Fatalf("Failed to marshal mcp_call: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(jsonData, &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -115,7 +115,7 @@ func TestMCPCallWithError(t *testing.T) {
 		t.Fatalf("Failed to marshal mcp_call with error: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(jsonData, &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -141,7 +141,7 @@ func TestMCPApprovalRequest(t *testing.T) {
 		t.Fatalf("Failed to marshal mcp_approval_request: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(jsonData, &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)
@@ -169,7 +169,7 @@ func TestMCPApprovalResponseInput(t *testing.T) {
 		t.Fatalf("Failed to marshal MCPApprovalResponseInput: %v", err)
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	err = json.Unmarshal(jsonData, &result)
 	if err != nil {
 		t.Fatalf("Failed to unmarshal JSON: %v", err)

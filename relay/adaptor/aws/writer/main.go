@@ -63,7 +63,7 @@ func ConvertRequest(textRequest relaymodel.GeneralOpenAIRequest) *Request {
 
 	// Handle stop sequences
 	if textRequest.Stop != nil {
-		if stopSlice, ok := textRequest.Stop.([]interface{}); ok {
+		if stopSlice, ok := textRequest.Stop.([]any); ok {
 			stopSequences := make([]string, 0, len(stopSlice))
 			for _, stop := range stopSlice {
 				if stopStr, ok := stop.(string); ok && stopStr != "" {

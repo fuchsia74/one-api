@@ -273,3 +273,49 @@ func TestApplyRequestTransformations_PopulatesMetaActualModel(t *testing.T) {
 		t.Fatalf("expected ActualModelName to use mapping, got %q", meta.ActualModelName)
 	}
 }
+
+func TestApplyRequestTransformations_NormalizesToolChoice(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "gpt-4o-mini",
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-4o-mini",
+		Messages: []model.Message{
+			{Role: "user", Content: "Call the weather tool"},
+		},
+		ToolChoice: map[string]any{
+			"type": "tool",
+			"name": "get_weather",
+		},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error: %v", err)
+	}
+
+	toolChoice, ok := req.ToolChoice.(map[string]any)
+	if !ok {
+		t.Fatalf("expected tool_choice to be map after normalization, got %T", req.ToolChoice)
+	}
+
+	if typ := toolChoice["type"]; typ != "function" {
+		t.Fatalf("expected normalized tool_choice type 'function', got %v", typ)
+	}
+
+	fn, _ := toolChoice["function"].(map[string]any)
+	if fn == nil {
+		t.Fatalf("expected nested function map to be present")
+	}
+
+	if name := fn["name"]; name != "get_weather" {
+		t.Fatalf("expected function name 'get_weather', got %v", name)
+	}
+
+	if _, exists := toolChoice["name"]; exists {
+		t.Fatalf("top-level name should remain unset before Response API flattening")
+	}
+}

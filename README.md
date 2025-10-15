@@ -7,30 +7,21 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ![](https://s3.laisky.com/uploads/2025/07/oneapi.drawio.png)
 
 ```plain
-=== One-API Regression Report ===
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│       MODEL        │ CHAT (STREAM=FALSE) │ CHAT (STREAM=TRUE) │ RESPONSE (STREAM=FALSE) │ RESPONSE (STREAM=TRUE) │ CLAUDE (STREAM=FALSE) │ CLAUDE (STREAM=TRUE) │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ gpt-4o-mini        │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 1.475s              │ 1.502s             │ 1.591s                  │ 1.115s                 │ 931ms                 │ 1.238s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ gpt-5-mini         │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 3.758s              │ 3.788s             │ 4.185s                  │ 7.194s                 │ 9.529s                │ 6.999s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ claude-3.5-haiku   │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 987ms               │ 693ms              │ 1.016s                  │ 773ms                  │ 1.266s                │ 704ms                │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ gemini-2.5-flash   │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 957ms               │ 913ms              │ 1.519s                  │ 1.369s                 │ 1.173s                │ 1.567s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ openai/gpt-oss-20b │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 625ms               │ 338ms              │ 476ms                   │ 506ms                  │ 567ms                 │ 537ms                │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
-│ deepseek-chat      │ PASS                │ PASS               │ PASS                    │ PASS                   │ PASS                  │ PASS                 │
-│                    │ 2.679s              │ 1.326s             │ 2.444s                  │ 1.251s                 │ 1.969s                │ 3.627s               │
-│────────────────────│─────────────────────│────────────────────│─────────────────────────│────────────────────────│───────────────────────│──────────────────────│
+=== One-API Regression Matrix ===
 
-Totals  | Requests: 36 | Passed: 36 | Failed: 0 | Skipped: 0
+Variant                  gpt-4o-mini  gpt-5-mini   claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
+Chat (stream=false)      PASS 3.40s   PASS 11.81s  PASS 1.37s        PASS 0.96s        PASS 1.96s          PASS 1.84s
+Chat (stream=true)       PASS 1.56s   PASS 7.91s   PASS 1.60s        PASS 0.86s        PASS 0.51s          PASS 1.49s
+Chat Tools               PASS 1.75s   PASS 4.87s   PASS 1.42s        PASS 2.47s        PASS 0.70s          PASS 2.12s
+Response (stream=false)  PASS 2.58s   PASS 10.23s  PASS 1.30s        PASS 0.90s        PASS 0.64s          PASS 2.60s
+Response (stream=true)   PASS 2.08s   PASS 3.76s   PASS 1.28s        PASS 1.15s        PASS 0.49s          PASS 1.23s
+Response Tools           PASS 2.04s   PASS 2.87s   PASS 2.05s        PASS 1.49s        PASS 0.73s          PASS 3.40s
+Claude (stream=false)    PASS 1.26s   PASS 3.33s   PASS 1.71s        PASS 1.02s        PASS 0.75s          PASS 1.77s
+Claude (stream=true)     PASS 2.91s   PASS 9.68s   PASS 1.12s        PASS 1.66s        PASS 1.18s          PASS 2.65s
+Claude Tools             PASS 3.21s   PASS 9.05s   PASS 1.54s        PASS 1.68s        PASS 0.53s          PASS 2.81s
+
+Totals  | Requests: 54 | Passed: 54 | Failed: 0 | Skipped: 0
+
 ```
 
 ### Why this fork exists
@@ -140,57 +131,102 @@ oneapi:
     options:
       max-size: "10m"
   environment:
+    # --- Session & Security ---
     # (optional) SESSION_SECRET set a fixed session secret so that user sessions won't be invalidated after server restart
     SESSION_SECRET: xxxxxxx
     # (optional) ENABLE_COOKIE_SECURE enable secure cookies, must be used with HTTPS
     ENABLE_COOKIE_SECURE: "true"
-    # (optional) COOKIE_MAXAGE_HOURS: Sets the session cookie's max age in hours. Default is `168` (7 days). Adjust this to control how long user sessions remain valid.
+    # (optional) COOKIE_MAXAGE_HOURS sets the session cookie's max age in hours. Default is `168` (7 days); adjust to control session lifetime.
     COOKIE_MAXAGE_HOURS: 168
 
+    # --- Core Runtime ---
+    # (optional) PORT override the listening port used by the HTTP server, default is `3000`
+    PORT: 3000
+    # (optional) GIN_MODE set Gin runtime mode; defaults to release when unset
+    GIN_MODE: release
+    # (optional) SHUTDOWN_TIMEOUT_SEC controls how long to wait for graceful shutdown and drains (seconds)
+    SHUTDOWN_TIMEOUT_SEC: 360
     # (optional) DEBUG enable debug mode
     DEBUG: "true"
-
     # (optional) DEBUG_SQL display SQL logs
     DEBUG_SQL: "true"
-    # (optional) REDIS_CONN_STRING set REDIS cache connection
-    REDIS_CONN_STRING: redis://100.122.41.16:6379/1
-    # (optional) SQL_DSN set SQL database connection,
-    # default is sqlite3, support mysql, postgresql, sqlite3
-    SQL_DSN: "postgres://laisky:xxxxxxx@1.2.3.4/oneapi"
+    # (optional) ENABLE_PROMETHEUS_METRICS expose /metrics for Prometheus scraping when true
+    ENABLE_PROMETHEUS_METRICS: "true"
+    # (optional) LOG_RETENTION_DAYS set log retention days; default is not to delete any logs
+    LOG_RETENTION_DAYS: 7
 
+    # --- Storage & Cache ---
+    # (optional) SQL_DSN set SQL database connection; leave empty to use SQLite (supports mysql, postgresql, sqlite3)
+    SQL_DSN: "postgres://laisky:xxxxxxx@1.2.3.4/oneapi"
+    # (optional) SQLITE_PATH override SQLite file path when SQL_DSN is empty
+    SQLITE_PATH: "/data/one-api.db"
+    # (optional) SQL_MAX_IDLE_CONNS tune database idle connection pool size
+    SQL_MAX_IDLE_CONNS: 200
+    # (optional) SQL_MAX_OPEN_CONNS tune database max open connections
+    SQL_MAX_OPEN_CONNS: 2000
+    # (optional) SQL_MAX_LIFETIME tune database connection lifetime in seconds
+    SQL_MAX_LIFETIME: 300
+    # (optional) REDIS_CONN_STRING set Redis cache connection
+    REDIS_CONN_STRING: redis://100.122.41.16:6379/1
+    # (optional) REDIS_PASSWORD set Redis password when authentication is required
+    REDIS_PASSWORD: ""
+    # (optional) SYNC_FREQUENCY refresh in-memory caches every N seconds when enabled
+    SYNC_FREQUENCY: 600
+    # (optional) MEMORY_CACHE_ENABLED force memory cache usage even without Redis
+    MEMORY_CACHE_ENABLED: "true"
+
+    # --- Usage & Billing ---
     # (optional) ENFORCE_INCLUDE_USAGE require upstream API responses to include usage field
     ENFORCE_INCLUDE_USAGE: "true"
+    # (optional) PRECONSUME_TOKEN_FOR_BACKGROUND_REQUEST reserve quota for background requests that report usage later
+    PRECONSUME_TOKEN_FOR_BACKGROUND_REQUEST: 15000
+    # (optional) DEFAULT_MAX_TOKEN set the default maximum number of tokens for requests, default is 2048
+    DEFAULT_MAX_TOKEN: 2048
+    # (optional) DEFAULT_USE_MIN_MAX_TOKENS_MODEL opt-in to the min/max token contract for supported channels
+    DEFAULT_USE_MIN_MAX_TOKENS_MODEL: "false"
 
-    # (optional) MAX_ITEMS_PER_PAGE maximum items per page, default is 10
-    MAX_ITEMS_PER_PAGE: 10
-
+    # --- Rate Limiting ---
     # (optional) GLOBAL_API_RATE_LIMIT maximum API requests per IP within three minutes, default is 1000
     GLOBAL_API_RATE_LIMIT: 1000
     # (optional) GLOBAL_WEB_RATE_LIMIT maximum web page requests per IP within three minutes, default is 1000
     GLOBAL_WEB_RATE_LIMIT: 1000
-    # (optional) /v1 API ratelimit for each token
+    # (optional) GLOBAL_RELAY_RATE_LIMIT /v1 API ratelimit for each token
     GLOBAL_RELAY_RATE_LIMIT: 1000
-    # (optional) Whether to ratelimit for channel, 0 is unlimited, 1 is to enable the ratelimit
+    # (optional) GLOBAL_CHANNEL_RATE_LIMIT whether to ratelimit per channel; 0 is unlimited, 1 enables rate limiting
     GLOBAL_CHANNEL_RATE_LIMIT: 1
-    # (optional) ShutdownTimeoutSec controls how long to wait for graceful shutdown and drains (seconds)
-    SHUTDOWN_TIMEOUT_SEC: 360
+    # (optional) CRITICAL_RATE_LIMIT tighten rate limits for admin-only APIs (seconds window matches defaults)
+    CRITICAL_RATE_LIMIT: 20
 
+    # --- Channel Automation ---
+    # (optional) CHANNEL_SUSPEND_SECONDS_FOR_429 set the suspension duration (seconds) after receiving a 429 error, default is 60 seconds
+    CHANNEL_SUSPEND_SECONDS_FOR_429: 60
+    # (optional) CHANNEL_TEST_FREQUENCY run automatic channel health checks every N seconds (0 disables)
+    CHANNEL_TEST_FREQUENCY: 0
+    # (optional) BATCH_UPDATE_ENABLED enable background batch quota updater
+    BATCH_UPDATE_ENABLED: "false"
+    # (optional) BATCH_UPDATE_INTERVAL batch quota flush interval in seconds
+    BATCH_UPDATE_INTERVAL: 5
+
+    # --- Frontend & Proxies ---
     # (optional) FRONTEND_BASE_URL redirect page requests to specified address, server-side setting only
     FRONTEND_BASE_URL: https://oneapi.laisky.com
+    # (optional) RELAY_PROXY forward upstream model calls through an HTTP proxy
+    RELAY_PROXY: ""
+    # (optional) USER_CONTENT_REQUEST_PROXY proxy for fetching user-provided assets
+    USER_CONTENT_REQUEST_PROXY: ""
+    # (optional) USER_CONTENT_REQUEST_TIMEOUT timeout (seconds) for fetching user assets
+    USER_CONTENT_REQUEST_TIMEOUT: 30
 
+    # --- Media & Pagination ---
+    # (optional) MAX_ITEMS_PER_PAGE maximum items per page, default is 100
+    MAX_ITEMS_PER_PAGE: 100
+    # (optional) MAX_INLINE_IMAGE_SIZE_MB set the maximum allowed image size (in MB) for inlining images as base64, default is 30
+    MAX_INLINE_IMAGE_SIZE_MB: 30
+
+    # --- Integrations ---
     # (optional) OPENROUTER_PROVIDER_SORT set sorting method for OpenRouter Providers, default is throughput
     OPENROUTER_PROVIDER_SORT: throughput
-
-    # (optional) CHANNEL_SUSPEND_SECONDS_FOR_429 set the duration for channel suspension when receiving 429 error, default is 60 seconds
-    CHANNEL_SUSPEND_SECONDS_FOR_429: 60
-
-    # (optional) DEFAULT_MAX_TOKEN set the default maximum number of tokens for requests, default is 2048
-      DEFAULT_MAX_TOKEN: 2048
-    # (optional) MAX_INLINE_IMAGE_SIZE_MB set the maximum allowed image size (in MB) for inlining images as base64, default is 30
-      MAX_INLINE_IMAGE_SIZE_MB: 30
-
-    # (optional) LOG_PUSH_API set the API address for pushing error logs to telegram.
-    # More information about log push can be found at: https://github.com/Laisky/laisky-blog-graphql/tree/master/internal/web/telegram
+    # (optional) LOG_PUSH_API set the API address for pushing error logs to external services
     LOG_PUSH_API: "https://gq.laisky.com/query/"
     LOG_PUSH_TYPE: "oneapi"
     LOG_PUSH_TOKEN: "xxxxxxx"
@@ -201,7 +237,7 @@ oneapi:
     - 3000:3000
 ```
 
-The initial default account and password are `root` / `123456`.
+The initial default account and password are `root` / `123456`. Listening port can be configured via the `PORT` environment variable, default is `3000`.
 
 > [!TIP]
 >

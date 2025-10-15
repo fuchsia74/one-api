@@ -97,7 +97,7 @@ func TestGetAllLogs_SortingValidation(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedError != "" {
-				var response map[string]interface{}
+				var response map[string]any
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				require.NoError(t, err)
 
@@ -135,7 +135,7 @@ func TestGetAllLogs_SortFallbackParams(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, w.Code)
 	// Response should be JSON with success field
-	var response map[string]interface{}
+	var response map[string]any
 	err := json.Unmarshal(w.Body.Bytes(), &response)
 	require.NoError(t, err)
 	_, ok := response["success"]
@@ -198,7 +198,7 @@ func TestGetUserLogs_SortingValidation(t *testing.T) {
 			assert.Equal(t, tt.expectedStatus, w.Code)
 
 			if tt.expectedError != "" {
-				var response map[string]interface{}
+				var response map[string]any
 				err := json.Unmarshal(w.Body.Bytes(), &response)
 				require.NoError(t, err)
 
@@ -316,7 +316,7 @@ func BenchmarkGetLogOrderClause(b *testing.B) {
 
 	for _, tc := range testCases {
 		b.Run(fmt.Sprintf("%s_%s", tc.sortBy, tc.sortOrder), func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				model.GetLogOrderClause(tc.sortBy, tc.sortOrder)
 			}
 		})

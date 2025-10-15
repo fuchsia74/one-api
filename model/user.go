@@ -219,7 +219,7 @@ func (user *User) Update(updatePassword bool) error {
 
 // ClearTotpSecret clears the TOTP secret for the user
 func (user *User) ClearTotpSecret() error {
-	err := DB.Model(user).Select("totp_secret").Updates(map[string]interface{}{
+	err := DB.Model(user).Select("totp_secret").Updates(map[string]any{
 		"totp_secret": "",
 	}).Error
 	if err != nil {
@@ -493,7 +493,7 @@ func UpdateUserUsedQuotaAndRequestCount(id int, quota int64) {
 
 func updateUserUsedQuotaAndRequestCount(id int, quota int64, count int) {
 	err := DB.Model(&User{}).Where("id = ?", id).Updates(
-		map[string]interface{}{
+		map[string]any{
 			"used_quota":    gorm.Expr("used_quota + ?", quota),
 			"request_count": gorm.Expr("request_count + ?", count),
 		},
@@ -510,7 +510,7 @@ func updateUserUsedQuotaAndRequestCount(id int, quota int64, count int) {
 
 func updateUserUsedQuota(id int, quota int64) {
 	err := DB.Model(&User{}).Where("id = ?", id).Updates(
-		map[string]interface{}{
+		map[string]any{
 			"used_quota": gorm.Expr("used_quota + ?", quota),
 		},
 	).Error

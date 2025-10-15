@@ -33,11 +33,11 @@ func ConnectDatabase(dbType, dsn string) (*DatabaseConnection, error) {
 
 	// Clean up DSN by removing scheme prefix for actual connection
 	cleanDSN := dsn
-	if strings.HasPrefix(dsn, "sqlite://") {
-		cleanDSN = strings.TrimPrefix(dsn, "sqlite://")
-	} else if strings.HasPrefix(dsn, "mysql://") {
+	if after, ok := strings.CutPrefix(dsn, "sqlite://"); ok {
+		cleanDSN = after
+	} else if after, ok := strings.CutPrefix(dsn, "mysql://"); ok {
 		// Convert mysql://user:pass@host:port/db to user:pass@tcp(host:port)/db
-		cleanDSN = strings.TrimPrefix(dsn, "mysql://")
+		cleanDSN = after
 		if strings.Contains(cleanDSN, "@") && strings.Contains(cleanDSN, "/") {
 			parts := strings.Split(cleanDSN, "@")
 			if len(parts) == 2 {

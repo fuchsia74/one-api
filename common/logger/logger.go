@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	errors "github.com/Laisky/errors/v2"
 	gutils "github.com/Laisky/go-utils/v5"
 	glog "github.com/Laisky/go-utils/v5/log"
 	"github.com/Laisky/zap"
@@ -65,10 +66,33 @@ func SetupLogger() {
 				return
 			}
 
+			if err = configureGlobalLogger(logPath); err != nil {
+				Logger.Error("failed to attach log file sink", zap.String("log_path", logPath), zap.Error(err))
+			}
+
 			gin.DefaultWriter = io.MultiWriter(os.Stdout, fd)
 			gin.DefaultErrorWriter = io.MultiWriter(os.Stderr, fd)
 		}
 	})
+}
+
+// configureGlobalLogger reinitializes the shared logger with console encoding and
+// attaches a file sink at logPath while retaining existing log levels.
+func configureGlobalLogger(logPath string) error {
+	level := Logger.Level()
+	newLogger, err := glog.New(
+		glog.WithName("one-api"),
+		glog.WithLevel(level),
+		glog.WithEncoding(glog.EncodingConsole),
+		glog.WithOutputPaths([]string{"stdout", logPath}),
+		glog.WithErrorOutputPaths([]string{"stderr", logPath}),
+	)
+	if err != nil {
+		return errors.Wrap(err, "create file logger")
+	}
+
+	Logger = newLogger
+	return nil
 }
 
 // SetupEnhancedLogger sets up the logger with alertPusher integration
