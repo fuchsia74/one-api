@@ -37,21 +37,25 @@ type chatToResponseStreamBridge struct {
 	usage                *openai.ResponseAPIUsage
 
 	toolCalls map[string]*streamToolCallState
+	toolIndex map[int]*streamToolCallState
 	toolOrder []string
 
 	lastFinishReason string
 	incomplete       *openai.IncompleteDetails
 
-	streamDone    bool
-	upstreamDone  bool
-	streamStarted bool
+	streamDone                bool
+	upstreamDone              bool
+	streamStarted             bool
+	requiredActionInitialized bool
 }
 
 type streamToolCallState struct {
-	id        string
-	name      string
-	index     int
-	arguments strings.Builder
+	id          string
+	name        string
+	index       int
+	arguments   strings.Builder
+	streamIndex *int
+	orderPos    int
 }
 
 func newChatToResponseStreamBridge(c *gin.Context, meta *metalib.Meta, request *openai.ResponseAPIRequest) openai_compatible.StreamRewriteHandler {
@@ -62,6 +66,7 @@ func newChatToResponseStreamBridge(c *gin.Context, meta *metalib.Meta, request *
 		createdAt:  time.Now().Unix(),
 		model:      meta.ActualModelName,
 		toolCalls:  make(map[string]*streamToolCallState),
+		toolIndex:  make(map[int]*streamToolCallState),
 	}
 
 	if handler.model == "" {
@@ -222,12 +227,17 @@ func (h *chatToResponseStreamBridge) HandleDone(c *gin.Context) (bool, bool) {
 		finalOutputs = append(finalOutputs, toolItem)
 	}
 
+	requiredAction := h.buildRequiredActionSnapshot()
+	if requiredAction != nil {
+		h.emitRequiredActionDelta(c, true)
+	}
+
 	status, incomplete := h.finalStatus()
 	if incomplete != nil {
 		h.incomplete = incomplete
 	}
 
-	response := h.buildFinalResponse(status, finalOutputs)
+	response := h.buildFinalResponse(status, finalOutputs, requiredAction)
 	if h.incomplete != nil {
 		response.IncompleteDetails = h.incomplete
 	}
@@ -374,28 +384,76 @@ func (h *chatToResponseStreamBridge) handleToolCalls(c *gin.Context, tools []mod
 			OutputIndex: state.index,
 			Delta:       args,
 		})
+		h.emitRequiredActionDelta(c, false)
 	}
 }
 
 func (h *chatToResponseStreamBridge) ensureToolCallState(c *gin.Context, tool *model.Tool) *streamToolCallState {
-	id := tool.Id
-	if id == "" {
-		id = fmt.Sprintf("call_%s", random.GetRandomString(16))
+	normalizedID := ""
+	if trimmed := strings.TrimSpace(tool.Id); trimmed != "" {
+		normalizedID = ensureResponseAPICallID(trimmed)
 	}
 
-	state, exists := h.toolCalls[id]
-	if !exists {
+	var state *streamToolCallState
+	if normalizedID != "" {
+		state = h.toolCalls[normalizedID]
+	}
+	if state == nil && tool.Index != nil {
+		idx := *tool.Index
+		if existing, ok := h.toolIndex[idx]; ok {
+			state = existing
+		} else if idx >= 0 && idx < len(h.toolOrder) {
+			if id := h.toolOrder[idx]; id != "" {
+				if candidate, ok := h.toolCalls[id]; ok {
+					state = candidate
+				}
+			}
+		}
+	}
+
+	created := false
+	if state == nil {
+		id := normalizedID
+		if id == "" {
+			id = fmt.Sprintf("call_%s", random.GetRandomString(16))
+		}
 		state = &streamToolCallState{
-			id:    id,
-			index: h.nextOutputIndex(),
+			id:       id,
+			index:    h.nextOutputIndex(),
+			orderPos: len(h.toolOrder),
 		}
-		h.toolCalls[id] = state
-		h.toolOrder = append(h.toolOrder, id)
-
-		if tool.Function != nil {
-			state.name = tool.Function.Name
+		if tool.Index != nil {
+			idx := *tool.Index
+			state.streamIndex = new(int)
+			*state.streamIndex = idx
+			h.toolIndex[idx] = state
 		}
+		h.toolCalls[state.id] = state
+		h.toolOrder = append(h.toolOrder, state.id)
+		created = true
+	}
 
+	if normalizedID != "" && normalizedID != state.id {
+		delete(h.toolCalls, state.id)
+		state.id = normalizedID
+		h.toolCalls[state.id] = state
+		h.toolOrder[state.orderPos] = state.id
+	}
+
+	if tool.Index != nil {
+		idx := *tool.Index
+		if state.streamIndex == nil {
+			state.streamIndex = new(int)
+		}
+		*state.streamIndex = idx
+		h.toolIndex[idx] = state
+	}
+
+	if tool.Function != nil && tool.Function.Name != "" {
+		state.name = tool.Function.Name
+	}
+
+	if created {
 		item := openai.OutputItem{
 			Id:     state.id,
 			Type:   "function_call",
@@ -408,9 +466,9 @@ func (h *chatToResponseStreamBridge) ensureToolCallState(c *gin.Context, tool *m
 			OutputIndex: state.index,
 			Item:        &item,
 		})
-	} else if tool.Function != nil && tool.Function.Name != "" {
-		state.name = tool.Function.Name
 	}
+
+	h.emitRequiredActionDelta(c, false)
 
 	return state
 }
@@ -431,7 +489,75 @@ func (h *chatToResponseStreamBridge) stringifyArguments(args any) string {
 	}
 }
 
-func (h *chatToResponseStreamBridge) buildFinalResponse(status string, outputs []openai.OutputItem) *openai.ResponseAPIResponse {
+// emitRequiredActionDelta streams the required_action payload so clients can observe tool call progress.
+// When markDone is true, a terminal done event is emitted after the delta message.
+func (h *chatToResponseStreamBridge) emitRequiredActionDelta(c *gin.Context, markDone bool) {
+	required := h.buildRequiredActionSnapshot()
+	if required == nil {
+		return
+	}
+
+	eventType := "response.required_action.delta"
+	if !h.requiredActionInitialized {
+		eventType = "response.required_action.added"
+		h.requiredActionInitialized = true
+	}
+
+	h.emitEvent(c, eventType, openai.ResponseAPIStreamEvent{
+		RequiredAction: required,
+	})
+
+	if markDone {
+		h.emitEvent(c, "response.required_action.done", openai.ResponseAPIStreamEvent{
+			RequiredAction: required,
+		})
+	}
+}
+
+// buildRequiredActionSnapshot constructs the Response API required_action object based on current tool call state.
+func (h *chatToResponseStreamBridge) buildRequiredActionSnapshot() *openai.ResponseAPIRequiredAction {
+	toolCalls := h.currentToolCallSnapshots()
+	if len(toolCalls) == 0 {
+		return nil
+	}
+
+	return &openai.ResponseAPIRequiredAction{
+		Type: "submit_tool_outputs",
+		SubmitToolOutputs: &openai.ResponseAPISubmitToolOutputs{
+			ToolCalls: toolCalls,
+		},
+	}
+}
+
+// currentToolCallSnapshots returns copies of the accumulated tool call information in stream order.
+func (h *chatToResponseStreamBridge) currentToolCallSnapshots() []openai.ResponseAPIToolCall {
+	if len(h.toolOrder) == 0 {
+		return nil
+	}
+
+	calls := make([]openai.ResponseAPIToolCall, 0, len(h.toolOrder))
+	for _, id := range h.toolOrder {
+		state := h.toolCalls[id]
+		if state == nil {
+			continue
+		}
+
+		callID := ensureResponseAPICallID(state.id)
+		state.id = callID
+		calls = append(calls, openai.ResponseAPIToolCall{
+			Id:   callID,
+			Type: "function",
+			Function: &openai.ResponseAPIFunctionCall{
+				Name:      state.name,
+				Arguments: state.arguments.String(),
+			},
+		})
+	}
+
+	return calls
+}
+
+func (h *chatToResponseStreamBridge) buildFinalResponse(status string, outputs []openai.OutputItem, requiredAction *openai.ResponseAPIRequiredAction) *openai.ResponseAPIResponse {
 	response := &openai.ResponseAPIResponse{
 		Id:                 h.responseID,
 		Object:             "response",
@@ -454,6 +580,7 @@ func (h *chatToResponseStreamBridge) buildFinalResponse(status string, outputs [
 		TopP:               h.original.TopP,
 		Truncation:         h.original.Truncation,
 		User:               h.original.User,
+		RequiredAction:     requiredAction,
 	}
 
 	if response.Model == "" {

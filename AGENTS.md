@@ -6,6 +6,8 @@
 
 Multiple agents might be modifying the code at the same time. If you come across changes that aren't yours, preserve them and avoid interfering with other agents' work. Only halt the task and inform me when you encounter an irreconcilable conflict.
 
+Should use TODOs tool to track tasks and progress.
+
 ### TimeZone
 
 Always use UTC for time handling in servers, databases, and APIs.

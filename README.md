@@ -9,18 +9,29 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ```plain
 === One-API Regression Matrix ===
 
-Variant                  gpt-4o-mini  gpt-5-mini   claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
-Chat (stream=false)      PASS 3.40s   PASS 11.81s  PASS 1.37s        PASS 0.96s        PASS 1.96s          PASS 1.84s
-Chat (stream=true)       PASS 1.56s   PASS 7.91s   PASS 1.60s        PASS 0.86s        PASS 0.51s          PASS 1.49s
-Chat Tools               PASS 1.75s   PASS 4.87s   PASS 1.42s        PASS 2.47s        PASS 0.70s          PASS 2.12s
-Response (stream=false)  PASS 2.58s   PASS 10.23s  PASS 1.30s        PASS 0.90s        PASS 0.64s          PASS 2.60s
-Response (stream=true)   PASS 2.08s   PASS 3.76s   PASS 1.28s        PASS 1.15s        PASS 0.49s          PASS 1.23s
-Response Tools           PASS 2.04s   PASS 2.87s   PASS 2.05s        PASS 1.49s        PASS 0.73s          PASS 3.40s
-Claude (stream=false)    PASS 1.26s   PASS 3.33s   PASS 1.71s        PASS 1.02s        PASS 0.75s          PASS 1.77s
-Claude (stream=true)     PASS 2.91s   PASS 9.68s   PASS 1.12s        PASS 1.66s        PASS 1.18s          PASS 2.65s
-Claude Tools             PASS 3.21s   PASS 9.05s   PASS 1.54s        PASS 1.68s        PASS 0.53s          PASS 2.81s
+Variant                        gpt-4o-mini                          gpt-5-mini                           claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
+Chat (stream=false)            PASS 2.28s                           PASS 7.48s                           PASS 1.53s        PASS 1.58s        PASS 0.62s          PASS 2.05s
+Chat (stream=true)             PASS 2.25s                           PASS 13.79s                          PASS 1.89s        PASS 1.24s        PASS 1.30s          PASS 1.81s
+Chat Tools (stream=false)      PASS 3.09s                           PASS 6.25s                           PASS 2.86s        PASS 3.05s        PASS 0.80s          PASS 2.59s
+Chat Tools (stream=true)       FAIL empty stream payload            FAIL stream missing tool invocation  PASS 1.63s        PASS 1.56s        PASS 0.71s          PASS 2.81s
+Response (stream=false)        PASS 2.94s                           PASS 9.57s                           PASS 2.68s        PASS 1.65s        PASS 1.15s          PASS 5.67s
+Response (stream=true)         PASS 2.42s                           PASS 12.51s                          PASS 3.83s        PASS 3.66s        PASS 1.44s          PASS 5.06s
+Response Tools (stream=false)  PASS 2.02s                           PASS 13.14s                          PASS 2.08s        PASS 1.51s        PASS 2.64s          PASS 2.71s
+Response Tools (stream=true)   PASS 2.39s                           PASS 4.21s                           PASS 1.44s        PASS 1.67s        PASS 0.80s          PASS 3.93s
+Claude (stream=false)          PASS 2.22s                           PASS 9.73s                           PASS 1.70s        PASS 0.96s        PASS 1.67s          PASS 1.89s
+Claude (stream=true)           PASS 2.31s                           PASS 14.45s                          PASS 1.74s        PASS 1.04s        PASS 1.17s          FAIL empty stream payload
+Claude Tools (stream=false)    PASS 1.83s                           PASS 8.23s                           PASS 1.65s        PASS 1.88s        PASS 2.57s          PASS 2.34s
+Claude Tools (stream=true)     FAIL stream missing tool invocation  FAIL stream missing tool invocation  PASS 1.95s        PASS 1.80s        PASS 0.67s          FAIL empty stream payload
 
-Totals  | Requests: 54 | Passed: 54 | Failed: 0 | Skipped: 0
+Totals  | Requests: 72 | Passed: 66 | Failed: 6 | Skipped: 0
+
+Failures:
+- deepseek-chat · Claude (stream=true) → empty stream payload
+- deepseek-chat · Claude Tools (stream=true) → empty stream payload
+- gpt-4o-mini · Chat Tools (stream=true) → empty stream payload
+- gpt-4o-mini · Claude Tools (stream=true) → stream missing tool invocation
+- gpt-5-mini · Chat Tools (stream=true) → stream missing tool invocation
+- gpt-5-mini · Claude Tools (stream=true) → stream missing tool invocation
 
 ```
 

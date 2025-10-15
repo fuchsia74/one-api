@@ -2076,6 +2076,8 @@ type ResponseAPIStreamEvent struct {
 
 	// Response-level events (type starts with "response.")
 	Response *ResponseAPIResponse `json:"response,omitempty"` // Full response object for response-level events
+	// Required action events (response.required_action.*)
+	RequiredAction *ResponseAPIRequiredAction `json:"required_action,omitempty"`
 
 	// Output item events (type contains "output_item")
 	OutputIndex int         `json:"output_index,omitempty"` // Index of the output item
