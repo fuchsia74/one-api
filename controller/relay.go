@@ -64,6 +64,10 @@ func Relay(c *gin.Context) {
 	relayMode := relaymode.GetByPath(c.Request.URL.Path)
 	channelId := c.GetInt(ctxkey.ChannelId)
 	userId := c.GetInt(ctxkey.Id)
+	shouldDebugLog := relayMode == relaymode.ChatCompletions || relayMode == relaymode.ResponseAPI || relayMode == relaymode.ClaudeMessages
+	if shouldDebugLog {
+		rcontroller.EnsureDebugResponseWriter(c)
+	}
 
 	// Start timing for Prometheus metrics
 	startTime := time.Now()
@@ -92,6 +96,9 @@ func Relay(c *gin.Context) {
 
 		// Record successful relay request metrics
 		PrometheusMonitor.RecordRelayRequest(c, relayMeta, startTime, true, 0, 0, 0)
+		if shouldDebugLog {
+			rcontroller.LogClientResponse(c, "client response sent")
+		}
 		return
 	}
 	lastFailedChannelId := channelId
@@ -290,6 +297,9 @@ func Relay(c *gin.Context) {
 		c.JSON(bizErr.StatusCode, gin.H{
 			"error": bizErr.Error,
 		})
+		if shouldDebugLog {
+			rcontroller.LogClientResponse(c, "client error response sent")
+		}
 	}
 }
 

@@ -40,6 +40,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	lg := gmw.GetLogger(c)
 	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
+	if err := logClientRequestPayload(c, "claude_messages"); err != nil {
+		return openai.ErrorWrapper(err, "invalid_claude_messages_request", http.StatusBadRequest)
+	}
 
 	// get & validate Claude Messages API request
 	claudeRequest, err := getAndValidateClaudeMessagesRequest(c)
@@ -155,6 +158,8 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	origResp := resp
+	upstreamCapture := wrapUpstreamResponse(resp)
 	// Immediately record a provisional request cost using estimated base quota
 	// even if the trusted path skipped physical pre-consume.
 	{
@@ -186,7 +191,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
 			lg.Warn("update user request cost to zero failed", zap.Error(err))
 		}
-		return RelayErrorHandler(resp)
+		return RelayErrorHandlerWithContext(c, resp)
 	}
 
 	// Set context flag to indicate Claude Messages native mode
@@ -263,6 +268,11 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	} else {
 		// Call the adapter's DoResponse method to handle response conversion
 		usage, respErr = adaptorInstance.DoResponse(c, resp, meta)
+	}
+	if upstreamCapture != nil {
+		logUpstreamResponseFromCapture(lg, origResp, upstreamCapture, "claude_messages")
+	} else {
+		logUpstreamResponseFromBytes(lg, origResp, nil, "claude_messages")
 	}
 
 	// If the adapter didn't handle the conversion (e.g., for native Anthropic),

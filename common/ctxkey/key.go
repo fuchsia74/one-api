@@ -206,6 +206,11 @@ const (
 	// Read in: controller/claude_messages to return converted responses.
 	ConvertedResponse = "converted_response"
 
+	// DebugResponseWriter stores the body-capturing response writer used for debug logging of outbound payloads.
+	// Set in: relay/controller debug logging helpers when enhanced diagnostics are enabled.
+	// Read in: controller/relay and relay/controller helpers when writing response debug logs.
+	DebugResponseWriter = "debug_response_writer"
+
 	// ResponseRewriteHandler stores a function that rewrites upstream OpenAI-compatible
 	// chat responses into another format (e.g., Response API) before returning to the client.
 	ResponseRewriteHandler = "response_rewrite_handler"
