@@ -86,6 +86,14 @@ var (
 			"eu-west-1",
 			"ap-northeast-1",
 		},
+		"anthropic.claude-haiku-4-5-20251001-v1:0": {
+			"us-west-1",
+			"us-west-2",
+			"us-east-1",
+			"sa-east-1",
+			"eu-west-2",
+			"eu-west-3",
+		},
 	}
 
 	// Default configuration following AWS best practices
@@ -106,6 +114,7 @@ var (
 //
 // Array.from(new Set(Array.from(document.querySelectorAll('pre.programlisting code')).map(e => e.textContent.trim()).filter(Boolean)));
 var CrossRegionInferences = []string{
+	"global.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"global.anthropic.claude-sonnet-4-20250514-v1:0",
 	"global.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"global.cohere.embed-v4:0",
@@ -120,6 +129,7 @@ var CrossRegionInferences = []string{
 	"us.anthropic.claude-3-haiku-20240307-v1:0",
 	"us.anthropic.claude-3-opus-20240229-v1:0",
 	"us.anthropic.claude-3-sonnet-20240229-v1:0",
+	"us.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"us.anthropic.claude-opus-4-1-20250805-v1:0",
 	"us.anthropic.claude-opus-4-20250514-v1:0",
 	"us.anthropic.claude-sonnet-4-20250514-v1:0",
@@ -164,6 +174,7 @@ var CrossRegionInferences = []string{
 	"apac.anthropic.claude-sonnet-4-20250514-v1:0",
 	"apac.twelvelabs.marengo-embed-2-7-v1:0",
 	"apac.twelvelabs.pegasus-1-2-v1:0",
+	"au.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"ca.amazon.nova-lite-v1:0",
 	"eu.amazon.nova-lite-v1:0",
 	"eu.amazon.nova-micro-v1:0",
@@ -172,6 +183,7 @@ var CrossRegionInferences = []string{
 	"eu.anthropic.claude-3-7-sonnet-20250219-v1:0",
 	"eu.anthropic.claude-3-haiku-20240307-v1:0",
 	"eu.anthropic.claude-3-sonnet-20240229-v1:0",
+	"eu.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"eu.anthropic.claude-sonnet-4-20250514-v1:0",
 	"eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"eu.cohere.embed-v4:0",
@@ -180,6 +192,7 @@ var CrossRegionInferences = []string{
 	"eu.mistral.pixtral-large-2502-v1:0",
 	"eu.twelvelabs.marengo-embed-2-7-v1:0",
 	"eu.twelvelabs.pegasus-1-2-v1:0",
+	"jp.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"jp.anthropic.claude-sonnet-4-5-20250929-v1:0",
 }
 
