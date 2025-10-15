@@ -276,20 +276,195 @@ func TestConvertResponseAPIToChatCompletionRequest(t *testing.T) {
 	if chatReq.Messages[1].StringContent() != "Hello there" {
 		t.Fatalf("expected user message content preserved, got %q", chatReq.Messages[1].StringContent())
 	}
-	if len(chatReq.Tools) != 2 {
-		t.Fatalf("expected 2 tools, got %d", len(chatReq.Tools))
+	if len(chatReq.Tools) != 1 {
+		t.Fatalf("expected 1 tool after filtering, got %d", len(chatReq.Tools))
 	}
 	if chatReq.Tools[0].Function == nil || chatReq.Tools[0].Function.Name != "lookup" {
 		t.Fatalf("function tool not converted correctly: %#v", chatReq.Tools[0])
-	}
-	if chatReq.Tools[1].Type != "web_search" {
-		t.Fatalf("web search tool not preserved: %#v", chatReq.Tools[1])
 	}
 	if chatReq.ToolChoice == nil {
 		t.Fatalf("expected tool choice to be set")
 	}
 	if chatReq.Reasoning == nil || chatReq.Reasoning.Effort == nil || *chatReq.Reasoning.Effort != reasoningEffort {
 		t.Fatalf("reasoning effort not preserved: %#v", chatReq.Reasoning)
+	}
+}
+
+func TestConvertResponseAPIToChatCompletionRequestDropsUnsupportedTools(t *testing.T) {
+	stream := true
+	responseReq := &ResponseAPIRequest{
+		Model:  "deepseek-chat",
+		Stream: &stream,
+		Input: ResponseAPIInput{
+			map[string]any{
+				"role":    "system",
+				"content": "You are AFFiNE AI.",
+			},
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type": "input_text",
+						"text": "Hello",
+					},
+				},
+			},
+		},
+		Tools: []ResponseAPITool{
+			{Type: "web_search_preview"},
+			{Type: "web_search"},
+			{
+				Type: "function",
+				Function: &model.Function{
+					Name:        "section_edit",
+					Description: "Edit a section",
+					Parameters: map[string]any{
+						"type": "object",
+					},
+				},
+			},
+		},
+		ToolChoice: map[string]any{"type": "tool", "name": "web_search"},
+	}
+
+	chatReq, err := ConvertResponseAPIToChatCompletionRequest(responseReq)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(chatReq.Tools) != 1 {
+		t.Fatalf("expected only supported tools to remain, got %d", len(chatReq.Tools))
+	}
+	if chatReq.Tools[0].Function == nil || chatReq.Tools[0].Function.Name != "section_edit" {
+		t.Fatalf("expected section_edit function to remain, got %#v", chatReq.Tools[0])
+	}
+
+	choice, ok := chatReq.ToolChoice.(map[string]any)
+	if !ok {
+		t.Fatalf("expected tool choice map, got %T", chatReq.ToolChoice)
+	}
+	if strings.ToLower(choice["type"].(string)) != "auto" {
+		t.Fatalf("expected tool_choice to downgrade to auto, got %#v", chatReq.ToolChoice)
+	}
+}
+
+func TestConvertResponseAPIToChatCompletionRequestSanitizesFunctionParameters(t *testing.T) {
+	stream := false
+	strict := true
+	responseReq := &ResponseAPIRequest{
+		Model:  "gemini-2.5-flash",
+		Stream: &stream,
+		Input: ResponseAPIInput{
+			map[string]any{
+				"role": "user",
+				"content": []any{
+					map[string]any{
+						"type": "input_text",
+						"text": "Hello",
+					},
+				},
+			},
+		},
+		Tools: []ResponseAPITool{
+			{
+				Type: "function",
+				Name: "get_weather",
+				Parameters: map[string]any{
+					"$schema":              "http://json-schema.org/draft-07/schema#",
+					"description":          "should be stripped",
+					"type":                 "object",
+					"additionalProperties": false,
+					"properties": map[string]any{
+						"city": map[string]any{
+							"type":                 "string",
+							"additionalProperties": map[string]any{"oops": true},
+						},
+					},
+					"required": []any{"city"},
+				},
+			},
+		},
+		Text: &ResponseTextConfig{
+			Format: &ResponseTextFormat{
+				Type: "json_schema",
+				Schema: map[string]any{
+					"$schema":              "http://json-schema.org/draft-07/schema#",
+					"type":                 "object",
+					"additionalProperties": false,
+					"properties": map[string]any{
+						"answer": map[string]any{
+							"type":                 "string",
+							"additionalProperties": false,
+						},
+					},
+				},
+				Strict: &strict,
+			},
+		},
+	}
+
+	chatReq, err := ConvertResponseAPIToChatCompletionRequest(responseReq)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(chatReq.Tools) != 1 {
+		t.Fatalf("expected a single sanitized function tool, got %d", len(chatReq.Tools))
+	}
+
+	fn := chatReq.Tools[0].Function
+	if fn == nil {
+		t.Fatalf("expected function to be present")
+	}
+
+	if fn.Strict != nil {
+		t.Fatalf("expected strict flag to be cleared, got %#v", fn.Strict)
+	}
+
+	params, ok := fn.Parameters.(map[string]any)
+	if !ok {
+		t.Fatalf("expected parameters map, got %T", fn.Parameters)
+	}
+
+	if _, exists := params["$schema"]; exists {
+		t.Fatalf("$schema should be removed from function parameters: %#v", params)
+	}
+	if _, exists := params["description"]; exists {
+		t.Fatalf("description should be removed from top-level parameters: %#v", params)
+	}
+	if _, exists := params["additionalProperties"]; exists {
+		t.Fatalf("additionalProperties should be removed from function parameters: %#v", params)
+	}
+
+	props, ok := params["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected properties map, got %#v", params["properties"])
+	}
+	city, ok := props["city"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected city property map, got %#v", props["city"])
+	}
+	if _, exists := city["additionalProperties"]; exists {
+		t.Fatalf("nested additionalProperties should be removed: %#v", city)
+	}
+
+	if chatReq.ResponseFormat == nil || chatReq.ResponseFormat.JsonSchema == nil {
+		t.Fatalf("expected response format schema to be preserved")
+	}
+
+	schema := chatReq.ResponseFormat.JsonSchema.Schema
+	if schema == nil {
+		t.Fatalf("expected sanitized schema, got nil")
+	}
+
+	if _, exists := schema["$schema"]; exists {
+		t.Fatalf("$schema should be pruned from response schema: %#v", schema)
+	}
+	if _, exists := schema["additionalProperties"]; exists {
+		t.Fatalf("additionalProperties should be pruned from response schema: %#v", schema)
+	}
+	if chatReq.ResponseFormat.JsonSchema.Strict != nil {
+		t.Fatalf("expected response schema strict flag to be cleared, got %#v", chatReq.ResponseFormat.JsonSchema.Strict)
 	}
 }
 

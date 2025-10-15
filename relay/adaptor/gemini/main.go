@@ -156,6 +156,10 @@ func cleanFunctionParametersInternal(params any, isTopLevel bool) any {
 			if key == "additionalProperties" {
 				continue
 			}
+			// Remove $schema markers; Gemini rejects JSON Schema meta keys
+			if key == "$schema" {
+				continue
+			}
 			// Skip description and strict only at top level
 			if isTopLevel && (key == "description" || key == "strict") {
 				continue
