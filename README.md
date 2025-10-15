@@ -9,29 +9,23 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ```plain
 === One-API Regression Matrix ===
 
-Variant                        gpt-4o-mini                          gpt-5-mini                           claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
-Chat (stream=false)            PASS 2.28s                           PASS 7.48s                           PASS 1.53s        PASS 1.58s        PASS 0.62s          PASS 2.05s
-Chat (stream=true)             PASS 2.25s                           PASS 13.79s                          PASS 1.89s        PASS 1.24s        PASS 1.30s          PASS 1.81s
-Chat Tools (stream=false)      PASS 3.09s                           PASS 6.25s                           PASS 2.86s        PASS 3.05s        PASS 0.80s          PASS 2.59s
-Chat Tools (stream=true)       FAIL empty stream payload            FAIL stream missing tool invocation  PASS 1.63s        PASS 1.56s        PASS 0.71s          PASS 2.81s
-Response (stream=false)        PASS 2.94s                           PASS 9.57s                           PASS 2.68s        PASS 1.65s        PASS 1.15s          PASS 5.67s
-Response (stream=true)         PASS 2.42s                           PASS 12.51s                          PASS 3.83s        PASS 3.66s        PASS 1.44s          PASS 5.06s
-Response Tools (stream=false)  PASS 2.02s                           PASS 13.14s                          PASS 2.08s        PASS 1.51s        PASS 2.64s          PASS 2.71s
-Response Tools (stream=true)   PASS 2.39s                           PASS 4.21s                           PASS 1.44s        PASS 1.67s        PASS 0.80s          PASS 3.93s
-Claude (stream=false)          PASS 2.22s                           PASS 9.73s                           PASS 1.70s        PASS 0.96s        PASS 1.67s          PASS 1.89s
-Claude (stream=true)           PASS 2.31s                           PASS 14.45s                          PASS 1.74s        PASS 1.04s        PASS 1.17s          FAIL empty stream payload
-Claude Tools (stream=false)    PASS 1.83s                           PASS 8.23s                           PASS 1.65s        PASS 1.88s        PASS 2.57s          PASS 2.34s
-Claude Tools (stream=true)     FAIL stream missing tool invocation  FAIL stream missing tool invocation  PASS 1.95s        PASS 1.80s        PASS 0.67s          FAIL empty stream payload
+Variant                        gpt-4o-mini  gpt-5-mini   claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
+Chat (stream=false)            PASS 1.51s   PASS 10.63s  PASS 1.89s        PASS 0.94s        PASS 0.54s          PASS 1.91s
+Chat (stream=true)             PASS 1.60s   PASS 9.82s   PASS 0.99s        PASS 3.42s        PASS 0.57s          PASS 2.39s
+Chat Tools (stream=false)      PASS 4.00s   PASS 6.26s   PASS 1.75s        PASS 2.03s        PASS 0.62s          PASS 4.56s
+Chat Tools (stream=true)       PASS 2.67s   PASS 5.42s   PASS 1.70s        PASS 1.24s        PASS 0.64s          PASS 2.60s
+Response (stream=false)        PASS 2.02s   PASS 9.31s   PASS 4.73s        PASS 3.53s        PASS 1.28s          PASS 4.84s
+Response (stream=true)         PASS 1.85s   PASS 9.97s   PASS 3.35s        PASS 1.96s        PASS 1.14s          PASS 3.47s
+Response Tools (stream=false)  PASS 3.17s   PASS 4.86s   PASS 1.71s        PASS 1.66s        PASS 1.01s          PASS 2.48s
+Response Tools (stream=true)   PASS 1.57s   PASS 3.51s   PASS 1.64s        PASS 2.13s        PASS 1.10s          PASS 3.52s
+Claude (stream=false)          PASS 1.40s   PASS 8.66s   PASS 2.42s        PASS 1.31s        PASS 0.81s          PASS 2.40s
+Claude (stream=true)           PASS 1.43s   PASS 5.32s   PASS 1.32s        PASS 1.22s        PASS 0.89s          PASS 3.81s
+Claude Tools (stream=false)    PASS 1.30s   PASS 7.90s   PASS 2.31s        PASS 3.68s        PASS 0.56s          PASS 3.89s
+Claude Tools (stream=true)     PASS 2.83s   PASS 8.73s   PASS 1.51s        PASS 3.77s        PASS 0.47s          PASS 2.66s
 
-Totals  | Requests: 72 | Passed: 66 | Failed: 6 | Skipped: 0
+Totals  | Requests: 72 | Passed: 72 | Failed: 0 | Skipped: 0
 
-Failures:
-- deepseek-chat · Claude (stream=true) → empty stream payload
-- deepseek-chat · Claude Tools (stream=true) → empty stream payload
-- gpt-4o-mini · Chat Tools (stream=true) → empty stream payload
-- gpt-4o-mini · Claude Tools (stream=true) → stream missing tool invocation
-- gpt-5-mini · Chat Tools (stream=true) → stream missing tool invocation
-- gpt-5-mini · Claude Tools (stream=true) → stream missing tool invocation
+2025-10-15T23:34:30Z    INFO    oneapi-test     test/main.go:31 all tests passed
 
 ```
 
@@ -98,7 +92,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
         - [Non-Stream](#non-stream)
       - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
         - [Support Claude Code](#support-claude-code)
-    - [Support claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5](#support-claude-opus-4-0--claude-opus-4-1--claude-sonnet-4-0--claude-sonnet-4-5)
+    - [Support Claude 4.x Models](#support-claude-4x-models)
     - [Google (Gemini \& Vertex) Features](#google-gemini--vertex-features)
       - [Support gemini-2.0-flash-exp](#support-gemini-20-flash-exp)
       - [Support gemini-2.0-flash](#support-gemini-20-flash)
@@ -453,9 +447,11 @@ export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
 
 You can use any model you like for Claude Code, even if the model doesn’t natively support the Claude Messages API.
 
-### Support claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5
+### Support Claude 4.x Models
 
 ![](https://s3.laisky.com/uploads/2025/09/claude-sonnet-4-5.png)
+
+claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5 / claude-haiku-4-5
 
 ### Google (Gemini & Vertex) Features
 

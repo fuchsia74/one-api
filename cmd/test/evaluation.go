@@ -296,6 +296,29 @@ func detectToolInvocationInStream(spec requestSpec, obj map[string]any) bool {
 				}
 			}
 		}
+		if choices, ok := obj["choices"].([]any); ok {
+			for _, choice := range choices {
+				choiceMap, ok := choice.(map[string]any)
+				if !ok {
+					continue
+				}
+				if delta, ok := choiceMap["delta"].(map[string]any); ok {
+					if calls, ok := delta["tool_calls"].([]any); ok && len(calls) > 0 {
+						return true
+					}
+				}
+				if message, ok := choiceMap["message"].(map[string]any); ok {
+					if calls, ok := message["tool_calls"].([]any); ok && len(calls) > 0 {
+						return true
+					}
+				}
+			}
+		}
+		if delta, ok := obj["delta"].(map[string]any); ok {
+			if calls, ok := delta["tool_calls"].([]any); ok && len(calls) > 0 {
+				return true
+			}
+		}
 	}
 	return false
 }
@@ -366,6 +389,18 @@ func isUnsupportedCombination(reqType requestType, stream bool, statusCode int, 
 		strings.Contains(lower, "stream parameter is not supported") ||
 		strings.Contains(lower, "stream currently disabled")) {
 		return true
+	}
+
+	if strings.Contains(lower, "no available channels") {
+		return true
+	}
+
+	if stream {
+		trimmed := strings.TrimSpace(string(body))
+		switch strings.ToLower(trimmed) {
+		case "data: [done]", "[done]", "data:[done]":
+			return true
+		}
 	}
 
 	if statusCode == http.StatusNotFound || statusCode == http.StatusMethodNotAllowed {

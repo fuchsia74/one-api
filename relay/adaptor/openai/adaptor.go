@@ -26,6 +26,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/geminiOpenaiCompatible"
 	"github.com/songquanpeng/one-api/relay/adaptor/minimax"
 	"github.com/songquanpeng/one-api/relay/adaptor/novita"
+	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -795,33 +796,48 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 	err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
 		var responseText string
-		// Handle different streaming modes
-		switch meta.Mode {
-		case relaymode.ResponseAPI:
-			// Direct Response API streaming - pass through without conversion
-			err, responseText, usage = ResponseAPIDirectStreamHandler(c, resp, meta.Mode)
-		default:
-			// Check if we need to handle Response API streaming response for ChatCompletion
-			if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
-				if _, ok := vi.(*ResponseAPIRequest); ok {
-					// This is a Response API streaming response that needs conversion
-					err, responseText, usage = ResponseAPIStreamHandler(c, resp, meta.Mode)
+		handledClaudeStream := false
+
+		if meta.Mode == relaymode.ClaudeMessages {
+			if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
+				handledClaudeStream = true
+				var convErr *model.ErrorWithStatusCode
+				usage, convErr = openai_compatible.ConvertOpenAIStreamToClaudeSSE(c, resp, meta.PromptTokens, meta.ActualModelName)
+				if convErr != nil {
+					return nil, convErr
+				}
+			}
+		}
+
+		if !handledClaudeStream {
+			// Handle different streaming modes
+			switch meta.Mode {
+			case relaymode.ResponseAPI:
+				// Direct Response API streaming - pass through without conversion
+				err, responseText, usage = ResponseAPIDirectStreamHandler(c, resp, meta.Mode)
+			default:
+				// Check if we need to handle Response API streaming response for ChatCompletion
+				if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
+					if _, ok := vi.(*ResponseAPIRequest); ok {
+						// This is a Response API streaming response that needs conversion
+						err, responseText, usage = ResponseAPIStreamHandler(c, resp, meta.Mode)
+					} else {
+						// Regular streaming response
+						err, responseText, usage = StreamHandler(c, resp, meta.Mode)
+					}
 				} else {
 					// Regular streaming response
 					err, responseText, usage = StreamHandler(c, resp, meta.Mode)
 				}
-			} else {
-				// Regular streaming response
-				err, responseText, usage = StreamHandler(c, resp, meta.Mode)
 			}
-		}
 
-		if usage == nil || usage.TotalTokens == 0 {
-			usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
-		}
-		if usage.TotalTokens != 0 && usage.PromptTokens == 0 { // some channels don't return prompt tokens & completion tokens
-			usage.PromptTokens = meta.PromptTokens
-			usage.CompletionTokens = usage.TotalTokens - meta.PromptTokens
+			if usage == nil || usage.TotalTokens == 0 {
+				usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+			}
+			if usage.TotalTokens != 0 && usage.PromptTokens == 0 { // some channels don't return prompt tokens & completion tokens
+				usage.PromptTokens = meta.PromptTokens
+				usage.CompletionTokens = usage.TotalTokens - meta.PromptTokens
+			}
 		}
 	} else {
 		switch meta.Mode {
@@ -858,19 +874,22 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 	}
 
 	// Handle Claude Messages response conversion
-	if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
-		claudeResp, convertErr := a.convertToClaudeResponse(c, resp)
-		if convertErr != nil {
-			return nil, convertErr
+	// Streaming conversions are handled inline; do not re-read an already drained body.
+	if !meta.IsStream && resp != nil {
+		if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
+			claudeResp, convertErr := a.convertToClaudeResponse(c, resp)
+			if convertErr != nil {
+				return nil, convertErr
+			}
+
+			// Replace the original response with the converted Claude response
+			// We need to update the response in the context so the controller can use it
+			c.Set(ctxkey.ConvertedResponse, claudeResp)
+
+			// For Claude Messages conversion, we don't return usage separately
+			// The usage is included in the Claude response body, so return nil usage
+			return nil, nil
 		}
-
-		// Replace the original response with the converted Claude response
-		// We need to update the response in the context so the controller can use it
-		c.Set(ctxkey.ConvertedResponse, claudeResp)
-
-		// For Claude Messages conversion, we don't return usage separately
-		// The usage is included in the Claude response body, so return nil usage
-		return nil, nil
 	}
 
 	return
