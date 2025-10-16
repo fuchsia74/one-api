@@ -80,19 +80,54 @@ var (
 			"ap-northeast-1",
 		},
 		"anthropic.claude-sonnet-4-5-20250929-v1:0": {
+			"us-west-1",
 			"us-west-2",
 			"us-east-1",
 			"us-east-2",
+			"sa-east-1",
 			"eu-west-1",
+			"eu-west-2",
+			"eu-west-3",
+			"eu-south-1",
+			"eu-south-2",
+			"eu-north-1",
+			"eu-central-1",
+			"eu-central-2",
+			"ca-central-1",
+			"ap-south-1",
+			"ap-south-2",
+			"ap-southeast-1",
+			"ap-southeast-2",
+			"ap-southeast-3",
+			"ap-southeast-4",
 			"ap-northeast-1",
+			"ap-northeast-2",
+			"ap-northeast-3",
 		},
 		"anthropic.claude-haiku-4-5-20251001-v1:0": {
 			"us-west-1",
 			"us-west-2",
 			"us-east-1",
+			"us-east-2",
 			"sa-east-1",
+			"eu-west-1",
 			"eu-west-2",
 			"eu-west-3",
+			"eu-south-1",
+			"eu-south-2",
+			"eu-north-1",
+			"eu-central-1",
+			"eu-central-2",
+			"ca-central-1",
+			"ap-south-1",
+			"ap-south-2",
+			"ap-southeast-1",
+			"ap-southeast-2",
+			"ap-southeast-3",
+			"ap-southeast-4",
+			"ap-northeast-1",
+			"ap-northeast-2",
+			"ap-northeast-3",
 		},
 	}
 
@@ -215,21 +250,21 @@ var RegionMapping = map[string][]string{
 	"eu-west-1":    {"eu"},
 	"eu-west-2":    {"eu"},
 	"eu-west-3":    {"eu"},
-	"eu-central-1": {"eu"},
 	"eu-north-1":   {"eu"},
 	"eu-south-1":   {"eu"},
+	"eu-central-1": {"eu"},
 	"eu-central-2": {"eu"},
 
 	// Asia Pacific regions
+	"ap-south-1":     {"apac"},
+	"ap-south-2":     {"apac"},
 	"ap-southeast-1": {"apac"},
 	"ap-southeast-2": {"apac", "au"},
-	"ap-northeast-1": {"apac"},
-	"ap-northeast-2": {"apac"},
-	"ap-south-1":     {"apac"},
 	"ap-southeast-3": {"apac"},
 	"ap-southeast-4": {"apac", "au"},
-	"ap-south-2":     {"apac"},
-	"ap-northeast-3": {"apac"},
+	"ap-northeast-1": {"jp", "apac"},
+	"ap-northeast-2": {"apac"},
+	"ap-northeast-3": {"jp", "apac"},
 }
 
 // getRegionPrefix returns the primary cross-region inference prefix for a given AWS region.
@@ -340,9 +375,6 @@ func testModelAvailability(ctx context.Context, client *bedrockruntime.Client, m
 
 	return true
 }
-
-// Deprecated: File-based ARN configuration has been replaced with channel-specific configuration
-// These functions are kept for backward compatibility but should not be used in new code
 
 // ConvertModelID2CrossRegionProfile converts the model ID to a cross-region profile ID.
 // Enhanced version that uses aws-sdk-go-v2 patterns and includes availability testing.
