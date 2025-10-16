@@ -198,69 +198,84 @@ var CrossRegionInferences = []string{
 
 // RegionMapping defines the mapping between AWS regions and their cross-region inference prefixes
 // Following AWS best practices for region grouping
-var RegionMapping = map[string]string{
+var RegionMapping = map[string][]string{
 	// US regions
-	"us-east-1":    "us",
-	"us-east-2":    "us",
-	"us-west-1":    "us",
-	"us-west-2":    "us",
-	"ca-central-1": "us", // Canada uses US inference profiles
-	"sa-east-1":    "us", // South America uses US inference profiles
+	"us-east-1":    {"us"},
+	"us-east-2":    {"us"},
+	"us-west-1":    {"us"},
+	"us-west-2":    {"us"},
+	"ca-central-1": {"us"}, // Canada uses US inference profiles
+	"sa-east-1":    {"us"}, // South America uses US inference profiles
 
 	// US Government regions
-	"us-gov-east-1": "us-gov",
-	"us-gov-west-1": "us-gov",
+	"us-gov-east-1": {"us-gov"},
+	"us-gov-west-1": {"us-gov"},
 
 	// EU regions
-	"eu-west-1":    "eu",
-	"eu-west-2":    "eu",
-	"eu-west-3":    "eu",
-	"eu-central-1": "eu",
-	"eu-north-1":   "eu",
-	"eu-south-1":   "eu",
-	"eu-central-2": "eu",
+	"eu-west-1":    {"eu"},
+	"eu-west-2":    {"eu"},
+	"eu-west-3":    {"eu"},
+	"eu-central-1": {"eu"},
+	"eu-north-1":   {"eu"},
+	"eu-south-1":   {"eu"},
+	"eu-central-2": {"eu"},
 
 	// Asia Pacific regions
-	"ap-southeast-1": "apac",
-	"ap-southeast-2": "apac",
-	"ap-northeast-1": "apac",
-	"ap-northeast-2": "apac",
-	"ap-south-1":     "apac",
-	"ap-southeast-3": "apac",
-	"ap-southeast-4": "apac",
-	"ap-south-2":     "apac",
-	"ap-northeast-3": "apac",
+	"ap-southeast-1": {"apac"},
+	"ap-southeast-2": {"apac", "au"},
+	"ap-northeast-1": {"apac"},
+	"ap-northeast-2": {"apac"},
+	"ap-south-1":     {"apac"},
+	"ap-southeast-3": {"apac"},
+	"ap-southeast-4": {"apac", "au"},
+	"ap-south-2":     {"apac"},
+	"ap-northeast-3": {"apac"},
 }
 
-// getRegionPrefix returns the cross-region inference prefix for a given AWS region
+// getRegionPrefix returns the primary cross-region inference prefix for a given AWS region.
 func getRegionPrefix(region string) string {
-	if prefix, exists := RegionMapping[region]; exists {
-		return prefix
+	prefixes := getRegionPrefixes(region)
+	if len(prefixes) == 0 {
+		return ""
+	}
+
+	return prefixes[0]
+}
+
+// getRegionPrefixes returns the ordered set of cross-region inference prefixes for the region.
+// The first prefix matches the historical single-prefix behavior to keep backwards compatibility.
+func getRegionPrefixes(region string) []string {
+	if prefixes, exists := RegionMapping[region]; exists {
+		if len(prefixes) > 0 {
+			return prefixes
+		}
 	}
 
 	// Fallback to parsing logic for regions not in the map
 	if strings.HasPrefix(region, "us-gov-") {
-		return "us-gov"
+		return []string{"us-gov"}
 	}
 
 	parts := strings.Split(region, "-")
 	if len(parts) == 0 {
-		return ""
+		return nil
 	}
 
 	switch parts[0] {
 	case "us":
-		return "us"
+		return []string{"us"}
 	case "eu":
-		return "eu"
+		return []string{"eu"}
 	case "ap":
-		return "apac"
+		return []string{"apac"}
 	case "ca", "sa":
 		// Canadian and South American regions typically use US inference profiles
-		return "us"
+		return []string{"us"}
+	case "au":
+		return []string{"au"}
 	default:
 		logger.Logger.Debug("unknown region prefix", zap.String("region", region))
-		return ""
+		return nil
 	}
 }
 
@@ -344,16 +359,18 @@ func ConvertModelID2CrossRegionProfile(ctx context.Context, model, region string
 		}
 	}
 
-	regionPrefix := getRegionPrefix(region)
-	if regionPrefix == "" {
+	regionPrefixes := getRegionPrefixes(region)
+	if len(regionPrefixes) == 0 {
 		lg.Debug("unsupported region for cross-region inference", zap.String("region", region))
 		return model
 	}
 
-	newModelID := regionPrefix + "." + model
-	if slices.Contains(CrossRegionInferences, newModelID) {
-		lg.Debug("convert model to cross-region profile", zap.String("model", model), zap.String("cross_region_profile", newModelID))
-		return newModelID
+	for _, regionPrefix := range regionPrefixes {
+		newModelID := regionPrefix + "." + model
+		if slices.Contains(CrossRegionInferences, newModelID) {
+			lg.Debug("convert model to cross-region profile", zap.String("model", model), zap.String("region_prefix", regionPrefix), zap.String("cross_region_profile", newModelID))
+			return newModelID
+		}
 	}
 
 	lg.Debug("no cross-region profile found", zap.String("model", model), zap.String("region", region))

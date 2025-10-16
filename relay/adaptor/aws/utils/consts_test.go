@@ -78,6 +78,12 @@ func TestConvertModelID2CrossRegionProfile(t *testing.T) {
 			expected: "eu.anthropic.claude-sonnet-4-20250514-v1:0",
 		},
 		{
+			name:     "Australian region prefers AU prefix when available",
+			model:    "anthropic.claude-sonnet-4-5-20250929-v1:0",
+			region:   "ap-southeast-2",
+			expected: "au.anthropic.claude-sonnet-4-5-20250929-v1:0",
+		},
+		{
 			name:     "Unsupported model returns original",
 			model:    "unsupported.model-v1:0",
 			region:   "us-east-1",
@@ -164,11 +170,22 @@ func TestConvertModelID2CrossRegionProfileWithFallback(t *testing.T) {
 
 func TestRegionMapping(t *testing.T) {
 	// Test that all regions in RegionMapping have valid prefixes
-	for region, expectedPrefix := range RegionMapping {
+	for region, prefixes := range RegionMapping {
+		if len(prefixes) == 0 {
+			t.Errorf("RegionMapping entry for %s has no prefixes", region)
+			continue
+		}
+
 		actualPrefix := getRegionPrefix(region)
-		if actualPrefix != expectedPrefix {
-			t.Errorf("RegionMapping inconsistency: region %s maps to %s but getRegionPrefix returns %s",
-				region, expectedPrefix, actualPrefix)
+		if actualPrefix != prefixes[0] {
+			t.Errorf("RegionMapping inconsistency: region %s primary prefix %s does not match getRegionPrefix result %s",
+				region, prefixes[0], actualPrefix)
+		}
+
+		for _, prefix := range prefixes {
+			if prefix == "" {
+				t.Errorf("RegionMapping entry for %s contains an empty prefix", region)
+			}
 		}
 	}
 }
@@ -183,6 +200,7 @@ func TestCrossRegionInferencesValidation(t *testing.T) {
 		"global": true,
 		"ca":     true,
 		"jp":     true,
+		"au":     true,
 	}
 
 	for _, modelID := range CrossRegionInferences {
