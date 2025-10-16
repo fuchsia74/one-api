@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"net/url"
 
 	"github.com/Laisky/errors/v2"
@@ -87,4 +88,73 @@ func (t *Tool) Validate() error {
 		}
 	}
 	return nil
+}
+
+// UnmarshalJSON supports both nested OpenAI function definitions and flattened
+// legacy payloads where function fields appear at the top level of the tool
+// object. The upstream providers expect the nested format, so we normalize the
+// data into the Function struct during decoding to ensure consistent marshaling
+// later in the pipeline.
+func (t *Tool) UnmarshalJSON(data []byte) error {
+	type alias Tool
+	var raw struct {
+		alias
+		Function    *Function `json:"function"`
+		Name        string    `json:"name"`
+		Description string    `json:"description"`
+		Parameters  any       `json:"parameters"`
+		Arguments   any       `json:"arguments"`
+		Required    []string  `json:"required"`
+		Strict      *bool     `json:"strict"`
+	}
+
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return errors.Wrap(err, "unmarshal tool")
+	}
+
+	*t = Tool(raw.alias)
+	t.Function = raw.Function
+
+	if t.Function == nil {
+		if hasFunctionShape(raw.Name, raw.Description, raw.Parameters, raw.Arguments, raw.Required, raw.Strict) {
+			t.Function = &Function{
+				Name:        raw.Name,
+				Description: raw.Description,
+				Parameters:  raw.Parameters,
+				Arguments:   raw.Arguments,
+				Required:    raw.Required,
+				Strict:      raw.Strict,
+			}
+		}
+		return nil
+	}
+
+	// Merge any flattened fields that were provided alongside the nested function
+	if raw.Name != "" && t.Function.Name == "" {
+		t.Function.Name = raw.Name
+	}
+	if raw.Description != "" && t.Function.Description == "" {
+		t.Function.Description = raw.Description
+	}
+	if raw.Parameters != nil && t.Function.Parameters == nil {
+		t.Function.Parameters = raw.Parameters
+	}
+	if raw.Arguments != nil && t.Function.Arguments == nil {
+		t.Function.Arguments = raw.Arguments
+	}
+	if len(raw.Required) > 0 && len(t.Function.Required) == 0 {
+		t.Function.Required = raw.Required
+	}
+	if raw.Strict != nil && t.Function.Strict == nil {
+		t.Function.Strict = raw.Strict
+	}
+
+	return nil
+}
+
+func hasFunctionShape(name, description string, parameters, arguments any, required []string, strict *bool) bool {
+	if name != "" || description != "" || parameters != nil || arguments != nil || strict != nil {
+		return true
+	}
+	return len(required) > 0
 }

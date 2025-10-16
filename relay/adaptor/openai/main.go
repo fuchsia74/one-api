@@ -356,9 +356,9 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	}
 
 	// Check for API errors
-	if textResponse.Error.Type != "" {
+	if textResponse.Error != nil && textResponse.Error.Type != "" {
 		return &model.ErrorWithStatusCode{
-			Error:      textResponse.Error,
+			Error:      *textResponse.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
 	}

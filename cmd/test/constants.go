@@ -2,7 +2,7 @@ package main
 
 const (
 	defaultAPIBase    = "https://oneapi.laisky.com"
-	defaultTestModels = "gpt-4o-mini,gpt-5-mini,claude-3.5-haiku,gemini-2.5-flash,openai/gpt-oss-20b,deepseek-chat"
+	defaultTestModels = "gpt-4o-mini,gpt-5-mini,claude-3.5-haiku,gemini-2.5-flash,openai/gpt-oss-20b,deepseek-chat,aws-claude-4.5-haiku,grok-4-fast-non-reasoning"
 
 	defaultMaxTokens   = 2048
 	defaultTemperature = 0.7

@@ -957,9 +957,9 @@ func UnifiedStreamProcessing(c *gin.Context, resp *http.Response, promptTokens i
 
 		// Try to parse as error response
 		var errorResponse SlimTextResponse
-		if err := json.Unmarshal(responseBody, &errorResponse); err == nil && errorResponse.Error.Type != "" {
+		if err := json.Unmarshal(responseBody, &errorResponse); err == nil && errorResponse.Error != nil && errorResponse.Error.Type != "" {
 			return &model.ErrorWithStatusCode{
-				Error:      errorResponse.Error,
+				Error:      *errorResponse.Error,
 				StatusCode: resp.StatusCode,
 			}, nil
 		}
