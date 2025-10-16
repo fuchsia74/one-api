@@ -64,6 +64,10 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		Tools:       claudeReq.Tools,
 	}
 
+	if req.Temperature != nil && req.TopP != nil {
+		req.TopP = nil
+	}
+
 	c.Set(ctxkey.RequestModel, request.Model)
 	c.Set(ctxkey.ConvertedRequest, req)
 	return req, nil

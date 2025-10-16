@@ -1069,3 +1069,22 @@ func TestConvertClaudeRequest_DirectPassthrough(t *testing.T) {
 	// Since the interface returns any, we just verify it's not nil and the flags are set correctly
 	assert.NotNil(t, result, "result should not be nil")
 }
+
+func TestConvertClaudeRequest_ClearsTopPWhenTemperatureProvided(t *testing.T) {
+	c := newThinkingContext(t, "/v1/messages")
+
+	claudeRequest := model.ClaudeRequest{
+		Model:       "claude-3.5-sonnet",
+		MaxTokens:   2048,
+		Messages:    []model.ClaudeMessage{{Role: "user", Content: "hello"}},
+		Temperature: float64Ptr(0.6),
+		TopP:        float64Ptr(0.5),
+	}
+
+	converted, err := ConvertClaudeRequest(c, claudeRequest)
+	require.NoError(t, err)
+	require.NotNil(t, converted)
+
+	assert.NotNil(t, converted.Temperature, "temperature should be preserved")
+	assert.Nil(t, converted.TopP, "top_p should be cleared when temperature is provided")
+}

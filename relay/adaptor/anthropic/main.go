@@ -199,6 +199,10 @@ func ConvertClaudeRequest(c *gin.Context, claudeRequest model.ClaudeRequest) (*R
 		request.TopK = claudeRequest.TopK
 	}
 
+	if request.Temperature != nil && request.TopP != nil {
+		request.TopP = nil
+	}
+
 	return request, nil
 }
 
