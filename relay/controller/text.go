@@ -57,6 +57,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.OriginModelName = textRequest.Model
 	textRequest.Model = meta.ActualModelName
 	meta.ActualModelName = textRequest.Model
+	applyThinkingQueryToChatRequest(c, textRequest, meta)
 	// set system prompt if not empty
 	systemPromptReset := setSystemPrompt(ctx, textRequest, meta.ForcedSystemPrompt)
 

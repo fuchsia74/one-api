@@ -53,6 +53,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
 	sanitizeResponseAPIRequest(responseAPIRequest)
+	applyThinkingQueryToResponseRequest(c, responseAPIRequest, meta)
 	if normalized, changed := openai.NormalizeToolChoiceForResponse(responseAPIRequest.ToolChoice); changed {
 		responseAPIRequest.ToolChoice = normalized
 	}
@@ -260,6 +261,7 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	meta.OriginModelName = chatRequest.Model
 	chatRequest.Model = metalib.GetMappedModelName(meta.OriginModelName, meta.ModelMapping)
 	meta.ActualModelName = chatRequest.Model
+	applyThinkingQueryToChatRequest(c, chatRequest, meta)
 	meta.RequestURLPath = "/v1/chat/completions"
 	meta.ResponseAPIFallback = true
 	if c.Request != nil && c.Request.URL != nil {

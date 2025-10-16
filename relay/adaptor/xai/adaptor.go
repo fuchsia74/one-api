@@ -71,10 +71,6 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 
 func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) (any, error) {
 	// XAI is OpenAI-compatible, so we can pass the request through with minimal changes
-	// Remove reasoning_effort as XAI doesn't support it
-	if request.ReasoningEffort != nil {
-		request.ReasoningEffort = nil
-	}
 	return request, nil
 }
 
