@@ -288,11 +288,23 @@ func testChannel(ctx context.Context, channel *model.Channel, request *relaymode
 		return "", errors.Wrap(err, "failed to read result body"), nil
 	}
 
+	statusCode := responseStatus(resp)
+
 	lg.Debug("testing channel response",
 		zap.Int("channel_id", channel.Id),
-		zap.Int("status", resp.StatusCode),
+		zap.Bool("response_nil", resp == nil),
+		zap.Int("status", statusCode),
 		zap.Int("response_bytes", len(respBody)))
 	return responseMessage, nil, nil
+}
+
+// responseStatus returns the response status code or zero when the response is nil.
+func responseStatus(resp *http.Response) int {
+	if resp == nil {
+		return 0
+	}
+
+	return resp.StatusCode
 }
 
 func TestChannel(c *gin.Context) {
