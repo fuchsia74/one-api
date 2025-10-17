@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/songquanpeng/one-api/dto"
 )
 
 func TestDashboardAggregations(t *testing.T) {
@@ -92,7 +94,7 @@ func TestDashboardAggregations(t *testing.T) {
 	day1Str := day1.Format("2006-01-02")
 	day2Str := day2.Format("2006-01-02")
 
-	modelByKey := make(map[string]*LogStatistic)
+	modelByKey := make(map[string]*dto.LogStatistic)
 	for _, stat := range modelStats {
 		modelByKey[fmt.Sprintf("%s|%s", stat.Day, stat.ModelName)] = stat
 	}
@@ -114,7 +116,7 @@ func TestDashboardAggregations(t *testing.T) {
 	userStats, err := SearchLogsByDayAndUser(0, start, end)
 	require.NoError(t, err)
 
-	userByKey := make(map[string]*LogStatisticByUser)
+	userByKey := make(map[string]*dto.LogStatisticByUser)
 	for _, stat := range userStats {
 		userByKey[fmt.Sprintf("%s|%s", stat.Day, stat.Username)] = stat
 	}
@@ -131,7 +133,7 @@ func TestDashboardAggregations(t *testing.T) {
 	tokenStats, err := SearchLogsByDayAndToken(0, start, end)
 	require.NoError(t, err)
 
-	tokenByKey := make(map[string]*LogStatisticByToken)
+	tokenByKey := make(map[string]*dto.LogStatisticByToken)
 	for _, stat := range tokenStats {
 		tokenByKey[fmt.Sprintf("%s|%s|%s", stat.Day, stat.TokenName, stat.Username)] = stat
 	}

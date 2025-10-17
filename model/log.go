@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/dto"
 )
 
 type Log struct {
@@ -446,36 +447,6 @@ func GetLogById(id int) (*Log, error) {
 	return &log, nil
 }
 
-type LogStatistic struct {
-	Day              string `gorm:"column:day"`
-	ModelName        string `gorm:"column:model_name"`
-	RequestCount     int    `gorm:"column:request_count"`
-	Quota            int    `gorm:"column:quota"`
-	PromptTokens     int    `gorm:"column:prompt_tokens"`
-	CompletionTokens int    `gorm:"column:completion_tokens"`
-}
-
-type LogStatisticByUser struct {
-	Day              string `gorm:"column:day"`
-	Username         string `gorm:"column:username"`
-	UserId           int    `gorm:"column:user_id"`
-	RequestCount     int    `gorm:"column:request_count"`
-	Quota            int    `gorm:"column:quota"`
-	PromptTokens     int    `gorm:"column:prompt_tokens"`
-	CompletionTokens int    `gorm:"column:completion_tokens"`
-}
-
-type LogStatisticByToken struct {
-	Day              string `gorm:"column:day"`
-	Username         string `gorm:"column:username"`
-	UserId           int    `gorm:"column:user_id"`
-	TokenName        string `gorm:"column:token_name"`
-	RequestCount     int    `gorm:"column:request_count"`
-	Quota            int    `gorm:"column:quota"`
-	PromptTokens     int    `gorm:"column:prompt_tokens"`
-	CompletionTokens int    `gorm:"column:completion_tokens"`
-}
-
 // dayAggregationSelect returns the SQL expression that normalizes log timestamps
 // into YYYY-MM-DD strings, accounting for the configured database engine.
 func dayAggregationSelect() string {
@@ -493,7 +464,7 @@ func dayAggregationSelect() string {
 // SearchLogsByDayAndModel returns per-day, per-model aggregates for logs in the
 // half-open timestamp range [start, endExclusive). `start` and `endExclusive`
 // are Unix seconds.
-func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*LogStatistic, err error) {
+func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*dto.LogStatistic, err error) {
 	groupSelect := dayAggregationSelect()
 
 	// If userId is 0, query all users (site-wide statistics)
@@ -539,7 +510,7 @@ func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*
 
 // SearchLogsByDayAndUser returns per-day, per-user aggregates for logs within
 // the half-open timestamp range [start, endExclusive).
-func SearchLogsByDayAndUser(userId, start, endExclusive int) ([]*LogStatisticByUser, error) {
+func SearchLogsByDayAndUser(userId, start, endExclusive int) ([]*dto.LogStatisticByUser, error) {
 	groupSelect := dayAggregationSelect()
 
 	var query string
@@ -578,7 +549,7 @@ func SearchLogsByDayAndUser(userId, start, endExclusive int) ([]*LogStatisticByU
 		args = []any{userId, start, endExclusive}
 	}
 
-	var stats []*LogStatisticByUser
+	var stats []*dto.LogStatisticByUser
 	err := LOG_DB.Raw(query, args...).Scan(&stats).Error
 	return stats, err
 }
@@ -586,7 +557,7 @@ func SearchLogsByDayAndUser(userId, start, endExclusive int) ([]*LogStatisticByU
 // SearchLogsByDayAndToken returns per-day, per-token aggregates (scoped by
 // username to disambiguate tokens with identical names) for the half-open
 // range [start, endExclusive).
-func SearchLogsByDayAndToken(userId, start, endExclusive int) ([]*LogStatisticByToken, error) {
+func SearchLogsByDayAndToken(userId, start, endExclusive int) ([]*dto.LogStatisticByToken, error) {
 	groupSelect := dayAggregationSelect()
 
 	var query string
@@ -627,7 +598,7 @@ func SearchLogsByDayAndToken(userId, start, endExclusive int) ([]*LogStatisticBy
 		args = []any{userId, start, endExclusive}
 	}
 
-	var stats []*LogStatisticByToken
+	var stats []*dto.LogStatisticByToken
 	err := LOG_DB.Raw(query, args...).Scan(&stats).Error
 	return stats, err
 }
