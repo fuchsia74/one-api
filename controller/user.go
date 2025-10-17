@@ -443,6 +443,26 @@ func GetUserDashboard(c *gin.Context) {
 		return
 	}
 
+	userStats, err := model.SearchLogsByDayAndUser(targetUserId, int(startTs), int(endTsExclusive))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Failed to get user usage data: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
+	tokenStats, err := model.SearchLogsByDayAndToken(targetUserId, int(startTs), int(endTsExclusive))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": "Failed to get token usage data: " + err.Error(),
+			"data":    nil,
+		})
+		return
+	}
+
 	// Get quota and status information
 	var totalQuota, usedQuota int64
 	var status string
@@ -486,6 +506,8 @@ func GetUserDashboard(c *gin.Context) {
 	// Create response with both log data and quota/status info
 	response := gin.H{
 		"logs":        dashboards,
+		"user_logs":   userStats,
+		"token_logs":  tokenStats,
 		"total_quota": totalQuota,
 		"used_quota":  usedQuota,
 		"status":      status,
