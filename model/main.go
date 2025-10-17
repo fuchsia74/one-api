@@ -154,7 +154,13 @@ func InitDB() {
 		return
 	}
 
-	// 1c) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
+	// 1c) Ensure traces.url can store long URLs (Turnstile tokens, etc.)
+	if err = MigrateTraceURLColumnToText(); err != nil {
+		logger.Logger.Fatal("failed to migrate traces.url column", zap.Error(err))
+		return
+	}
+
+	// 1d) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
 	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
 		logger.Logger.Fatal("failed to migrate user_request_costs unique index", zap.Error(err))
 		return

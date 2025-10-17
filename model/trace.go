@@ -16,7 +16,7 @@ import (
 type Trace struct {
 	Id         int    `json:"id" gorm:"primaryKey;autoIncrement"`
 	TraceId    string `json:"trace_id" gorm:"type:varchar(64);uniqueIndex;not null"` // TraceID from gin-middlewares
-	URL        string `json:"url" gorm:"type:varchar(512);not null"`                 // Request URL
+	URL        string `json:"url" gorm:"type:text;not null"`                         // Request URL
 	Method     string `json:"method" gorm:"type:varchar(16);not null"`               // HTTP method
 	BodySize   int64  `json:"body_size" gorm:"bigint;default:0"`                     // Request body size in bytes
 	Status     int    `json:"status" gorm:"default:0"`                               // HTTP status code
@@ -45,6 +45,11 @@ const (
 	TimestampRequestCompleted      = "request_completed"
 )
 
+// maxTraceURLLength guards against unbounded storage of user-provided URLs.
+// Modern browsers typically cap URLs at ~2000 characters; we allow double that to
+// accommodate reverse proxies injecting metadata while still preventing runaway growth.
+const maxTraceURLLength = 4096
+
 // CreateTrace creates a new trace record with initial data
 func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int64) (*Trace, error) {
 	lg := gmw.GetLogger(ctx)
@@ -52,6 +57,14 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 
 	timestamps := &TraceTimestamps{
 		RequestReceived: &now,
+	}
+
+	urlToStore, truncated := enforceTraceURLLimit(url)
+	if truncated {
+		lg.Warn("trace url truncated to max length",
+			zap.String("trace_id", traceId),
+			zap.Int("original_length", len(url)),
+			zap.Int("truncated_length", len(urlToStore)))
 	}
 
 	timestampsJSON, err := json.Marshal(timestamps)
@@ -64,7 +77,7 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 
 	trace := &Trace{
 		TraceId:    traceId,
-		URL:        url,
+		URL:        urlToStore,
 		Method:     method,
 		BodySize:   bodySize,
 		Timestamps: string(timestampsJSON),
@@ -79,7 +92,7 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 
 	lg.Debug("created trace record",
 		zap.String("trace_id", traceId),
-		zap.String("url", url),
+		zap.String("url", urlToStore),
 		zap.String("method", method))
 
 	return trace, nil
@@ -199,4 +212,18 @@ func (t *Trace) GetTraceTimestamps() (*TraceTimestamps, error) {
 		return nil, errors.Wrapf(err, "failed to unmarshal trace timestamps for trace_id: %s", t.TraceId)
 	}
 	return &timestamps, nil
+}
+
+// enforceTraceURLLimit truncates URLs longer than maxTraceURLLength while preserving UTF-8 boundaries.
+func enforceTraceURLLimit(raw string) (string, bool) {
+	if len(raw) <= maxTraceURLLength {
+		return raw, false
+	}
+
+	runes := []rune(raw)
+	if len(runes) <= maxTraceURLLength {
+		return raw[:maxTraceURLLength], true
+	}
+
+	return string(runes[:maxTraceURLLength]), true
 }
