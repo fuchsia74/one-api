@@ -159,6 +159,8 @@ oneapi:
     ENABLE_PROMETHEUS_METRICS: "true"
     # (optional) LOG_RETENTION_DAYS set log retention days; default is not to delete any logs
     LOG_RETENTION_DAYS: 7
+    # (optional) TRACE_RENTATION_DAYS retain trace records for the specified number of days; default is 30 and 0 disables cleanup
+    TRACE_RENTATION_DAYS: 30
 
     # --- Storage & Cache ---
     # (optional) SQL_DSN set SQL database connection; leave empty to use SQLite (supports mysql, postgresql, sqlite3)

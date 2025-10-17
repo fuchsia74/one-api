@@ -143,6 +143,15 @@ var (
 		return v
 	}()
 
+	// TraceRetentionDays controls how long trace records are kept before the retention worker removes them (0 disables cleanup).
+	TraceRetentionDays = func() int {
+		v := env.Int("TRACE_RENTATION_DAYS", 30)
+		if v < 0 {
+			return 0
+		}
+		return v
+	}()
+
 	// LogPushAPI defines the webhook endpoint for escalated log alerts.
 	LogPushAPI = env.String("LOG_PUSH_API", "")
 	// LogPushType labels outbound log alerts so downstream processors can route them.
