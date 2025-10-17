@@ -1,5 +1,9 @@
 # Repository Guidelines
 
+## Project
+
+The purpose of the one‑api project is to let users freely use any of the ChatCompletion API, Response API, or Claude Messages API formats to request any model on any channel. one‑api transparently handles the request and response format conversions. Please make sure that all adapters support conversion among the three API formats.
+
 ## General
 
 ### Agents

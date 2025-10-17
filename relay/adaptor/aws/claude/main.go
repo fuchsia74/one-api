@@ -153,13 +153,26 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 		return utils.WrapErr(errors.Wrap(err, "unmarshal response")), nil
 	}
 
-	openaiResp := anthropic.ResponseClaude2OpenAI(c, claudeResponse)
-	openaiResp.Model = modelName
 	usage := relaymodel.Usage{
 		PromptTokens:     claudeResponse.Usage.InputTokens,
 		CompletionTokens: claudeResponse.Usage.OutputTokens,
 		TotalTokens:      claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens,
 	}
+
+	if native, ok := c.Get(ctxkey.ClaudeMessagesNative); ok {
+		if useNative, _ := native.(bool); useNative {
+			claudeResponse.Model = modelName
+			respBody, merr := json.Marshal(claudeResponse)
+			if merr != nil {
+				return utils.WrapErr(errors.Wrap(merr, "marshal claude response")), nil
+			}
+			c.Data(http.StatusOK, "application/json", respBody)
+			return nil, &usage
+		}
+	}
+
+	openaiResp := anthropic.ResponseClaude2OpenAI(c, claudeResponse)
+	openaiResp.Model = modelName
 	openaiResp.Usage = usage
 
 	c.JSON(http.StatusOK, openaiResp)

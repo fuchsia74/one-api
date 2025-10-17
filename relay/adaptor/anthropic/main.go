@@ -742,6 +742,8 @@ func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.Tex
 			}
 		case "text":
 			responseText += v.Text
+		case "tool_use":
+			// handled below when building tool call payloads
 		default:
 			logger.Warn("unknown response type", zap.String("type", v.Type))
 		}

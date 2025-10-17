@@ -9,23 +9,23 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ```plain
 === One-API Regression Matrix ===
 
-Variant                        gpt-4o-mini  gpt-5-mini   claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
-Chat (stream=false)            PASS 1.51s   PASS 10.63s  PASS 1.89s        PASS 0.94s        PASS 0.54s          PASS 1.91s
-Chat (stream=true)             PASS 1.60s   PASS 9.82s   PASS 0.99s        PASS 3.42s        PASS 0.57s          PASS 2.39s
-Chat Tools (stream=false)      PASS 4.00s   PASS 6.26s   PASS 1.75s        PASS 2.03s        PASS 0.62s          PASS 4.56s
-Chat Tools (stream=true)       PASS 2.67s   PASS 5.42s   PASS 1.70s        PASS 1.24s        PASS 0.64s          PASS 2.60s
-Response (stream=false)        PASS 2.02s   PASS 9.31s   PASS 4.73s        PASS 3.53s        PASS 1.28s          PASS 4.84s
-Response (stream=true)         PASS 1.85s   PASS 9.97s   PASS 3.35s        PASS 1.96s        PASS 1.14s          PASS 3.47s
-Response Tools (stream=false)  PASS 3.17s   PASS 4.86s   PASS 1.71s        PASS 1.66s        PASS 1.01s          PASS 2.48s
-Response Tools (stream=true)   PASS 1.57s   PASS 3.51s   PASS 1.64s        PASS 2.13s        PASS 1.10s          PASS 3.52s
-Claude (stream=false)          PASS 1.40s   PASS 8.66s   PASS 2.42s        PASS 1.31s        PASS 0.81s          PASS 2.40s
-Claude (stream=true)           PASS 1.43s   PASS 5.32s   PASS 1.32s        PASS 1.22s        PASS 0.89s          PASS 3.81s
-Claude Tools (stream=false)    PASS 1.30s   PASS 7.90s   PASS 2.31s        PASS 3.68s        PASS 0.56s          PASS 3.89s
-Claude Tools (stream=true)     PASS 2.83s   PASS 8.73s   PASS 1.51s        PASS 3.77s        PASS 0.47s          PASS 2.66s
+Variant                        gpt-4o-mini  gpt-5-mini   claude-haiku-4-5  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat  grok-4-fast-non-reasoning
+Chat (stream=false)            PASS 2.88s   PASS 8.86s   PASS 2.95s        PASS 5.55s        PASS 1.60s          PASS 6.94s     PASS 6.83s
+Chat (stream=true)             PASS 7.29s   PASS 9.71s   PASS 4.43s        PASS 4.55s        PASS 4.39s          PASS 3.62s     PASS 3.61s
+Chat Tools (stream=false)      PASS 4.18s   PASS 11.01s  PASS 7.24s        PASS 4.03s        PASS 6.20s          PASS 4.14s     PASS 2.43s
+Chat Tools (stream=true)       PASS 6.21s   PASS 6.85s   PASS 3.62s        PASS 6.94s        PASS 3.62s          PASS 7.81s     PASS 4.01s
+Response (stream=false)        PASS 4.57s   PASS 13.07s  PASS 9.22s        PASS 7.03s        PASS 2.88s          PASS 4.21s     PASS 4.16s
+Response (stream=true)         PASS 4.45s   PASS 27.11s  PASS 7.62s        PASS 2.88s        PASS 4.09s          PASS 6.85s     PASS 4.44s
+Response Tools (stream=false)  PASS 4.02s   PASS 7.07s   PASS 6.86s        PASS 6.21s        PASS 1.55s          PASS 7.06s     PASS 4.12s
+Response Tools (stream=true)   PASS 2.96s   PASS 7.35s   PASS 6.85s        PASS 6.96s        PASS 0.51s          PASS 2.93s     PASS 6.84s
+Claude (stream=false)          PASS 4.03s   PASS 8.82s   PASS 5.56s        PASS 7.21s        PASS 6.20s          PASS 4.39s     PASS 4.39s
+Claude (stream=true)           PASS 4.58s   PASS 16.01s  PASS 2.43s        PASS 4.16s        PASS 4.31s          PASS 6.21s     PASS 2.43s
+Claude Tools (stream=false)    PASS 2.89s   PASS 7.09s   PASS 7.21s        PASS 4.03s        PASS 2.42s          PASS 4.13s     PASS 7.45s
+Claude Tools (stream=true)     PASS 1.52s   PASS 10.05s  PASS 4.46s        PASS 4.51s        PASS 3.61s          PASS 6.84s     PASS 1.48s
 
-Totals  | Requests: 72 | Passed: 72 | Failed: 0 | Skipped: 0
+Totals  | Requests: 84 | Passed: 84 | Failed: 0 | Skipped: 0
 
-2025-10-15T23:34:30Z    INFO    oneapi-test     test/main.go:31 all tests passed
+2025-10-17T13:47:47Z    INFO    oneapi-test     test/main.go:31 all tests passed
 
 ```
 

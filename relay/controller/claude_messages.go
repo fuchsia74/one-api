@@ -61,6 +61,8 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.ActualModelName = claudeRequest.Model
 	metalib.Set2Context(c, meta)
 
+	sanitizeClaudeMessagesRequest(claudeRequest)
+
 	// get channel model ratio
 	channelModelRatio, channelCompletionRatio := getChannelRatios(c)
 
@@ -113,16 +115,11 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		if gerr != nil {
 			return openai.ErrorWrapper(gerr, "get_original_body_failed", http.StatusInternalServerError)
 		}
-		// If a mapping changed the model name, rewrite it in the raw JSON for upstream compatibility
-		if meta.ActualModelName != meta.OriginModelName {
-			rewritten, rerr := rewriteClaudeModelInJSON(rawBody, meta.ActualModelName)
-			if rerr != nil {
-				return openai.ErrorWrapper(rerr, "rewrite_model_in_body_failed", http.StatusInternalServerError)
-			}
-			requestBody = bytes.NewReader(rewritten)
-		} else {
-			requestBody = bytes.NewReader(rawBody)
+		rewritten, rerr := rewriteClaudeRequestBody(rawBody, claudeRequest)
+		if rerr != nil {
+			return openai.ErrorWrapper(rerr, "rewrite_claude_body_failed", http.StatusInternalServerError)
 		}
+		requestBody = bytes.NewReader(rewritten)
 	} else {
 		requestBytes, merr := json.Marshal(convertedRequest)
 		if merr != nil {
@@ -467,19 +464,31 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 // Removed redundant getChannelRatiosForClaude; use getChannelRatios from response.go to keep DRY.
 
-// rewriteClaudeModelInJSON rewrites the top-level "model" field in a Claude Messages JSON payload.
-// It preserves the rest of the body intact to avoid conversion artifacts.
-func rewriteClaudeModelInJSON(raw []byte, mappedModel string) ([]byte, error) {
-	if len(raw) == 0 {
+// sanitizeClaudeMessagesRequest enforces parameter constraints required by upstream providers.
+func sanitizeClaudeMessagesRequest(request *ClaudeMessagesRequest) {
+	if request == nil {
+		return
+	}
+	if request.Temperature != nil && request.TopP != nil {
+		request.TopP = nil
+	}
+}
+
+// rewriteClaudeRequestBody updates the raw JSON payload to reflect sanitized request fields.
+func rewriteClaudeRequestBody(raw []byte, request *ClaudeMessagesRequest) ([]byte, error) {
+	if len(raw) == 0 || request == nil {
 		return raw, nil
 	}
 	var obj map[string]any
 	if err := json.Unmarshal(raw, &obj); err != nil {
-		return nil, errors.Wrap(err, "unmarshal raw claude body for model rewrite")
+		return nil, errors.Wrap(err, "unmarshal raw claude body for rewrite")
 	}
-	// Only rewrite when the field exists or when adding is required for correctness.
-	// Claude requires model; validator already checked, so set it directly.
-	obj["model"] = mappedModel
+	if request.Model != "" {
+		obj["model"] = request.Model
+	}
+	if request.TopP == nil {
+		delete(obj, "top_p")
+	}
 	out, err := json.Marshal(obj)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal rewritten claude body")
