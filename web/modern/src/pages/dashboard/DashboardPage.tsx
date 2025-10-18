@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -102,6 +102,7 @@ export function DashboardPage() {
   const { user } = useAuthStore()
   const isAdmin = useMemo(() => (user?.role ?? 0) >= 10, [user])
   const [filtersReady, setFiltersReady] = useState(false)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   useLayoutEffect(() => {
     if (typeof document === 'undefined') {
@@ -224,6 +225,15 @@ export function DashboardPage() {
       return
     }
 
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
+
     setLoading(true)
     setDateError('')
     try {
@@ -234,7 +244,15 @@ export function DashboardPage() {
         params.set('user_id', dashUser || 'all')
       }
       // Unified API call - complete URL with /api prefix
-      const res = await api.get('/api/user/dashboard?' + params.toString())
+      const res = await api.get('/api/user/dashboard?' + params.toString(), {
+        signal: abortController.signal
+      })
+      
+      // Check if this request was aborted
+      if (abortController.signal.aborted) {
+        return
+      }
+
       const { success, data, message } = res.data
       if (success) {
         // Handle new API response structure
@@ -283,14 +301,21 @@ export function DashboardPage() {
         setUserRows([])
         setTokenRows([])
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        return
+      }
       console.error('Failed to fetch dashboard data:', error)
       setDateError('Failed to fetch dashboard data')
       setRows([])
       setUserRows([])
       setTokenRows([])
     } finally {
-      setLoading(false)
+      // Only clear loading if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setLoading(false)
+      }
     }
   }
 
@@ -323,6 +348,15 @@ export function DashboardPage() {
       return
     }
     
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort()
+    }
+
+    // Create new AbortController for this request
+    const abortController = new AbortController()
+    abortControllerRef.current = abortController
+    
     setLoading(true)
     setDateError('')
     try {
@@ -332,7 +366,15 @@ export function DashboardPage() {
       if (isAdmin) {
         params.set('user_id', dashUser || 'all')
       }
-      const res = await api.get('/api/user/dashboard?' + params.toString())
+      const res = await api.get('/api/user/dashboard?' + params.toString(), {
+        signal: abortController.signal
+      })
+      
+      // Check if this request was aborted
+      if (abortController.signal.aborted) {
+        return
+      }
+
       const { success, data, message } = res.data
       if (success) {
         const logs = data?.logs || data || []
@@ -380,14 +422,21 @@ export function DashboardPage() {
         setUserRows([])
         setTokenRows([])
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignore abort errors
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        return
+      }
       console.error('Failed to fetch dashboard data:', error)
       setDateError('Failed to fetch dashboard data')
       setRows([])
       setUserRows([])
       setTokenRows([])
     } finally {
-      setLoading(false)
+      // Only clear loading if this request wasn't aborted
+      if (!abortController.signal.aborted) {
+        setLoading(false)
+      }
     }
   }
 
