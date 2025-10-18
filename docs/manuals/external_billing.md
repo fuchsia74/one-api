@@ -2,6 +2,29 @@
 
 This guide explains how external services can report usage to One-API using the `/api/token/consume` endpoint. It covers the lifecycle of billing events, how transaction identifiers are managed, example requests, and integration best practices.
 
+## Menu
+
+- [External Billing Integration Guide](#external-billing-integration-guide)
+  - [Menu](#menu)
+  - [Implementation Mapping](#implementation-mapping)
+  - [Key Concepts](#key-concepts)
+  - [Dependencies \& Prerequisites](#dependencies--prerequisites)
+  - [Authentication](#authentication)
+  - [End-to-End Flow (Pre → Post)](#end-to-end-flow-pre--post)
+    - [1. Pre-Consume Reservation](#1-pre-consume-reservation)
+    - [2. Post-Consume Reconciliation](#2-post-consume-reconciliation)
+    - [Optional: Cancel a Pending Reservation](#optional-cancel-a-pending-reservation)
+  - [Single-Step Consumption (`phase":"single"`)](#single-step-consumption-phasesingle)
+  - [Request Payload Fields](#request-payload-fields)
+  - [Response Payload](#response-payload)
+    - [Sample `post` Response](#sample-post-response)
+  - [Flow Overview](#flow-overview)
+  - [Timeout \& Auto-Confirmation Lifecycle](#timeout--auto-confirmation-lifecycle)
+  - [Operational Considerations](#operational-considerations)
+  - [Error Handling \& Retries](#error-handling--retries)
+  - [Best Practices](#best-practices)
+  - [Additional Notes](#additional-notes)
+
 ## Implementation Mapping
 
 - All features described here are implemented in `controller/token.go` and `model/token_transaction.go`.
@@ -24,6 +47,14 @@ This guide explains how external services can report usage to One-API using the 
 **Timeouts are always clamped to the configured minimum and maximum. If a client requests a value outside this range, One-API will use the nearest allowed value.**
 
 **Legacy clients (no `phase` field) are treated as `single` phase, which performs reservation and confirmation in one request.**
+
+## Dependencies & Prerequisites
+
+- **Authenticated token** – Every request must present a bearer token whose API key is enabled, unexpired, and has sufficient quota. Requests fail with validation errors if the key has been disabled, expired, or exhausted (see `validateTokenForConsumption`).
+- **Network reachability** – The external system must reach the One-API host and HTTPS endpoint (`/api/token/consume`). Timeouts should align with One-API’s own request timeout (`BILLING_TIMEOUT`).
+- **Configuration constants** – Reservation windows are governed by `EXTERNAL_BILLING_DEFAULT_TIMEOUT` (default 600s) and capped by `EXTERNAL_BILLING_MAX_TIMEOUT` (default 3600s). Values outside this range are clamped server-side (`normalizeTimeoutSeconds`).
+- **Quota balance** – `pre` and `single` phases atomically reserve quota via `PreConsumeTokenQuota`, verifying both token-level and user-level quotas before committing the hold. The upstream caller should be prepared for `400` errors when quota is insufficient.
+- **Idempotent storage** – Clients must persist the returned `transaction.transaction_id` reliably; it is required for `post`/`cancel` and is unique per token (`generateTransactionID`).
 
 ## Authentication
 
@@ -138,6 +169,51 @@ The response includes a `transaction` object with status `confirmed` and the gen
 | `timeout_seconds`  | optional (`pre`) | Overrides the auto-confirm window (clamped to project configuration).                                    |
 | `elapsed_time_ms`  | optional         | Upstream processing latency captured in logs.                                                            |
 
+## Response Payload
+
+Every successful call returns the updated token snapshot in `data` and, when applicable, a `transaction` object describing the hold or reconciliation. The `transaction` object includes:
+
+| Field                          | Description                                                                                                         |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------- |
+| `id`                           | Internal database identifier of the transaction.                                                                    |
+| `transaction_id`               | Client-facing identifier that must be reused in later phases.                                                       |
+| `status_code` / `status`       | Numeric and string representations of the transaction state (`pending`, `confirmed`, `auto_confirmed`, `canceled`). |
+| `pre_quota`                    | Reserved quota recorded during the `pre` phase.                                                                     |
+| `final_quota`                  | Final reconciled quota; `null` while the transaction is pending.                                                    |
+| `auto_confirmed`               | Indicates whether the server auto-confirmed the hold after timeout.                                                 |
+| `expires_at`                   | UNIX timestamp (seconds) when the pending hold will auto-confirm. Set to `0` once confirmed/canceled.               |
+| `confirmed_at` / `canceled_at` | Timestamps for terminal states, when applicable.                                                                    |
+| `reason`                       | Copy of `add_reason` stored for auditing.                                                                           |
+| `request_id` / `trace_id`      | Correlators linked to the originating One-API request.                                                              |
+| `log_id`                       | Associated audit log record, if any.                                                                                |
+| `elapsed_time_ms`              | Optional latency metric copied from the request (only persisted when > 0).                                          |
+
+### Sample `post` Response
+
+```json
+{
+  "success": true,
+  "message": "",
+  "data": {
+    "id": 1,
+    "remain_quota": 9730,
+    "unlimited_quota": false,
+    "name": "transcode-token"
+  },
+  "transaction": {
+    "transaction_id": "8ac38e33-6c7f-4059-9cb3-f6d32df29f35",
+    "status": "confirmed",
+    "status_code": 2,
+    "pre_quota": 150,
+    "final_quota": 120,
+    "auto_confirmed": false,
+    "expires_at": 0,
+    "reason": "async-transcode",
+    "confirmed_at": 1735694100
+  }
+}
+```
+
 ## Flow Overview
 
 ```mermaid
@@ -151,6 +227,21 @@ flowchart TD
     C -->|Timeout| H[Auto-confirm]
     H --> E
 ```
+
+## Timeout & Auto-Confirmation Lifecycle
+
+- The controller runs `autoConfirmExpiredTokenTransactions` at the start of every `/api/token/consume` invocation. Any pending holds whose `expires_at` is in the past are atomically marked `auto_confirmed`, preserving the originally reserved `pre_quota` without additional quota adjustments.
+- Auto-confirmed transactions update their associated audit log entry through `buildAutoConfirmLogContent`, so downstream systems can detect stale jobs.
+- To avoid unwanted auto-confirmation, supply a realistic `timeout_seconds` during the `pre` phase. Requests outside the configured range are clamped to the nearest bound.
+- If a job finishes after auto-confirmation, a subsequent `post` call will fail because the transaction is no longer `pending`. In that case, reconcile differences by creating a new `single` transaction covering the delta.
+
+## Operational Considerations
+
+- **Error handling** – Validation failures (missing fields, exhausted quota, terminal transaction states) return `400` responses with descriptive error messages. Unknown transaction IDs return `404`. Retryable server-side issues surface as `429`/`5xx`; callers should use exponential backoff.
+- **Idempotency strategy** – Once a transaction leaves the `pending` state, repeated `post`/`cancel` calls respond with an error describing the current status. Clients should treat such errors as a signal that the earlier attempt already succeeded and reconcile locally.
+- **Logging & auditing** – Each phase appends to the consumption log (`model.RecordConsumeLog`). The `log_id` included in the response enables cross-referencing UI audit tables with transaction metadata.
+- **Quota adjustments** – `post` reconciles differences between reserved and final usage by charging or refunding the delta via `PostConsumeTokenQuota`. Passing a larger `final_used_quota` than was reserved is allowed, provided quota remains available.
+- **Elapsed time metrics** – The server only persists `elapsed_time_ms` when the provided value is positive. Use this field to surface upstream processing latency in internal dashboards.
 
 ## Error Handling & Retries
 
