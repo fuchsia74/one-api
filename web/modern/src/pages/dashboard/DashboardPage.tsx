@@ -247,7 +247,7 @@ export function DashboardPage() {
       const res = await api.get('/api/user/dashboard?' + params.toString(), {
         signal: abortController.signal
       })
-      
+
       // Check if this request was aborted
       if (abortController.signal.aborted) {
         return
@@ -334,20 +334,20 @@ export function DashboardPage() {
     if (preset === 'today') start.setDate(today.getDate())
     if (preset === '7d') start.setDate(today.getDate() - 6)
     if (preset === '30d') start.setDate(today.getDate() - 29)
-    
+
     const newFromDate = fmt(start)
     const newToDate = fmt(today)
-    
+
     setFromDate(newFromDate)
     setToDate(newToDate)
-    
+
     // Validate and fetch data immediately
     const validationError = validateDateRange(newFromDate, newToDate)
     if (validationError) {
       setDateError(validationError)
       return
     }
-    
+
     // Cancel any pending request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
@@ -356,7 +356,7 @@ export function DashboardPage() {
     // Create new AbortController for this request
     const abortController = new AbortController()
     abortControllerRef.current = abortController
-    
+
     setLoading(true)
     setDateError('')
     try {
@@ -369,7 +369,7 @@ export function DashboardPage() {
       const res = await api.get('/api/user/dashboard?' + params.toString(), {
         signal: abortController.signal
       })
-      
+
       // Check if this request was aborted
       if (abortController.signal.aborted) {
         return
