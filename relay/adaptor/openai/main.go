@@ -591,6 +591,11 @@ func ResponseAPIHandler(c *gin.Context, resp *http.Response, promptTokens int, m
 
 	// Forward all response headers
 	for k, values := range resp.Header {
+		if strings.EqualFold(k, "Content-Length") ||
+			strings.EqualFold(k, "Transfer-Encoding") ||
+			strings.EqualFold(k, "Content-Encoding") {
+			continue
+		}
 		for _, v := range values {
 			c.Writer.Header().Add(k, v)
 		}
@@ -984,6 +989,11 @@ func ResponseAPIDirectHandler(c *gin.Context, resp *http.Response, promptTokens 
 
 	// Forward all response headers
 	for k, values := range resp.Header {
+		if strings.EqualFold(k, "Content-Length") ||
+			strings.EqualFold(k, "Transfer-Encoding") ||
+			strings.EqualFold(k, "Content-Encoding") {
+			continue
+		}
 		for _, v := range values {
 			c.Writer.Header().Add(k, v)
 		}

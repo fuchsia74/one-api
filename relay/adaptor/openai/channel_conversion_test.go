@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/require"
 
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/relay/channeltype"
@@ -174,4 +175,43 @@ func TestModelSpecificConversion(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAzureGPT5ConversionToResponseAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	chatRequest := &model.GeneralOpenAIRequest{
+		Model: "gpt-5-mini",
+		Messages: []model.Message{
+			{Role: "user", Content: "Hi"},
+		},
+	}
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = &http.Request{}
+
+	azureMeta := &meta.Meta{
+		Mode:            relaymode.ChatCompletions,
+		ChannelType:     channeltype.Azure,
+		BaseURL:         "https://example.azure.com",
+		RequestURLPath:  "/v1/chat/completions",
+		ActualModelName: chatRequest.Model,
+	}
+	c.Set(ctxkey.Meta, azureMeta)
+
+	adaptor := &Adaptor{}
+	adaptor.Init(azureMeta)
+
+	converted, err := adaptor.ConvertRequest(c, relaymode.ChatCompletions, chatRequest)
+	require.NoError(t, err)
+	require.IsType(t, &ResponseAPIRequest{}, converted)
+
+	url, urlErr := adaptor.GetRequestURL(azureMeta)
+	require.NoError(t, urlErr)
+	require.Contains(t, url, "/openai/v1/responses?api-version=v1")
+
+	stored, ok := c.Get(ctxkey.ConvertedRequest)
+	require.True(t, ok)
+	require.IsType(t, &ResponseAPIRequest{}, stored)
 }

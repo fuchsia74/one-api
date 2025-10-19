@@ -42,6 +42,30 @@ type Adaptor struct {
 	ChannelType int
 }
 
+// azureRequiresResponseAPI returns true when Azure supports the model only via the Response API.
+func azureRequiresResponseAPI(modelName string) bool {
+	normalized := normalizedModelName(modelName)
+	return strings.HasPrefix(normalized, "gpt-5")
+}
+
+// shouldForceResponseAPI reports whether the upstream request must use the Response API surface.
+func shouldForceResponseAPI(metaInfo *meta.Meta) bool {
+	if metaInfo == nil {
+		return false
+	}
+	switch metaInfo.ChannelType {
+	case channeltype.OpenAI:
+		if metaInfo.ResponseAPIFallback {
+			return false
+		}
+		return !IsModelsOnlySupportedByChatCompletionAPI(metaInfo.ActualModelName)
+	case channeltype.Azure:
+		return azureRequiresResponseAPI(metaInfo.ActualModelName)
+	default:
+		return false
+	}
+}
+
 // webSearchCallUSDPerThousand returns the USD cost per 1000 calls for the given model name
 //
 //   - https://openai.com/api/pricing/
@@ -100,7 +124,9 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		// https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/reasoning?tabs=python#api--feature-support
 		if strings.HasPrefix(meta.ActualModelName, "o1") ||
 			strings.HasPrefix(meta.ActualModelName, "o3") {
-			defaultVersion = "2024-12-01-preview"
+			defaultVersion = "2025-04-01-preview"
+		} else if azureRequiresResponseAPI(meta.ActualModelName) {
+			defaultVersion = "v1"
 		}
 
 		if meta.Mode == relaymode.ImagesGenerations {
@@ -111,15 +137,26 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		}
 
 		// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/chatgpt-quickstart?pivots=rest-api&tabs=command-line#rest-api
-		requestURL := strings.Split(meta.RequestURLPath, "?")[0]
-		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, defaultVersion)
-		task := strings.TrimPrefix(requestURL, "/v1/")
+		// https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/reasoning?tabs=gpt-5%2Cpython%2Cpy#api--feature-support
+		useResponseAPI := meta.Mode == relaymode.ResponseAPI || azureRequiresResponseAPI(meta.ActualModelName)
+		requestPath := meta.RequestURLPath
+		if idx := strings.Index(requestPath, "?"); idx >= 0 {
+			requestPath = requestPath[:idx]
+		}
+		if strings.TrimSpace(requestPath) == "" {
+			requestPath = "/v1/chat/completions"
+		}
+		if useResponseAPI {
+			requestURL := "/openai/v1/responses"
+			if strings.TrimSpace(defaultVersion) != "" {
+				requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, defaultVersion)
+			}
+			return GetFullRequestURL(meta.BaseURL, requestURL, meta.ChannelType), nil
+		}
+		task := strings.TrimPrefix(requestPath, "/")
+		task = strings.TrimPrefix(task, "v1/")
 		model_ := meta.ActualModelName
-		// https://github.com/songquanpeng/one-api/issues/2235
-		// model_ = strings.Replace(model_, ".", "", -1)
-		//https://github.com/songquanpeng/one-api/issues/1191
-		// {your endpoint}/openai/deployments/{your azure_model}/chat/completions?api-version={api_version}
-		requestURL = fmt.Sprintf("/openai/deployments/%s/%s", model_, task)
+		requestURL := fmt.Sprintf("/openai/deployments/%s/%s?api-version=%s", model_, task, defaultVersion)
 		return GetFullRequestURL(meta.BaseURL, requestURL, meta.ChannelType), nil
 	case channeltype.Minimax:
 		return minimax.GetRequestURL(meta)
@@ -207,10 +244,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	}
 
 	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
-		meta.ChannelType == channeltype.OpenAI &&
-		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
-		!meta.ResponseAPIFallback {
+		shouldForceResponseAPI(meta) {
 		responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
+		c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
 		logConvertedRequest(c, meta, relayMode, responseAPIRequest)
 		return responseAPIRequest, nil
 	}
@@ -683,12 +719,11 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	c.Set(ctxkey.ClaudeMessagesConversion, true)
 	c.Set(ctxkey.OriginalClaudeRequest, request)
 
-	// For OpenAI adaptor, check if we should convert to Response API format
-	meta := meta.GetByContext(c)
-	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
-		!meta.ResponseAPIFallback {
+	// For OpenAI and Azure adaptors, check if we should convert to Response API format
+	metaInfo := meta.GetByContext(c)
+	if shouldForceResponseAPI(metaInfo) {
 		// Apply transformations first
-		if err := a.applyRequestTransformations(meta, openaiRequest); err != nil {
+		if err := a.applyRequestTransformations(metaInfo, openaiRequest); err != nil {
 			return nil, errors.Wrap(err, "apply request transformations for Claude conversion")
 		}
 
