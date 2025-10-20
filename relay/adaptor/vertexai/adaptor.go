@@ -39,8 +39,7 @@ const channelName = "vertexai"
 //   - https://cloud.google.com/vertex-ai/generative-ai/docs/learn/locations#global-preview
 func IsRequireGlobalEndpoint(model string) bool {
 	// gemini-2.5-pro-preview models use global endpoint
-	if strings.HasPrefix(model, "gemini-2.5-pro") ||
-		strings.HasPrefix(model, "gemini-2.5-flash") {
+	if strings.HasPrefix(model, "gemini-2.5") {
 		return true
 	}
 
