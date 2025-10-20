@@ -296,7 +296,6 @@ export function EditChannelPage() {
   const [customModel, setCustomModel] = useState('')
   const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
   const [loadedChannelType, setLoadedChannelType] = useState<number | null>(null) // Track the loaded channel type
-  const [autoFilledType, setAutoFilledType] = useState<number | null>(null) // Prevent repeated auto-fill per type
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -368,13 +367,6 @@ export function EditChannelPage() {
         const base = (res.data?.data?.default_base_url as string) || ''
         if (!cancelled) {
           setDefaultBaseURL(base)
-          // Prefill only on create when user left it blank and server has a default
-          if (!isEdit) {
-            const current = form.getValues('base_url') || ''
-            if (!current.trim() && base) {
-              form.setValue('base_url', base)
-            }
-          }
         }
       } catch (_) {
         // ignore
@@ -1404,17 +1396,6 @@ export function EditChannelPage() {
     }
     // Re-run when channel type changes as sections expand/collapse
   }, [shouldShowLoading, watchType])
-
-  // Default pricing auto-fill: when Model Configs is empty, auto-populate once per type (no preview shown)
-  useEffect(() => {
-    if (normalizedChannelType !== null && defaultPricing && autoFilledType !== normalizedChannelType) {
-      const current = form.getValues('model_configs') || ''
-      if (!current.trim()) {
-        form.setValue('model_configs', defaultPricing, { shouldDirty: true })
-        setAutoFilledType(normalizedChannelType)
-      }
-    }
-  }, [normalizedChannelType, defaultPricing, autoFilledType, form])
 
   if (shouldShowLoading) {
     console.log('[CHANNEL_TYPE_DEBUG] Showing loading screen')

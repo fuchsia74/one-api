@@ -220,9 +220,14 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
     initChannel(typeValue);
     let localModels = getChannelModels(typeValue);
     setBasicModels(localModels);
-    if (localModels.length > 0 && Array.isArray(values['models']) && values['models'].length == 0) {
-      setFieldValue('models', initialModel(localModels));
-    }
+
+    setFieldValue('models', []);
+    setFieldValue('model_configs', '');
+    setFieldValue('model_mapping', '');
+    setFieldValue('system_prompt', '');
+    setFieldValue('inference_profile_arn_map', '');
+    setFieldValue('base_url', '');
+    setFieldValue('other', '');
 
     setFieldValue('config', { api_format: 'chat_completion' });
     // Load default pricing for the new channel type
@@ -269,7 +274,7 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
     }
   };
 
-  const loadDefaultPricing = async (channelType, existingModelConfigs = null) => {
+  const loadDefaultPricing = async (channelType) => {
     try {
       const res = await API.get(`/api/channel/default-pricing?type=${channelType}`);
       if (res.data.success) {
@@ -437,13 +442,12 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
             // If parsing fails, keep original value but log the error
           }
         }
-
         data.base_url = data.base_url ?? '';
         data.is_edit = true;
         initChannel(data.type);
         setInitialInput(data);
         // Load default pricing for this channel type, but don't override existing model_configs
-        loadDefaultPricing(data.type, data.model_configs);
+        loadDefaultPricing(data.type);
       } else {
         showError(message);
       }

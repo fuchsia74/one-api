@@ -170,7 +170,7 @@ const EditChannel = (props) => {
         model_configs: '',
     });
 
-    const loadDefaultPricing = async (channelType, existingModelConfigs = null) => {
+    const loadDefaultPricing = async (channelType) => {
         try {
             const res = await API.get(`/api/channel/default-pricing?type=${channelType}`);
             if (res.data.success) {
@@ -210,12 +210,6 @@ const EditChannel = (props) => {
                 setDefaultPricing({
                     model_configs: defaultModelConfigs,
                 });
-
-                // If current model_configs is empty, populate with defaults
-                // Don't override if we have existing model_configs from loadChannel
-                if (!inputs.model_configs && !existingModelConfigs) {
-                    handleInputChange('model_configs', defaultModelConfigs);
-                }
             }
         } catch (error) {
             console.error('Failed to load default pricing:', error);
@@ -242,74 +236,23 @@ const EditChannel = (props) => {
     };
 
     const handleInputChange = (name, value) => {
-        setInputs((inputs) => ({ ...inputs, [name]: value }));
+        setInputs((prev) => {
+            const next = { ...prev, [name]: value };
+            if (name === 'type') {
+                next.base_url = '';
+                next.other = '';
+                next.model_mapping = '';
+                next.system_prompt = '';
+                next.models = [];
+                next.model_configs = '';
+                next.inference_profile_arn_map = '';
+            }
+            return next;
+        });
         if (name === 'type') {
             // Load default pricing for the new channel type
             loadDefaultPricing(value);
             setConfig({ ...defaultConfig });
-
-            if (inputs.models.length === 0) {
-                let localModels = [];
-                switch (value) {
-                    case 14:
-                        localModels = ["claude-instant-1.2", "claude-2", "claude-2.0", "claude-2.1", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307", "claude-3-5-haiku-20241022", "claude-3-5-sonnet-20240620", "claude-3-5-sonnet-20241022"];
-                        break;
-                    case 11:
-                        localModels = ['PaLM-2'];
-                        break;
-                    case 15:
-                        localModels = ['ERNIE-Bot', 'ERNIE-Bot-turbo', 'ERNIE-Bot-4', 'Embedding-V1'];
-                        break;
-                    case 17:
-                        localModels = ["qwen-turbo", "qwen-plus", "qwen-max", "qwen-max-longcontext", 'text-embedding-v1'];
-                        break;
-                    case 16:
-                        localModels = ['chatglm_pro', 'chatglm_std', 'chatglm_lite'];
-                        break;
-                    case 18:
-                        localModels = ['SparkDesk', 'SparkDesk-v1.1', 'SparkDesk-v2.1', 'SparkDesk-v3.1', 'SparkDesk-v3.1-128K', 'SparkDesk-v3.5', 'SparkDesk-v3.5-32K', 'SparkDesk-v4.0'];
-                        break;
-                    case 19:
-                        localModels = ['360GPT_S2_V9', 'embedding-bert-512-v1', 'embedding_s1_v1', 'semantic_similarity_s1_v1'];
-                        break;
-                    case 23:
-                        localModels = ['hunyuan'];
-                        break;
-                    case 24:
-                        localModels = ['gemini-pro', 'gemini-pro-vision'];
-                        break;
-                    case 25:
-                        localModels = ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'];
-                        break;
-                    case 26:
-                        localModels = ['glm-4', 'glm-4v', 'glm-3-turbo'];
-                        break;
-                    case 2:
-                        localModels = ['mj_imagine', 'mj_variation', 'mj_reroll', 'mj_blend', 'mj_upscale', 'mj_describe'];
-                        break;
-                    case 5:
-                        localModels = [
-                            'swap_face',
-                            'mj_imagine',
-                            'mj_variation',
-                            'mj_reroll',
-                            'mj_blend',
-                            'mj_upscale',
-                            'mj_describe',
-                            'mj_zoom',
-                            'mj_shorten',
-                            'mj_modal',
-                            'mj_inpaint',
-                            'mj_custom_zoom',
-                            'mj_high_variation',
-                            'mj_low_variation',
-                            'mj_pan',
-                        ];
-                        break;
-                }
-                setInputs((inputs) => ({ ...inputs, models: localModels }));
-            }
-            loadDefaultPricing(value);
         }
         //setAutoBan
     };
@@ -385,7 +328,7 @@ const EditChannel = (props) => {
                 setConfig({ ...defaultConfig });
             }
             // Load default pricing for this channel type, but don't override existing model_configs
-            loadDefaultPricing(data.type, data.model_configs);
+            loadDefaultPricing(data.type);
             if (data.auto_ban === 0) {
                 setAutoBan(false);
             } else {

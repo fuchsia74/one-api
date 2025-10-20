@@ -176,7 +176,7 @@ const EditChannel = () => {
     model_configs: '',
   });
 
-  const loadDefaultPricing = async (channelType, existingModelConfigs = null) => {
+  const loadDefaultPricing = async (channelType) => {
     try {
       const res = await API.get(`/api/channel/default-pricing?type=${channelType}`);
       if (res.data.success) {
@@ -218,15 +218,6 @@ const EditChannel = () => {
         setDefaultPricing({
           model_configs: defaultModelConfigs,
         });
-
-        // If current model_configs is empty, populate with defaults
-        // Don't override if we have existing model_configs from loadChannel
-        if (!inputs.model_configs && !existingModelConfigs) {
-          setInputs((inputs) => ({
-            ...inputs,
-            model_configs: defaultModelConfigs,
-          }));
-        }
       }
     } catch (error) {
       console.error('Failed to load default pricing:', error);
@@ -269,16 +260,23 @@ const EditChannel = () => {
   };
 
   const handleInputChange = (e, { name, value }) => {
-    setInputs((inputs) => ({ ...inputs, [name]: value }));
+    setInputs((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === 'type') {
+        next.base_url = '';
+        next.other = '';
+        next.model_mapping = '';
+        next.system_prompt = '';
+        next.models = [];
+        next.model_configs = '';
+        next.inference_profile_arn_map = '';
+      }
+      return next;
+    });
     if (name === 'type') {
       // Fetch channel-specific models for the selected channel type
       fetchChannelSpecificModels(value).then((channelSpecificModels) => {
         setBasicModels(channelSpecificModels);
-        console.log('setBasicModels called with channel-specific models for type', value, ':', channelSpecificModels);
-
-        if (inputs.models.length === 0) {
-          setInputs((inputs) => ({ ...inputs, models: channelSpecificModels }));
-        }
       });
 
       // Load default pricing for the new channel type
@@ -370,7 +368,7 @@ const EditChannel = () => {
       });
 
       // Load default pricing for this channel type, but don't override existing model_configs
-      loadDefaultPricing(data.type, data.model_configs);
+      loadDefaultPricing(data.type);
     } else {
       showError(message);
     }
