@@ -494,7 +494,7 @@ func SearchUserLogs(userId int, keyword string, startIdx int, num int, sortBy st
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int) (quota int64) {
 	ifnull := "ifnull"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		ifnull = "COALESCE"
 	}
 	tx := LOG_DB.Table("logs").Select(fmt.Sprintf("%s(sum(quota),0)", ifnull))
@@ -522,7 +522,7 @@ func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelNa
 
 func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string) (token int) {
 	ifnull := "ifnull"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		ifnull = "COALESCE"
 	}
 	tx := LOG_DB.Table("logs").Select(fmt.Sprintf("%s(sum(prompt_tokens),0) + %s(sum(completion_tokens),0)", ifnull, ifnull))
@@ -562,11 +562,11 @@ func GetLogById(id int) (*Log, error) {
 // dayAggregationSelect returns the SQL expression that normalizes log timestamps
 // into YYYY-MM-DD strings, accounting for the configured database engine.
 func dayAggregationSelect() string {
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		return "TO_CHAR(date_trunc('day', to_timestamp(created_at)), 'YYYY-MM-DD') as day"
 	}
 
-	if common.UsingSQLite {
+	if common.UsingSQLite.Load() {
 		return "strftime('%Y-%m-%d', datetime(created_at, 'unixepoch')) as day"
 	}
 

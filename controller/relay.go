@@ -411,7 +411,7 @@ func logChannelSuspensionStatus(ctx context.Context, group, model string, failed
 	var abilities []dbmodel.Ability
 	now := time.Now()
 	groupCol := "`group`"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = "\"group\""
 	}
 

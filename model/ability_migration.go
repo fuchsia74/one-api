@@ -26,10 +26,10 @@ func MigrateAbilitySuspendUntilColumn() error {
 
 	var err error
 	switch {
-	case common.UsingMySQL:
+	case common.UsingMySQL.Load():
 		err = migrateAbilitySuspendUntilMySQL()
 		err = errors.Wrap(err, "migrateAbilitySuspendUntilMySQL")
-	case common.UsingPostgreSQL:
+	case common.UsingPostgreSQL.Load():
 		err = migrateAbilitySuspendUntilPostgres()
 		err = errors.Wrap(err, "migrateAbilitySuspendUntilPostgres")
 	default:
@@ -105,7 +105,7 @@ func migrateAbilitySuspendUntilPostgres() error {
 func normalizeAbilitySuspendUntilValues() error {
 	logger.Logger.Debug("Normalizing legacy ability suspend_until values")
 	groupCol := "`group`"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 	}
 
@@ -149,7 +149,7 @@ func normalizeAbilitySuspendUntilValues() error {
 		}
 
 		formatted := parsed.UTC().Format("2006-01-02 15:04:05")
-		if common.UsingPostgreSQL {
+		if common.UsingPostgreSQL.Load() {
 			formatted = parsed.UTC().Format(time.RFC3339)
 		}
 

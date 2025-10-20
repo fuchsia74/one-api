@@ -159,14 +159,14 @@ func setupDistributorTestDB(t *testing.T) (*gorm.DB, func()) {
 	require.NoError(t, testDB.AutoMigrate(&model.User{}, &model.Channel{}, &model.Ability{}))
 
 	originalDB := model.DB
-	originalUsingSQLite := common.UsingSQLite
+	originalUsingSQLite := common.UsingSQLite.Load()
 
 	model.DB = testDB
-	common.UsingSQLite = true
+	common.UsingSQLite.Store(true)
 
 	cleanup := func() {
 		model.DB = originalDB
-		common.UsingSQLite = originalUsingSQLite
+		common.UsingSQLite.Store(originalUsingSQLite)
 	}
 
 	return testDB, cleanup

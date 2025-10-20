@@ -27,9 +27,9 @@ func TestUpdateUserRequestCostQuotaByRequestID_AllowsZeroQuotaRecords(t *testing
 	DB = testDB
 	defer func() { DB = originalDB }()
 
-	originalUsingSQLite := common.UsingSQLite
-	common.UsingSQLite = true
-	defer func() { common.UsingSQLite = originalUsingSQLite }()
+	originalUsingSQLite := common.UsingSQLite.Load()
+	common.UsingSQLite.Store(true)
+	defer func() { common.UsingSQLite.Store(originalUsingSQLite) }()
 
 	userID := 42
 	reqID := "test-request-0"

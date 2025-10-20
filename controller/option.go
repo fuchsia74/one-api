@@ -97,5 +97,4 @@ func UpdateOption(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }

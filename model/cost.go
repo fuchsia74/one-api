@@ -133,7 +133,7 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	// If table does not exist yet, skip quietly; AutoMigrate will create it with the unique index from tags
 	tableExists := false
 	var err error
-	if common.UsingMySQL {
+	if common.UsingMySQL.Load() {
 		tableExists, err = mysqlTableExists("user_request_costs")
 		if err != nil {
 			return errors.Wrap(err, "check user_request_costs existence (mysql)")
@@ -148,7 +148,7 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 
 	indexName := "idx_user_request_costs_request_id"
 	checkIndexExists := func() (bool, error) {
-		if common.UsingMySQL {
+		if common.UsingMySQL.Load() {
 			return mysqlIndexExists("user_request_costs", indexName)
 		}
 		return DB.Migrator().HasIndex(&UserRequestCost{}, indexName), nil
@@ -169,7 +169,7 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	var dedupColumn string
 	for _, col := range markerColumns {
 		var hasColumn bool
-		if common.UsingMySQL {
+		if common.UsingMySQL.Load() {
 			hasColumn, err = mysqlColumnExists("user_request_costs", col)
 		} else {
 			hasColumn = DB.Migrator().HasColumn(&UserRequestCost{}, col)
@@ -263,14 +263,14 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	}
 
 	columnAltered := false
-	if common.UsingMySQL {
+	if common.UsingMySQL.Load() {
 		var altered bool
 		altered, err = ensureMySQLRequestIDColumnSized()
 		if err != nil {
 			return err
 		}
 		columnAltered = columnAltered || altered
-	} else if common.UsingPostgreSQL {
+	} else if common.UsingPostgreSQL.Load() {
 		var altered bool
 		altered, err = ensurePostgresRequestIDColumnSized()
 		if err != nil {
@@ -296,15 +296,15 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 	logger.Logger.Debug("Creating unique index on user_request_costs.request_id",
 		zap.String("index", indexName))
 	switch {
-	case common.UsingPostgreSQL:
+	case common.UsingPostgreSQL.Load():
 		if err = DB.Exec(fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON user_request_costs (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (postgres)")
 		}
-	case common.UsingMySQL:
+	case common.UsingMySQL.Load():
 		if err = DB.Exec(fmt.Sprintf("ALTER TABLE user_request_costs ADD UNIQUE INDEX %s (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (mysql)")
 		}
-	case common.UsingSQLite:
+	case common.UsingSQLite.Load():
 		if err = DB.Exec(fmt.Sprintf("CREATE UNIQUE INDEX IF NOT EXISTS %s ON user_request_costs (request_id)", indexName)).Error; err != nil {
 			return errors.Wrap(err, "create unique index on user_request_costs.request_id failed (sqlite)")
 		}
@@ -326,9 +326,9 @@ func MigrateUserRequestCostEnsureUniqueRequestID() error {
 func deleteLongUserRequestCostRequestIDs() (int64, error) {
 	var query string
 	switch {
-	case common.UsingMySQL, common.UsingPostgreSQL:
+	case common.UsingMySQL.Load(), common.UsingPostgreSQL.Load():
 		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE CHAR_LENGTH(request_id) > %d", RequestIDMaxLen)
-	case common.UsingSQLite:
+	case common.UsingSQLite.Load():
 		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE LENGTH(request_id) > %d", RequestIDMaxLen)
 	default:
 		query = fmt.Sprintf("DELETE FROM user_request_costs WHERE LENGTH(request_id) > %d", RequestIDMaxLen)
@@ -347,9 +347,9 @@ func deleteLongUserRequestCostRequestIDs() (int64, error) {
 // HasColumn helper treats the implicit rowid as an id column.
 func userRequestCostHasIDColumn() (bool, error) {
 	switch {
-	case common.UsingMySQL:
+	case common.UsingMySQL.Load():
 		return mysqlColumnExists("user_request_costs", "id")
-	case common.UsingPostgreSQL:
+	case common.UsingPostgreSQL.Load():
 		type result struct {
 			Count int `gorm:"column:count"`
 		}
@@ -359,7 +359,7 @@ func userRequestCostHasIDColumn() (bool, error) {
 			return false, errors.Wrap(err, "query postgres information_schema for user_request_costs.id")
 		}
 		return res.Count > 0, nil
-	case common.UsingSQLite:
+	case common.UsingSQLite.Load():
 		rows, err := DB.Raw("PRAGMA table_info(user_request_costs)").Rows()
 		if err != nil {
 			return false, errors.Wrap(err, "query sqlite table info for user_request_costs")

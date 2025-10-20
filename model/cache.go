@@ -31,7 +31,7 @@ var (
 
 func CacheGetTokenByKey(key string) (*Token, error) {
 	keyCol := "`key`"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		keyCol = `"key"`
 	}
 	var token Token

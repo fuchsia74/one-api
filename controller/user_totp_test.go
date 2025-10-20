@@ -55,8 +55,8 @@ func setupTestEnvironment(t *testing.T) (*gorm.DB, func()) {
 	model.LOG_DB = testDB // Use same DB for logging in tests
 
 	// Set SQLite flag for proper query handling
-	originalUsingSQLite := common.UsingSQLite
-	common.UsingSQLite = true
+	originalUsingSQLite := common.UsingSQLite.Load()
+	common.UsingSQLite.Store(true)
 
 	// Disable Redis for testing to use memory-based rate limiting
 	originalRedisEnabled := common.IsRedisEnabled()
@@ -82,7 +82,7 @@ func setupTestEnvironment(t *testing.T) (*gorm.DB, func()) {
 	cleanup := func() {
 		model.DB = originalDB
 		model.LOG_DB = originalLogDB
-		common.UsingSQLite = originalUsingSQLite
+		common.UsingSQLite.Store(originalUsingSQLite)
 		common.SetRedisEnabled(originalRedisEnabled)
 	}
 

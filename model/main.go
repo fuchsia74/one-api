@@ -83,7 +83,7 @@ func chooseDB(dsn string) (*gorm.DB, error) {
 
 func openPostgreSQL(dsn string) (*gorm.DB, error) {
 	logger.Logger.Info("using PostgreSQL as database")
-	common.UsingPostgreSQL = true
+	common.UsingPostgreSQL.Store(true)
 	return gorm.Open(postgres.New(postgres.Config{
 		DSN:                  dsn,
 		PreferSimpleProtocol: true, // disables implicit prepared statement usage
@@ -95,7 +95,7 @@ func openPostgreSQL(dsn string) (*gorm.DB, error) {
 
 func openMySQL(dsn string) (*gorm.DB, error) {
 	logger.Logger.Info("using MySQL as database")
-	common.UsingMySQL = true
+	common.UsingMySQL.Store(true)
 	normalized, err := common.NormalizeMySQLDSN(dsn)
 	if err != nil {
 		return nil, errors.Wrap(err, "normalize MySQL DSN")
@@ -108,7 +108,7 @@ func openMySQL(dsn string) (*gorm.DB, error) {
 
 func openSQLite() (*gorm.DB, error) {
 	logger.Logger.Info("SQL_DSN not set, using SQLite as database")
-	common.UsingSQLite = true
+	common.UsingSQLite.Store(true)
 	dsn := fmt.Sprintf("%s?_busy_timeout=%d", common.SQLitePath, common.SQLiteBusyTimeout)
 	return gorm.Open(sqlite.Open(dsn), &gorm.Config{
 		PrepareStmt: true, // precompile SQL
@@ -134,7 +134,7 @@ func InitDB() {
 		return
 	}
 
-	if common.UsingMySQL {
+	if common.UsingMySQL.Load() {
 		_, _ = sqlDB.Exec("DROP INDEX idx_channels_key ON channels;") // TODO: delete this line when most users have upgraded
 	}
 

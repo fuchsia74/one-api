@@ -83,7 +83,7 @@ func Redeem(ctx context.Context, key string, userId int) (quota int64, err error
 	redemption := &Redemption{}
 
 	keyCol := "`key`"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		keyCol = `"key"`
 	}
 

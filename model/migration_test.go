@@ -30,9 +30,9 @@ func setupMigrationTestDB(t *testing.T) *gorm.DB {
 	}
 
 	// Set database type flags
-	common.UsingSQLite = true
-	common.UsingMySQL = false
-	common.UsingPostgreSQL = false
+	common.UsingSQLite.Store(true)
+	common.UsingMySQL.Store(false)
+	common.UsingPostgreSQL.Store(false)
 
 	return db
 }

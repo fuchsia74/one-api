@@ -54,7 +54,6 @@ func GetAllRedemptions(c *gin.Context) {
 		"data":    redemptions,
 		"total":   totalCount,
 	})
-	return
 }
 
 func SearchRedemptions(c *gin.Context) {
@@ -89,7 +88,6 @@ func SearchRedemptions(c *gin.Context) {
 		"data":    redemptions,
 		"total":   total,
 	})
-	return
 }
 
 func GetRedemption(c *gin.Context) {
@@ -114,7 +112,6 @@ func GetRedemption(c *gin.Context) {
 		"message": "",
 		"data":    redemption,
 	})
-	return
 }
 
 func AddRedemption(c *gin.Context) {
@@ -178,7 +175,6 @@ func AddRedemption(c *gin.Context) {
 		"message": "",
 		"data":    keys,
 	})
-	return
 }
 
 func DeleteRedemption(c *gin.Context) {
@@ -195,7 +191,6 @@ func DeleteRedemption(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func UpdateRedemption(c *gin.Context) {
@@ -241,5 +236,4 @@ func UpdateRedemption(c *gin.Context) {
 		"message": "",
 		"data":    cleanRedemption,
 	})
-	return
 }

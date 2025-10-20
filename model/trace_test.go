@@ -2,12 +2,14 @@ package model
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/stretchr/testify/require"
 
+	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/logger"
 )
 
@@ -50,4 +52,44 @@ func TestCreateTraceURLWithinLimit(t *testing.T) {
 	err = DB.Where("trace_id = ?", "test-trace-within-limit").First(&stored).Error
 	require.NoError(t, err)
 	require.Equal(t, url, stored.URL)
+}
+
+func TestTraceDBSessionDisablesPreparedStatementsOnPostgres(t *testing.T) {
+	setupTestDatabase(t)
+	prev := common.UsingPostgreSQL.Load()
+	common.UsingPostgreSQL.Store(true)
+	t.Cleanup(func() { common.UsingPostgreSQL.Store(prev) })
+
+	session := traceDBWithContext(nil)
+	require.False(t, session.Config.PrepareStmt)
+
+	sessionGin := traceDBWithGin(nil)
+	require.False(t, sessionGin.Config.PrepareStmt)
+}
+
+func TestUpdateTraceTimestampWithPostgresSession(t *testing.T) {
+	setupTestDatabase(t)
+	prev := common.UsingPostgreSQL.Load()
+	common.UsingPostgreSQL.Store(true)
+	t.Cleanup(func() { common.UsingPostgreSQL.Store(prev) })
+
+	const traceID = "test-trace-postgres-session"
+	require.NoError(t, DB.Exec("DELETE FROM traces WHERE trace_id = ?", traceID).Error)
+
+	trace := &Trace{
+		TraceId:    traceID,
+		URL:        "/api/test",
+		Method:     "GET",
+		Timestamps: `{"request_received": 1}`,
+	}
+	require.NoError(t, DB.Create(trace).Error)
+
+	require.NoError(t, UpdateTraceTimestamp(nil, traceID, TimestampRequestCompleted))
+
+	var stored Trace
+	require.NoError(t, DB.Where("trace_id = ?", traceID).First(&stored).Error)
+
+	var parsed TraceTimestamps
+	require.NoError(t, json.Unmarshal([]byte(stored.Timestamps), &parsed))
+	require.NotNil(t, parsed.RequestCompleted)
 }

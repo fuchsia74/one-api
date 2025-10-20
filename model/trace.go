@@ -10,6 +10,8 @@ import (
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+
+	"github.com/songquanpeng/one-api/common"
 )
 
 // Trace represents a request tracing record with key timestamps
@@ -83,7 +85,9 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 		Timestamps: string(timestampsJSON),
 	}
 
-	if err := DB.Create(trace).Error; err != nil {
+	db := traceDBWithContext(ctx)
+
+	if err := db.Create(trace).Error; err != nil {
 		lg.Error("failed to create trace record",
 			zap.Error(err),
 			zap.String("trace_id", traceId))
@@ -101,8 +105,9 @@ func CreateTrace(ctx context.Context, traceId, url, method string, bodySize int6
 // UpdateTraceTimestamp updates a specific timestamp in the trace record
 func UpdateTraceTimestamp(ctx *gin.Context, traceId, timestampKey string) error {
 	lg := gmw.GetLogger(ctx)
+	db := traceDBWithGin(ctx)
 	var trace Trace
-	if err := DB.Where("trace_id = ?", traceId).First(&trace).Error; err != nil {
+	if err := db.Where("trace_id = ?", traceId).First(&trace).Error; err != nil {
 		// For some internal flows (e.g., channel test helper using a synthetic gin.Context),
 		// trace IDs may not correspond to a persisted request trace. Treat not found as best-effort.
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -155,7 +160,7 @@ func UpdateTraceTimestamp(ctx *gin.Context, traceId, timestampKey string) error 
 		return errors.Wrapf(err, "failed to marshal updated trace timestamps for trace_id: %s", traceId)
 	}
 
-	if err := DB.Model(&trace).Update("timestamps", string(timestampsJSON)).Error; err != nil {
+	if err := db.Model(&trace).Update("timestamps", string(timestampsJSON)).Error; err != nil {
 		lg.Error("failed to update trace timestamp",
 			zap.Error(err),
 			zap.String("trace_id", traceId),
@@ -174,7 +179,8 @@ func UpdateTraceTimestamp(ctx *gin.Context, traceId, timestampKey string) error 
 func UpdateTraceStatus(ctx context.Context, traceId string, status int) error {
 	lg := gmw.GetLogger(ctx)
 	// Use RowsAffected to determine if the record exists; treat 0 as best-effort no-op.
-	tx := DB.Model(&Trace{}).Where("trace_id = ?", traceId).Update("status", status)
+	db := traceDBWithContext(ctx)
+	tx := db.Model(&Trace{}).Where("trace_id = ?", traceId).Update("status", status)
 	if tx.Error != nil {
 		lg.Error("failed to update trace status",
 			zap.Error(tx.Error),
@@ -199,10 +205,49 @@ func UpdateTraceStatus(ctx context.Context, traceId string, status int) error {
 // GetTraceByTraceId retrieves a trace record by trace ID
 func GetTraceByTraceId(traceId string) (*Trace, error) {
 	var trace Trace
-	if err := DB.Where("trace_id = ?", traceId).First(&trace).Error; err != nil {
+	db := traceDBWithContext(nil)
+	if err := db.Where("trace_id = ?", traceId).First(&trace).Error; err != nil {
 		return nil, errors.Wrapf(err, "failed to get trace by trace_id: %s", traceId)
 	}
 	return &trace, nil
+}
+
+// traceDBWithGin returns a gorm session suitable for trace operations. When running on
+// PostgreSQL we must disable prepared statements for these queries because schema
+// migrations that alter JSON/TEXT columns can invalidate cached plans. Using
+// PrepareStmt=false ensures the driver issues simple protocol queries and avoids the
+// "cached plan must not change result type" error.
+func traceDBWithGin(ctx *gin.Context) *gorm.DB {
+	var base *gorm.DB
+	if ctx != nil && ctx.Request != nil {
+		base = DB.WithContext(ctx.Request.Context())
+	} else {
+		base = DB
+	}
+	return applyTraceDBSession(base)
+}
+
+// traceDBWithContext mirrors traceDBWithGin but accepts a standard context for callers
+// outside the Gin execution flow.
+func traceDBWithContext(ctx context.Context) *gorm.DB {
+	if ctx != nil {
+		return applyTraceDBSession(DB.WithContext(ctx))
+	}
+	return applyTraceDBSession(DB)
+}
+
+func applyTraceDBSession(db *gorm.DB) *gorm.DB {
+	if !common.UsingPostgreSQL.Load() || db == nil {
+		return db
+	}
+
+	session := db.Session(&gorm.Session{NewDB: true})
+	if session.Config != nil {
+		cfgCopy := *session.Config
+		cfgCopy.PrepareStmt = false
+		session.Config = &cfgCopy
+	}
+	return session
 }
 
 // GetTraceTimestamps parses and returns the timestamps from a trace record

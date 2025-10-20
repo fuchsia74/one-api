@@ -65,7 +65,6 @@ func GetAllChannels(c *gin.Context) {
 		"data":    channels,
 		"total":   totalCount,
 	})
-	return
 }
 
 func SearchChannels(c *gin.Context) {
@@ -89,7 +88,6 @@ func SearchChannels(c *gin.Context) {
 		"message": "",
 		"data":    channels,
 	})
-	return
 }
 
 func GetChannel(c *gin.Context) {
@@ -114,7 +112,6 @@ func GetChannel(c *gin.Context) {
 		"message": "",
 		"data":    channel,
 	})
-	return
 }
 
 func AddChannel(c *gin.Context) {
@@ -201,7 +198,6 @@ func AddChannel(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func DeleteChannel(c *gin.Context) {
@@ -219,7 +215,6 @@ func DeleteChannel(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func DeleteDisabledChannel(c *gin.Context) {
@@ -236,7 +231,6 @@ func DeleteDisabledChannel(c *gin.Context) {
 		"message": "",
 		"data":    rows,
 	})
-	return
 }
 
 func UpdateChannel(c *gin.Context) {
@@ -296,7 +290,6 @@ func UpdateChannel(c *gin.Context) {
 		"message": "",
 		"data":    channel,
 	})
-	return
 }
 
 func GetChannelPricing(c *gin.Context) {
@@ -325,7 +318,7 @@ func GetChannelPricing(c *gin.Context) {
 	modelConfigs := channel.GetModelPriceConfigs()
 
 	// Debug logging to help identify data issues
-	if modelConfigs != nil && len(modelConfigs) > 0 {
+	if len(modelConfigs) > 0 {
 		var modelNames []string
 		for modelName := range modelConfigs {
 			modelNames = append(modelNames, modelName)
@@ -342,7 +335,6 @@ func GetChannelPricing(c *gin.Context) {
 			"model_configs":    modelConfigs,
 		},
 	})
-	return
 }
 
 func UpdateChannelPricing(c *gin.Context) {
@@ -380,7 +372,7 @@ func UpdateChannelPricing(c *gin.Context) {
 	}
 
 	// Handle both old format (separate model_ratio and completion_ratio) and new format (unified model_configs)
-	if request.ModelConfigs != nil && len(request.ModelConfigs) > 0 {
+	if len(request.ModelConfigs) > 0 {
 		// New unified format - preferred approach
 		err = channel.SetModelPriceConfigs(request.ModelConfigs)
 		if err != nil {
@@ -390,21 +382,17 @@ func UpdateChannelPricing(c *gin.Context) {
 			})
 			return
 		}
-	} else if (request.ModelRatio != nil && len(request.ModelRatio) > 0) || (request.CompletionRatio != nil && len(request.CompletionRatio) > 0) {
+	} else if len(request.ModelRatio) > 0 || len(request.CompletionRatio) > 0 {
 		// Old format - convert to unified format automatically
 		modelConfigs := make(map[string]model.ModelConfigLocal)
 
 		// Collect all model names from both ratios
 		allModelNames := make(map[string]bool)
-		if request.ModelRatio != nil {
-			for modelName := range request.ModelRatio {
-				allModelNames[modelName] = true
-			}
+		for modelName := range request.ModelRatio {
+			allModelNames[modelName] = true
 		}
-		if request.CompletionRatio != nil {
-			for modelName := range request.CompletionRatio {
-				allModelNames[modelName] = true
-			}
+		for modelName := range request.CompletionRatio {
+			allModelNames[modelName] = true
 		}
 
 		// Create ModelPriceLocal entries for each model
@@ -453,7 +441,6 @@ func UpdateChannelPricing(c *gin.Context) {
 		"success": true,
 		"message": "",
 	})
-	return
 }
 
 func GetChannelDefaultPricing(c *gin.Context) {

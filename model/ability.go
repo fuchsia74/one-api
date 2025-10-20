@@ -35,7 +35,7 @@ func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority b
 	ability := Ability{}
 	groupCol := "`group`"
 	trueVal := "1"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 		trueVal = "true"
 	}
@@ -49,7 +49,7 @@ func GetRandomSatisfiedChannel(group string, model string, ignoreFirstPriority b
 		maxPrioritySubQuery := DB.Model(&Ability{}).Select("MAX(priority)").Where(groupCol+" = ? AND model = ? AND enabled = "+trueVal+" AND (suspend_until IS NULL OR suspend_until < ?)", group, model, now)
 		channelQuery = DB.Where(groupCol+" = ? AND model = ? AND enabled = "+trueVal+" AND priority = (?) AND (suspend_until IS NULL OR suspend_until < ?)", group, model, maxPrioritySubQuery, now)
 	}
-	if common.UsingSQLite || common.UsingPostgreSQL {
+	if common.UsingSQLite.Load() || common.UsingPostgreSQL.Load() {
 		err = channelQuery.Order("RANDOM()").First(&ability).Error
 	} else {
 		err = channelQuery.Order("RAND()").First(&ability).Error
@@ -119,7 +119,7 @@ func UpdateAbilityStatus(channelId int, status bool) error {
 func GetGroupModels(ctx context.Context, group string) ([]string, error) {
 	groupCol := "`group`"
 	trueVal := "1"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 		trueVal = "true"
 	}
@@ -144,7 +144,7 @@ func GetGroupModelsV2(ctx context.Context, group string) ([]dto.EnabledAbility, 
 	// prepare query based on database type
 	groupCol := "`group`"
 	trueVal := "1"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 		trueVal = "true"
 	}
@@ -180,7 +180,7 @@ func SuspendAbility(ctx context.Context, group string, modelName string, channel
 	groupCol := "`group`"
 	modelCol := "`model`"
 	channelCol := "`channel_id`"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 		modelCol = `"model"`
 		channelCol = `"channel_id"`
@@ -199,7 +199,7 @@ func GetRandomSatisfiedChannelExcluding(group string, model string, ignoreFirstP
 	ability := Ability{}
 	groupCol := "`group`"
 	trueVal := "1"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 		trueVal = "true"
 	}
@@ -282,7 +282,7 @@ func GetRandomSatisfiedChannelExcluding(group string, model string, ignoreFirstP
 		}
 	}
 
-	if common.UsingSQLite || common.UsingPostgreSQL {
+	if common.UsingSQLite.Load() || common.UsingPostgreSQL.Load() {
 		err = channelQuery.Order("RANDOM()").First(&ability).Error
 	} else {
 		err = channelQuery.Order("RAND()").First(&ability).Error

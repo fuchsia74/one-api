@@ -47,7 +47,7 @@ func TestCacheMissLogging(t *testing.T) {
 
 		// Should handle cache miss gracefully
 		// Some implementations may return empty slice with nil error; accept both behaviors
-		if models == nil || len(models) == 0 {
+		if len(models) == 0 {
 			if err != nil {
 				assert.Error(t, err)
 			} else {

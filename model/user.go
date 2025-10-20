@@ -109,7 +109,7 @@ func SearchUsers(keyword string, sortBy string, sortOrder string) (users []*User
 		}
 	}
 
-	if !common.UsingPostgreSQL {
+	if !common.UsingPostgreSQL.Load() {
 		err = DB.Omit("password").Where("id = ? or username LIKE ? or email LIKE ? or display_name LIKE ?", keyword, keyword+"%", keyword+"%", keyword+"%").Order(orderClause).Find(&users).Error
 	} else {
 		err = DB.Omit("password").Where("username LIKE ? or email LIKE ? or display_name LIKE ?", keyword+"%", keyword+"%", keyword+"%").Order(orderClause).Find(&users).Error
@@ -424,7 +424,7 @@ func GetUserEmail(id int) (email string, err error) {
 
 func GetUserGroup(id int) (group string, err error) {
 	groupCol := "`group`"
-	if common.UsingPostgreSQL {
+	if common.UsingPostgreSQL.Load() {
 		groupCol = `"group"`
 	}
 

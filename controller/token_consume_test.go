@@ -46,8 +46,8 @@ func setupConsumeTokenTest(t *testing.T) (cleanup func(), user *model.User, toke
 	model.DB = db
 	model.LOG_DB = db
 
-	originalUsingSQLite := common.UsingSQLite
-	common.UsingSQLite = true
+	originalUsingSQLite := common.UsingSQLite.Load()
+	common.UsingSQLite.Store(true)
 
 	originalRedis := common.IsRedisEnabled()
 	common.SetRedisEnabled(false)
@@ -82,7 +82,7 @@ func setupConsumeTokenTest(t *testing.T) (cleanup func(), user *model.User, toke
 	cleanup = func() {
 		model.DB = originalDB
 		model.LOG_DB = originalLOG
-		common.UsingSQLite = originalUsingSQLite
+		common.UsingSQLite.Store(originalUsingSQLite)
 		common.SetRedisEnabled(originalRedis)
 		config.ExternalBillingDefaultTimeoutSec = originalDefaultTimeout
 		config.ExternalBillingMaxTimeoutSec = originalMaxTimeout

@@ -32,9 +32,9 @@ func TestGetRandomSatisfiedChannelExcluding_PriorityLogic(t *testing.T) {
 	defer func() { DB = originalDB }()
 
 	// Set SQLite flag for proper query handling
-	originalUsingSQLite := common.UsingSQLite
-	common.UsingSQLite = true
-	defer func() { common.UsingSQLite = originalUsingSQLite }()
+	originalUsingSQLite := common.UsingSQLite.Load()
+	common.UsingSQLite.Store(true)
+	defer func() { common.UsingSQLite.Store(originalUsingSQLite) }()
 
 	// Create test channels with different priorities
 	channels := []Channel{
@@ -164,9 +164,9 @@ func TestGetRandomSatisfiedChannelExcluding_SuspendedChannels(t *testing.T) {
 	defer func() { DB = originalDB }()
 
 	// Set SQLite flag for proper query handling
-	originalUsingSQLite := common.UsingSQLite
-	common.UsingSQLite = true
-	defer func() { common.UsingSQLite = originalUsingSQLite }()
+	originalUsingSQLite := common.UsingSQLite.Load()
+	common.UsingSQLite.Store(true)
+	defer func() { common.UsingSQLite.Store(originalUsingSQLite) }()
 
 	// Create test channels
 	channels := []Channel{

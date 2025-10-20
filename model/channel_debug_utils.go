@@ -232,7 +232,7 @@ func CleanAllMixedModelData() error {
 		if channel.ModelConfigs != nil && *channel.ModelConfigs != "" && *channel.ModelConfigs != "{}" {
 			// Check if this channel has mixed model data
 			configs := channel.GetModelPriceConfigs()
-			if configs != nil && len(configs) > 0 {
+			if len(configs) > 0 {
 				hasMixedData := false
 				channelTypeModels := getExpectedModelsForChannelType(channel.Type)
 

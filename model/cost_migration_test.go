@@ -34,18 +34,18 @@ func setupMySQLMockDB(t *testing.T) (sqlmock.Sqlmock, func() error) {
 	originalDB := DB
 	DB = gdb
 
-	originalMySQL := common.UsingMySQL
-	originalSQLite := common.UsingSQLite
-	originalPostgres := common.UsingPostgreSQL
-	common.UsingMySQL = true
-	common.UsingSQLite = false
-	common.UsingPostgreSQL = false
+	originalMySQL := common.UsingMySQL.Load()
+	originalSQLite := common.UsingSQLite.Load()
+	originalPostgres := common.UsingPostgreSQL.Load()
+	common.UsingMySQL.Store(true)
+	common.UsingSQLite.Store(false)
+	common.UsingPostgreSQL.Store(false)
 
 	t.Cleanup(func() {
 		DB = originalDB
-		common.UsingMySQL = originalMySQL
-		common.UsingSQLite = originalSQLite
-		common.UsingPostgreSQL = originalPostgres
+		common.UsingMySQL.Store(originalMySQL)
+		common.UsingSQLite.Store(originalSQLite)
+		common.UsingPostgreSQL.Store(originalPostgres)
 	})
 
 	return mock, func() error {
@@ -68,18 +68,18 @@ func setupSQLiteCostDB(t *testing.T) func() {
 	originalDB := DB
 	DB = gdb
 
-	originalSQLite := common.UsingSQLite
-	originalMySQL := common.UsingMySQL
-	originalPostgres := common.UsingPostgreSQL
-	common.UsingSQLite = true
-	common.UsingMySQL = false
-	common.UsingPostgreSQL = false
+	originalSQLite := common.UsingSQLite.Load()
+	originalMySQL := common.UsingMySQL.Load()
+	originalPostgres := common.UsingPostgreSQL.Load()
+	common.UsingSQLite.Store(true)
+	common.UsingMySQL.Store(false)
+	common.UsingPostgreSQL.Store(false)
 
 	return func() {
 		DB = originalDB
-		common.UsingSQLite = originalSQLite
-		common.UsingMySQL = originalMySQL
-		common.UsingPostgreSQL = originalPostgres
+		common.UsingSQLite.Store(originalSQLite)
+		common.UsingMySQL.Store(originalMySQL)
+		common.UsingPostgreSQL.Store(originalPostgres)
 		_ = sqlDB.Close()
 	}
 }

@@ -92,16 +92,16 @@ func TestNormalizeAbilitySuspendUntilValues(t *testing.T) {
 	DB = db
 	t.Cleanup(func() { DB = originalDB })
 
-	originalSQLite := common.UsingSQLite
-	originalMySQL := common.UsingMySQL
-	originalPostgres := common.UsingPostgreSQL
-	common.UsingSQLite = true
-	common.UsingMySQL = false
-	common.UsingPostgreSQL = false
+	originalSQLite := common.UsingSQLite.Load()
+	originalMySQL := common.UsingMySQL.Load()
+	originalPostgres := common.UsingPostgreSQL.Load()
+	common.UsingSQLite.Store(true)
+	common.UsingMySQL.Store(false)
+	common.UsingPostgreSQL.Store(false)
 	t.Cleanup(func() {
-		common.UsingSQLite = originalSQLite
-		common.UsingMySQL = originalMySQL
-		common.UsingPostgreSQL = originalPostgres
+		common.UsingSQLite.Store(originalSQLite)
+		common.UsingMySQL.Store(originalMySQL)
+		common.UsingPostgreSQL.Store(originalPostgres)
 	})
 
 	require.NoError(t, DB.Exec("CREATE TABLE abilities (`group` TEXT, model TEXT, channel_id INTEGER, suspend_until TEXT)").Error)
@@ -181,16 +181,16 @@ func TestMigrateAbilitySuspendUntilColumnSQLiteIntegration(t *testing.T) {
 	DB = db
 	t.Cleanup(func() { DB = originalDB })
 
-	originalSQLite := common.UsingSQLite
-	originalMySQL := common.UsingMySQL
-	originalPostgres := common.UsingPostgreSQL
-	common.UsingSQLite = true
-	common.UsingMySQL = false
-	common.UsingPostgreSQL = false
+	originalSQLite := common.UsingSQLite.Load()
+	originalMySQL := common.UsingMySQL.Load()
+	originalPostgres := common.UsingPostgreSQL.Load()
+	common.UsingSQLite.Store(true)
+	common.UsingMySQL.Store(false)
+	common.UsingPostgreSQL.Store(false)
 	t.Cleanup(func() {
-		common.UsingSQLite = originalSQLite
-		common.UsingMySQL = originalMySQL
-		common.UsingPostgreSQL = originalPostgres
+		common.UsingSQLite.Store(originalSQLite)
+		common.UsingMySQL.Store(originalMySQL)
+		common.UsingPostgreSQL.Store(originalPostgres)
 	})
 
 	require.NoError(t, DB.Exec("CREATE TABLE abilities (`group` TEXT, model TEXT, channel_id INTEGER, suspend_until TEXT)").Error)

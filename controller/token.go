@@ -31,13 +31,13 @@ func GetRequestCost(c *gin.Context) {
 			"success": false,
 			"message": "request_id should not be empty",
 		})
-		return
+
 	}
 
 	docu, err := model.GetCostByRequestId(reqId)
 	if err != nil {
 		helper.RespondError(c, err)
-		return
+
 	}
 
 	c.JSON(http.StatusOK, docu)
@@ -86,7 +86,6 @@ func GetAllTokens(c *gin.Context) {
 		"data":    tokens,
 		"total":   totalCount,
 	})
-	return
 }
 
 func SearchTokens(c *gin.Context) {
@@ -368,7 +367,7 @@ func ConsumeToken(c *gin.Context) {
 }
 
 // processPreConsume reserves quota for a future post confirmation and records a pending transaction.
-func processPreConsume(ctx context.Context, c *gin.Context, token *model.Token, userID int, req *consumeTokenRequest, requestID string, traceID string) (*model.TokenTransaction, *model.Token, error) {
+func processPreConsume(ctx context.Context, _ *gin.Context, token *model.Token, userID int, req *consumeTokenRequest, requestID string, traceID string) (*model.TokenTransaction, *model.Token, error) {
 	if req.AddUsedQuota == 0 {
 		return nil, nil, errors.New("add_used_quota must be greater than 0 for pre phase")
 	}
@@ -908,5 +907,4 @@ func UpdateToken(c *gin.Context) {
 		"message": "",
 		"data":    cleanToken,
 	})
-	return
 }

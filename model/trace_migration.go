@@ -55,9 +55,9 @@ func MigrateTraceURLColumnToText() error {
 
 		var alterErr error
 		switch {
-		case common.UsingMySQL:
+		case common.UsingMySQL.Load():
 			alterErr = tx.Exec("ALTER TABLE traces MODIFY COLUMN url TEXT NOT NULL").Error
-		case common.UsingPostgreSQL:
+		case common.UsingPostgreSQL.Load():
 			alterErr = tx.Exec("ALTER TABLE traces ALTER COLUMN url TYPE TEXT").Error
 		default:
 			alterErr = nil
@@ -83,7 +83,7 @@ func MigrateTraceURLColumnToText() error {
 // traceURLColumnNeedsMigration reports whether the traces.url column is still backed by a fixed-length VARCHAR type.
 func traceURLColumnNeedsMigration() (bool, error) {
 	switch {
-	case common.UsingMySQL:
+	case common.UsingMySQL.Load():
 		var tableExists int
 		if err := DB.Raw(`SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'traces'`).Scan(&tableExists).Error; err != nil {
 			return false, errors.Wrap(err, "check traces table existence (mysql)")
@@ -101,7 +101,7 @@ func traceURLColumnNeedsMigration() (bool, error) {
 		}
 		return !strings.Contains(columnType, "text"), nil
 
-	case common.UsingPostgreSQL:
+	case common.UsingPostgreSQL.Load():
 		var tableExists int
 		if err := DB.Raw(`SELECT COUNT(*) FROM information_schema.tables WHERE table_name = 'traces'`).Scan(&tableExists).Error; err != nil {
 			return false, errors.Wrap(err, "check traces table existence (postgres)")
@@ -119,7 +119,7 @@ func traceURLColumnNeedsMigration() (bool, error) {
 		}
 		return columnType == "character varying", nil
 
-	case common.UsingSQLite:
+	case common.UsingSQLite.Load():
 		return false, nil
 	default:
 		return false, nil

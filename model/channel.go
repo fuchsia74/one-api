@@ -422,18 +422,14 @@ func (channel *Channel) MigrateModelConfigsToModelPrice() error {
 			allModelNames[modelName] = true
 		}
 	}
-	if modelRatios != nil {
-		for modelName := range modelRatios {
-			if modelName != "" {
-				allModelNames[modelName] = true
-			}
+	for modelName := range modelRatios {
+		if modelName != "" {
+			allModelNames[modelName] = true
 		}
 	}
-	if completionRatios != nil {
-		for modelName := range completionRatios {
-			if modelName != "" {
-				allModelNames[modelName] = true
-			}
+	for modelName := range completionRatios {
+		if modelName != "" {
+			allModelNames[modelName] = true
 		}
 	}
 
@@ -545,7 +541,7 @@ func (channel *Channel) GetModelPriceConfigs() map[string]ModelConfigLocal {
 
 // SetModelPriceConfigs sets the channel-specific model price configurations in the new unified format
 func (channel *Channel) SetModelPriceConfigs(modelPriceConfigs map[string]ModelConfigLocal) error {
-	if modelPriceConfigs == nil || len(modelPriceConfigs) == 0 {
+	if len(modelPriceConfigs) == 0 {
 		channel.ModelConfigs = nil
 		return nil
 	}
@@ -834,7 +830,7 @@ func (channel *Channel) GetCompletionRatio() map[string]float64 {
 // SetModelRatio sets the channel-specific model ratio map
 // DEPRECATED: Use SetModelPriceConfigs() instead. This method is kept for backward compatibility.
 func (channel *Channel) SetModelRatio(modelRatio map[string]float64) error {
-	if modelRatio == nil || len(modelRatio) == 0 {
+	if len(modelRatio) == 0 {
 		channel.ModelRatio = nil
 		return nil
 	}
@@ -850,7 +846,7 @@ func (channel *Channel) SetModelRatio(modelRatio map[string]float64) error {
 // SetCompletionRatio sets the channel-specific completion ratio map
 // DEPRECATED: Use SetModelPriceConfigs() instead. This method is kept for backward compatibility.
 func (channel *Channel) SetCompletionRatio(completionRatio map[string]float64) error {
-	if completionRatio == nil || len(completionRatio) == 0 {
+	if len(completionRatio) == 0 {
 		channel.CompletionRatio = nil
 		return nil
 	}
@@ -968,13 +964,13 @@ func (channel *Channel) MigrateHistoricalPricingToModelConfigs() error {
 	}
 
 	// Skip if no valid historical data to migrate
-	if (modelRatios == nil || len(modelRatios) == 0) && (completionRatios == nil || len(completionRatios) == 0) {
+	if len(modelRatios) == 0 && len(completionRatios) == 0 {
 		return nil
 	}
 
 	// Check if ModelConfigs already has unified data
 	existingConfigs := channel.GetModelPriceConfigs()
-	if existingConfigs != nil && len(existingConfigs) > 0 {
+	if len(existingConfigs) > 0 {
 		// Check if existing configs have pricing data (not just MaxTokens)
 		hasPricingData := false
 		for _, config := range existingConfigs {
@@ -999,20 +995,16 @@ func (channel *Channel) MigrateHistoricalPricingToModelConfigs() error {
 
 	// Collect all valid model names from both ratios and existing configs
 	allModelNames := make(map[string]bool)
-	if modelRatios != nil {
-		for modelName, ratio := range modelRatios {
-			// Skip invalid entries
-			if modelName != "" && ratio >= 0 {
-				allModelNames[modelName] = true
-			}
+	for modelName, ratio := range modelRatios {
+		// Skip invalid entries
+		if modelName != "" && ratio >= 0 {
+			allModelNames[modelName] = true
 		}
 	}
-	if completionRatios != nil {
-		for modelName, ratio := range completionRatios {
-			// Skip invalid entries
-			if modelName != "" && ratio >= 0 {
-				allModelNames[modelName] = true
-			}
+	for modelName, ratio := range completionRatios {
+		// Skip invalid entries
+		if modelName != "" && ratio >= 0 {
+			allModelNames[modelName] = true
 		}
 	}
 	for modelName := range existingConfigs {
@@ -1149,9 +1141,9 @@ func performFieldMigration() error {
 
 	// Perform database-specific column type changes
 	var err error
-	if common.UsingMySQL {
+	if common.UsingMySQL.Load() {
 		err = performMySQLFieldMigration(tx)
-	} else if common.UsingPostgreSQL {
+	} else if common.UsingPostgreSQL.Load() {
 		err = performPostgreSQLFieldMigration(tx)
 	} else {
 		// This should not happen due to the check in checkIfFieldMigrationNeeded,
@@ -1219,7 +1211,7 @@ func performPostgreSQLFieldMigration(tx *gorm.DB) error {
 // This function provides idempotency by checking the current column types in the database.
 // Returns true if migration is needed, false if fields are already TEXT type.
 func checkIfFieldMigrationNeeded() (bool, error) {
-	if common.UsingMySQL {
+	if common.UsingMySQL.Load() {
 		// First check if the channels table exists at all
 		var tableExists int
 		err := DB.Raw(`SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES
@@ -1269,7 +1261,7 @@ func checkIfFieldMigrationNeeded() (bool, error) {
 		need := !(isTextType(modelConfigsType) && isTextType(modelMappingType))
 		return need, nil
 
-	} else if common.UsingPostgreSQL {
+	} else if common.UsingPostgreSQL.Load() {
 		// First check if the channels table exists at all
 		var tableExists int
 		err := DB.Raw(`SELECT COUNT(*) FROM information_schema.tables
@@ -1313,7 +1305,7 @@ func checkIfFieldMigrationNeeded() (bool, error) {
 		// Migration needed if either field is still character varying (varchar)
 		return modelConfigsType == "character varying" || modelMappingType == "character varying", nil
 
-	} else if common.UsingSQLite {
+	} else if common.UsingSQLite.Load() {
 		// SQLite is flexible with column types and doesn't enforce strict typing
 		// TEXT and VARCHAR are treated the same way, so no migration is needed
 		logger.Logger.Info("SQLite detected - column type migration not required (SQLite is flexible with text types)")
@@ -1414,7 +1406,7 @@ func MigrateAllChannelModelConfigs() error {
 			saveErr := DB.Model(channel).Update("model_configs", channel.ModelConfigs).Error
 			if saveErr != nil {
 				// Detect MySQL column size overflow and attempt on-the-fly migration+retry
-				if common.UsingMySQL && isMySQLDataTooLongErr(saveErr) {
+				if common.UsingMySQL.Load() && isMySQLDataTooLongErr(saveErr) {
 					logger.Logger.Warn("Detected model_configs length overflow, attempting column type migration to TEXT and retry",
 						zap.Int("channel_id", channel.Id))
 					if migErr := performMySQLFieldMigration(DB); migErr != nil {
