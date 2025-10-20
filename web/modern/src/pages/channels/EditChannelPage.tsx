@@ -144,6 +144,9 @@ const CHANNEL_TYPES: ChannelType[] = [
   { key: 13, text: 'Proxy: AIGC2D', value: 13, color: 'purple' },
 ]
 
+const CHANNEL_TYPES_WITH_DEDICATED_BASE_URL = new Set<number>([3, 50])
+const CHANNEL_TYPES_WITH_CUSTOM_KEY_FIELD = new Set<number>([34])
+
 const OPENAI_COMPATIBLE_API_FORMAT_OPTIONS = [
   { value: 'chat_completion', label: 'ChatCompletion (default)' },
   { value: 'response', label: 'Response' },
@@ -345,6 +348,8 @@ export function EditChannelPage() {
 
   const selectedChannelType = CHANNEL_TYPES.find(t => t.value === normalizedChannelType)
   const hasSelectedType = normalizedChannelType !== null && !!selectedChannelType
+  const channelTypeRequiresDedicatedBaseURL = normalizedChannelType !== null && CHANNEL_TYPES_WITH_DEDICATED_BASE_URL.has(normalizedChannelType)
+  const channelTypeOverridesKeyField = normalizedChannelType !== null && CHANNEL_TYPES_WITH_CUSTOM_KEY_FIELD.has(normalizedChannelType)
 
   // Debug logging for watchType changes
   useEffect(() => {
@@ -737,6 +742,20 @@ export function EditChannelPage() {
         delete payload.key
       }
 
+      const normalizedSubmitType = normalizeChannelType(payload.type)
+      const baseURLRawValue = typeof payload.base_url === 'string' ? payload.base_url : ''
+      const trimmedBaseURL = baseURLRawValue.trim()
+      const baseURLRequired = normalizedSubmitType !== null && CHANNEL_TYPES_WITH_DEDICATED_BASE_URL.has(normalizedSubmitType)
+
+      if (baseURLRequired && !trimmedBaseURL) {
+        form.setError('base_url', { message: 'Base URL is required for this channel type' })
+        notify({ type: 'error', title: 'Validation error', message: 'Base URL is required for this channel type.' })
+        return
+      }
+
+      payload.base_url = trimmedBaseURL
+      form.clearErrors('base_url')
+
       // Handle base_url - remove trailing slash
       if (payload.base_url && payload.base_url.endsWith('/')) {
         payload.base_url = payload.base_url.slice(0, -1)
@@ -922,6 +941,18 @@ export function EditChannelPage() {
   const fieldHasError = (name: string) => !!(form.formState.errors as any)?.[name]
   const errorClass = (name: string) => (fieldHasError(name) ? 'border-destructive focus-visible:ring-destructive' : '')
 
+  const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
+    <div className="flex items-center gap-1">
+      <FormLabel>{label}</FormLabel>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
+      </Tooltip>
+    </div>
+  )
+
   // Render channel-specific configuration fields
   const renderChannelSpecificFields = () => {
     const channelType = normalizedChannelType
@@ -944,6 +975,7 @@ export function EditChannelPage() {
                     <Input
                       placeholder={defaultBaseURL || 'https://your-resource.openai.azure.com'}
                       className={errorClass('base_url')}
+                      required
                       {...field}
                     />
                   </FormControl>
@@ -1307,6 +1339,8 @@ export function EditChannelPage() {
                   <FormControl>
                     <Input
                       placeholder={defaultBaseURL || 'https://api.your-provider.com/v1'}
+                      className={errorClass('base_url')}
+                      required
                       {...field}
                     />
                   </FormControl>
@@ -1398,19 +1432,6 @@ export function EditChannelPage() {
 
   console.log('[CHANNEL_TYPE_DEBUG] Rendering main form')
 
-  // Small helper to render a label with a tooltip icon
-  const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
-    <div className="flex items-center gap-1">
-      <FormLabel>{label}</FormLabel>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
-      </Tooltip>
-    </div>
-  )
-
   return (
     <div className="container mx-auto px-4 py-6">
       <TooltipProvider>
@@ -1498,53 +1519,59 @@ export function EditChannelPage() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="key"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="API Key"
-                        help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
-                      />
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
-                          className={errorClass('key')}
-                          {...field}
+                {!channelTypeOverridesKeyField && (
+                  <FormField
+                    control={form.control}
+                    name="key"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="API Key"
+                          help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
                         />
-                      </FormControl>
-                      {isEdit && (
-                        <div className="text-xs text-muted-foreground">
-                          Current API key is hidden for security. Enter a new key only if you want to update it.
-                        </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
+                            className={errorClass('key')}
+                            {...field}
+                          />
+                        </FormControl>
+                        {isEdit && (
+                          <div className="text-xs text-muted-foreground">
+                            Current API key is hidden for security. Enter a new key only if you want to update it.
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-                <FormField
-                  control={form.control}
-                  name="base_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="Base URL (Optional)"
-                        help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
-                      />
-                      <FormControl>
-                        <Input
-                          placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
-                          className={errorClass('base_url')}
-                          {...field}
+                {!channelTypeRequiresDedicatedBaseURL && (
+                  <FormField
+                    control={form.control}
+                    name="base_url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="Base URL (Optional)"
+                          help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Input
+                            placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
+                            className={errorClass('base_url')}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {renderChannelSpecificFields()}
 
                 {(!isEdit && !hasSelectedType) ? (
                   <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
@@ -1909,10 +1936,6 @@ export function EditChannelPage() {
                     )}
                   />
                 )}
-
-                {/* Channel-specific configuration sections */}
-                {renderChannelSpecificFields()}
-
                 <FormField
                   control={form.control}
                   name="system_prompt"
