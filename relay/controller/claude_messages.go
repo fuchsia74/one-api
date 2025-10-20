@@ -946,6 +946,7 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 
 	cacheWrite5mTokens := usage.CacheWrite5mTokens
 	cacheWrite1hTokens := usage.CacheWrite1hTokens
+	metadata := model.AppendCacheWriteTokensMetadata(nil, cacheWrite5mTokens, cacheWrite1hTokens)
 
 	// Use centralized detailed billing function with explicit trace ID
 	quotaDelta := quota - preConsumedQuota
@@ -977,6 +978,7 @@ func postConsumeClaudeMessagesQuotaWithTraceID(ctx context.Context, requestId st
 		CachedCompletionTokens: cachedCompletionTokens,
 		CacheWrite5mTokens:     cacheWrite5mTokens,
 		CacheWrite1hTokens:     cacheWrite1hTokens,
+		Metadata:               metadata,
 		RequestId:              requestId,
 		TraceId:                traceId,
 	})

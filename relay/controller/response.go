@@ -1104,6 +1104,7 @@ func postConsumeResponseAPIQuota(ctx context.Context,
 			CachedCompletionTokens: 0,
 			CacheWrite5mTokens:     usage.CacheWrite5mTokens,
 			CacheWrite1hTokens:     usage.CacheWrite1hTokens,
+			Metadata:               model.AppendCacheWriteTokensMetadata(nil, usage.CacheWrite5mTokens, usage.CacheWrite1hTokens),
 			RequestId:              requestId,
 			TraceId:                traceId,
 		})

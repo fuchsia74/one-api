@@ -791,6 +791,7 @@ CREATE TABLE logs (
     completion_tokens INTEGER,
     cached_prompt_tokens INTEGER,         -- Persisted cached prompt tokens (2025-08)
     quota INTEGER,
+    metadata TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
@@ -798,7 +799,7 @@ CREATE TABLE logs (
 **Note:**
 
 - The backend log API returns `cached_prompt_tokens` for each log entry. The frontend shows cached prompt tokens as a tooltip in the Prompt column.
-- Cache-write token amounts are available at runtime in the usage object (`cache_write_5m_tokens`, `cache_write_1h_tokens`) and are billed accordingly. Persisting them to logs can be added later if needed.
+- Provider-specific attributes such as Claude cache-write token counts are serialized into the `metadata` text column as JSON (e.g., `{ "cache_write_tokens": { "ephemeral_5m": 123 } }`).
 
 ### Relationships
 

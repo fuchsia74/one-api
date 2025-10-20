@@ -129,6 +129,7 @@ type QuotaConsumeDetail struct {
 	CachedCompletionTokens int
 	CacheWrite5mTokens     int
 	CacheWrite1hTokens     int
+	Metadata               model.LogMetadata
 	// Explicit IDs propagated from gin.Context
 	RequestId string
 	TraceId   string
@@ -194,11 +195,16 @@ func PostConsumeQuotaDetailed(detail QuotaConsumeDetail) {
 		SystemPromptReset:      detail.SystemPromptReset,
 		CachedPromptTokens:     detail.CachedPromptTokens,
 		CachedCompletionTokens: detail.CachedCompletionTokens,
-		CacheWrite5mTokens:     detail.CacheWrite5mTokens,
-		CacheWrite1hTokens:     detail.CacheWrite1hTokens,
 		RequestId:              detail.RequestId,
 		TraceId:                detail.TraceId,
 	}
+
+	metadata := model.CloneLogMetadata(detail.Metadata)
+	metadata = model.AppendCacheWriteTokensMetadata(metadata, detail.CacheWrite5mTokens, detail.CacheWrite1hTokens)
+	if len(metadata) > 0 {
+		entry.Metadata = metadata
+	}
+
 	PostConsumeQuotaWithLog(detail.Ctx, detail.TokenId, detail.QuotaDelta, detail.TotalQuota, entry)
 }
 

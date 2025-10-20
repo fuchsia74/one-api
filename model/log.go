@@ -2,6 +2,8 @@ package model
 
 import (
 	"context"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -38,9 +40,116 @@ type Log struct {
 	// Cached token counts (prompt/output) for cost transparency
 	CachedPromptTokens     int `json:"cached_prompt_tokens" gorm:"default:0;index"`
 	CachedCompletionTokens int `json:"cached_completion_tokens" gorm:"default:0;index"`
-	// Cache write token counts (Anthropic Claude prompt caching)
-	CacheWrite5mTokens int `json:"cache_write_5m_tokens" gorm:"default:0;index"`
-	CacheWrite1hTokens int `json:"cache_write_1h_tokens" gorm:"default:0;index"`
+	// Metadata holds provider-specific attributes serialized as JSON (e.g., cache write tokens).
+	Metadata LogMetadata `json:"metadata,omitempty" gorm:"type:text"`
+}
+
+// LogMetadata stores structured provider-specific attributes associated with a log entry.
+// It is serialized as JSON in the underlying database column to avoid schema churn when
+// new adaptor-specific fields appear.
+type LogMetadata map[string]any
+
+const (
+	// LogMetadataKeyCacheWriteTokens groups cache write token counts recorded for billing transparency.
+	LogMetadataKeyCacheWriteTokens = "cache_write_tokens"
+	// LogMetadataKeyCacheWrite5m records the count of 5-minute window cache write tokens.
+	LogMetadataKeyCacheWrite5m = "ephemeral_5m"
+	// LogMetadataKeyCacheWrite1h records the count of 1-hour window cache write tokens.
+	LogMetadataKeyCacheWrite1h = "ephemeral_1h"
+)
+
+// Value converts LogMetadata to a driver-compatible JSON representation.
+func (m LogMetadata) Value() (driver.Value, error) {
+	if len(m) == 0 {
+		return nil, nil
+	}
+
+	payload, err := json.Marshal(map[string]any(m))
+	if err != nil {
+		return nil, errors.Wrap(err, "marshal log metadata")
+	}
+	if string(payload) == "null" {
+		return nil, nil
+	}
+	return string(payload), nil
+}
+
+// Scan populates LogMetadata from a database value.
+func (m *LogMetadata) Scan(value any) error {
+	if m == nil {
+		return errors.New("log metadata scan: nil receiver")
+	}
+	if value == nil {
+		*m = nil
+		return nil
+	}
+
+	var data []byte
+	switch v := value.(type) {
+	case []byte:
+		data = v
+	case string:
+		data = []byte(v)
+	default:
+		return errors.Errorf("log metadata scan: unsupported type %T", value)
+	}
+
+	if len(data) == 0 {
+		*m = nil
+		return nil
+	}
+
+	decoded := make(map[string]any)
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return errors.Wrap(err, "unmarshal log metadata")
+	}
+	if len(decoded) == 0 {
+		*m = nil
+		return nil
+	}
+
+	*m = LogMetadata(decoded)
+	return nil
+}
+
+// CloneLogMetadata returns a shallow copy of the provided metadata map.
+func CloneLogMetadata(src LogMetadata) LogMetadata {
+	if len(src) == 0 {
+		return nil
+	}
+
+	clone := LogMetadata{}
+	for k, v := range src {
+		clone[k] = v
+	}
+	return clone
+}
+
+// AppendCacheWriteTokensMetadata appends cache write token counts into the metadata map.
+func AppendCacheWriteTokensMetadata(metadata LogMetadata, cacheWrite5m, cacheWrite1h int) LogMetadata {
+	if cacheWrite5m == 0 && cacheWrite1h == 0 {
+		return metadata
+	}
+	if metadata == nil {
+		metadata = LogMetadata{}
+	}
+
+	existing, _ := metadata[LogMetadataKeyCacheWriteTokens].(map[string]any)
+	if existing == nil {
+		existing = map[string]any{}
+	}
+	if cacheWrite5m != 0 {
+		existing[LogMetadataKeyCacheWrite5m] = cacheWrite5m
+	}
+	if cacheWrite1h != 0 {
+		existing[LogMetadataKeyCacheWrite1h] = cacheWrite1h
+	}
+	if len(existing) == 0 {
+		return metadata
+	}
+
+	metadata[LogMetadataKeyCacheWriteTokens] = existing
+	return metadata
 }
 
 const (

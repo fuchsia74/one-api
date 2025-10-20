@@ -15,6 +15,16 @@ import { useAuthStore } from '@/lib/stores/auth'
 import { RefreshCw, Eye, EyeOff, Copy, FileDown, Calendar, Filter } from 'lucide-react'
 import { TracingModal } from '@/components/TracingModal'
 
+type CacheWriteTokensMetadata = {
+  ephemeral_5m?: number
+  ephemeral_1h?: number
+}
+
+type LogMetadata = {
+  cache_write_tokens?: CacheWriteTokensMetadata
+  [key: string]: unknown
+}
+
 interface LogRow {
   id: number
   type: number
@@ -28,14 +38,13 @@ interface LogRow {
   completion_tokens?: number
   cached_prompt_tokens?: number
   cached_completion_tokens?: number
-  cache_write_5m_tokens?: number
-  cache_write_1h_tokens?: number
   elapsed_time?: number
   request_id?: string
   trace_id?: string
   content?: string
   is_stream?: boolean
   system_prompt_reset?: boolean
+  metadata?: LogMetadata
 }
 
 interface LogStatistics {
@@ -91,6 +100,23 @@ const getLatencyColor = (ms?: number) => {
   if (ms < 1000) return 'text-green-600'
   if (ms < 3000) return 'text-yellow-600'
   return 'text-red-600'
+}
+
+const coerceTokenCount = (value: unknown) => {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0
+  return Math.trunc(value)
+}
+
+const getCacheWriteSummaries = (metadata?: LogMetadata) => {
+  const details = metadata?.cache_write_tokens
+  if (!details) {
+    return { fiveMinute: 0, oneHour: 0 }
+  }
+
+  return {
+    fiveMinute: coerceTokenCount(details.ephemeral_5m),
+    oneHour: coerceTokenCount(details.ephemeral_1h),
+  }
 }
 
 export function LogsPage() {
@@ -301,22 +327,25 @@ export function LogsPage() {
   const handleExportLogs = () => {
     // Implementation for exporting logs to CSV
     const csvHeaders = ['Time', 'Type', 'Model', 'Token', 'Username', 'Quota', 'Prompt Tokens', 'Completion Tokens', 'Cached Prompt Tokens', 'Cached Completion Tokens', 'Cache Write 5m Tokens', 'Cache Write 1h Tokens', 'Latency', 'Content']
-    const csvData = data.map(log => [
-      formatTimestamp(log.created_at),
-      log.type,
-      log.model_name,
-      log.token_name || '',
-      log.username || '',
-      log.quota,
-      log.prompt_tokens || 0,
-      log.completion_tokens || 0,
-      log.cached_prompt_tokens || 0,
-      log.cached_completion_tokens || 0,
-      log.cache_write_5m_tokens || 0,
-      log.cache_write_1h_tokens || 0,
-      log.elapsed_time || 0,
-      (log.content || '').replace(/,/g, ';').replace(/\n/g, ' ')
-    ])
+    const csvData = data.map(log => {
+      const { fiveMinute, oneHour } = getCacheWriteSummaries(log.metadata)
+      return [
+        formatTimestamp(log.created_at),
+        log.type,
+        log.model_name,
+        log.token_name || '',
+        log.username || '',
+        log.quota,
+        log.prompt_tokens || 0,
+        log.completion_tokens || 0,
+        log.cached_prompt_tokens || 0,
+        log.cached_completion_tokens || 0,
+        fiveMinute,
+        oneHour,
+        log.elapsed_time || 0,
+        (log.content || '').replace(/,/g, ';').replace(/\n/g, ' ')
+      ]
+    })
 
     const csv = [csvHeaders, ...csvData].map(row => row.join(',')).join('\n')
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -453,23 +482,26 @@ export function LogsPage() {
       {
         accessorKey: 'completion_tokens',
         header: 'Completion',
-        cell: ({ row }) => (
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <span className="font-mono text-sm cursor-help">{row.original.completion_tokens || 0}</span>
-              </TooltipTrigger>
-              <TooltipContent>
-                <div className="flex flex-col gap-1">
-                  <div>Output tokens: {row.original.completion_tokens ?? 0}</div>
-                  <div>Cached tokens: {row.original.cached_completion_tokens ?? 0}</div>
-                  <div>Cache write 5m: {row.original.cache_write_5m_tokens ?? 0}</div>
-                  <div>Cache write 1h: {row.original.cache_write_1h_tokens ?? 0}</div>
-                </div>
-              </TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-        ),
+        cell: ({ row }) => {
+          const { fiveMinute, oneHour } = getCacheWriteSummaries(row.original.metadata)
+          return (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="font-mono text-sm cursor-help">{row.original.completion_tokens || 0}</span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <div className="flex flex-col gap-1">
+                    <div>Output tokens: {row.original.completion_tokens ?? 0}</div>
+                    <div>Cached tokens: {row.original.cached_completion_tokens ?? 0}</div>
+                    <div>Cache write 5m: {fiveMinute}</div>
+                    <div>Cache write 1h: {oneHour}</div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          )
+        },
       },
       {
         accessorKey: 'quota',
