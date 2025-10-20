@@ -47,11 +47,13 @@ const channelSchema = z.object({
     vertex_ai_project_id: z.string().optional(),
     vertex_ai_adc: z.string().optional(),
     auth_type: z.string().default('personal_access_token'),
+    api_format: z.enum(['chat_completion', 'response']).default('chat_completion'),
   }).default({}),
   inference_profile_arn_map: z.string().optional(),
 })
 
 type ChannelForm = z.infer<typeof channelSchema>
+type ChannelConfigForm = NonNullable<ChannelForm['config']>
 
 interface ChannelType {
   key: number
@@ -128,7 +130,6 @@ const CHANNEL_TYPES: ChannelType[] = [
   { key: 44, text: 'SiliconFlow', value: 44, color: 'blue' },
   { key: 45, text: 'xAI', value: 45, color: 'blue' },
   { key: 46, text: 'Replicate', value: 46, color: 'blue' },
-  { key: 8, text: 'Custom Channel', value: 8, color: 'pink', description: 'Not recommended, use OpenAI Compatible instead' },
   { key: 22, text: 'Knowledge Base: FastGPT', value: 22, color: 'blue' },
   { key: 21, text: 'Knowledge Base: AI Proxy', value: 21, color: 'purple' },
   { key: 20, text: 'OpenRouter', value: 20, color: 'black' },
@@ -141,6 +142,11 @@ const CHANNEL_TYPES: ChannelType[] = [
   { key: 9, text: 'Proxy: AI.LS', value: 9, color: 'yellow' },
   { key: 12, text: 'Proxy: API2GPT', value: 12, color: 'blue' },
   { key: 13, text: 'Proxy: AIGC2D', value: 13, color: 'purple' },
+]
+
+const OPENAI_COMPATIBLE_API_FORMAT_OPTIONS = [
+  { value: 'chat_completion', label: 'ChatCompletion (default)' },
+  { value: 'response', label: 'Response' },
 ]
 
 const COZE_AUTH_OPTIONS = [
@@ -315,6 +321,7 @@ export function EditChannelPage() {
         vertex_ai_project_id: '',
         vertex_ai_adc: '',
         auth_type: 'personal_access_token',
+        api_format: 'chat_completion',
       },
       inference_profile_arn_map: '',
     },
@@ -426,7 +433,7 @@ export function EditChannelPage() {
         }
 
         // Parse JSON configuration
-        let config = {
+        let config: ChannelConfigForm = {
           region: '',
           ak: '',
           sk: '',
@@ -434,10 +441,16 @@ export function EditChannelPage() {
           vertex_ai_project_id: '',
           vertex_ai_adc: '',
           auth_type: 'personal_access_token',
+          api_format: 'chat_completion',
         }
         if (data.config && typeof data.config === 'string' && data.config.trim() !== '') {
           try {
-            config = { ...config, ...JSON.parse(data.config) }
+            const parsed = JSON.parse(data.config) as Partial<ChannelConfigForm>
+            config = {
+              ...config,
+              ...parsed,
+              api_format: parsed.api_format === 'response' ? 'response' : 'chat_completion',
+            }
           } catch (e) {
             console.error('Failed to parse config JSON:', e)
           }
@@ -1278,23 +1291,10 @@ export function EditChannelPage() {
           />
         )
 
-      case 8: // Custom Channel (Deprecated)
       case 50: // OpenAI Compatible
         return (
           <div className="space-y-4 p-4 border rounded-lg bg-purple-50/50">
-            <h4 className="font-medium text-purple-900">
-              {channelType === 8 ? 'Custom Channel Configuration' : 'OpenAI Compatible Configuration'}
-            </h4>
-            {channelType === 8 && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800">
-                    <strong>Deprecated:</strong> Use OpenAI Compatible channel instead.
-                  </span>
-                </div>
-              </div>
-            )}
+            <h4 className="font-medium text-purple-900">OpenAI Compatible Configuration</h4>
             <FormField
               control={form.control}
               name="base_url"
@@ -1309,6 +1309,33 @@ export function EditChannelPage() {
                       placeholder={defaultBaseURL || 'https://api.your-provider.com/v1'}
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="config.api_format"
+              render={({ field }) => (
+                <FormItem>
+                  <LabelWithHelp
+                    label="Upstream API Format *"
+                    help={'Select which upstream API surface should handle requests. ChatCompletion is the historical default; choose Response when the upstream expects OpenAI Response API payloads.'}
+                  />
+                  <FormControl>
+                    <Select value={field.value ?? 'chat_completion'} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select upstream API format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {OPENAI_COMPATIBLE_API_FORMAT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>

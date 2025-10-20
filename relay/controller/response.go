@@ -945,14 +945,18 @@ func supportsNativeResponseAPI(meta *metalib.Meta) bool {
 	if meta == nil {
 		return false
 	}
-	if meta.ChannelType != channeltype.OpenAI {
+	switch meta.ChannelType {
+	case channeltype.OpenAI:
+		base := strings.TrimSpace(strings.ToLower(meta.BaseURL))
+		if base == "" {
+			return true
+		}
+		return strings.Contains(base, "api.openai.com")
+	case channeltype.OpenAICompatible:
+		return channeltype.UseOpenAICompatibleResponseAPI(meta.Config.APIFormat)
+	default:
 		return false
 	}
-	base := strings.TrimSpace(strings.ToLower(meta.BaseURL))
-	if base == "" {
-		return true
-	}
-	return strings.Contains(base, "api.openai.com")
 }
 
 func isReasoningModel(modelName string) bool {

@@ -106,7 +106,21 @@ func CountTokenText(text string, modelName string) int {
 // GetFullRequestURL constructs the full request URL for OpenAI-compatible APIs
 func GetFullRequestURL(baseURL string, requestURL string, channelType int) string {
 	if channelType == channeltype.OpenAICompatible {
-		return fmt.Sprintf("%s%s", strings.TrimSuffix(baseURL, "/"), strings.TrimPrefix(requestURL, "/v1"))
+		trimmedBase := strings.TrimRight(baseURL, "/")
+		path := requestURL
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+		if strings.HasSuffix(trimmedBase, "/v1") {
+			path = strings.TrimPrefix(path, "/v1")
+			if path == "" {
+				path = "/"
+			}
+			if !strings.HasPrefix(path, "/") {
+				path = "/" + path
+			}
+		}
+		return trimmedBase + path
 	}
 	return fmt.Sprintf("%s%s", baseURL, requestURL)
 }

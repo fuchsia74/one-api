@@ -235,8 +235,8 @@ func TestChannelDefaultPricing(t *testing.T) {
 	router := gin.New()
 	router.GET("/api/channel/default-pricing", GetChannelDefaultPricing)
 
-	// Test Custom channel (should return global pricing from all adapters)
-	req1, _ := http.NewRequest("GET", "/api/channel/default-pricing?type=8", nil) // Custom = 8
+	// Test OpenAI-compatible channel (should return global pricing from all adapters)
+	req1, _ := http.NewRequest("GET", "/api/channel/default-pricing?type=50", nil) // OpenAICompatible = 50
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, req1)
 
@@ -254,10 +254,10 @@ func TestChannelDefaultPricing(t *testing.T) {
 	assert.True(t, customResponse.Success)
 
 	// Parse the JSON strings to verify they contain models from multiple adapters
-	var customModelRatios map[string]float64
-	err1 = json.Unmarshal([]byte(customResponse.Data.ModelRatio), &customModelRatios)
+	var compatibleModelRatios map[string]float64
+	err1 = json.Unmarshal([]byte(customResponse.Data.ModelRatio), &compatibleModelRatios)
 	assert.NoError(t, err1)
-	assert.NotEmpty(t, customModelRatios, "Custom channel should have model ratios")
+	assert.NotEmpty(t, compatibleModelRatios, "OpenAI-compatible channel should have model ratios")
 
 	// Test specific channel type (should return only that adapter's pricing)
 	req2, _ := http.NewRequest("GET", "/api/channel/default-pricing?type=40", nil) // DeepSeek = 40
@@ -283,9 +283,9 @@ func TestChannelDefaultPricing(t *testing.T) {
 	assert.NotEmpty(t, deepseekModelRatios, "DeepSeek channel should have model ratios")
 
 	// Custom should have significantly more models since it includes all adapters
-	assert.Greater(t, len(customModelRatios), len(deepseekModelRatios),
-		"Custom channel should have more models than specific channel")
+	assert.Greater(t, len(compatibleModelRatios), len(deepseekModelRatios),
+		"OpenAI-compatible channel should have more models than specific channel")
 
-	t.Logf("✓ Custom channel has %d models from global pricing", len(customModelRatios))
+	t.Logf("✓ OpenAI-compatible channel has %d models from global pricing", len(compatibleModelRatios))
 	t.Logf("✓ Specific channel has %d models from its adapter", len(deepseekModelRatios))
 }

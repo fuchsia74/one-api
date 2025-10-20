@@ -61,6 +61,11 @@ func shouldForceResponseAPI(metaInfo *meta.Meta) bool {
 		return !IsModelsOnlySupportedByChatCompletionAPI(metaInfo.ActualModelName)
 	case channeltype.Azure:
 		return azureRequiresResponseAPI(metaInfo.ActualModelName)
+	case channeltype.OpenAICompatible:
+		if metaInfo.ResponseAPIFallback {
+			return false
+		}
+		return channeltype.UseOpenAICompatibleResponseAPI(metaInfo.Config.APIFormat)
 	default:
 		return false
 	}
@@ -158,6 +163,30 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		model_ := meta.ActualModelName
 		requestURL := fmt.Sprintf("/openai/deployments/%s/%s?api-version=%s", model_, task, defaultVersion)
 		return GetFullRequestURL(meta.BaseURL, requestURL, meta.ChannelType), nil
+	case channeltype.OpenAICompatible:
+		requestPath := strings.TrimSpace(meta.RequestURLPath)
+		query := ""
+		if idx := strings.Index(requestPath, "?"); idx >= 0 {
+			query = requestPath[idx:]
+			requestPath = requestPath[:idx]
+		}
+
+		format := channeltype.NormalizeOpenAICompatibleAPIFormat(meta.Config.APIFormat)
+		if meta.Mode == relaymode.ChatCompletions || meta.Mode == relaymode.ClaudeMessages || meta.Mode == relaymode.ResponseAPI {
+			if format == channeltype.OpenAICompatibleAPIFormatResponse {
+				requestPath = "/v1/responses"
+			} else {
+				if requestPath == "" || requestPath == "/" || requestPath == "/v1/responses" || requestPath == "/v1/messages" {
+					requestPath = "/v1/chat/completions"
+				}
+			}
+		}
+
+		if requestPath == "" {
+			requestPath = "/v1/chat/completions"
+		}
+
+		return GetFullRequestURL(meta.BaseURL, requestPath+query, meta.ChannelType), nil
 	case channeltype.Minimax:
 		return minimax.GetRequestURL(meta)
 	case channeltype.Doubao:
@@ -220,7 +249,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return nil, errors.New("request is nil")
 	}
 
-	meta := meta.GetByContext(c)
+	metaInfo := meta.GetByContext(c)
 	// Add debug info for conversion path
 	// This helps diagnose cases where model name may be missing or conversion selects Response API unexpectedly.
 	// Note: use request.Model for origin field and meta.ActualModelName for resolved model.
@@ -231,27 +260,29 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	// Handle direct Response API requests
 	if relayMode == relaymode.ResponseAPI {
 		// Apply transformations (e.g., image URL -> base64) and pass through
-		if err := a.applyRequestTransformations(meta, request); err != nil {
+		if err := a.applyRequestTransformations(metaInfo, request); err != nil {
 			return nil, errors.Wrap(err, "apply request transformations for Response API")
 		}
-		logConvertedRequest(c, meta, relayMode, request)
+		logConvertedRequest(c, metaInfo, relayMode, request)
 		return request, nil
 	}
 
 	// Apply existing transformations for other modes before determining conversion strategy
-	if err := a.applyRequestTransformations(meta, request); err != nil {
+	if err := a.applyRequestTransformations(metaInfo, request); err != nil {
 		return nil, errors.Wrap(err, "apply request transformations")
 	}
 
 	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
-		shouldForceResponseAPI(meta) {
+		shouldForceResponseAPI(metaInfo) {
 		responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
 		c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
-		logConvertedRequest(c, meta, relayMode, responseAPIRequest)
+		metaInfo.RequestURLPath = "/v1/responses"
+		meta.Set2Context(c, metaInfo)
+		logConvertedRequest(c, metaInfo, relayMode, responseAPIRequest)
 		return responseAPIRequest, nil
 	}
 
-	logConvertedRequest(c, meta, relayMode, request)
+	logConvertedRequest(c, metaInfo, relayMode, request)
 	return request, nil
 }
 

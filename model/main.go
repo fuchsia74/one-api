@@ -182,6 +182,11 @@ func InitDB() {
 
 	// STEP 3: Migrate existing ModelConfigs data from old format to new format
 	// This handles data format changes after schema is correct
+	if err = MigrateCustomChannelsToOpenAICompatible(); err != nil {
+		logger.Logger.Fatal("failed to migrate custom channels", zap.Error(err))
+		return
+	}
+
 	if err = MigrateAllChannelModelConfigs(); err != nil {
 		logger.Logger.Error("failed to migrate channel ModelConfigs", zap.Error(err))
 		// Don't fail startup for this migration, just log the error

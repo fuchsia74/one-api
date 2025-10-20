@@ -468,9 +468,9 @@ func GetChannelDefaultPricing(c *gin.Context) {
 
 	var defaultPricing map[string]adaptor.ModelConfig
 
-	// For Custom channels and OpenAI-compatible channels, use global pricing from all adapters
-	// This gives users access to pricing for all supported models
-	if channelType == channeltype.Custom || channelType == channeltype.OpenAICompatible {
+	// OpenAI-compatible channels use global pricing so operators can mix models from
+	// multiple providers without defining per-channel price maps.
+	if channeltype.IsOpenAICompatible(channelType) {
 		// Use global pricing manager to get pricing from all adapters
 		defaultPricing = pricing.GetGlobalModelPricing()
 	} else {
