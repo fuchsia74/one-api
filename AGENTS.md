@@ -1,10 +1,16 @@
 # Repository Guidelines
 
+## Project
+
+The purpose of the one‑api project is to let users freely use any of the ChatCompletion API, Response API, or Claude Messages API formats to request any model on any channel. one‑api transparently handles the request and response format conversions. Please make sure that all adapters support conversion among the three API formats.
+
 ## General
 
 ### Agents
 
 Multiple agents might be modifying the code at the same time. If you come across changes that aren't yours, preserve them and avoid interfering with other agents' work. Only halt the task and inform me when you encounter an irreconcilable conflict.
+
+Should use TODOs tool to track tasks and progress.
 
 ### TimeZone
 
@@ -18,12 +24,18 @@ For any date‑range query, the handling of the ending date must encompass the e
 
 Please create suitable unit tests based on the current project circumstances. Whenever a new issue arises, update the unit tests during the fix to ensure thorough coverage of the problem by the test cases. Avoid creating temporary, one-off test scripts, and focus on continuously enhancing the unit test cases.
 
+Use `"github.com/stretchr/testify/require"` for assertions in tests.
+
 ### Comments
 
 Every function/interface must have a comment explaining its purpose, parameters, and return values. This is crucial for maintaining code clarity and facilitating future maintenance.
 The comment should start with the function/interface name and be in complete sentences.
 
 ## Golang Style
+
+This project is developed and run using Go 1.25. Please use the newest Go syntax and features as much as possible.
+
+Ideally, a single file should not exceed 600 lines. Please split the overly long files according to their functionality.
 
 ### Context
 

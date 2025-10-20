@@ -20,6 +20,7 @@ import (
 
 const (
 	extraRequestHeaderPrefix = "X-"
+	requestPreviewLimit      = 4096
 )
 
 func SetupCommonRequestHeader(c *gin.Context, req *http.Request, meta *meta.Meta) {
@@ -41,6 +42,42 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	fullRequestURL, err := a.GetRequestURL(meta)
 	if err != nil {
 		return nil, errors.Wrap(err, "get request url failed")
+	}
+
+	var (
+		preview   []byte
+		truncated bool
+		bodySize  = -1
+	)
+	if requestBody != nil {
+		if sized, ok := requestBody.(interface{ Len() int }); ok {
+			bodySize = sized.Len()
+		} else if sized64, ok := requestBody.(interface{ Size() int64 }); ok {
+			bodySize = int(sized64.Size())
+		}
+		if seeker, ok := requestBody.(io.ReadSeeker); ok {
+			currentPos, _ := seeker.Seek(0, io.SeekCurrent)
+			if bodySize < 0 {
+				total, err := seeker.Seek(0, io.SeekEnd)
+				if err == nil {
+					bodySize = int(total)
+				}
+			}
+			_, _ = seeker.Seek(currentPos, io.SeekStart)
+			buf := make([]byte, requestPreviewLimit+1)
+			n, err := seeker.Read(buf)
+			if err != nil && err != io.EOF {
+				n = 0
+			}
+			if n > requestPreviewLimit {
+				preview = append([]byte(nil), buf[:requestPreviewLimit]...)
+				truncated = true
+			} else {
+				preview = append([]byte(nil), buf[:n]...)
+				truncated = false
+			}
+			_, _ = seeker.Seek(currentPos, io.SeekStart)
+		}
 	}
 
 	req, err := gutils.NewReusableRequest(gmw.Ctx(c),
@@ -68,7 +105,16 @@ func DoRequestHelper(a Adaptor, c *gin.Context, meta *meta.Meta, requestBody io.
 	ctx = gmw.SetLogger(ctx, lg)
 
 	// Log upstream request for billing tracking
-	lg.Debug("sending request to upstream channel")
+	fields := []zap.Field{
+		zap.String("method", req.Method),
+		zap.String("url", fullRequestURL),
+		zap.Bool("body_truncated", truncated),
+		zap.ByteString("body_preview", preview),
+	}
+	if bodySize >= 0 {
+		fields = append(fields, zap.Int("body_bytes", bodySize))
+	}
+	lg.Debug("forwarding request to upstream channel", fields...)
 
 	// Optionally: Record when request is forwarded to upstream (non-standard event)
 	tracing.RecordTraceTimestamp(c, model.TimestampRequestForwarded)

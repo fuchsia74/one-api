@@ -8,6 +8,7 @@ import (
 	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/relay/channeltype"
 )
 
 // DebugChannelModelConfigs prints detailed information about a channel's model configuration
@@ -273,9 +274,9 @@ func contains(slice []string, item string) bool {
 func getExpectedModelsForChannelType(channelType int) []string {
 	// This is a simplified version - in practice, you'd want to get this from the adapters
 	switch channelType {
-	case 1: // OpenAI
+	case channeltype.OpenAI: // OpenAI
 		return []string{"gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-4o-mini", "text-embedding-ada-002", "text-embedding-3-small", "text-embedding-3-large"}
-	case 8: // Claude
+	case channeltype.OpenAICompatible: // Legacy custom/OpenAI-compatible migration path (commonly used for Claude)
 		return []string{"claude-instant-1.2", "claude-2", "claude-2.0", "claude-2.1", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307", "claude-3-5-haiku-20241022", "claude-3-5-sonnet-20240620", "claude-3-5-sonnet-20241022"}
 	default:
 		return []string{} // Allow all models for unknown types
@@ -286,7 +287,7 @@ func getExpectedModelsForChannelType(channelType int) []string {
 func getChannelDefaultPricing(channelType int) string {
 	// Generate appropriate default model configs for the channel type
 	switch channelType {
-	case 1: // OpenAI
+	case channeltype.OpenAI: // OpenAI
 		return `{
   "gpt-3.5-turbo": {
     "ratio": 0.0015,
@@ -314,7 +315,7 @@ func getChannelDefaultPricing(channelType int) string {
     "max_tokens": 128000
   }
 }`
-	case 8: // Claude
+	case channeltype.OpenAICompatible: // Legacy custom/OpenAI-compatible (historically used for Claude)
 		return `{
   "claude-3-haiku-20240307": {
     "ratio": 0.00000025,

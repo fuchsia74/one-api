@@ -26,6 +26,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor/geminiOpenaiCompatible"
 	"github.com/songquanpeng/one-api/relay/adaptor/minimax"
 	"github.com/songquanpeng/one-api/relay/adaptor/novita"
+	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/billing/ratio"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	"github.com/songquanpeng/one-api/relay/meta"
@@ -39,6 +40,35 @@ type Adaptor struct {
 	//     zap.String("url", url),
 	//     zap.Error(err))
 	ChannelType int
+}
+
+// azureRequiresResponseAPI returns true when Azure supports the model only via the Response API.
+func azureRequiresResponseAPI(modelName string) bool {
+	normalized := normalizedModelName(modelName)
+	return strings.HasPrefix(normalized, "gpt-5")
+}
+
+// shouldForceResponseAPI reports whether the upstream request must use the Response API surface.
+func shouldForceResponseAPI(metaInfo *meta.Meta) bool {
+	if metaInfo == nil {
+		return false
+	}
+	switch metaInfo.ChannelType {
+	case channeltype.OpenAI:
+		if metaInfo.ResponseAPIFallback {
+			return false
+		}
+		return !IsModelsOnlySupportedByChatCompletionAPI(metaInfo.ActualModelName)
+	case channeltype.Azure:
+		return azureRequiresResponseAPI(metaInfo.ActualModelName)
+	case channeltype.OpenAICompatible:
+		if metaInfo.ResponseAPIFallback {
+			return false
+		}
+		return channeltype.UseOpenAICompatibleResponseAPI(metaInfo.Config.APIFormat)
+	default:
+		return false
+	}
 }
 
 // webSearchCallUSDPerThousand returns the USD cost per 1000 calls for the given model name
@@ -99,7 +129,9 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		// https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/reasoning?tabs=python#api--feature-support
 		if strings.HasPrefix(meta.ActualModelName, "o1") ||
 			strings.HasPrefix(meta.ActualModelName, "o3") {
-			defaultVersion = "2024-12-01-preview"
+			defaultVersion = "2025-04-01-preview"
+		} else if azureRequiresResponseAPI(meta.ActualModelName) {
+			defaultVersion = "v1"
 		}
 
 		if meta.Mode == relaymode.ImagesGenerations {
@@ -110,16 +142,51 @@ func (a *Adaptor) GetRequestURL(meta *meta.Meta) (string, error) {
 		}
 
 		// https://learn.microsoft.com/en-us/azure/cognitive-services/openai/chatgpt-quickstart?pivots=rest-api&tabs=command-line#rest-api
-		requestURL := strings.Split(meta.RequestURLPath, "?")[0]
-		requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, defaultVersion)
-		task := strings.TrimPrefix(requestURL, "/v1/")
+		// https://learn.microsoft.com/en-us/azure/ai-foundry/openai/how-to/reasoning?tabs=gpt-5%2Cpython%2Cpy#api--feature-support
+		useResponseAPI := meta.Mode == relaymode.ResponseAPI || azureRequiresResponseAPI(meta.ActualModelName)
+		requestPath := meta.RequestURLPath
+		if idx := strings.Index(requestPath, "?"); idx >= 0 {
+			requestPath = requestPath[:idx]
+		}
+		if strings.TrimSpace(requestPath) == "" {
+			requestPath = "/v1/chat/completions"
+		}
+		if useResponseAPI {
+			requestURL := "/openai/v1/responses"
+			if strings.TrimSpace(defaultVersion) != "" {
+				requestURL = fmt.Sprintf("%s?api-version=%s", requestURL, defaultVersion)
+			}
+			return GetFullRequestURL(meta.BaseURL, requestURL, meta.ChannelType), nil
+		}
+		task := strings.TrimPrefix(requestPath, "/")
+		task = strings.TrimPrefix(task, "v1/")
 		model_ := meta.ActualModelName
-		// https://github.com/songquanpeng/one-api/issues/2235
-		// model_ = strings.Replace(model_, ".", "", -1)
-		//https://github.com/songquanpeng/one-api/issues/1191
-		// {your endpoint}/openai/deployments/{your azure_model}/chat/completions?api-version={api_version}
-		requestURL = fmt.Sprintf("/openai/deployments/%s/%s", model_, task)
+		requestURL := fmt.Sprintf("/openai/deployments/%s/%s?api-version=%s", model_, task, defaultVersion)
 		return GetFullRequestURL(meta.BaseURL, requestURL, meta.ChannelType), nil
+	case channeltype.OpenAICompatible:
+		requestPath := strings.TrimSpace(meta.RequestURLPath)
+		query := ""
+		if idx := strings.Index(requestPath, "?"); idx >= 0 {
+			query = requestPath[idx:]
+			requestPath = requestPath[:idx]
+		}
+
+		format := channeltype.NormalizeOpenAICompatibleAPIFormat(meta.Config.APIFormat)
+		if meta.Mode == relaymode.ChatCompletions || meta.Mode == relaymode.ClaudeMessages || meta.Mode == relaymode.ResponseAPI {
+			if format == channeltype.OpenAICompatibleAPIFormatResponse {
+				requestPath = "/v1/responses"
+			} else {
+				if requestPath == "" || requestPath == "/" || requestPath == "/v1/responses" || requestPath == "/v1/messages" {
+					requestPath = "/v1/chat/completions"
+				}
+			}
+		}
+
+		if requestPath == "" {
+			requestPath = "/v1/chat/completions"
+		}
+
+		return GetFullRequestURL(meta.BaseURL, requestPath+query, meta.ChannelType), nil
 	case channeltype.Minimax:
 		return minimax.GetRequestURL(meta)
 	case channeltype.Doubao:
@@ -182,7 +249,7 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 		return nil, errors.New("request is nil")
 	}
 
-	meta := meta.GetByContext(c)
+	metaInfo := meta.GetByContext(c)
 	// Add debug info for conversion path
 	// This helps diagnose cases where model name may be missing or conversion selects Response API unexpectedly.
 	// Note: use request.Model for origin field and meta.ActualModelName for resolved model.
@@ -193,28 +260,29 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	// Handle direct Response API requests
 	if relayMode == relaymode.ResponseAPI {
 		// Apply transformations (e.g., image URL -> base64) and pass through
-		if err := a.applyRequestTransformations(meta, request); err != nil {
+		if err := a.applyRequestTransformations(metaInfo, request); err != nil {
 			return nil, errors.Wrap(err, "apply request transformations for Response API")
 		}
-		logConvertedRequest(c, meta, relayMode, request)
+		logConvertedRequest(c, metaInfo, relayMode, request)
 		return request, nil
 	}
 
 	// Apply existing transformations for other modes before determining conversion strategy
-	if err := a.applyRequestTransformations(meta, request); err != nil {
+	if err := a.applyRequestTransformations(metaInfo, request); err != nil {
 		return nil, errors.Wrap(err, "apply request transformations")
 	}
 
 	if (relayMode == relaymode.ChatCompletions || relayMode == relaymode.ClaudeMessages) &&
-		meta.ChannelType == channeltype.OpenAI &&
-		!IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
-		!meta.ResponseAPIFallback {
+		shouldForceResponseAPI(metaInfo) {
 		responseAPIRequest := ConvertChatCompletionToResponseAPI(request)
-		logConvertedRequest(c, meta, relayMode, responseAPIRequest)
+		c.Set(ctxkey.ConvertedRequest, responseAPIRequest)
+		metaInfo.RequestURLPath = "/v1/responses"
+		meta.Set2Context(c, metaInfo)
+		logConvertedRequest(c, metaInfo, relayMode, responseAPIRequest)
 		return responseAPIRequest, nil
 	}
 
-	logConvertedRequest(c, meta, relayMode, request)
+	logConvertedRequest(c, metaInfo, relayMode, request)
 	return request, nil
 }
 
@@ -682,12 +750,11 @@ func (a *Adaptor) ConvertClaudeRequest(c *gin.Context, request *model.ClaudeRequ
 	c.Set(ctxkey.ClaudeMessagesConversion, true)
 	c.Set(ctxkey.OriginalClaudeRequest, request)
 
-	// For OpenAI adaptor, check if we should convert to Response API format
-	meta := meta.GetByContext(c)
-	if meta.ChannelType == channeltype.OpenAI && !IsModelsOnlySupportedByChatCompletionAPI(meta.ActualModelName) &&
-		!meta.ResponseAPIFallback {
+	// For OpenAI and Azure adaptors, check if we should convert to Response API format
+	metaInfo := meta.GetByContext(c)
+	if shouldForceResponseAPI(metaInfo) {
 		// Apply transformations first
-		if err := a.applyRequestTransformations(meta, openaiRequest); err != nil {
+		if err := a.applyRequestTransformations(metaInfo, openaiRequest); err != nil {
 			return nil, errors.Wrap(err, "apply request transformations for Claude conversion")
 		}
 
@@ -795,33 +862,48 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 	err *model.ErrorWithStatusCode) {
 	if meta.IsStream {
 		var responseText string
-		// Handle different streaming modes
-		switch meta.Mode {
-		case relaymode.ResponseAPI:
-			// Direct Response API streaming - pass through without conversion
-			err, responseText, usage = ResponseAPIDirectStreamHandler(c, resp, meta.Mode)
-		default:
-			// Check if we need to handle Response API streaming response for ChatCompletion
-			if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
-				if _, ok := vi.(*ResponseAPIRequest); ok {
-					// This is a Response API streaming response that needs conversion
-					err, responseText, usage = ResponseAPIStreamHandler(c, resp, meta.Mode)
+		handledClaudeStream := false
+
+		if meta.Mode == relaymode.ClaudeMessages {
+			if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
+				handledClaudeStream = true
+				var convErr *model.ErrorWithStatusCode
+				usage, convErr = openai_compatible.ConvertOpenAIStreamToClaudeSSE(c, resp, meta.PromptTokens, meta.ActualModelName)
+				if convErr != nil {
+					return nil, convErr
+				}
+			}
+		}
+
+		if !handledClaudeStream {
+			// Handle different streaming modes
+			switch meta.Mode {
+			case relaymode.ResponseAPI:
+				// Direct Response API streaming - pass through without conversion
+				err, responseText, usage = ResponseAPIDirectStreamHandler(c, resp, meta.Mode)
+			default:
+				// Check if we need to handle Response API streaming response for ChatCompletion
+				if vi, ok := c.Get(ctxkey.ConvertedRequest); ok {
+					if _, ok := vi.(*ResponseAPIRequest); ok {
+						// This is a Response API streaming response that needs conversion
+						err, responseText, usage = ResponseAPIStreamHandler(c, resp, meta.Mode)
+					} else {
+						// Regular streaming response
+						err, responseText, usage = StreamHandler(c, resp, meta.Mode)
+					}
 				} else {
 					// Regular streaming response
 					err, responseText, usage = StreamHandler(c, resp, meta.Mode)
 				}
-			} else {
-				// Regular streaming response
-				err, responseText, usage = StreamHandler(c, resp, meta.Mode)
 			}
-		}
 
-		if usage == nil || usage.TotalTokens == 0 {
-			usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
-		}
-		if usage.TotalTokens != 0 && usage.PromptTokens == 0 { // some channels don't return prompt tokens & completion tokens
-			usage.PromptTokens = meta.PromptTokens
-			usage.CompletionTokens = usage.TotalTokens - meta.PromptTokens
+			if usage == nil || usage.TotalTokens == 0 {
+				usage = ResponseText2Usage(responseText, meta.ActualModelName, meta.PromptTokens)
+			}
+			if usage.TotalTokens != 0 && usage.PromptTokens == 0 { // some channels don't return prompt tokens & completion tokens
+				usage.PromptTokens = meta.PromptTokens
+				usage.CompletionTokens = usage.TotalTokens - meta.PromptTokens
+			}
 		}
 	} else {
 		switch meta.Mode {
@@ -858,19 +940,22 @@ func (a *Adaptor) DoResponse(c *gin.Context,
 	}
 
 	// Handle Claude Messages response conversion
-	if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
-		claudeResp, convertErr := a.convertToClaudeResponse(c, resp)
-		if convertErr != nil {
-			return nil, convertErr
+	// Streaming conversions are handled inline; do not re-read an already drained body.
+	if !meta.IsStream && resp != nil {
+		if isClaudeConversion, exists := c.Get(ctxkey.ClaudeMessagesConversion); exists && isClaudeConversion.(bool) {
+			claudeResp, convertErr := a.convertToClaudeResponse(c, resp)
+			if convertErr != nil {
+				return nil, convertErr
+			}
+
+			// Replace the original response with the converted Claude response
+			// We need to update the response in the context so the controller can use it
+			c.Set(ctxkey.ConvertedResponse, claudeResp)
+
+			// For Claude Messages conversion, we don't return usage separately
+			// The usage is included in the Claude response body, so return nil usage
+			return nil, nil
 		}
-
-		// Replace the original response with the converted Claude response
-		// We need to update the response in the context so the controller can use it
-		c.Set(ctxkey.ConvertedResponse, claudeResp)
-
-		// For Claude Messages conversion, we don't return usage separately
-		// The usage is included in the Claude response body, so return nil usage
-		return nil, nil
 	}
 
 	return

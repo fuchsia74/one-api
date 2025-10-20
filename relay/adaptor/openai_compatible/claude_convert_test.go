@@ -181,3 +181,26 @@ func TestConvertOpenAIStreamToClaudeSSE_NoUpstreamUsage_Computed(t *testing.T) {
 	assert.Contains(t, out, "\"type\":\"message_start\"")
 	assert.Contains(t, out, "data: [DONE]")
 }
+
+func TestConvertOpenAIStreamToClaudeSSE_ResponseAPIToolCall(t *testing.T) {
+	c, w := newGinTestContext()
+
+	chunks := []string{
+		`data: {"type":"response.completed","response":{"id":"resp_1","object":"response","model":"gpt-4o-mini","status":"completed","output":[{"type":"function_call","call_id":"call_123","name":"get_weather","arguments":"{\"location\":\"SF\"}"}],"usage":{"input_tokens":21,"output_tokens":5,"total_tokens":26}}}`,
+		`data: [DONE]`,
+	}
+	body := strings.Join(chunks, "\n\n") + "\n\n"
+	resp := &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}
+
+	usage, errResp := ConvertOpenAIStreamToClaudeSSE(c, resp, 10, "gpt-4o-mini")
+	require.Nil(t, errResp)
+	require.NotNil(t, usage)
+	assert.Equal(t, 21, usage.PromptTokens)
+	assert.Equal(t, 5, usage.CompletionTokens)
+	assert.Equal(t, 26, usage.TotalTokens)
+
+	out := w.Body.String()
+	assert.Contains(t, out, `"content_block":{"id":"call_123","input":{},"name":"get_weather","type":"tool_use"}`)
+	assert.Contains(t, out, `"delta":{"partial_json":"{\"location\":\"SF\"}","type":"input_json_delta"}`)
+	assert.Contains(t, out, `"type":"message_stop"`)
+}

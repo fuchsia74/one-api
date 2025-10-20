@@ -65,6 +65,44 @@ func TestHandler_NonStream_ThinkingParam(t *testing.T) {
 	}
 }
 
+// TestHandler_NonStream_OmitsEmptyErrorField verifies that the handler does not emit the error field
+// when upstream responses omit it, preserving OpenAI compatibility for clients that gate on its presence.
+func TestHandler_NonStream_OmitsEmptyErrorField(t *testing.T) {
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	c.Request = req
+
+	respStruct := SlimTextResponse{
+		Choices: []TextResponseChoice{
+			{
+				Index:        0,
+				Message:      structToMessage("plain response"),
+				FinishReason: "stop",
+			},
+		},
+		Usage: modelUsage(5, 7),
+	}
+	b, _ := json.Marshal(respStruct)
+
+	upstream := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(string(b))),
+	}
+
+	if err, _ := Handler(c, upstream, 0, "gpt-4"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var out map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("failed to decode handler output: %v", err)
+	}
+	if _, exists := out["error"]; exists {
+		t.Fatalf("expected no error field in handler output, got %s", w.Body.String())
+	}
+}
+
 // Helpers
 func structToMessage(s string) model.Message {
 	return model.Message{Content: s, Role: "assistant"}

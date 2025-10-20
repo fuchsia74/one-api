@@ -31,29 +31,32 @@ import (
 
 // https://docs.aws.amazon.com/bedrock/latest/userguide/model-ids.html
 var AwsModelIDMap = map[string]string{
-	"claude-instant-1.2":                        "anthropic.claude-instant-v1",
-	"claude-2.0":                                "anthropic.claude-v2",
-	"claude-2.1":                                "anthropic.claude-v2:1",
-	"claude-3-haiku-20240307":                   "anthropic.claude-3-haiku-20240307-v1:0",
-	"claude-3-5-haiku-latest":                   "anthropic.claude-3-5-haiku-20241022-v1:0",
-	"claude-3-5-haiku-20241022":                 "anthropic.claude-3-5-haiku-20241022-v1:0",
-	"claude-3-sonnet-20240229":                  "anthropic.claude-3-sonnet-20240229-v1:0",
-	"claude-3-5-sonnet-latest":                  "anthropic.claude-3-5-sonnet-20241022-v2:0",
-	"claude-3-5-sonnet-20240620":                "anthropic.claude-3-5-sonnet-20240620-v1:0",
-	"claude-3-5-sonnet-20241022":                "anthropic.claude-3-5-sonnet-20241022-v2:0",
-	"claude-3-7-sonnet-latest":                  "anthropic.claude-3-7-sonnet-20250219-v1:0",
-	"claude-3-7-sonnet-20250219":                "anthropic.claude-3-7-sonnet-20250219-v1:0",
-	"claude-sonnet-4-0":                         "anthropic.claude-sonnet-4-20250514-v1:0",
-	"claude-sonnet-4-20250514":                  "anthropic.claude-sonnet-4-20250514-v1:0",
-	"claude-sonnet-4-5":                         "anthropic.claude-sonnet-4-5-20250929-v1:0",
-	"anthropic.claude-sonnet-4-5-20250929-v1:0": "anthropic.claude-sonnet-4-5-20250929-v1:0",
-	"claude-3-7-sonnet-latest-tag":              "claude-3-7-sonnet-latest-tag",
-	"claude-4-sonnet-latest-tag":                "claude-4-sonnet-latest-tag",
-	"claude-3-opus-20240229":                    "anthropic.claude-3-opus-20240229-v1:0",
-	"claude-opus-4-0":                           "anthropic.claude-opus-4-20250514-v1:0",
-	"claude-opus-4-20250514":                    "anthropic.claude-opus-4-20250514-v1:0",
-	"claude-opus-4-1":                           "anthropic.claude-opus-4-1-20250805-v1:0",
-	"claude-opus-4-1-20250805":                  "anthropic.claude-opus-4-1-20250805-v1:0",
+	"claude-instant-1.2": "anthropic.claude-instant-v1",
+	"claude-2.0":         "anthropic.claude-v2",
+	"claude-2.1":         "anthropic.claude-v2:1",
+	// haiku
+	"claude-3-haiku-20240307":   "anthropic.claude-3-haiku-20240307-v1:0",
+	"claude-3-5-haiku-latest":   "anthropic.claude-3-5-haiku-20241022-v1:0",
+	"claude-3-5-haiku-20241022": "anthropic.claude-3-5-haiku-20241022-v1:0",
+	"claude-haiku-4-5":          "anthropic.claude-haiku-4-5-20251001-v1:0",
+	"claude-haiku-4-5-20251001": "anthropic.claude-haiku-4-5-20251001-v1:0",
+	// sonnet
+	"claude-3-sonnet-20240229":   "anthropic.claude-3-sonnet-20240229-v1:0",
+	"claude-3-5-sonnet-latest":   "anthropic.claude-3-5-sonnet-20241022-v2:0",
+	"claude-3-5-sonnet-20240620": "anthropic.claude-3-5-sonnet-20240620-v1:0",
+	"claude-3-5-sonnet-20241022": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+	"claude-3-7-sonnet-latest":   "anthropic.claude-3-7-sonnet-20250219-v1:0",
+	"claude-3-7-sonnet-20250219": "anthropic.claude-3-7-sonnet-20250219-v1:0",
+	"claude-sonnet-4-0":          "anthropic.claude-sonnet-4-20250514-v1:0",
+	"claude-sonnet-4-20250514":   "anthropic.claude-sonnet-4-20250514-v1:0",
+	"claude-sonnet-4-5":          "anthropic.claude-sonnet-4-5-20250929-v1:0",
+	"claude-sonnet-4-5-20250929": "anthropic.claude-sonnet-4-5-20250929-v1:0",
+	// opus
+	"claude-3-opus-20240229":   "anthropic.claude-3-opus-20240229-v1:0",
+	"claude-opus-4-0":          "anthropic.claude-opus-4-20250514-v1:0",
+	"claude-opus-4-20250514":   "anthropic.claude-opus-4-20250514-v1:0",
+	"claude-opus-4-1":          "anthropic.claude-opus-4-1-20250805-v1:0",
+	"claude-opus-4-1-20250805": "anthropic.claude-opus-4-1-20250805-v1:0",
 }
 
 func AwsModelID(requestModel string) (string, error) {
@@ -150,13 +153,26 @@ func Handler(c *gin.Context, awsCli *bedrockruntime.Client, modelName string) (*
 		return utils.WrapErr(errors.Wrap(err, "unmarshal response")), nil
 	}
 
-	openaiResp := anthropic.ResponseClaude2OpenAI(c, claudeResponse)
-	openaiResp.Model = modelName
 	usage := relaymodel.Usage{
 		PromptTokens:     claudeResponse.Usage.InputTokens,
 		CompletionTokens: claudeResponse.Usage.OutputTokens,
 		TotalTokens:      claudeResponse.Usage.InputTokens + claudeResponse.Usage.OutputTokens,
 	}
+
+	if native, ok := c.Get(ctxkey.ClaudeMessagesNative); ok {
+		if useNative, _ := native.(bool); useNative {
+			claudeResponse.Model = modelName
+			respBody, merr := json.Marshal(claudeResponse)
+			if merr != nil {
+				return utils.WrapErr(errors.Wrap(merr, "marshal claude response")), nil
+			}
+			c.Data(http.StatusOK, "application/json", respBody)
+			return nil, &usage
+		}
+	}
+
+	openaiResp := anthropic.ResponseClaude2OpenAI(c, claudeResponse)
+	openaiResp.Model = modelName
 	openaiResp.Usage = usage
 
 	c.JSON(http.StatusOK, openaiResp)

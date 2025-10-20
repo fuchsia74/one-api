@@ -80,11 +80,54 @@ var (
 			"ap-northeast-1",
 		},
 		"anthropic.claude-sonnet-4-5-20250929-v1:0": {
+			"us-west-1",
 			"us-west-2",
 			"us-east-1",
 			"us-east-2",
+			"sa-east-1",
 			"eu-west-1",
+			"eu-west-2",
+			"eu-west-3",
+			"eu-south-1",
+			"eu-south-2",
+			"eu-north-1",
+			"eu-central-1",
+			"eu-central-2",
+			"ca-central-1",
+			"ap-south-1",
+			"ap-south-2",
+			"ap-southeast-1",
+			"ap-southeast-2",
+			"ap-southeast-3",
+			"ap-southeast-4",
 			"ap-northeast-1",
+			"ap-northeast-2",
+			"ap-northeast-3",
+		},
+		"anthropic.claude-haiku-4-5-20251001-v1:0": {
+			"us-west-1",
+			"us-west-2",
+			"us-east-1",
+			"us-east-2",
+			"sa-east-1",
+			"eu-west-1",
+			"eu-west-2",
+			"eu-west-3",
+			"eu-south-1",
+			"eu-south-2",
+			"eu-north-1",
+			"eu-central-1",
+			"eu-central-2",
+			"ca-central-1",
+			"ap-south-1",
+			"ap-south-2",
+			"ap-southeast-1",
+			"ap-southeast-2",
+			"ap-southeast-3",
+			"ap-southeast-4",
+			"ap-northeast-1",
+			"ap-northeast-2",
+			"ap-northeast-3",
 		},
 	}
 
@@ -106,6 +149,7 @@ var (
 //
 // Array.from(new Set(Array.from(document.querySelectorAll('pre.programlisting code')).map(e => e.textContent.trim()).filter(Boolean)));
 var CrossRegionInferences = []string{
+	"global.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"global.anthropic.claude-sonnet-4-20250514-v1:0",
 	"global.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"global.cohere.embed-v4:0",
@@ -120,6 +164,7 @@ var CrossRegionInferences = []string{
 	"us.anthropic.claude-3-haiku-20240307-v1:0",
 	"us.anthropic.claude-3-opus-20240229-v1:0",
 	"us.anthropic.claude-3-sonnet-20240229-v1:0",
+	"us.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"us.anthropic.claude-opus-4-1-20250805-v1:0",
 	"us.anthropic.claude-opus-4-20250514-v1:0",
 	"us.anthropic.claude-sonnet-4-20250514-v1:0",
@@ -164,6 +209,7 @@ var CrossRegionInferences = []string{
 	"apac.anthropic.claude-sonnet-4-20250514-v1:0",
 	"apac.twelvelabs.marengo-embed-2-7-v1:0",
 	"apac.twelvelabs.pegasus-1-2-v1:0",
+	"au.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"ca.amazon.nova-lite-v1:0",
 	"eu.amazon.nova-lite-v1:0",
 	"eu.amazon.nova-micro-v1:0",
@@ -172,6 +218,7 @@ var CrossRegionInferences = []string{
 	"eu.anthropic.claude-3-7-sonnet-20250219-v1:0",
 	"eu.anthropic.claude-3-haiku-20240307-v1:0",
 	"eu.anthropic.claude-3-sonnet-20240229-v1:0",
+	"eu.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"eu.anthropic.claude-sonnet-4-20250514-v1:0",
 	"eu.anthropic.claude-sonnet-4-5-20250929-v1:0",
 	"eu.cohere.embed-v4:0",
@@ -180,74 +227,90 @@ var CrossRegionInferences = []string{
 	"eu.mistral.pixtral-large-2502-v1:0",
 	"eu.twelvelabs.marengo-embed-2-7-v1:0",
 	"eu.twelvelabs.pegasus-1-2-v1:0",
+	"jp.anthropic.claude-haiku-4-5-20251001-v1:0",
 	"jp.anthropic.claude-sonnet-4-5-20250929-v1:0",
 }
 
 // RegionMapping defines the mapping between AWS regions and their cross-region inference prefixes
 // Following AWS best practices for region grouping
-var RegionMapping = map[string]string{
+var RegionMapping = map[string][]string{
 	// US regions
-	"us-east-1":    "us",
-	"us-east-2":    "us",
-	"us-west-1":    "us",
-	"us-west-2":    "us",
-	"ca-central-1": "us", // Canada uses US inference profiles
-	"sa-east-1":    "us", // South America uses US inference profiles
+	"us-east-1":    {"us"},
+	"us-east-2":    {"us"},
+	"us-west-1":    {"us"},
+	"us-west-2":    {"us"},
+	"ca-central-1": {"us"}, // Canada uses US inference profiles
+	"sa-east-1":    {"us"}, // South America uses US inference profiles
 
 	// US Government regions
-	"us-gov-east-1": "us-gov",
-	"us-gov-west-1": "us-gov",
+	"us-gov-east-1": {"us-gov"},
+	"us-gov-west-1": {"us-gov"},
 
 	// EU regions
-	"eu-west-1":    "eu",
-	"eu-west-2":    "eu",
-	"eu-west-3":    "eu",
-	"eu-central-1": "eu",
-	"eu-north-1":   "eu",
-	"eu-south-1":   "eu",
-	"eu-central-2": "eu",
+	"eu-west-1":    {"eu"},
+	"eu-west-2":    {"eu"},
+	"eu-west-3":    {"eu"},
+	"eu-north-1":   {"eu"},
+	"eu-south-1":   {"eu"},
+	"eu-central-1": {"eu"},
+	"eu-central-2": {"eu"},
 
 	// Asia Pacific regions
-	"ap-southeast-1": "apac",
-	"ap-southeast-2": "apac",
-	"ap-northeast-1": "apac",
-	"ap-northeast-2": "apac",
-	"ap-south-1":     "apac",
-	"ap-southeast-3": "apac",
-	"ap-southeast-4": "apac",
-	"ap-south-2":     "apac",
-	"ap-northeast-3": "apac",
+	"ap-south-1":     {"apac"},
+	"ap-south-2":     {"apac"},
+	"ap-southeast-1": {"apac"},
+	"ap-southeast-2": {"apac", "au"},
+	"ap-southeast-3": {"apac"},
+	"ap-southeast-4": {"apac", "au"},
+	"ap-northeast-1": {"jp", "apac"},
+	"ap-northeast-2": {"apac"},
+	"ap-northeast-3": {"jp", "apac"},
 }
 
-// getRegionPrefix returns the cross-region inference prefix for a given AWS region
+// getRegionPrefix returns the primary cross-region inference prefix for a given AWS region.
 func getRegionPrefix(region string) string {
-	if prefix, exists := RegionMapping[region]; exists {
-		return prefix
+	prefixes := getRegionPrefixes(region)
+	if len(prefixes) == 0 {
+		return ""
+	}
+
+	return prefixes[0]
+}
+
+// getRegionPrefixes returns the ordered set of cross-region inference prefixes for the region.
+// The first prefix matches the historical single-prefix behavior to keep backwards compatibility.
+func getRegionPrefixes(region string) []string {
+	if prefixes, exists := RegionMapping[region]; exists {
+		if len(prefixes) > 0 {
+			return prefixes
+		}
 	}
 
 	// Fallback to parsing logic for regions not in the map
 	if strings.HasPrefix(region, "us-gov-") {
-		return "us-gov"
+		return []string{"us-gov"}
 	}
 
 	parts := strings.Split(region, "-")
 	if len(parts) == 0 {
-		return ""
+		return nil
 	}
 
 	switch parts[0] {
 	case "us":
-		return "us"
+		return []string{"us"}
 	case "eu":
-		return "eu"
+		return []string{"eu"}
 	case "ap":
-		return "apac"
+		return []string{"apac"}
 	case "ca", "sa":
 		// Canadian and South American regions typically use US inference profiles
-		return "us"
+		return []string{"us"}
+	case "au":
+		return []string{"au"}
 	default:
 		logger.Logger.Debug("unknown region prefix", zap.String("region", region))
-		return ""
+		return nil
 	}
 }
 
@@ -313,9 +376,6 @@ func testModelAvailability(ctx context.Context, client *bedrockruntime.Client, m
 	return true
 }
 
-// Deprecated: File-based ARN configuration has been replaced with channel-specific configuration
-// These functions are kept for backward compatibility but should not be used in new code
-
 // ConvertModelID2CrossRegionProfile converts the model ID to a cross-region profile ID.
 // Enhanced version that uses aws-sdk-go-v2 patterns and includes availability testing.
 func ConvertModelID2CrossRegionProfile(ctx context.Context, model, region string) string {
@@ -331,16 +391,18 @@ func ConvertModelID2CrossRegionProfile(ctx context.Context, model, region string
 		}
 	}
 
-	regionPrefix := getRegionPrefix(region)
-	if regionPrefix == "" {
+	regionPrefixes := getRegionPrefixes(region)
+	if len(regionPrefixes) == 0 {
 		lg.Debug("unsupported region for cross-region inference", zap.String("region", region))
 		return model
 	}
 
-	newModelID := regionPrefix + "." + model
-	if slices.Contains(CrossRegionInferences, newModelID) {
-		lg.Debug("convert model to cross-region profile", zap.String("model", model), zap.String("cross_region_profile", newModelID))
-		return newModelID
+	for _, regionPrefix := range regionPrefixes {
+		newModelID := regionPrefix + "." + model
+		if slices.Contains(CrossRegionInferences, newModelID) {
+			lg.Debug("convert model to cross-region profile", zap.String("model", model), zap.String("region_prefix", regionPrefix), zap.String("cross_region_profile", newModelID))
+			return newModelID
+		}
 	}
 
 	lg.Debug("no cross-region profile found", zap.String("model", model), zap.String("region", region))

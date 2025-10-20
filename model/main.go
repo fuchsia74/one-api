@@ -154,7 +154,13 @@ func InitDB() {
 		return
 	}
 
-	// 1c) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
+	// 1c) Ensure traces.url can store long URLs (Turnstile tokens, etc.)
+	if err = MigrateTraceURLColumnToText(); err != nil {
+		logger.Logger.Fatal("failed to migrate traces.url column", zap.Error(err))
+		return
+	}
+
+	// 1d) Ensure user_request_costs has a unique index on request_id and deduplicate old data quietly
 	if err = MigrateUserRequestCostEnsureUniqueRequestID(); err != nil {
 		logger.Logger.Fatal("failed to migrate user_request_costs unique index", zap.Error(err))
 		return
@@ -176,6 +182,11 @@ func InitDB() {
 
 	// STEP 3: Migrate existing ModelConfigs data from old format to new format
 	// This handles data format changes after schema is correct
+	if err = MigrateCustomChannelsToOpenAICompatible(); err != nil {
+		logger.Logger.Fatal("failed to migrate custom channels", zap.Error(err))
+		return
+	}
+
 	if err = MigrateAllChannelModelConfigs(); err != nil {
 		logger.Logger.Error("failed to migrate channel ModelConfigs", zap.Error(err))
 		// Don't fail startup for this migration, just log the error

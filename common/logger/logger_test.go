@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -136,7 +135,6 @@ func TestSetupLoggerWritesToFile(t *testing.T) {
 	originalLogger := Logger
 	originalLogDir := LogDir
 	originalOnlyOne := config.OnlyOneLogFile
-	originalOnce := setupLogOnce
 	originalDefaultWriter := gin.DefaultWriter
 	originalDefaultErrorWriter := gin.DefaultErrorWriter
 
@@ -144,14 +142,14 @@ func TestSetupLoggerWritesToFile(t *testing.T) {
 		Logger = originalLogger
 		LogDir = originalLogDir
 		config.OnlyOneLogFile = originalOnlyOne
-		setupLogOnce = originalOnce
 		gin.DefaultWriter = originalDefaultWriter
 		gin.DefaultErrorWriter = originalDefaultErrorWriter
+		ResetSetupLogOnceForTests()
 	})
 
 	LogDir = dir
 	config.OnlyOneLogFile = true
-	setupLogOnce = sync.Once{}
+	ResetSetupLogOnceForTests()
 
 	SetupLogger()
 
@@ -165,6 +163,56 @@ func TestSetupLoggerWritesToFile(t *testing.T) {
 	}
 	if !strings.Contains(string(content), "file logging test entry") {
 		t.Fatalf("log file %s does not contain expected log entry", logPath)
+	}
+}
+
+func TestResetSetupLogOnceForTestsAllowsReconfiguration(t *testing.T) {
+	originalLogger := Logger
+	originalLogDir := LogDir
+	originalOnlyOne := config.OnlyOneLogFile
+	originalDefaultWriter := gin.DefaultWriter
+	originalDefaultErrorWriter := gin.DefaultErrorWriter
+
+	t.Cleanup(func() {
+		Logger = originalLogger
+		LogDir = originalLogDir
+		config.OnlyOneLogFile = originalOnlyOne
+		gin.DefaultWriter = originalDefaultWriter
+		gin.DefaultErrorWriter = originalDefaultErrorWriter
+		ResetSetupLogOnceForTests()
+	})
+
+	config.OnlyOneLogFile = true
+	firstDir := t.TempDir()
+	secondDir := t.TempDir()
+
+	LogDir = firstDir
+	ResetSetupLogOnceForTests()
+	SetupLogger()
+	Logger.Info("first directory setup complete")
+	_ = Logger.Sync()
+
+	firstLogPath := filepath.Join(firstDir, "oneapi.log")
+	if _, err := os.Stat(firstLogPath); err != nil {
+		t.Fatalf("expected log file in first dir: %v", err)
+	}
+
+	LogDir = secondDir
+	SetupLogger()
+	secondLogPath := filepath.Join(secondDir, "oneapi.log")
+	if _, err := os.Stat(secondLogPath); err == nil {
+		t.Fatalf("log file %s should not exist before reset", secondLogPath)
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("unexpected error checking %s: %v", secondLogPath, err)
+	}
+
+	ResetSetupLogOnceForTests()
+	SetupLogger()
+	Logger.Info("second directory setup complete after reset")
+	_ = Logger.Sync()
+
+	if _, err := os.Stat(secondLogPath); err != nil {
+		t.Fatalf("expected log file after reset: %v", err)
 	}
 }
 

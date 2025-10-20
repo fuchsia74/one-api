@@ -28,6 +28,39 @@ import (
 	"github.com/songquanpeng/one-api/relay/streaming"
 )
 
+type responseStreamToolCallState struct {
+	name     string
+	index    int
+	hasIndex bool
+	args     strings.Builder
+}
+
+func (s *responseStreamToolCallState) setName(name string) {
+	if name != "" {
+		s.name = name
+	}
+}
+
+func (s *responseStreamToolCallState) setIndex(idx int) {
+	s.index = idx
+	s.hasIndex = true
+}
+
+func (s *responseStreamToolCallState) appendArgs(delta string) {
+	if delta != "" {
+		s.args.WriteString(delta)
+	}
+}
+
+func (s *responseStreamToolCallState) replaceArgs(full string) {
+	s.args.Reset()
+	s.args.WriteString(full)
+}
+
+func (s *responseStreamToolCallState) arguments() string {
+	return s.args.String()
+}
+
 // Use shared constants from openai_compatible package
 const (
 	dataPrefix       = openai_compatible.DataPrefix
@@ -323,9 +356,9 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 	}
 
 	// Check for API errors
-	if textResponse.Error.Type != "" {
+	if textResponse.Error != nil && textResponse.Error.Type != "" {
 		return &model.ErrorWithStatusCode{
-			Error:      textResponse.Error,
+			Error:      *textResponse.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
@@ -558,6 +591,11 @@ func ResponseAPIHandler(c *gin.Context, resp *http.Response, promptTokens int, m
 
 	// Forward all response headers
 	for k, values := range resp.Header {
+		if strings.EqualFold(k, "Content-Length") ||
+			strings.EqualFold(k, "Transfer-Encoding") ||
+			strings.EqualFold(k, "Content-Encoding") {
+			continue
+		}
 		for _, v := range values {
 			c.Writer.Header().Add(k, v)
 		}
@@ -584,6 +622,19 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 	var usage *model.Usage
 	webSearchSeen := make(map[string]struct{})
 	webSearchCount := 0
+	toolStates := make(map[string]*responseStreamToolCallState)
+
+	getToolState := func(id string) *responseStreamToolCallState {
+		if id == "" {
+			return nil
+		}
+		state, ok := toolStates[id]
+		if !ok {
+			state = &responseStreamToolCallState{}
+			toolStates[id] = state
+		}
+		return state
+	}
 
 	// Set up scanner for reading the stream line by line
 	scanner := bufio.NewScanner(resp.Body)
@@ -665,22 +716,144 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 			}
 		}
 
+		// Update tool state tracking with metadata from the streaming event
+		if streamEvent != nil {
+			eventType := streamEvent.Type
+			if streamEvent.Item != nil && streamEvent.Item.Type == "function_call" {
+				if state := getToolState(streamEvent.Item.Id); state != nil {
+					if streamEvent.OutputIndex >= 0 {
+						state.setIndex(streamEvent.OutputIndex)
+					}
+					state.setName(streamEvent.Item.Name)
+					if streamEvent.Item.Arguments != "" {
+						state.appendArgs(streamEvent.Item.Arguments)
+					}
+				}
+			}
+			if strings.HasPrefix(eventType, "response.function_call_arguments.delta") {
+				if state := getToolState(streamEvent.ItemId); state != nil {
+					if streamEvent.OutputIndex >= 0 {
+						state.setIndex(streamEvent.OutputIndex)
+					}
+					state.appendArgs(streamEvent.Delta)
+				}
+			}
+			if strings.HasPrefix(eventType, "response.function_call_arguments.done") {
+				if state := getToolState(streamEvent.ItemId); state != nil {
+					if streamEvent.OutputIndex >= 0 {
+						state.setIndex(streamEvent.OutputIndex)
+					}
+					if streamEvent.Arguments != "" {
+						state.replaceArgs(streamEvent.Arguments)
+					}
+				}
+			}
+		}
+
 		// Convert Response API chunk to ChatCompletion streaming format with proper index context
 		chatCompletionChunk := ConvertResponseAPIStreamToChatCompletionWithIndex(&responseAPIChunk, outputIndex)
+
+		if len(chatCompletionChunk.Choices) > 0 {
+			delta := &chatCompletionChunk.Choices[0].Delta
+			candidateIDs := make([]string, 0, 3)
+			for _, tc := range delta.ToolCalls {
+				candidateIDs = append(candidateIDs, tc.Id)
+			}
+			if streamEvent != nil {
+				if streamEvent.Item != nil && streamEvent.Item.Type == "function_call" && streamEvent.Item.Id != "" {
+					candidateIDs = append(candidateIDs, streamEvent.Item.Id)
+				}
+				if streamEvent.ItemId != "" {
+					candidateIDs = append(candidateIDs, streamEvent.ItemId)
+				}
+			}
+
+			// Ensure tool call deltas include accumulated state
+			for idx := range delta.ToolCalls {
+				tc := &delta.ToolCalls[idx]
+				callID := tc.Id
+				if callID == "" && streamEvent != nil {
+					if streamEvent.Item != nil && streamEvent.Item.Type == "function_call" && streamEvent.Item.Id != "" {
+						callID = streamEvent.Item.Id
+						tc.Id = callID
+					} else if streamEvent.ItemId != "" {
+						callID = streamEvent.ItemId
+						tc.Id = callID
+					}
+				}
+				if state := getToolState(callID); state != nil {
+					if tc.Function == nil {
+						tc.Function = &model.Function{}
+					}
+					tc.Function.Name = state.name
+					tc.Function.Arguments = state.arguments()
+					if state.hasIndex {
+						idxCopy := state.index
+						tc.Index = &idxCopy
+					}
+				}
+			}
+
+			if len(delta.ToolCalls) == 0 && len(candidateIDs) > 0 {
+				for _, id := range candidateIDs {
+					if state := toolStates[id]; state != nil {
+						tool := model.Tool{
+							Id:   id,
+							Type: "function",
+							Function: &model.Function{
+								Name:      state.name,
+								Arguments: state.arguments(),
+							},
+						}
+						if state.hasIndex {
+							idxCopy := state.index
+							tool.Index = &idxCopy
+						}
+						delta.ToolCalls = append(delta.ToolCalls, tool)
+						break
+					}
+				}
+			}
+		}
 
 		// Accumulate usage information
 		if chatCompletionChunk.Usage != nil {
 			usage = chatCompletionChunk.Usage
 		}
 
-		// IMPORTANT: Only send ChatCompletion chunks to client for delta events ONLY
-		// Completely discard ALL other events including completion events to prevent client-side duplication
+		// Decide whether to forward this chunk based on event semantics
+		shouldSendChunk := false
 		if streamEvent != nil {
 			eventType := streamEvent.Type
+			hasMeaningfulDelta := func() bool {
+				if len(chatCompletionChunk.Choices) == 0 {
+					return false
+				}
+				delta := chatCompletionChunk.Choices[0].Delta
+				if delta.Reasoning != nil && *delta.Reasoning != "" {
+					return true
+				}
+				if len(delta.ToolCalls) > 0 {
+					return true
+				}
+				switch v := delta.Content.(type) {
+				case string:
+					return v != ""
+				case []byte:
+					return len(v) > 0
+				}
+				return false
+			}()
 
-			// Only send chunks for delta events (incremental content)
 			if strings.Contains(eventType, "delta") {
-				// Send the converted chunk to the client
+				shouldSendChunk = hasMeaningfulDelta
+			} else if len(chatCompletionChunk.Choices) > 0 && len(chatCompletionChunk.Choices[0].Delta.ToolCalls) > 0 {
+				shouldSendChunk = true
+			} else if hasMeaningfulDelta && !strings.Contains(eventType, "output_text.done") && !strings.Contains(eventType, "reasoning_summary_text.done") {
+				shouldSendChunk = true
+			}
+
+			if shouldSendChunk {
 				jsonStr, err := json.Marshal(chatCompletionChunk)
 				if err != nil {
 					lg := gmw.GetLogger(c)
@@ -816,6 +989,11 @@ func ResponseAPIDirectHandler(c *gin.Context, resp *http.Response, promptTokens 
 
 	// Forward all response headers
 	for k, values := range resp.Header {
+		if strings.EqualFold(k, "Content-Length") ||
+			strings.EqualFold(k, "Transfer-Encoding") ||
+			strings.EqualFold(k, "Content-Encoding") {
+			continue
+		}
 		for _, v := range values {
 			c.Writer.Header().Add(k, v)
 		}

@@ -18,6 +18,7 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/random"
+	"github.com/songquanpeng/one-api/dto"
 )
 
 var (
@@ -201,7 +202,7 @@ func CacheGetGroupModels(ctx context.Context, group string) (models []string, er
 }
 
 // CacheGetGroupModelsV2 is a version of CacheGetGroupModels that returns EnabledAbility instead of string
-func CacheGetGroupModelsV2(ctx context.Context, group string) (models []EnabledAbility, err error) {
+func CacheGetGroupModelsV2(ctx context.Context, group string) (models []dto.EnabledAbility, err error) {
 	if !common.IsRedisEnabled() {
 		return GetGroupModelsV2(ctx, group)
 	}

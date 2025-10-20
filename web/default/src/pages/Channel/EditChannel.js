@@ -1,10 +1,10 @@
-import React, {useEffect, useState} from 'react';
-import {useTranslation} from 'react-i18next';
-import {Button, Card, Form, Input, Message, Popup, Icon} from 'semantic-ui-react';
-import {useNavigate, useParams} from 'react-router-dom';
-import {API, copy, getChannelModels, showError, showInfo, showSuccess, verifyJSON,} from '../../helpers';
-import {CHANNEL_OPTIONS, COZE_AUTH_OPTIONS} from '../../constants';
-import {renderChannelTip} from '../../helpers/render';
+import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+import { Button, Card, Form, Input, Message, Popup, Icon } from 'semantic-ui-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { API, copy, getChannelModels, showError, showInfo, showSuccess, verifyJSON, } from '../../helpers';
+import { CHANNEL_OPTIONS, COZE_AUTH_OPTIONS } from '../../constants';
+import { renderChannelTip } from '../../helpers/render';
 import ChannelDebugPanel from '../../components/ChannelDebugPanel';
 
 const MODEL_MAPPING_EXAMPLE = {
@@ -122,6 +122,11 @@ const LabelWithTooltip = ({ label, helpText, children }) => (
   </label>
 );
 
+const OPENAI_COMPATIBLE_API_FORMAT_OPTIONS = [
+  { key: 'chat_completion', text: 'ChatCompletion (default)', value: 'chat_completion' },
+  { key: 'response', text: 'Response', value: 'response' },
+];
+
 const EditChannel = () => {
   const { t } = useTranslation();
   const params = useParams();
@@ -165,12 +170,13 @@ const EditChannel = () => {
     vertex_ai_project_id: '',
     vertex_ai_adc: '',
     auth_type: 'personal_access_token',
+    api_format: 'chat_completion',
   });
   const [defaultPricing, setDefaultPricing] = useState({
     model_configs: '',
   });
 
-  const loadDefaultPricing = async (channelType, existingModelConfigs = null) => {
+  const loadDefaultPricing = async (channelType) => {
     try {
       const res = await API.get(`/api/channel/default-pricing?type=${channelType}`);
       if (res.data.success) {
@@ -212,15 +218,6 @@ const EditChannel = () => {
         setDefaultPricing({
           model_configs: defaultModelConfigs,
         });
-
-        // If current model_configs is empty, populate with defaults
-        // Don't override if we have existing model_configs from loadChannel
-        if (!inputs.model_configs && !existingModelConfigs) {
-          setInputs((inputs) => ({
-            ...inputs,
-            model_configs: defaultModelConfigs,
-          }));
-        }
       }
     } catch (error) {
       console.error('Failed to load default pricing:', error);
@@ -263,22 +260,31 @@ const EditChannel = () => {
   };
 
   const handleInputChange = (e, { name, value }) => {
-    setInputs((inputs) => ({ ...inputs, [name]: value }));
+    setInputs((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === 'type') {
+        next.base_url = '';
+        next.other = '';
+        next.model_mapping = '';
+        next.system_prompt = '';
+        next.models = [];
+        next.model_configs = '';
+        next.inference_profile_arn_map = '';
+      }
+      return next;
+    });
     if (name === 'type') {
       // Fetch channel-specific models for the selected channel type
       fetchChannelSpecificModels(value).then((channelSpecificModels) => {
         setBasicModels(channelSpecificModels);
-        console.log('setBasicModels called with channel-specific models for type', value, ':', channelSpecificModels);
-
-        if (inputs.models.length === 0) {
-          setInputs((inputs) => ({ ...inputs, models: channelSpecificModels }));
-        }
       });
 
       // Load default pricing for the new channel type
       loadDefaultPricing(value);
     }
-  };  const handleConfigChange = (e, { name, value }) => {
+  };
+
+  const handleConfigChange = (e, { name, value }) => {
     setConfig((inputs) => ({ ...inputs, [name]: value }));
   };
 
@@ -340,7 +346,19 @@ const EditChannel = () => {
       }
       setInputs(data);
       if (data.config !== '') {
-        setConfig(JSON.parse(data.config));
+        try {
+          const parsedConfig = JSON.parse(data.config);
+          setConfig((current) => ({
+            ...current,
+            ...parsedConfig,
+            api_format: parsedConfig.api_format || 'chat_completion',
+          }));
+        } catch (error) {
+          console.error('Failed to parse channel config:', error);
+          setConfig((current) => ({ ...current, api_format: 'chat_completion' }));
+        }
+      } else {
+        setConfig((current) => ({ ...current, api_format: 'chat_completion' }));
       }
 
       // Fetch channel-specific models for this channel type
@@ -350,7 +368,7 @@ const EditChannel = () => {
       });
 
       // Load default pricing for this channel type, but don't override existing model_configs
-      loadDefaultPricing(data.type, data.model_configs);
+      loadDefaultPricing(data.type);
     } else {
       showError(message);
     }
@@ -415,6 +433,16 @@ const EditChannel = () => {
       });
       // Load default pricing for new channels
       loadDefaultPricing(inputs.type);
+      setConfig({
+        region: '',
+        sk: '',
+        ak: '',
+        user_id: '',
+        vertex_ai_project_id: '',
+        vertex_ai_adc: '',
+        auth_type: 'personal_access_token',
+        api_format: 'chat_completion',
+      });
     }
     fetchModels().then();
     fetchGroups().then();
@@ -596,432 +624,531 @@ const EditChannel = () => {
             </div>
           ) : (
             <Form autoComplete='new-password'>
-            <Form.Field>
-              <Form.Select
-                label={t('channel.edit.type')}
-                name='type'
-                required
-                search
-                options={CHANNEL_OPTIONS}
-                value={inputs.type}
-                onChange={handleInputChange}
-              />
-            </Form.Field>
-            {renderChannelTip(inputs.type)}
-            <Form.Field>
-              <Form.Input
-                label={t('channel.edit.name')}
-                name='name'
-                placeholder={t('channel.edit.name_placeholder')}
-                onChange={handleInputChange}
-                value={inputs.name}
-                required
-              />
-            </Form.Field>
-            <Form.Field>
-              <Form.Dropdown
-                label={t('channel.edit.group')}
-                placeholder={t('channel.edit.group_placeholder')}
-                name='groups'
-                required
-                fluid
-                multiple
-                selection
-                allowAdditions
-                additionLabel={t('channel.edit.group_addition')}
-                onChange={handleInputChange}
-                value={inputs.groups}
-                autoComplete='new-password'
-                options={groupOptions}
-              />
-            </Form.Field>
-
-            {/* Azure OpenAI specific fields */}
-            {inputs.type === 3 && (
-            <>
-              <Message>
-                Note: <strong>The model deployment name must match the model name</strong>
-                , because One API will replace the model parameter in the request body
-                with your deployment name (dots in the model name will be removed).
-                <a
-                  target='_blank'
-                  href='https://github.com/songquanpeng/one-api/issues/133?notification_referrer_id=NT_kwDOAmJSYrM2NjIwMzI3NDgyOjM5OTk4MDUw#issuecomment-1571602271'
-                >
-                  Image Demo
-                </a>
-              </Message>
+              <Form.Field>
+                <Form.Select
+                  label={t('channel.edit.type')}
+                  name='type'
+                  required
+                  search
+                  options={CHANNEL_OPTIONS}
+                  value={inputs.type}
+                  onChange={handleInputChange}
+                />
+              </Form.Field>
+              {renderChannelTip(inputs.type)}
               <Form.Field>
                 <Form.Input
-                  label='AZURE_OPENAI_ENDPOINT'
-                  name='base_url'
-                  placeholder='Please enter AZURE_OPENAI_ENDPOINT, for example: https://docs-test-001.openai.azure.com'
+                  label={t('channel.edit.name')}
+                  name='name'
+                  placeholder={t('channel.edit.name_placeholder')}
                   onChange={handleInputChange}
-                  value={inputs.base_url}
-                  autoComplete='new-password'
+                  value={inputs.name}
+                  required
                 />
               </Form.Field>
-              <Form.Field>
-                <Form.Input
-                  label='Default API Version'
-                  name='other'
-                  placeholder='Please enter default API version, for example: 2024-03-01-preview. This configuration can be overridden by actual request query parameters'
-                  onChange={handleInputChange}
-                  value={inputs.other}
-                  autoComplete='new-password'
-                />
-              </Form.Field>
-            </>
-          )}
-
-            {/* Custom base URL field */}
-            {inputs.type === 8 && (
-              <Form.Field>
-                <Form.Input
-                    required
-                    label={t('channel.edit.proxy_url')}
-                    name='base_url'
-                    placeholder={t('channel.edit.proxy_url_placeholder')}
-                    onChange={handleInputChange}
-                    value={inputs.base_url}
-                    autoComplete='new-password'
-                />
-              </Form.Field>
-            )}
-            {inputs.type === 50 && (
-                <Form.Field>
-                  <Form.Input
-                      required
-                  label={t('channel.edit.base_url')}
-                  name='base_url'
-                  placeholder={t('channel.edit.base_url_placeholder')}
-                  onChange={handleInputChange}
-                  value={inputs.base_url}
-                  autoComplete='new-password'
-                />
-              </Form.Field>
-            )}
-
-            {inputs.type === 18 && (
-              <Form.Field>
-                <Form.Input
-                  label={t('channel.edit.spark_version')}
-                  name='other'
-                  placeholder={t('channel.edit.spark_version_placeholder')}
-                  onChange={handleInputChange}
-                  value={inputs.other}
-                  autoComplete='new-password'
-                />
-              </Form.Field>
-            )}
-            {inputs.type === 21 && (
-              <Form.Field>
-                <Form.Input
-                  label={t('channel.edit.knowledge_id')}
-                  name='other'
-                  placeholder={t('channel.edit.knowledge_id_placeholder')}
-                  onChange={handleInputChange}
-                  value={inputs.other}
-                  autoComplete='new-password'
-                />
-              </Form.Field>
-            )}
-            {inputs.type === 17 && (
-              <Form.Field>
-                <Form.Input
-                  label={t('channel.edit.plugin_param')}
-                  name='other'
-                  placeholder={t('channel.edit.plugin_param_placeholder')}
-                  onChange={handleInputChange}
-                  value={inputs.other}
-                  autoComplete='new-password'
-                />
-              </Form.Field>
-            )}
-            {inputs.type === 34 && (
-              <Message>{t('channel.edit.coze_notice')}</Message>
-            )}
-            {inputs.type === 40 && (
-              <Message>
-                {t('channel.edit.douban_notice')}
-                <a
-                  target='_blank'
-                  href='https://console.volcengine.com/ark/region:ark+cn-beijing/endpoint'
-                >
-                  {t('channel.edit.douban_notice_link')}
-                </a>
-                {t('channel.edit.douban_notice_2')}
-              </Message>
-            )}
-            {inputs.type !== 43 && (
               <Form.Field>
                 <Form.Dropdown
-                  label={t('channel.edit.models')}
-                  placeholder={t('channel.edit.models_placeholder')}
-                  name='models'
+                  label={t('channel.edit.group')}
+                  placeholder={t('channel.edit.group_placeholder')}
+                  name='groups'
                   required
                   fluid
                   multiple
-                  search
-                  onLabelClick={(e, { value }) => {
-                    copy(value).then();
-                  }}
                   selection
+                  allowAdditions
+                  additionLabel={t('channel.edit.group_addition')}
                   onChange={handleInputChange}
-                  value={inputs.models}
+                  value={inputs.groups}
                   autoComplete='new-password'
-                  options={modelOptions}
+                  options={groupOptions}
                 />
               </Form.Field>
-            )}
-            {inputs.type !== 43 && (
-              <div style={{ lineHeight: '40px', marginBottom: '12px' }}>
-                <Button
-                  type={'button'}
-                  onClick={() => {
-                    // Use channel-specific models (basicModels) and deduplicate with existing models
-                    const currentModels = inputs.models || [];
-                    const channelModels = basicModels || [];
 
-                    // Merge and deduplicate
-                    const uniqueModels = [...new Set([...currentModels, ...channelModels])];
-
-                    console.log('Fill Related Models clicked - using channel-specific models:', channelModels);
-                    console.log('Current models:', currentModels);
-                    console.log('Merged and deduplicated models:', uniqueModels);
-
-                    handleInputChange(null, {
-                      name: 'models',
-                      value: uniqueModels,
-                    });
-                  }}
-                >
-                  {t('channel.edit.buttons.fill_models')}
-                </Button>
-                <Button
-                  type={'button'}
-                  onClick={() => {
-                    // Use all models and deduplicate with existing models
-                    const currentModels = inputs.models || [];
-                    const allModels = fullModels || [];
-
-                    // Merge and deduplicate
-                    const uniqueModels = [...new Set([...currentModels, ...allModels])];
-
-                    handleInputChange(null, {
-                      name: 'models',
-                      value: uniqueModels,
-                    });
-                  }}
-                >
-                  {t('channel.edit.buttons.fill_all')}
-                </Button>
-                <Button
-                  type={'button'}
-                  onClick={() => {
-                    handleInputChange(null, { name: 'models', value: [] });
-                  }}
-                >
-                  {t('channel.edit.buttons.clear')}
-                </Button>
-                <Input
-                  action={
-                    <Button type={'button'} onClick={addCustomModel}>
-                      {t('channel.edit.buttons.add_custom')}
-                    </Button>
-                  }
-                  placeholder={t('channel.edit.buttons.custom_placeholder')}
-                  value={customModel}
-                  onChange={(e, { value }) => {
-                    setCustomModel(value);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      addCustomModel();
-                      e.preventDefault();
-                    }
-                  }}
-                />
-              </div>
-            )}
-            {inputs.type !== 43 && (
-              <>
-                <Form.Field>
-                  <LabelWithTooltip
-                    label={t('channel.edit.model_mapping')}
-                    helpText={t('channel.edit.model_mapping_help')}
-                  >
-                    <Button
-                      type="button"
-                      size="mini"
-                      onClick={() => {
-                        const formatted = formatJSON(inputs.model_mapping);
-                        setInputs((inputs) => ({
-                          ...inputs,
-                          model_mapping: formatted,
-                        }));
-                      }}
-                      style={{ marginLeft: '10px' }}
-                      disabled={!inputs.model_mapping || inputs.model_mapping.trim() === ''}
+              {/* Azure OpenAI specific fields */}
+              {inputs.type === 3 && (
+                <>
+                  <Message>
+                    Note: <strong>The model deployment name must match the model name</strong>
+                    , because One API will replace the model parameter in the request body
+                    with your deployment name (dots in the model name will be removed).
+                    <a
+                      target='_blank'
+                      href='https://github.com/songquanpeng/one-api/issues/133?notification_referrer_id=NT_kwDOAmJSYrM2NjIwMzI3NDgyOjM5OTk4MDUw#issuecomment-1571602271'
                     >
-                      Format JSON
-                    </Button>
-                  </LabelWithTooltip>
-                  <Form.TextArea
-                    placeholder={`${t(
-                      'channel.edit.model_mapping_placeholder'
-                    )}\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
-                    name='model_mapping'
-                    onChange={handleInputChange}
-                    value={inputs.model_mapping}
-                    style={{
-                      minHeight: 150,
-                      fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
-                      fontSize: '13px',
-                      lineHeight: '1.4',
-                      backgroundColor: '#f8f9fa',
-                      border: `1px solid ${isValidJSON(inputs.model_mapping) ? '#e1e5e9' : '#ff6b6b'}`,
-                      borderRadius: '4px',
-                    }}
-                    autoComplete='new-password'
-                  />
-                  <div style={{ fontSize: '12px', marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#666' }}>
-                      {t('channel.edit.model_mapping_placeholder').split('\n')[0]}
-                    </span>
-                    {inputs.model_mapping && inputs.model_mapping.trim() !== '' && (
-                      <span style={{
-                        color: isValidJSON(inputs.model_mapping) ? '#28a745' : '#dc3545',
-                        fontWeight: 'bold',
-                        fontSize: '11px'
-                      }}>
-                        {isValidJSON(inputs.model_mapping) ? '✓ Valid JSON' : '✗ Invalid JSON'}
-                      </span>
-                    )}
-                  </div>
-                </Form.Field>
-                <Form.Field>
-                  <LabelWithTooltip
-                    label={t('channel.edit.model_configs')}
-                    helpText={t('channel.edit.model_configs_help')}
-                  >
-                    <Button
-                      type="button"
-                      size="mini"
-                      onClick={() => {
-                        const formatted = formatJSON(defaultPricing.model_configs);
-                        setInputs((inputs) => ({
-                          ...inputs,
-                          model_configs: formatted,
-                        }));
-                      }}
-                      style={{ marginLeft: '10px' }}
-                    >
-                      {t('channel.edit.buttons.load_defaults')}
-                    </Button>
-                    <Button
-                      type="button"
-                      size="mini"
-                      onClick={() => {
-                        const formatted = formatJSON(inputs.model_configs);
-                        setInputs((inputs) => ({
-                          ...inputs,
-                          model_configs: formatted,
-                        }));
-                      }}
-                      style={{ marginLeft: '5px' }}
-                      disabled={!inputs.model_configs || inputs.model_configs.trim() === ''}
-                    >
-                      Format JSON
-                    </Button>
-                  </LabelWithTooltip>
-                  <Form.TextArea
-                    placeholder={`${t(
-                      'channel.edit.model_configs_placeholder'
-                    )}\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
-                    name='model_configs'
-                    onChange={handleInputChange}
-                    value={inputs.model_configs}
-                    style={{
-                      minHeight: 200,
-                      fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
-                      fontSize: '13px',
-                      lineHeight: '1.4',
-                      backgroundColor: '#f8f9fa',
-                      border: `1px solid ${isValidJSON(inputs.model_configs) ? '#e1e5e9' : '#ff6b6b'}`,
-                      borderRadius: '4px',
-                    }}
-                    autoComplete='new-password'
-                  />
-                  <div style={{ fontSize: '12px', marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: 'var(--text-secondary)' }}>
-                      {t('channel.edit.model_configs_help')}
-                    </span>
-                    {inputs.model_configs && inputs.model_configs.trim() !== '' && (
-                      <span style={{
-                        color: isValidJSON(inputs.model_configs) ? 'var(--success-color)' : 'var(--error-color)',
-                        fontWeight: 'bold',
-                        fontSize: '11px'
-                      }}>
-                        {isValidJSON(inputs.model_configs) ? '✓ Valid JSON' : '✗ Invalid JSON'}
-                      </span>
-                    )}
-                  </div>
-                </Form.Field>
-                <Form.Field>
-                  <LabelWithTooltip
-                    label={t('channel.edit.system_prompt')}
-                    helpText={t('channel.edit.system_prompt_help')}
-                  />
-                  <Form.TextArea
-                    placeholder={t('channel.edit.system_prompt_placeholder')}
-                    name='system_prompt'
-                    onChange={handleInputChange}
-                    value={inputs.system_prompt}
-                    style={{
-                      minHeight: 150,
-                      fontFamily: 'JetBrains Mono, Consolas',
-                    }}
-                    autoComplete='new-password'
-                  />
-                </Form.Field>
-              </>
-            )}
-            {/* Move Coze authentication type selection and input fields here */}
-            {inputs.type === 34 && (
-              <>
-                <Form.Field>
-                  <Form.Select
-                    label={t('channel.edit.coze_auth_type')}
-                    name="auth_type"
-                    options={COZE_AUTH_OPTIONS.map(option => ({
-                      ...option,
-                      text: t(`channel.edit.coze_auth_options.${option.text}`)
-                    }))}
-                    value={config.auth_type}
-                    onChange={(e, { name, value }) => handleConfigChange(e, { name, value })}
-                  />
-                </Form.Field>
-                {config.auth_type === 'personal_access_token' ? (
+                      Image Demo
+                    </a>
+                  </Message>
                   <Form.Field>
                     <Form.Input
-                      label={t('channel.edit.key')}
-                      name='key'
-                      required
-                      placeholder={t('channel.edit.key_prompts.default')}
+                      label='AZURE_OPENAI_ENDPOINT'
+                      name='base_url'
+                      placeholder='Please enter AZURE_OPENAI_ENDPOINT, for example: https://docs-test-001.openai.azure.com'
                       onChange={handleInputChange}
-                      value={inputs.key}
+                      value={inputs.base_url}
                       autoComplete='new-password'
                     />
                   </Form.Field>
-                ) : (
+                  <Form.Field>
+                    <Form.Input
+                      label='Default API Version'
+                      name='other'
+                      placeholder='Please enter default API version, for example: 2024-03-01-preview. This configuration can be overridden by actual request query parameters'
+                      onChange={handleInputChange}
+                      value={inputs.other}
+                      autoComplete='new-password'
+                    />
+                  </Form.Field>
+                </>
+              )}
+
+              {inputs.type === 50 && (
+                <>
+                  <Form.Field>
+                    <Form.Input
+                      required
+                      label={t('channel.edit.base_url')}
+                      name='base_url'
+                      placeholder={t('channel.edit.base_url_placeholder')}
+                      onChange={handleInputChange}
+                      value={inputs.base_url}
+                      autoComplete='new-password'
+                    />
+                  </Form.Field>
+                  <Form.Field>
+                    <LabelWithTooltip
+                      label={t('channel.edit.api_format', 'Upstream API Format')}
+                      helpText={t('channel.edit.api_format_help', 'Choose the upstream surface to forward requests to. ChatCompletion matches legacy OpenAI-compatible providers, while Response targets providers that expect the Response API payload.')}
+                    >
+                      <Form.Dropdown
+                        selection
+                        options={OPENAI_COMPATIBLE_API_FORMAT_OPTIONS}
+                        name='api_format'
+                        value={config.api_format}
+                        onChange={(event, data) => handleConfigChange(event, data)}
+                        autoComplete='off'
+                      />
+                    </LabelWithTooltip>
+                  </Form.Field>
+                </>
+              )}
+
+              {inputs.type === 18 && (
+                <Form.Field>
+                  <Form.Input
+                    label={t('channel.edit.spark_version')}
+                    name='other'
+                    placeholder={t('channel.edit.spark_version_placeholder')}
+                    onChange={handleInputChange}
+                    value={inputs.other}
+                    autoComplete='new-password'
+                  />
+                </Form.Field>
+              )}
+              {inputs.type === 21 && (
+                <Form.Field>
+                  <Form.Input
+                    label={t('channel.edit.knowledge_id')}
+                    name='other'
+                    placeholder={t('channel.edit.knowledge_id_placeholder')}
+                    onChange={handleInputChange}
+                    value={inputs.other}
+                    autoComplete='new-password'
+                  />
+                </Form.Field>
+              )}
+              {inputs.type === 17 && (
+                <Form.Field>
+                  <Form.Input
+                    label={t('channel.edit.plugin_param')}
+                    name='other'
+                    placeholder={t('channel.edit.plugin_param_placeholder')}
+                    onChange={handleInputChange}
+                    value={inputs.other}
+                    autoComplete='new-password'
+                  />
+                </Form.Field>
+              )}
+              {inputs.type === 34 && (
+                <Message>{t('channel.edit.coze_notice')}</Message>
+              )}
+              {inputs.type === 40 && (
+                <Message>
+                  {t('channel.edit.douban_notice')}
+                  <a
+                    target='_blank'
+                    href='https://console.volcengine.com/ark/region:ark+cn-beijing/endpoint'
+                  >
+                    {t('channel.edit.douban_notice_link')}
+                  </a>
+                  {t('channel.edit.douban_notice_2')}
+                </Message>
+              )}
+              {inputs.type !== 43 && (
+                <Form.Field>
+                  <Form.Dropdown
+                    label={t('channel.edit.models')}
+                    placeholder={t('channel.edit.models_placeholder')}
+                    name='models'
+                    required
+                    fluid
+                    multiple
+                    search
+                    onLabelClick={(e, { value }) => {
+                      copy(value).then();
+                    }}
+                    selection
+                    onChange={handleInputChange}
+                    value={inputs.models}
+                    autoComplete='new-password'
+                    options={modelOptions}
+                  />
+                </Form.Field>
+              )}
+              {inputs.type !== 43 && (
+                <div style={{ lineHeight: '40px', marginBottom: '12px' }}>
+                  <Button
+                    type={'button'}
+                    onClick={() => {
+                      // Use channel-specific models (basicModels) and deduplicate with existing models
+                      const currentModels = inputs.models || [];
+                      const channelModels = basicModels || [];
+
+                      // Merge and deduplicate
+                      const uniqueModels = [...new Set([...currentModels, ...channelModels])];
+
+                      console.log('Fill Related Models clicked - using channel-specific models:', channelModels);
+                      console.log('Current models:', currentModels);
+                      console.log('Merged and deduplicated models:', uniqueModels);
+
+                      handleInputChange(null, {
+                        name: 'models',
+                        value: uniqueModels,
+                      });
+                    }}
+                  >
+                    {t('channel.edit.buttons.fill_models')}
+                  </Button>
+                  <Button
+                    type={'button'}
+                    onClick={() => {
+                      // Use all models and deduplicate with existing models
+                      const currentModels = inputs.models || [];
+                      const allModels = fullModels || [];
+
+                      // Merge and deduplicate
+                      const uniqueModels = [...new Set([...currentModels, ...allModels])];
+
+                      handleInputChange(null, {
+                        name: 'models',
+                        value: uniqueModels,
+                      });
+                    }}
+                  >
+                    {t('channel.edit.buttons.fill_all')}
+                  </Button>
+                  <Button
+                    type={'button'}
+                    onClick={() => {
+                      handleInputChange(null, { name: 'models', value: [] });
+                    }}
+                  >
+                    {t('channel.edit.buttons.clear')}
+                  </Button>
+                  <Input
+                    action={
+                      <Button type={'button'} onClick={addCustomModel}>
+                        {t('channel.edit.buttons.add_custom')}
+                      </Button>
+                    }
+                    placeholder={t('channel.edit.buttons.custom_placeholder')}
+                    value={customModel}
+                    onChange={(e, { value }) => {
+                      setCustomModel(value);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        addCustomModel();
+                        e.preventDefault();
+                      }
+                    }}
+                  />
+                </div>
+              )}
+              {inputs.type !== 43 && (
+                <>
+                  <Form.Field>
+                    <LabelWithTooltip
+                      label={t('channel.edit.model_mapping')}
+                      helpText={t('channel.edit.model_mapping_help')}
+                    >
+                      <Button
+                        type="button"
+                        size="mini"
+                        onClick={() => {
+                          const formatted = formatJSON(inputs.model_mapping);
+                          setInputs((inputs) => ({
+                            ...inputs,
+                            model_mapping: formatted,
+                          }));
+                        }}
+                        style={{ marginLeft: '10px' }}
+                        disabled={!inputs.model_mapping || inputs.model_mapping.trim() === ''}
+                      >
+                        Format JSON
+                      </Button>
+                    </LabelWithTooltip>
+                    <Form.TextArea
+                      placeholder={`${t(
+                        'channel.edit.model_mapping_placeholder'
+                      )}\n${JSON.stringify(MODEL_MAPPING_EXAMPLE, null, 2)}`}
+                      name='model_mapping'
+                      onChange={handleInputChange}
+                      value={inputs.model_mapping}
+                      style={{
+                        minHeight: 150,
+                        fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
+                        fontSize: '13px',
+                        lineHeight: '1.4',
+                        backgroundColor: '#f8f9fa',
+                        border: `1px solid ${isValidJSON(inputs.model_mapping) ? '#e1e5e9' : '#ff6b6b'}`,
+                        borderRadius: '4px',
+                      }}
+                      autoComplete='new-password'
+                    />
+                    <div style={{ fontSize: '12px', marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: '#666' }}>
+                        {t('channel.edit.model_mapping_placeholder').split('\n')[0]}
+                      </span>
+                      {inputs.model_mapping && inputs.model_mapping.trim() !== '' && (
+                        <span style={{
+                          color: isValidJSON(inputs.model_mapping) ? '#28a745' : '#dc3545',
+                          fontWeight: 'bold',
+                          fontSize: '11px'
+                        }}>
+                          {isValidJSON(inputs.model_mapping) ? '✓ Valid JSON' : '✗ Invalid JSON'}
+                        </span>
+                      )}
+                    </div>
+                  </Form.Field>
+                  <Form.Field>
+                    <LabelWithTooltip
+                      label={t('channel.edit.model_configs')}
+                      helpText={t('channel.edit.model_configs_help')}
+                    >
+                      <Button
+                        type="button"
+                        size="mini"
+                        onClick={() => {
+                          const formatted = formatJSON(defaultPricing.model_configs);
+                          setInputs((inputs) => ({
+                            ...inputs,
+                            model_configs: formatted,
+                          }));
+                        }}
+                        style={{ marginLeft: '10px' }}
+                      >
+                        {t('channel.edit.buttons.load_defaults')}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="mini"
+                        onClick={() => {
+                          const formatted = formatJSON(inputs.model_configs);
+                          setInputs((inputs) => ({
+                            ...inputs,
+                            model_configs: formatted,
+                          }));
+                        }}
+                        style={{ marginLeft: '5px' }}
+                        disabled={!inputs.model_configs || inputs.model_configs.trim() === ''}
+                      >
+                        Format JSON
+                      </Button>
+                    </LabelWithTooltip>
+                    <Form.TextArea
+                      placeholder={`${t(
+                        'channel.edit.model_configs_placeholder'
+                      )}\n${JSON.stringify(MODEL_CONFIGS_EXAMPLE, null, 2)}`}
+                      name='model_configs'
+                      onChange={handleInputChange}
+                      value={inputs.model_configs}
+                      style={{
+                        minHeight: 200,
+                        fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
+                        fontSize: '13px',
+                        lineHeight: '1.4',
+                        backgroundColor: '#f8f9fa',
+                        border: `1px solid ${isValidJSON(inputs.model_configs) ? '#e1e5e9' : '#ff6b6b'}`,
+                        borderRadius: '4px',
+                      }}
+                      autoComplete='new-password'
+                    />
+                    <div style={{ fontSize: '12px', marginTop: '5px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ color: 'var(--text-secondary)' }}>
+                        {t('channel.edit.model_configs_help')}
+                      </span>
+                      {inputs.model_configs && inputs.model_configs.trim() !== '' && (
+                        <span style={{
+                          color: isValidJSON(inputs.model_configs) ? 'var(--success-color)' : 'var(--error-color)',
+                          fontWeight: 'bold',
+                          fontSize: '11px'
+                        }}>
+                          {isValidJSON(inputs.model_configs) ? '✓ Valid JSON' : '✗ Invalid JSON'}
+                        </span>
+                      )}
+                    </div>
+                  </Form.Field>
+                  <Form.Field>
+                    <LabelWithTooltip
+                      label={t('channel.edit.system_prompt')}
+                      helpText={t('channel.edit.system_prompt_help')}
+                    />
+                    <Form.TextArea
+                      placeholder={t('channel.edit.system_prompt_placeholder')}
+                      name='system_prompt'
+                      onChange={handleInputChange}
+                      value={inputs.system_prompt}
+                      style={{
+                        minHeight: 150,
+                        fontFamily: 'JetBrains Mono, Consolas',
+                      }}
+                      autoComplete='new-password'
+                    />
+                  </Form.Field>
+                </>
+              )}
+              {/* Move Coze authentication type selection and input fields here */}
+              {inputs.type === 34 && (
+                <>
+                  <Form.Field>
+                    <Form.Select
+                      label={t('channel.edit.coze_auth_type')}
+                      name="auth_type"
+                      options={COZE_AUTH_OPTIONS.map(option => ({
+                        ...option,
+                        text: t(`channel.edit.coze_auth_options.${option.text}`)
+                      }))}
+                      value={config.auth_type}
+                      onChange={(e, { name, value }) => handleConfigChange(e, { name, value })}
+                    />
+                  </Form.Field>
+                  {config.auth_type === 'personal_access_token' ? (
+                    <Form.Field>
+                      <Form.Input
+                        label={t('channel.edit.key')}
+                        name='key'
+                        required
+                        placeholder={t('channel.edit.key_prompts.default')}
+                        onChange={handleInputChange}
+                        value={inputs.key}
+                        autoComplete='new-password'
+                      />
+                    </Form.Field>
+                  ) : (
+                    <Form.Field>
+                      <Form.TextArea
+                        label={t('channel.edit.oauth_jwt_config')}
+                        name="key"
+                        required
+                        placeholder={`${t(
+                          'channel.edit.oauth_jwt_config_placeholder'
+                        )}\n${JSON.stringify(OAUTH_JWT_CONFIG_EXAMPLE, null, 2)}`}
+                        onChange={handleInputChange}
+                        value={inputs.key}
+                        style={{
+                          minHeight: 150,
+                          fontFamily: 'JetBrains Mono, Consolas',
+                        }}
+                        autoComplete='new-password'
+                      />
+                    </Form.Field>
+                  )}
+                </>
+              )}
+
+              {inputs.type === 33 && (
+                <Form.Field>
+                  <Form.Input
+                    label='Region'
+                    name='region'
+                    required
+                    placeholder={t('channel.edit.aws_region_placeholder')}
+                    onChange={handleConfigChange}
+                    value={config.region}
+                    autoComplete=''
+                  />
+                  <Form.Input
+                    label='AK'
+                    name='ak'
+                    required
+                    placeholder={t('channel.edit.aws_ak_placeholder')}
+                    onChange={handleConfigChange}
+                    value={config.ak}
+                    autoComplete=''
+                  />
+                  <Form.Input
+                    label='SK'
+                    name='sk'
+                    required
+                    placeholder={t('channel.edit.aws_sk_placeholder')}
+                    onChange={handleConfigChange}
+                    value={config.sk}
+                    autoComplete=''
+                  />
+                </Form.Field>
+              )}
+              {inputs.type === 42 && (
+                <Form.Field>
+                  <Form.Input
+                    label='Region'
+                    name='region'
+                    required
+                    placeholder={t('channel.edit.vertex_region_placeholder')}
+                    onChange={handleConfigChange}
+                    value={config.region}
+                    autoComplete=''
+                  />
+                  <Form.Input
+                    label={t('channel.edit.vertex_project_id')}
+                    name='vertex_ai_project_id'
+                    required
+                    placeholder={t('channel.edit.vertex_project_id_placeholder')}
+                    onChange={handleConfigChange}
+                    value={config.vertex_ai_project_id}
+                    autoComplete=''
+                  />
+                  <Form.Input
+                    label={t('channel.edit.vertex_credentials')}
+                    name='vertex_ai_adc'
+                    required
+                    placeholder={t('channel.edit.vertex_credentials_placeholder')}
+                    onChange={handleConfigChange}
+                    value={config.vertex_ai_adc}
+                    autoComplete=''
+                  />
+                </Form.Field>
+              )}
+              {inputs.type === 34 && (
+                <Form.Input
+                  label={t('channel.edit.user_id')}
+                  name='user_id'
+                  required
+                  placeholder={t('channel.edit.user_id_placeholder')}
+                  onChange={handleConfigChange}
+                  value={config.user_id}
+                  autoComplete=''
+                />
+              )}
+              {inputs.type !== 33 &&
+                inputs.type !== 42 &&
+                inputs.type !== 34 &&
+                (batch ? (
                   <Form.Field>
                     <Form.TextArea
-                      label={t('channel.edit.oauth_jwt_config')}
-                      name="key"
+                      label={t('channel.edit.key')}
+                      name='key'
                       required
-                      placeholder={`${t(
-                          'channel.edit.oauth_jwt_config_placeholder'
-                      )}\n${JSON.stringify(OAUTH_JWT_CONFIG_EXAMPLE, null, 2)}`}
+                      placeholder={t('channel.edit.batch_placeholder')}
                       onChange={handleInputChange}
                       value={inputs.key}
                       style={{
@@ -1031,222 +1158,126 @@ const EditChannel = () => {
                       autoComplete='new-password'
                     />
                   </Form.Field>
-                )}
-              </>
-            )}
-
-            {inputs.type === 33 && (
-              <Form.Field>
-                <Form.Input
-                  label='Region'
-                  name='region'
-                  required
-                  placeholder={t('channel.edit.aws_region_placeholder')}
-                  onChange={handleConfigChange}
-                  value={config.region}
-                  autoComplete=''
-                />
-                <Form.Input
-                  label='AK'
-                  name='ak'
-                  required
-                  placeholder={t('channel.edit.aws_ak_placeholder')}
-                  onChange={handleConfigChange}
-                  value={config.ak}
-                  autoComplete=''
-                />
-                <Form.Input
-                  label='SK'
-                  name='sk'
-                  required
-                  placeholder={t('channel.edit.aws_sk_placeholder')}
-                  onChange={handleConfigChange}
-                  value={config.sk}
-                  autoComplete=''
-                />
-              </Form.Field>
-            )}
-            {inputs.type === 42 && (
-              <Form.Field>
-                <Form.Input
-                  label='Region'
-                  name='region'
-                  required
-                  placeholder={t('channel.edit.vertex_region_placeholder')}
-                  onChange={handleConfigChange}
-                  value={config.region}
-                  autoComplete=''
-                />
-                <Form.Input
-                  label={t('channel.edit.vertex_project_id')}
-                  name='vertex_ai_project_id'
-                  required
-                  placeholder={t('channel.edit.vertex_project_id_placeholder')}
-                  onChange={handleConfigChange}
-                  value={config.vertex_ai_project_id}
-                  autoComplete=''
-                />
-                <Form.Input
-                  label={t('channel.edit.vertex_credentials')}
-                  name='vertex_ai_adc'
-                  required
-                  placeholder={t('channel.edit.vertex_credentials_placeholder')}
-                  onChange={handleConfigChange}
-                  value={config.vertex_ai_adc}
-                  autoComplete=''
-                />
-              </Form.Field>
-            )}
-            {inputs.type === 34 && (
-              <Form.Input
-                label={t('channel.edit.user_id')}
-                name='user_id'
-                required
-                placeholder={t('channel.edit.user_id_placeholder')}
-                onChange={handleConfigChange}
-                value={config.user_id}
-                autoComplete=''
-              />
-            )}
-            {inputs.type !== 33 &&
-              inputs.type !== 42 &&
-              inputs.type !== 34 &&
-              (batch ? (
-                <Form.Field>
-                  <Form.TextArea
-                    label={t('channel.edit.key')}
-                    name='key'
-                    required
-                    placeholder={t('channel.edit.batch_placeholder')}
-                    onChange={handleInputChange}
-                    value={inputs.key}
-                    style={{
-                      minHeight: 150,
-                      fontFamily: 'JetBrains Mono, Consolas',
-                    }}
-                    autoComplete='new-password'
-                  />
-                </Form.Field>
-              ) : (
+                ) : (
+                  <Form.Field>
+                    <Form.Input
+                      label={t('channel.edit.key')}
+                      name='key'
+                      required
+                      placeholder={type2secretPrompt(inputs.type, t)}
+                      onChange={handleInputChange}
+                      value={inputs.key}
+                      autoComplete='new-password'
+                    />
+                  </Form.Field>
+                ))}
+              {inputs.type === 37 && (
                 <Form.Field>
                   <Form.Input
-                    label={t('channel.edit.key')}
-                    name='key'
+                    label='Account ID'
+                    name='user_id'
                     required
-                    placeholder={type2secretPrompt(inputs.type, t)}
-                    onChange={handleInputChange}
-                    value={inputs.key}
-                    autoComplete='new-password'
+                    placeholder={
+                      'Please enter Account ID, e.g.: d8d7c61dbc334c32d3ced580e4bf42b4'
+                    }
+                    onChange={handleConfigChange}
+                    value={config.user_id}
+                    autoComplete=''
                   />
                 </Form.Field>
-              ))}
-            {inputs.type === 37 && (
-              <Form.Field>
-                <Form.Input
-                  label='Account ID'
-                  name='user_id'
-                  required
-                  placeholder={
-                    'Please enter Account ID, e.g.: d8d7c61dbc334c32d3ced580e4bf42b4'
-                  }
-                  onChange={handleConfigChange}
-                  value={config.user_id}
-                  autoComplete=''
+              )}
+              {inputs.type !== 33 && !isEdit && (
+                <Form.Checkbox
+                  checked={batch}
+                  label={t('channel.edit.batch')}
+                  name='batch'
+                  onChange={() => setBatch(!batch)}
                 />
-              </Form.Field>
-            )}
-            {inputs.type !== 33 && !isEdit && (
-              <Form.Checkbox
-                checked={batch}
-                label={t('channel.edit.batch')}
-                name='batch'
-                onChange={() => setBatch(!batch)}
-              />
-            )}
-            {inputs.type !== 3 &&
-              inputs.type !== 33 &&
-              inputs.type !== 8 &&
+              )}
+              {inputs.type !== 3 &&
+                inputs.type !== 33 &&
+                inputs.type !== 8 &&
                 inputs.type !== 50 &&
-              inputs.type !== 22 && (
+                inputs.type !== 22 && (
+                  <Form.Field>
+                    <Form.Input
+                      label={t('channel.edit.proxy_url')}
+                      name='base_url'
+                      placeholder={t('channel.edit.proxy_url_placeholder')}
+                      onChange={handleInputChange}
+                      value={inputs.base_url}
+                      autoComplete='new-password'
+                    />
+                  </Form.Field>
+                )}
+              {inputs.type === 22 && (
                 <Form.Field>
                   <Form.Input
-                      label={t('channel.edit.proxy_url')}
+                    label='Private Deployment URL'
                     name='base_url'
-                      placeholder={t('channel.edit.proxy_url_placeholder')}
+                    placeholder={
+                      'Please enter the private deployment URL, format: https://fastgpt.run/api/openapi'
+                    }
                     onChange={handleInputChange}
                     value={inputs.base_url}
                     autoComplete='new-password'
                   />
                 </Form.Field>
               )}
-            {inputs.type === 22 && (
+
               <Form.Field>
+                <LabelWithTooltip
+                  label={t('channel.edit.ratelimit')}
+                  helpText={t('channel.edit.ratelimit_help')}
+                />
                 <Form.Input
-                  label='Private Deployment URL'
-                  name='base_url'
-                  placeholder={
-                    'Please enter the private deployment URL, format: https://fastgpt.run/api/openapi'
-                  }
+                  name='ratelimit'
+                  placeholder={t('channel.edit.ratelimit_placeholder')}
                   onChange={handleInputChange}
-                  value={inputs.base_url}
+                  value={inputs.ratelimit}
                   autoComplete='new-password'
                 />
               </Form.Field>
-            )}
 
-            <Form.Field>
-              <LabelWithTooltip
-                label={t('channel.edit.ratelimit')}
-                helpText={t('channel.edit.ratelimit_help')}
-              />
-              <Form.Input
-                name='ratelimit'
-                placeholder={t('channel.edit.ratelimit_placeholder')}
-                onChange={handleInputChange}
-                value={inputs.ratelimit}
-                autoComplete='new-password'
-              />
-            </Form.Field>
+              {/* Channel-specific pricing fields - now handled through model_configs */}
 
-            {/* Channel-specific pricing fields - now handled through model_configs */}
+              {/* AWS-specific inference profile ARN mapping */}
+              {inputs.type === 33 && (
+                <Form.Field>
+                  <label>
+                    Inference Profile ARN Map
+                  </label>
+                  <Form.TextArea
+                    name="inference_profile_arn_map"
+                    placeholder={`Optional. JSON mapping of model names to AWS Bedrock Inference Profile ARNs.\nExample:\n${JSON.stringify({
+                      "claude-3-5-sonnet-20241022": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
+                      "claude-3-haiku-20240307": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
+                    }, null, 2)}`}
+                    style={{
+                      minHeight: 150,
+                      fontFamily: 'JetBrains Mono, Consolas',
+                    }}
+                    onChange={handleInputChange}
+                    value={inputs.inference_profile_arn_map}
+                    autoComplete="new-password"
+                  />
+                  <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px' }}>
+                    JSON format: {`{"model_name": "arn:aws:bedrock:region:account:inference-profile/profile-id"}`}. Maps model names to AWS Bedrock Inference Profile ARNs. Leave empty to use default model IDs.
+                  </div>
+                </Form.Field>
+              )}
 
-            {/* AWS-specific inference profile ARN mapping */}
-            {inputs.type === 33 && (
-              <Form.Field>
-                <label>
-                  Inference Profile ARN Map
-                </label>
-                <Form.TextArea
-                  name="inference_profile_arn_map"
-                  placeholder={`Optional. JSON mapping of model names to AWS Bedrock Inference Profile ARNs.\nExample:\n${JSON.stringify({
-                    "claude-3-5-sonnet-20241022": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-5-sonnet-20241022-v2:0",
-                    "claude-3-haiku-20240307": "arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-3-haiku-20240307-v1:0"
-                  }, null, 2)}`}
-                  style={{
-                    minHeight: 150,
-                    fontFamily: 'JetBrains Mono, Consolas',
-                  }}
-                  onChange={handleInputChange}
-                  value={inputs.inference_profile_arn_map}
-                  autoComplete="new-password"
-                />
-                <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: '5px' }}>
-                  JSON format: {`{"model_name": "arn:aws:bedrock:region:account:inference-profile/profile-id"}`}. Maps model names to AWS Bedrock Inference Profile ARNs. Leave empty to use default model IDs.
-                </div>
-              </Form.Field>
-            )}
-
-            <Button onClick={handleCancel}>
-              {t('channel.edit.buttons.cancel')}
-            </Button>
-            <Button
-              type={isEdit ? 'button' : 'submit'}
-              positive
-              onClick={submit}
-            >
-              {t('channel.edit.buttons.submit')}
-            </Button>
-          </Form>
+              <Button onClick={handleCancel}>
+                {t('channel.edit.buttons.cancel')}
+              </Button>
+              <Button
+                type={isEdit ? 'button' : 'submit'}
+                positive
+                onClick={submit}
+              >
+                {t('channel.edit.buttons.submit')}
+              </Button>
+            </Form>
           )}
         </Card.Content>
       </Card>

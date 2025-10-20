@@ -33,7 +33,7 @@ var DefaultGlobalPricingAdapters = []int{
 
 // GlobalPricingManager manages the third-layer global model pricing
 // It merges pricing from selected adapters to provide fallback pricing
-// for custom channels that don't have specific model pricing
+// for OpenAI-compatible channels (including legacy "custom" entries) that don't have specific model pricing
 type GlobalPricingManager struct {
 	mu                   sync.RWMutex
 	globalModelPricing   map[string]adaptor.ModelConfig

@@ -111,6 +111,27 @@ func TestEvaluateStreamResponseSuccess(t *testing.T) {
 	}
 }
 
+func TestEvaluateStreamResponseToolInvocationChat(t *testing.T) {
+	data := []byte("data: {\"choices\":[{\"delta\":{\"tool_calls\":[{\"id\":\"call_1\"}]}}]}\n\n")
+	spec := requestSpec{Type: requestTypeChatCompletion, Expectation: expectationToolInvocation}
+	success, reason := evaluateStreamResponse(spec, data)
+	if !success {
+		t.Fatalf("expected stream tool invocation success, got failure: %s", reason)
+	}
+}
+
+func TestEvaluateStreamResponseToolInvocationMissing(t *testing.T) {
+	data := []byte("data: {\"choices\":[{\"delta\":{}}]}\n\n")
+	spec := requestSpec{Type: requestTypeChatCompletion, Expectation: expectationToolInvocation}
+	success, reason := evaluateStreamResponse(spec, data)
+	if success {
+		t.Fatalf("expected stream tool invocation failure, got success")
+	}
+	if reason == "" {
+		t.Fatalf("expected failure reason when tool invocation is absent")
+	}
+}
+
 func TestIsUnsupportedCombinationStream(t *testing.T) {
 	body := []byte("streaming is not supported")
 	if !isUnsupportedCombination(requestTypeChatCompletion, true, http.StatusBadRequest, body, "") {

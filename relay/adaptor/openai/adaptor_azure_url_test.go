@@ -1,8 +1,9 @@
 package openai
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay/channeltype"
@@ -23,17 +24,30 @@ func TestAzureGetRequestURLRequiresModel(t *testing.T) {
 	a := &Adaptor{}
 	a.Init(m)
 
-	if _, err := a.GetRequestURL(m); err == nil {
-		t.Fatalf("expected error when ActualModelName is empty for Azure, got nil")
-	}
+	_, err := a.GetRequestURL(m)
+	require.Error(t, err)
 
 	m.ActualModelName = "gpt-4o-mini"
 	url, err := a.GetRequestURL(m)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	require.NoError(t, err)
+	require.Contains(t, url, "/openai/deployments/gpt-4o-mini/chat/completions?api-version=")
+}
+
+func TestAzureGPT5UsesResponseAPI(t *testing.T) {
+	config := model.ChannelConfig{APIVersion: "2025-04-01-preview"}
+	m := &meta.Meta{
+		Mode:            relaymode.ChatCompletions,
+		ChannelType:     channeltype.Azure,
+		BaseURL:         "https://example.azure.com",
+		ActualModelName: "gpt-5-mini",
+		RequestURLPath:  "/v1/chat/completions",
+		Config:          config,
 	}
 
-	if !strings.Contains(url, "/openai/deployments/gpt-4o-mini/chat/completions?api-version=") {
-		t.Fatalf("unexpected azure request url: %s", url)
-	}
+	a := &Adaptor{}
+	a.Init(m)
+
+	url, err := a.GetRequestURL(m)
+	require.NoError(t, err)
+	require.Contains(t, url, "/openai/v1/responses?api-version=v1")
 }

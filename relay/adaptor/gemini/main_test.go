@@ -78,6 +78,27 @@ func TestCleanFunctionParameters(t *testing.T) {
 			},
 		},
 		{
+			name: "remove $schema everywhere",
+			input: map[string]any{
+				"type":    "object",
+				"$schema": "http://json-schema.org/draft-07/schema#",
+				"properties": map[string]any{
+					"city": map[string]any{
+						"type":    "string",
+						"$schema": "http://json-schema.org/draft-07/schema#",
+					},
+				},
+			},
+			expected: map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"city": map[string]any{
+						"type": "string",
+					},
+				},
+			},
+		},
+		{
 			name: "remove unsupported format values - critical fix for log error",
 			input: map[string]any{
 				"type": "object",

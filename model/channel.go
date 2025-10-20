@@ -74,6 +74,7 @@ type ChannelConfig struct {
 	VertexAIProjectID string `json:"vertex_ai_project_id,omitempty"`
 	VertexAIADC       string `json:"vertex_ai_adc,omitempty"`
 	AuthType          string `json:"auth_type,omitempty"`
+	APIFormat         string `json:"api_format,omitempty"`
 }
 
 type ModelConfig struct {

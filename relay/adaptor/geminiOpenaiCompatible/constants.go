@@ -10,6 +10,8 @@ import (
 // ModelRatios contains all supported models and their pricing ratios
 // Model list is derived from the keys of this map, eliminating redundancy
 // Based on Google AI pricing: https://ai.google.dev/pricing
+//
+// ⚠️ Note: should also check relay/adaptor/vertexai/adaptor.go:IsRequireGlobalEndpoint
 var ModelRatios = map[string]adaptor.ModelConfig{
 	// Gemini Pro Models
 	"gemini-pro":     {Ratio: 0.5 * ratio.MilliTokensUsd, CompletionRatio: 3},
@@ -44,11 +46,15 @@ var ModelRatios = map[string]adaptor.ModelConfig{
 	"gemini-2.0-pro-exp-02-05": {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 4},
 
 	// Gemini 2.5 Flash Models
-	"gemini-2.5-flash-lite-preview-06-17": {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 4},
-	"gemini-2.5-flash":                    {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
-	"gemini-2.5-flash-preview-04-17":      {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
-	"gemini-2.5-flash-preview-05-20":      {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
-	"gemini-2.5-flash-image-preview":      {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3, ImagePriceUsd: 0.039 * ratio.ImageUsdPerPic},
+	"gemini-2.5-flash-lite":                 {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 0.4 / 0.1},
+	"gemini-2.5-flash-lite-preview-06-17":   {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 4},
+	"gemini-2.5-flash-lite-preview-09-2025": {Ratio: 0.1 * ratio.MilliTokensUsd, CompletionRatio: 4},
+	"gemini-2.5-flash":                      {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
+	"gemini-2.5-flash-preview-04-17":        {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
+	"gemini-2.5-flash-preview-05-20":        {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
+	"gemini-2.5-flash-preview-09-2025":      {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3},
+	"gemini-2.5-flash-image":                {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3, ImagePriceUsd: 0.039 * ratio.ImageUsdPerPic},
+	"gemini-2.5-flash-image-preview":        {Ratio: 0.3 * ratio.MilliTokensUsd, CompletionRatio: 2.5 / 0.3, ImagePriceUsd: 0.039 * ratio.ImageUsdPerPic},
 
 	// Gemini 2.5 Pro Models
 	"gemini-2.5-pro":               {Ratio: 1.25 * ratio.MilliTokensUsd, CompletionRatio: 8},

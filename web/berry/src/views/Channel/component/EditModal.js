@@ -54,7 +54,7 @@ const validationSchema = Yup.object().shape({
   models: Yup.array().min(1, '模型 不能为空'),
   groups: Yup.array().min(1, '用户组 不能为空'),
   base_url: Yup.string().when('type', {
-    is: (value) => [3, 8].includes(value),
+    is: (value) => [3, 50].includes(value),
     then: Yup.string().required('渠道API地址 不能为空'), // base_url 是必需的
     otherwise: Yup.string() // 在其他情况下，base_url 可以是任意字符串
   }),
@@ -220,11 +220,16 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
     initChannel(typeValue);
     let localModels = getChannelModels(typeValue);
     setBasicModels(localModels);
-    if (localModels.length > 0 && Array.isArray(values['models']) && values['models'].length == 0) {
-      setFieldValue('models', initialModel(localModels));
-    }
 
-    setFieldValue('config', {});
+    setFieldValue('models', []);
+    setFieldValue('model_configs', '');
+    setFieldValue('model_mapping', '');
+    setFieldValue('system_prompt', '');
+    setFieldValue('inference_profile_arn_map', '');
+    setFieldValue('base_url', '');
+    setFieldValue('other', '');
+
+    setFieldValue('config', { api_format: 'chat_completion' });
     // Load default pricing for the new channel type
     loadDefaultPricing(typeValue);
   };
@@ -269,7 +274,7 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
     }
   };
 
-  const loadDefaultPricing = async (channelType, existingModelConfigs = null) => {
+  const loadDefaultPricing = async (channelType) => {
     try {
       const res = await API.get(`/api/channel/default-pricing?type=${channelType}`);
       if (res.data.success) {
@@ -382,59 +387,70 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
       const cacheBuster = Date.now();
       let res = await API.get(`/api/channel/${channelId}?_cb=${cacheBuster}`);
       const { success, message, data } = res.data;
-    if (success) {
-      if (data.models === '') {
-        data.models = [];
+      if (success) {
+        if (data.models === '') {
+          data.models = [];
+        } else {
+          data.models = initialModel(data.models);
+        }
+        if (data.group === '') {
+          data.groups = [];
+        } else {
+          data.groups = data.group.split(',');
+        }
+        if (data.model_mapping !== '') {
+          data.model_mapping = JSON.stringify(JSON.parse(data.model_mapping), null, 2);
+        }
+        if (data.config !== '') {
+          try {
+            const parsedConfig = JSON.parse(data.config);
+            data.config = {
+              ...defaultConfig.input.config,
+              ...parsedConfig,
+              api_format: parsedConfig.api_format || 'chat_completion'
+            };
+          } catch (error) {
+            console.error('Failed to parse channel config:', error);
+            data.config = { ...defaultConfig.input.config };
+          }
+        } else {
+          data.config = { ...defaultConfig.input.config };
+        }
+        // Format pricing fields for display
+        if (data.model_ratio && data.model_ratio !== '') {
+          try {
+            data.model_ratio = JSON.stringify(JSON.parse(data.model_ratio), null, 2);
+          } catch (e) {
+            console.error('Failed to parse model_ratio:', e);
+          }
+        }
+        if (data.completion_ratio && data.completion_ratio !== '') {
+          try {
+            data.completion_ratio = JSON.stringify(JSON.parse(data.completion_ratio), null, 2);
+          } catch (e) {
+            console.error('Failed to parse completion_ratio:', e);
+          }
+        }
+        if (data.model_configs && data.model_configs !== '') {
+          try {
+            const parsedConfigs = JSON.parse(data.model_configs);
+            // Pretty format with proper indentation
+            data.model_configs = JSON.stringify(parsedConfigs, null, 2);
+            console.log('Loaded model_configs for channel:', data.id, 'type:', data.type, 'models:', Object.keys(parsedConfigs));
+          } catch (e) {
+            console.error('Failed to parse model_configs:', e);
+            // If parsing fails, keep original value but log the error
+          }
+        }
+        data.base_url = data.base_url ?? '';
+        data.is_edit = true;
+        initChannel(data.type);
+        setInitialInput(data);
+        // Load default pricing for this channel type, but don't override existing model_configs
+        loadDefaultPricing(data.type);
       } else {
-        data.models = initialModel(data.models);
+        showError(message);
       }
-      if (data.group === '') {
-        data.groups = [];
-      } else {
-        data.groups = data.group.split(',');
-      }
-      if (data.model_mapping !== '') {
-        data.model_mapping = JSON.stringify(JSON.parse(data.model_mapping), null, 2);
-      }
-      if (data.config !== '') {
-        data.config = JSON.parse(data.config);
-      }
-      // Format pricing fields for display
-      if (data.model_ratio && data.model_ratio !== '') {
-        try {
-          data.model_ratio = JSON.stringify(JSON.parse(data.model_ratio), null, 2);
-        } catch (e) {
-          console.error('Failed to parse model_ratio:', e);
-        }
-      }
-      if (data.completion_ratio && data.completion_ratio !== '') {
-        try {
-          data.completion_ratio = JSON.stringify(JSON.parse(data.completion_ratio), null, 2);
-        } catch (e) {
-          console.error('Failed to parse completion_ratio:', e);
-        }
-      }
-      if (data.model_configs && data.model_configs !== '') {
-        try {
-          const parsedConfigs = JSON.parse(data.model_configs);
-          // Pretty format with proper indentation
-          data.model_configs = JSON.stringify(parsedConfigs, null, 2);
-          console.log('Loaded model_configs for channel:', data.id, 'type:', data.type, 'models:', Object.keys(parsedConfigs));
-        } catch (e) {
-          console.error('Failed to parse model_configs:', e);
-          // If parsing fails, keep original value but log the error
-        }
-      }
-
-      data.base_url = data.base_url ?? '';
-      data.is_edit = true;
-      initChannel(data.type);
-      setInitialInput(data);
-      // Load default pricing for this channel type, but don't override existing model_configs
-      loadDefaultPricing(data.type, data.model_configs);
-    } else {
-      showError(message);
-    }
     } catch (error) {
       showError(error.message);
     } finally {
@@ -513,580 +529,603 @@ const EditModal = ({ open, channelId, onCancel, onOk }) => {
         ) : (
           <Formik initialValues={initialInput} enableReinitialize validationSchema={validationSchema} onSubmit={submit}>
             {({ errors, handleBlur, handleChange, handleSubmit, isSubmitting, touched, values, setFieldValue }) => (
-            <form noValidate onSubmit={handleSubmit}>
-              <FormControl fullWidth error={Boolean(touched.type && errors.type)} sx={{ ...theme.typography.otherInput }}>
-                <InputLabel htmlFor="channel-type-label">{inputLabel.type}</InputLabel>
-                <Select
-                  id="channel-type-label"
-                  label={inputLabel.type}
-                  value={values.type}
-                  name="type"
-                  onBlur={handleBlur}
-                  onChange={(e) => {
-                    handleChange(e);
-                    handleTypeChange(setFieldValue, e.target.value, values);
-                  }}
-                  MenuProps={{
-                    PaperProps: {
-                      style: {
-                        maxHeight: 200
+              <form noValidate onSubmit={handleSubmit}>
+                <FormControl fullWidth error={Boolean(touched.type && errors.type)} sx={{ ...theme.typography.otherInput }}>
+                  <InputLabel htmlFor="channel-type-label">{inputLabel.type}</InputLabel>
+                  <Select
+                    id="channel-type-label"
+                    label={inputLabel.type}
+                    value={values.type}
+                    name="type"
+                    onBlur={handleBlur}
+                    onChange={(e) => {
+                      handleChange(e);
+                      handleTypeChange(setFieldValue, e.target.value, values);
+                    }}
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 200
+                        }
                       }
-                    }
-                  }}
-                >
-                  {Object.values(CHANNEL_OPTIONS)
-                    .sort((a, b) => {
-                      return a.text.localeCompare(b.text);
-                    })
-                    .map((option) => {
-                      return (
-                        <MenuItem key={option.value} value={option.value}>
-                          {option.text}
-                        </MenuItem>
-                      );
-                    })}
-                </Select>
-                {touched.type && errors.type ? (
-                  <FormHelperText error id="helper-tex-channel-type-label">
-                    {errors.type}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-tex-channel-type-label"> {inputPrompt.type} </FormHelperText>
-                )}
-              </FormControl>
+                    }}
+                  >
+                    {Object.values(CHANNEL_OPTIONS)
+                      .sort((a, b) => {
+                        return a.text.localeCompare(b.text);
+                      })
+                      .map((option) => {
+                        return (
+                          <MenuItem key={option.value} value={option.value}>
+                            {option.text}
+                          </MenuItem>
+                        );
+                      })}
+                  </Select>
+                  {touched.type && errors.type ? (
+                    <FormHelperText error id="helper-tex-channel-type-label">
+                      {errors.type}
+                    </FormHelperText>
+                  ) : (
+                    <FormHelperText id="helper-tex-channel-type-label"> {inputPrompt.type} </FormHelperText>
+                  )}
+                </FormControl>
 
-              <FormControl fullWidth error={Boolean(touched.name && errors.name)} sx={{ ...theme.typography.otherInput }}>
-                <InputLabel htmlFor="channel-name-label">{inputLabel.name}</InputLabel>
-                <OutlinedInput
-                  id="channel-name-label"
-                  label={inputLabel.name}
-                  type="text"
-                  value={values.name}
-                  name="name"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  inputProps={{ autoComplete: 'name' }}
-                  aria-describedby="helper-text-channel-name-label"
-                />
-                {touched.name && errors.name ? (
-                  <FormHelperText error id="helper-tex-channel-name-label">
-                    {errors.name}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-tex-channel-name-label"> {inputPrompt.name} </FormHelperText>
-                )}
-              </FormControl>
-
-              <FormControl fullWidth error={Boolean(touched.base_url && errors.base_url)} sx={{ ...theme.typography.otherInput }}>
-                <InputLabel htmlFor="channel-base_url-label">{inputLabel.base_url}</InputLabel>
-                <OutlinedInput
-                  id="channel-base_url-label"
-                  label={inputLabel.base_url}
-                  type="text"
-                  value={values.base_url}
-                  name="base_url"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  inputProps={{}}
-                  aria-describedby="helper-text-channel-base_url-label"
-                />
-                {touched.base_url && errors.base_url ? (
-                  <FormHelperText error id="helper-tex-channel-base_url-label">
-                    {errors.base_url}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-tex-channel-base_url-label"> {inputPrompt.base_url} </FormHelperText>
-                )}
-              </FormControl>
-
-              {inputPrompt.other && (
-                <FormControl fullWidth error={Boolean(touched.other && errors.other)} sx={{ ...theme.typography.otherInput }}>
-                  <InputLabel htmlFor="channel-other-label">{inputLabel.other}</InputLabel>
+                <FormControl fullWidth error={Boolean(touched.name && errors.name)} sx={{ ...theme.typography.otherInput }}>
+                  <InputLabel htmlFor="channel-name-label">{inputLabel.name}</InputLabel>
                   <OutlinedInput
-                    id="channel-other-label"
-                    label={inputLabel.other}
+                    id="channel-name-label"
+                    label={inputLabel.name}
                     type="text"
-                    value={values.other}
-                    name="other"
+                    value={values.name}
+                    name="name"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    inputProps={{ autoComplete: 'name' }}
+                    aria-describedby="helper-text-channel-name-label"
+                  />
+                  {touched.name && errors.name ? (
+                    <FormHelperText error id="helper-tex-channel-name-label">
+                      {errors.name}
+                    </FormHelperText>
+                  ) : (
+                    <FormHelperText id="helper-tex-channel-name-label"> {inputPrompt.name} </FormHelperText>
+                  )}
+                </FormControl>
+
+                <FormControl fullWidth error={Boolean(touched.base_url && errors.base_url)} sx={{ ...theme.typography.otherInput }}>
+                  <InputLabel htmlFor="channel-base_url-label">{inputLabel.base_url}</InputLabel>
+                  <OutlinedInput
+                    id="channel-base_url-label"
+                    label={inputLabel.base_url}
+                    type="text"
+                    value={values.base_url}
+                    name="base_url"
                     onBlur={handleBlur}
                     onChange={handleChange}
                     inputProps={{}}
-                    aria-describedby="helper-text-channel-other-label"
+                    aria-describedby="helper-text-channel-base_url-label"
                   />
-                  {touched.other && errors.other ? (
-                    <FormHelperText error id="helper-tex-channel-other-label">
-                      {errors.other}
+                  {touched.base_url && errors.base_url ? (
+                    <FormHelperText error id="helper-tex-channel-base_url-label">
+                      {errors.base_url}
                     </FormHelperText>
                   ) : (
-                    <FormHelperText id="helper-tex-channel-other-label"> {inputPrompt.other} </FormHelperText>
+                    <FormHelperText id="helper-tex-channel-base_url-label"> {inputPrompt.base_url} </FormHelperText>
                   )}
                 </FormControl>
-              )}
 
-              <FormControl fullWidth sx={{ ...theme.typography.otherInput }}>
-                <Autocomplete
-                  multiple
-                  id="channel-groups-label"
-                  options={groupOptions}
-                  value={values.groups}
-                  onChange={(e, value) => {
-                    const event = {
-                      target: {
-                        name: 'groups',
-                        value: value
-                      }
-                    };
-                    handleChange(event);
-                  }}
-                  onBlur={handleBlur}
-                  filterSelectedOptions
-                  renderInput={(params) => <TextField {...params} name="groups" error={Boolean(errors.groups)} label={inputLabel.groups} />}
-                  aria-describedby="helper-text-channel-groups-label"
-                />
-                {errors.groups ? (
-                  <FormHelperText error id="helper-tex-channel-groups-label">
-                    {errors.groups}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-tex-channel-groups-label"> {inputPrompt.groups} </FormHelperText>
+                {values.type === 50 && (
+                  <FormControl fullWidth sx={{ ...theme.typography.otherInput }}>
+                    <InputLabel id="channel-api-format-label">上游 API 格式</InputLabel>
+                    <Select
+                      labelId="channel-api-format-label"
+                      id="channel-api-format"
+                      label="上游 API 格式"
+                      value={values.config?.api_format ?? 'chat_completion'}
+                      onChange={(event) => {
+                        const nextConfig = {
+                          ...values.config,
+                          api_format: event.target.value
+                        };
+                        setFieldValue('config', nextConfig, true);
+                      }}
+                    >
+                      <MenuItem value="chat_completion">ChatCompletion（默认）</MenuItem>
+                      <MenuItem value="response">Response</MenuItem>
+                    </Select>
+                    <FormHelperText>ChatCompletion 适用于传统 OpenAI 兼容渠道；当上游只接受 Response API 时请选择 Response。</FormHelperText>
+                  </FormControl>
                 )}
-              </FormControl>
 
-              <FormControl fullWidth sx={{ ...theme.typography.otherInput }}>
-                <Autocomplete
-                  multiple
-                  freeSolo
-                  id="channel-models-label"
-                  options={modelOptions}
-                  value={values.models}
-                  onChange={(e, value) => {
-                    const event = {
-                      target: {
-                        name: 'models',
-                        value: value.map((item) => (typeof item === 'string' ? { id: item, group: '自定义：点击或回车输入' } : item))
-                      }
-                    };
-                    handleChange(event);
-                  }}
-                  onBlur={handleBlur}
-                  // filterSelectedOptions
-                  disableCloseOnSelect
-                  renderInput={(params) => <TextField {...params} name="models" error={Boolean(errors.models)} label={inputLabel.models} />}
-                  groupBy={(option) => option.group}
-                  getOptionLabel={(option) => {
-                    if (typeof option === 'string') {
-                      return option;
-                    }
-                    if (option.inputValue) {
-                      return option.inputValue;
-                    }
-                    return option.id;
-                  }}
-                  filterOptions={(options, params) => {
-                    const filtered = filter(options, params);
-                    const { inputValue } = params;
-                    const isExisting = options.some((option) => inputValue === option.id);
-                    if (inputValue !== '' && !isExisting) {
-                      filtered.push({
-                        id: inputValue,
-                        group: '自定义：点击或回车输入'
-                      });
-                    }
-                    return filtered;
-                  }}
-                  renderOption={(props, option, { selected }) => (
-                    <li {...props}>
-                      <Checkbox icon={icon} checkedIcon={checkedIcon} style={{ marginRight: 8 }} checked={selected} />
-                      {option.id}
-                    </li>
+                {inputPrompt.other && (
+                  <FormControl fullWidth error={Boolean(touched.other && errors.other)} sx={{ ...theme.typography.otherInput }}>
+                    <InputLabel htmlFor="channel-other-label">{inputLabel.other}</InputLabel>
+                    <OutlinedInput
+                      id="channel-other-label"
+                      label={inputLabel.other}
+                      type="text"
+                      value={values.other}
+                      name="other"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      inputProps={{}}
+                      aria-describedby="helper-text-channel-other-label"
+                    />
+                    {touched.other && errors.other ? (
+                      <FormHelperText error id="helper-tex-channel-other-label">
+                        {errors.other}
+                      </FormHelperText>
+                    ) : (
+                      <FormHelperText id="helper-tex-channel-other-label"> {inputPrompt.other} </FormHelperText>
+                    )}
+                  </FormControl>
+                )}
+
+                <FormControl fullWidth sx={{ ...theme.typography.otherInput }}>
+                  <Autocomplete
+                    multiple
+                    id="channel-groups-label"
+                    options={groupOptions}
+                    value={values.groups}
+                    onChange={(e, value) => {
+                      const event = {
+                        target: {
+                          name: 'groups',
+                          value: value
+                        }
+                      };
+                      handleChange(event);
+                    }}
+                    onBlur={handleBlur}
+                    filterSelectedOptions
+                    renderInput={(params) => <TextField {...params} name="groups" error={Boolean(errors.groups)} label={inputLabel.groups} />}
+                    aria-describedby="helper-text-channel-groups-label"
+                  />
+                  {errors.groups ? (
+                    <FormHelperText error id="helper-tex-channel-groups-label">
+                      {errors.groups}
+                    </FormHelperText>
+                  ) : (
+                    <FormHelperText id="helper-tex-channel-groups-label"> {inputPrompt.groups} </FormHelperText>
                   )}
-                />
-                {errors.models ? (
-                  <FormHelperText error id="helper-tex-channel-models-label">
-                    {errors.models}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-tex-channel-models-label"> {inputPrompt.models} </FormHelperText>
-                )}
-              </FormControl>
-              <Container
-                sx={{
-                  textAlign: 'right'
-                }}
-              >
-                <ButtonGroup variant="outlined" aria-label="small outlined primary button group">
-                  <Button
-                    onClick={() => {
-                      setFieldValue('models', initialModel(basicModels));
+                </FormControl>
+
+                <FormControl fullWidth sx={{ ...theme.typography.otherInput }}>
+                  <Autocomplete
+                    multiple
+                    freeSolo
+                    id="channel-models-label"
+                    options={modelOptions}
+                    value={values.models}
+                    onChange={(e, value) => {
+                      const event = {
+                        target: {
+                          name: 'models',
+                          value: value.map((item) => (typeof item === 'string' ? { id: item, group: '自定义：点击或回车输入' } : item))
+                        }
+                      };
+                      handleChange(event);
                     }}
-                  >
-                    填入相关模型
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setFieldValue('models', modelOptions);
+                    onBlur={handleBlur}
+                    // filterSelectedOptions
+                    disableCloseOnSelect
+                    renderInput={(params) => <TextField {...params} name="models" error={Boolean(errors.models)} label={inputLabel.models} />}
+                    groupBy={(option) => option.group}
+                    getOptionLabel={(option) => {
+                      if (typeof option === 'string') {
+                        return option;
+                      }
+                      if (option.inputValue) {
+                        return option.inputValue;
+                      }
+                      return option.id;
                     }}
-                  >
-                    填入所有模型
-                  </Button>
-                </ButtonGroup>
-              </Container>
-              {inputLabel.key && (
-                <>
-                  <FormControl fullWidth error={Boolean(touched.key && errors.key)} sx={{ ...theme.typography.otherInput }}>
-                    {!batchAdd ? (
-                      <>
-                        <InputLabel htmlFor="channel-key-label">{inputLabel.key}</InputLabel>
-                        <OutlinedInput
+                    filterOptions={(options, params) => {
+                      const filtered = filter(options, params);
+                      const { inputValue } = params;
+                      const isExisting = options.some((option) => inputValue === option.id);
+                      if (inputValue !== '' && !isExisting) {
+                        filtered.push({
+                          id: inputValue,
+                          group: '自定义：点击或回车输入'
+                        });
+                      }
+                      return filtered;
+                    }}
+                    renderOption={(props, option, { selected }) => (
+                      <li {...props}>
+                        <Checkbox icon={icon} checkedIcon={checkedIcon} style={{ marginRight: 8 }} checked={selected} />
+                        {option.id}
+                      </li>
+                    )}
+                  />
+                  {errors.models ? (
+                    <FormHelperText error id="helper-tex-channel-models-label">
+                      {errors.models}
+                    </FormHelperText>
+                  ) : (
+                    <FormHelperText id="helper-tex-channel-models-label"> {inputPrompt.models} </FormHelperText>
+                  )}
+                </FormControl>
+                <Container
+                  sx={{
+                    textAlign: 'right'
+                  }}
+                >
+                  <ButtonGroup variant="outlined" aria-label="small outlined primary button group">
+                    <Button
+                      onClick={() => {
+                        setFieldValue('models', initialModel(basicModels));
+                      }}
+                    >
+                      填入相关模型
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setFieldValue('models', modelOptions);
+                      }}
+                    >
+                      填入所有模型
+                    </Button>
+                  </ButtonGroup>
+                </Container>
+                {inputLabel.key && (
+                  <>
+                    <FormControl fullWidth error={Boolean(touched.key && errors.key)} sx={{ ...theme.typography.otherInput }}>
+                      {!batchAdd ? (
+                        <>
+                          <InputLabel htmlFor="channel-key-label">{inputLabel.key}</InputLabel>
+                          <OutlinedInput
+                            id="channel-key-label"
+                            label={inputLabel.key}
+                            type="text"
+                            value={values.key}
+                            name="key"
+                            onBlur={handleBlur}
+                            onChange={handleChange}
+                            inputProps={{}}
+                            aria-describedby="helper-text-channel-key-label"
+                          />
+                        </>
+                      ) : (
+                        <TextField
+                          multiline
                           id="channel-key-label"
                           label={inputLabel.key}
-                          type="text"
                           value={values.key}
                           name="key"
                           onBlur={handleBlur}
                           onChange={handleChange}
-                          inputProps={{}}
                           aria-describedby="helper-text-channel-key-label"
+                          minRows={5}
+                          placeholder={inputPrompt.key + '，一行一个密钥'}
                         />
-                      </>
-                    ) : (
-                      <TextField
-                        multiline
-                        id="channel-key-label"
-                        label={inputLabel.key}
-                        value={values.key}
-                        name="key"
-                        onBlur={handleBlur}
-                        onChange={handleChange}
-                        aria-describedby="helper-text-channel-key-label"
-                        minRows={5}
-                        placeholder={inputPrompt.key + '，一行一个密钥'}
-                      />
-                    )}
+                      )}
 
-                    {touched.key && errors.key ? (
-                      <FormHelperText error id="helper-tex-channel-key-label">
-                        {errors.key}
-                      </FormHelperText>
-                    ) : (
-                      <FormHelperText id="helper-tex-channel-key-label"> {inputPrompt.key} </FormHelperText>
-                    )}
-                  </FormControl>
-                  {channelId === 0 && (
-                    <Container
-                      sx={{
-                        textAlign: 'right'
-                      }}
-                    >
-                      <Switch checked={batchAdd} onChange={(e) => setBatchAdd(e.target.checked)} />
-                      批量添加
-                    </Container>
-                  )}
-                </>
-              )}
-
-              {inputLabel.config &&
-                Object.keys(inputLabel.config).map((configName) => {
-                  return (
-                    <FormControl key={'config.' + configName} fullWidth sx={{ ...theme.typography.otherInput }}>
-                      <TextField
-                        multiline
-                        key={'config.' + configName}
-                        name={'config.' + configName}
-                        value={values.config?.[configName] || ''}
-                        label={configName}
-                        placeholder={inputPrompt.config[configName]}
-                        onChange={handleChange}
-                      />
-                      <FormHelperText id={`helper-tex-config.${configName}-label`}> {inputPrompt.config[configName]} </FormHelperText>
+                      {touched.key && errors.key ? (
+                        <FormHelperText error id="helper-tex-channel-key-label">
+                          {errors.key}
+                        </FormHelperText>
+                      ) : (
+                        <FormHelperText id="helper-tex-channel-key-label"> {inputPrompt.key} </FormHelperText>
+                      )}
                     </FormControl>
-                  );
-                })}
-
-              <FormControl fullWidth error={Boolean(touched.model_mapping && errors.model_mapping)} sx={{ ...theme.typography.otherInput }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <LabelWithTooltip
-                    htmlFor="channel-model_mapping-label"
-                    label={inputLabel.model_mapping}
-                    helpText="将传入的模型请求重定向到不同的模型。例如，将'gpt-4-0314'映射到'gpt-4'以处理已弃用的模型名称。JSON格式：{&quot;请求模型&quot;: &quot;实际模型&quot;}"
-                    sx={{
-                      position: 'relative',
-                      transform: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      color: theme.palette.text.primary
-                    }}
-                  />
-                  <Box>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        const formattedValue = formatJSON(values.model_mapping);
-                        setFieldValue('model_mapping', formattedValue);
-                      }}
-                      disabled={!values.model_mapping || values.model_mapping.trim() === ''}
-                    >
-                      格式化JSON
-                    </Button>
-                  </Box>
-                </Box>
-                <TextField
-                  multiline
-                  id="channel-model_mapping-label"
-                  value={values.model_mapping}
-                  name="model_mapping"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  aria-describedby="helper-text-channel-model_mapping-label"
-                  minRows={5}
-                  placeholder={inputPrompt.model_mapping}
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
-                      fontSize: '13px',
-                      lineHeight: '1.4',
-                      backgroundColor: '#f8f9fa',
-                    },
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': {
-                        borderColor: isValidJSON(values.model_mapping) ? theme.palette.grey[300] : theme.palette.error.main,
-                      },
-                    }
-                  }}
-                />
-                {touched.model_mapping && errors.model_mapping ? (
-                  <FormHelperText error id="helper-tex-channel-model_mapping-label">
-                    {errors.model_mapping}
-                  </FormHelperText>
-                ) : (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <FormHelperText id="helper-tex-channel-model_mapping-label">
-                      {inputPrompt.model_mapping}
-                    </FormHelperText>
-                    {values.model_mapping && values.model_mapping.trim() !== '' && (
-                      <Typography
-                        variant="caption"
+                    {channelId === 0 && (
+                      <Container
                         sx={{
-                          color: isValidJSON(values.model_mapping) ? theme.palette.success.main : theme.palette.error.main,
-                          fontWeight: 'bold',
-                          fontSize: '11px'
+                          textAlign: 'right'
                         }}
                       >
-                        {isValidJSON(values.model_mapping) ? '✓ 有效JSON' : '✗ 无效JSON'}
-                      </Typography>
+                        <Switch checked={batchAdd} onChange={(e) => setBatchAdd(e.target.checked)} />
+                        批量添加
+                      </Container>
                     )}
-                  </Box>
+                  </>
                 )}
-              </FormControl>
-              <FormControl fullWidth error={Boolean(touched.system_prompt && errors.system_prompt)} sx={{ ...theme.typography.otherInput }}>
-                <LabelWithTooltip
-                  htmlFor="channel-system_prompt-label"
-                  label={inputLabel.system_prompt}
-                  helpText="为通过此渠道的所有请求强制设置特定的系统提示词。适用于创建专门的AI助手或强制执行特定的行为模式。"
-                  sx={{
-                    position: 'relative',
-                    transform: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: theme.palette.text.primary,
-                    mb: 1
-                  }}
-                />
-                <TextField
-                  multiline
-                  id="channel-system_prompt-label"
-                  value={values.system_prompt}
-                  name="system_prompt"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  aria-describedby="helper-text-channel-system_prompt-label"
-                  minRows={5}
-                  placeholder={inputPrompt.system_prompt}
-                />
-                {touched.system_prompt && errors.system_prompt ? (
-                  <FormHelperText error id="helper-tex-channel-system_prompt-label">
-                    {errors.system_prompt}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-tex-channel-system_prompt-label"> {inputPrompt.system_prompt} </FormHelperText>
-                )}
-              </FormControl>
 
-              {/* Channel-specific pricing fields - now handled through model_configs */}
+                {inputLabel.config &&
+                  Object.keys(inputLabel.config).map((configName) => {
+                    return (
+                      <FormControl key={'config.' + configName} fullWidth sx={{ ...theme.typography.otherInput }}>
+                        <TextField
+                          multiline
+                          key={'config.' + configName}
+                          name={'config.' + configName}
+                          value={values.config?.[configName] || ''}
+                          label={configName}
+                          placeholder={inputPrompt.config[configName]}
+                          onChange={handleChange}
+                        />
+                        <FormHelperText id={`helper-tex-config.${configName}-label`}> {inputPrompt.config[configName]} </FormHelperText>
+                      </FormControl>
+                    );
+                  })}
 
-              <FormControl fullWidth error={Boolean(touched.model_configs && errors.model_configs)} sx={{ ...theme.typography.otherInput }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
-                  <LabelWithTooltip
-                    htmlFor="channel-model_configs-label"
-                    label="模型配置"
-                    helpText="为每个模型配置定价和限制。'ratio'设置输入token成本，'completion_ratio'设置输出token成本倍数，'max_tokens'设置请求限制。覆盖默认定价。"
-                    sx={{
-                      position: 'relative',
-                      transform: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      color: theme.palette.text.primary
-                    }}
-                  />
-                  <Box>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        const formattedValue = formatJSON(defaultPricing.model_configs);
-                        setFieldValue('model_configs', formattedValue);
+                <FormControl fullWidth error={Boolean(touched.model_mapping && errors.model_mapping)} sx={{ ...theme.typography.otherInput }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <LabelWithTooltip
+                      htmlFor="channel-model_mapping-label"
+                      label={inputLabel.model_mapping}
+                      helpText="将传入的模型请求重定向到不同的模型。例如，将'gpt-4-0314'映射到'gpt-4'以处理已弃用的模型名称。JSON格式：{&quot;请求模型&quot;: &quot;实际模型&quot;}"
+                      sx={{
+                        position: 'relative',
+                        transform: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: theme.palette.text.primary
                       }}
-                      sx={{ mr: 1 }}
-                    >
-                      加载默认值
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => {
-                        const formattedValue = formatJSON(values.model_configs);
-                        setFieldValue('model_configs', formattedValue);
-                      }}
-                      disabled={!values.model_configs || values.model_configs.trim() === ''}
-                    >
-                      格式化JSON
-                    </Button>
-                  </Box>
-                </Box>
-                <TextField
-                  multiline
-                  id="channel-model_configs-label"
-                  value={values.model_configs}
-                  name="model_configs"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  aria-describedby="helper-text-channel-model_configs-label"
-                  minRows={8}
-                  placeholder='统一的模型配置包括定价和属性。JSON格式，键为模型名称，值包含ratio、completion_ratio和max_tokens字段，例如：{"gpt-3.5-turbo": {"ratio": 0.0015, "completion_ratio": 2.0, "max_tokens": 65536}}'
-                  sx={{
-                    '& .MuiInputBase-input': {
-                      fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
-                      fontSize: '13px',
-                      lineHeight: '1.4',
-                      backgroundColor: '#f8f9fa',
-                    },
-                    '& .MuiOutlinedInput-root': {
-                      '& fieldset': {
-                        borderColor: isValidJSON(values.model_configs) ? theme.palette.grey[300] : theme.palette.error.main,
-                      },
-                    }
-                  }}
-                />
-                {touched.model_configs && errors.model_configs ? (
-                  <FormHelperText error id="helper-tex-channel-model_configs-label">
-                    {errors.model_configs}
-                  </FormHelperText>
-                ) : (
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <FormHelperText id="helper-tex-channel-model_configs-label">
-                      JSON 格式：统一的模型配置包括定价和属性。键为模型名称，值包含ratio、completion_ratio和max_tokens字段。
-                    </FormHelperText>
-                    {values.model_configs && values.model_configs.trim() !== '' && (
-                      <Typography
-                        variant="caption"
-                        sx={{
-                          color: isValidJSON(values.model_configs) ? theme.palette.success.main : theme.palette.error.main,
-                          fontWeight: 'bold',
-                          fontSize: '11px'
+                    />
+                    <Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const formattedValue = formatJSON(values.model_mapping);
+                          setFieldValue('model_mapping', formattedValue);
                         }}
+                        disabled={!values.model_mapping || values.model_mapping.trim() === ''}
                       >
-                        {isValidJSON(values.model_configs) ? '✓ 有效JSON' : '✗ 无效JSON'}
-                      </Typography>
-                    )}
+                        格式化JSON
+                      </Button>
+                    </Box>
                   </Box>
-                )}
-              </FormControl>
-
-              {/* AWS-specific inference profile ARN mapping */}
-              {values.type === 33 && (
-                <FormControl fullWidth error={Boolean(touched.inference_profile_arn_map && errors.inference_profile_arn_map)} sx={{ ...theme.typography.otherInput }}>
-                  <InputLabel
-                    htmlFor="channel-inference_profile_arn_map-label"
-                    sx={{
-                      position: 'relative',
-                      transform: 'none',
-                      fontSize: '0.875rem',
-                      fontWeight: 500,
-                      color: theme.palette.text.primary
-                    }}
-                  >
-                    {inputLabel.inference_profile_arn_map}
-                  </InputLabel>
                   <TextField
                     multiline
-                    id="channel-inference_profile_arn_map-label"
-                    value={values.inference_profile_arn_map}
-                    name="inference_profile_arn_map"
+                    id="channel-model_mapping-label"
+                    value={values.model_mapping}
+                    name="model_mapping"
                     onBlur={handleBlur}
                     onChange={handleChange}
-                    aria-describedby="helper-text-channel-inference_profile_arn_map-label"
+                    aria-describedby="helper-text-channel-model_mapping-label"
                     minRows={5}
-                    placeholder={inputPrompt.inference_profile_arn_map}
+                    placeholder={inputPrompt.model_mapping}
+                    sx={{
+                      '& .MuiInputBase-input': {
+                        fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
+                        fontSize: '13px',
+                        lineHeight: '1.4',
+                        backgroundColor: '#f8f9fa',
+                      },
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                          borderColor: isValidJSON(values.model_mapping) ? theme.palette.grey[300] : theme.palette.error.main,
+                        },
+                      }
+                    }}
                   />
-                  {touched.inference_profile_arn_map && errors.inference_profile_arn_map ? (
-                    <FormHelperText error id="helper-tex-channel-inference_profile_arn_map-label">
-                      {errors.inference_profile_arn_map}
+                  {touched.model_mapping && errors.model_mapping ? (
+                    <FormHelperText error id="helper-tex-channel-model_mapping-label">
+                      {errors.model_mapping}
                     </FormHelperText>
                   ) : (
-                    <FormHelperText id="helper-tex-channel-inference_profile_arn_map-label">
-                      JSON 格式：{`{"模型名称": "arn:aws:bedrock:region:account:inference-profile/profile-id"}`}。将模型名称映射到 AWS Bedrock 推理配置文件 ARN。留空则使用默认模型 ID。
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <FormHelperText id="helper-tex-channel-model_mapping-label">
+                        {inputPrompt.model_mapping}
+                      </FormHelperText>
+                      {values.model_mapping && values.model_mapping.trim() !== '' && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: isValidJSON(values.model_mapping) ? theme.palette.success.main : theme.palette.error.main,
+                            fontWeight: 'bold',
+                            fontSize: '11px'
+                          }}
+                        >
+                          {isValidJSON(values.model_mapping) ? '✓ 有效JSON' : '✗ 无效JSON'}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </FormControl>
+                <FormControl fullWidth error={Boolean(touched.system_prompt && errors.system_prompt)} sx={{ ...theme.typography.otherInput }}>
+                  <LabelWithTooltip
+                    htmlFor="channel-system_prompt-label"
+                    label={inputLabel.system_prompt}
+                    helpText="为通过此渠道的所有请求强制设置特定的系统提示词。适用于创建专门的AI助手或强制执行特定的行为模式。"
+                    sx={{
+                      position: 'relative',
+                      transform: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: theme.palette.text.primary,
+                      mb: 1
+                    }}
+                  />
+                  <TextField
+                    multiline
+                    id="channel-system_prompt-label"
+                    value={values.system_prompt}
+                    name="system_prompt"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    aria-describedby="helper-text-channel-system_prompt-label"
+                    minRows={5}
+                    placeholder={inputPrompt.system_prompt}
+                  />
+                  {touched.system_prompt && errors.system_prompt ? (
+                    <FormHelperText error id="helper-tex-channel-system_prompt-label">
+                      {errors.system_prompt}
+                    </FormHelperText>
+                  ) : (
+                    <FormHelperText id="helper-tex-channel-system_prompt-label"> {inputPrompt.system_prompt} </FormHelperText>
+                  )}
+                </FormControl>
+
+                {/* Channel-specific pricing fields - now handled through model_configs */}
+
+                <FormControl fullWidth error={Boolean(touched.model_configs && errors.model_configs)} sx={{ ...theme.typography.otherInput }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1 }}>
+                    <LabelWithTooltip
+                      htmlFor="channel-model_configs-label"
+                      label="模型配置"
+                      helpText="为每个模型配置定价和限制。'ratio'设置输入token成本，'completion_ratio'设置输出token成本倍数，'max_tokens'设置请求限制。覆盖默认定价。"
+                      sx={{
+                        position: 'relative',
+                        transform: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: theme.palette.text.primary
+                      }}
+                    />
+                    <Box>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const formattedValue = formatJSON(defaultPricing.model_configs);
+                          setFieldValue('model_configs', formattedValue);
+                        }}
+                        sx={{ mr: 1 }}
+                      >
+                        加载默认值
+                      </Button>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => {
+                          const formattedValue = formatJSON(values.model_configs);
+                          setFieldValue('model_configs', formattedValue);
+                        }}
+                        disabled={!values.model_configs || values.model_configs.trim() === ''}
+                      >
+                        格式化JSON
+                      </Button>
+                    </Box>
+                  </Box>
+                  <TextField
+                    multiline
+                    id="channel-model_configs-label"
+                    value={values.model_configs}
+                    name="model_configs"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    aria-describedby="helper-text-channel-model_configs-label"
+                    minRows={8}
+                    placeholder='统一的模型配置包括定价和属性。JSON格式，键为模型名称，值包含ratio、completion_ratio和max_tokens字段，例如：{"gpt-3.5-turbo": {"ratio": 0.0015, "completion_ratio": 2.0, "max_tokens": 65536}}'
+                    sx={{
+                      '& .MuiInputBase-input': {
+                        fontFamily: 'JetBrains Mono, Consolas, Monaco, "Courier New", monospace',
+                        fontSize: '13px',
+                        lineHeight: '1.4',
+                        backgroundColor: '#f8f9fa',
+                      },
+                      '& .MuiOutlinedInput-root': {
+                        '& fieldset': {
+                          borderColor: isValidJSON(values.model_configs) ? theme.palette.grey[300] : theme.palette.error.main,
+                        },
+                      }
+                    }}
+                  />
+                  {touched.model_configs && errors.model_configs ? (
+                    <FormHelperText error id="helper-tex-channel-model_configs-label">
+                      {errors.model_configs}
+                    </FormHelperText>
+                  ) : (
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <FormHelperText id="helper-tex-channel-model_configs-label">
+                        JSON 格式：统一的模型配置包括定价和属性。键为模型名称，值包含ratio、completion_ratio和max_tokens字段。
+                      </FormHelperText>
+                      {values.model_configs && values.model_configs.trim() !== '' && (
+                        <Typography
+                          variant="caption"
+                          sx={{
+                            color: isValidJSON(values.model_configs) ? theme.palette.success.main : theme.palette.error.main,
+                            fontWeight: 'bold',
+                            fontSize: '11px'
+                          }}
+                        >
+                          {isValidJSON(values.model_configs) ? '✓ 有效JSON' : '✗ 无效JSON'}
+                        </Typography>
+                      )}
+                    </Box>
+                  )}
+                </FormControl>
+
+                {/* AWS-specific inference profile ARN mapping */}
+                {values.type === 33 && (
+                  <FormControl fullWidth error={Boolean(touched.inference_profile_arn_map && errors.inference_profile_arn_map)} sx={{ ...theme.typography.otherInput }}>
+                    <InputLabel
+                      htmlFor="channel-inference_profile_arn_map-label"
+                      sx={{
+                        position: 'relative',
+                        transform: 'none',
+                        fontSize: '0.875rem',
+                        fontWeight: 500,
+                        color: theme.palette.text.primary
+                      }}
+                    >
+                      {inputLabel.inference_profile_arn_map}
+                    </InputLabel>
+                    <TextField
+                      multiline
+                      id="channel-inference_profile_arn_map-label"
+                      value={values.inference_profile_arn_map}
+                      name="inference_profile_arn_map"
+                      onBlur={handleBlur}
+                      onChange={handleChange}
+                      aria-describedby="helper-text-channel-inference_profile_arn_map-label"
+                      minRows={5}
+                      placeholder={inputPrompt.inference_profile_arn_map}
+                    />
+                    {touched.inference_profile_arn_map && errors.inference_profile_arn_map ? (
+                      <FormHelperText error id="helper-tex-channel-inference_profile_arn_map-label">
+                        {errors.inference_profile_arn_map}
+                      </FormHelperText>
+                    ) : (
+                      <FormHelperText id="helper-tex-channel-inference_profile_arn_map-label">
+                        JSON 格式：{`{"模型名称": "arn:aws:bedrock:region:account:inference-profile/profile-id"}`}。将模型名称映射到 AWS Bedrock 推理配置文件 ARN。留空则使用默认模型 ID。
+                      </FormHelperText>
+                    )}
+                  </FormControl>
+                )}
+
+                {/* Rate Limit Field */}
+                <FormControl fullWidth error={Boolean(touched.ratelimit && errors.ratelimit)} sx={{ ...theme.typography.otherInput }}>
+                  <LabelWithTooltip
+                    htmlFor="channel-ratelimit-label"
+                    label={inputLabel.ratelimit}
+                    helpText="控制每个令牌在每个渠道3分钟内的最大请求次数。设置为0表示不限制。这有助于防止滥用和管理API使用量。"
+                    sx={{
+                      position: 'relative',
+                      transform: 'none',
+                      fontSize: '0.875rem',
+                      fontWeight: 500,
+                      color: theme.palette.text.primary,
+                      mb: 1
+                    }}
+                  />
+                  <OutlinedInput
+                    id="channel-ratelimit-label"
+                    type="number"
+                    value={values.ratelimit}
+                    name="ratelimit"
+                    onBlur={handleBlur}
+                    onChange={handleChange}
+                    placeholder={inputPrompt.ratelimit}
+                    inputProps={{ min: 0 }}
+                    aria-describedby="helper-text-channel-ratelimit-label"
+                  />
+                  {touched.ratelimit && errors.ratelimit ? (
+                    <FormHelperText error id="helper-text-channel-ratelimit-label">
+                      {errors.ratelimit}
+                    </FormHelperText>
+                  ) : (
+                    <FormHelperText id="helper-text-channel-ratelimit-label">
+                      {inputPrompt.ratelimit}
                     </FormHelperText>
                   )}
                 </FormControl>
-              )}
 
-              {/* Rate Limit Field */}
-              <FormControl fullWidth error={Boolean(touched.ratelimit && errors.ratelimit)} sx={{ ...theme.typography.otherInput }}>
-                <LabelWithTooltip
-                  htmlFor="channel-ratelimit-label"
-                  label={inputLabel.ratelimit}
-                  helpText="控制每个令牌在每个渠道3分钟内的最大请求次数。设置为0表示不限制。这有助于防止滥用和管理API使用量。"
-                  sx={{
-                    position: 'relative',
-                    transform: 'none',
-                    fontSize: '0.875rem',
-                    fontWeight: 500,
-                    color: theme.palette.text.primary,
-                    mb: 1
-                  }}
-                />
-                <OutlinedInput
-                  id="channel-ratelimit-label"
-                  type="number"
-                  value={values.ratelimit}
-                  name="ratelimit"
-                  onBlur={handleBlur}
-                  onChange={handleChange}
-                  placeholder={inputPrompt.ratelimit}
-                  inputProps={{ min: 0 }}
-                  aria-describedby="helper-text-channel-ratelimit-label"
-                />
-                {touched.ratelimit && errors.ratelimit ? (
-                  <FormHelperText error id="helper-text-channel-ratelimit-label">
-                    {errors.ratelimit}
-                  </FormHelperText>
-                ) : (
-                  <FormHelperText id="helper-text-channel-ratelimit-label">
-                    {inputPrompt.ratelimit}
-                  </FormHelperText>
-                )}
-              </FormControl>
-
-              <DialogActions>
-                <Button onClick={onCancel}>取消</Button>
-                <Button disableElevation disabled={isSubmitting} type="submit" variant="contained" color="primary">
-                  提交
-                </Button>
-              </DialogActions>
-            </form>
-          )}
-        </Formik>
+                <DialogActions>
+                  <Button onClick={onCancel}>取消</Button>
+                  <Button disableElevation disabled={isSubmitting} type="submit" variant="contained" color="primary">
+                    提交
+                  </Button>
+                </DialogActions>
+              </form>
+            )}
+          </Formik>
         )}
       </DialogContent>
     </Dialog>

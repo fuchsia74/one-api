@@ -13,6 +13,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common"
 	"github.com/songquanpeng/one-api/common/utils"
+	"github.com/songquanpeng/one-api/dto"
 )
 
 type Ability struct {
@@ -131,16 +132,10 @@ func GetGroupModels(ctx context.Context, group string) ([]string, error) {
 	return models, err
 }
 
-var getGroupModelsV2Cache = gutils.NewExpCache[[]EnabledAbility](context.Background(), time.Second*10)
-
-type EnabledAbility struct {
-	Model       string `json:"model" gorm:"model"`
-	ChannelType int    `json:"channel_type" gorm:"channel_type"`
-	ChannelId   int    `json:"channel_id" gorm:"channel_id"`
-}
+var getGroupModelsV2Cache = gutils.NewExpCache[[]dto.EnabledAbility](context.Background(), time.Second*10)
 
 // GetGroupModelsV2 returns all enabled models for this group with their channel names.
-func GetGroupModelsV2(ctx context.Context, group string) ([]EnabledAbility, error) {
+func GetGroupModelsV2(ctx context.Context, group string) ([]dto.EnabledAbility, error) {
 	// get from cache first
 	if models, ok := getGroupModelsV2Cache.Load(group); ok {
 		return models, nil
@@ -156,7 +151,7 @@ func GetGroupModelsV2(ctx context.Context, group string) ([]EnabledAbility, erro
 	now := time.Now()
 
 	// query with JOIN to get model, channel type, and channel ID in a single query
-	var models []EnabledAbility
+	var models []dto.EnabledAbility
 	query := DB.Model(&Ability{}).
 		Select("DISTINCT abilities.model AS model, channels.type AS channel_type, abilities.channel_id AS channel_id").
 		Joins("JOIN channels ON abilities.channel_id = channels.id").

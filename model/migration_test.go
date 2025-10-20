@@ -70,6 +70,32 @@ func TestMigrateChannelFieldsToText_Idempotency(t *testing.T) {
 	}
 }
 
+func TestMigrateTraceURLColumnToText_SQLite(t *testing.T) {
+	// Setup test database
+	testDB := setupMigrationTestDB(t)
+	originalDB := DB
+	DB = testDB
+	defer func() { DB = originalDB }()
+
+	if err := MigrateTraceURLColumnToText(); err != nil {
+		t.Errorf("SQLite trace URL migration should not fail: %v", err)
+	}
+}
+
+func TestMigrateTraceURLColumnToText_Idempotency(t *testing.T) {
+	// Setup test database
+	testDB := setupMigrationTestDB(t)
+	originalDB := DB
+	DB = testDB
+	defer func() { DB = originalDB }()
+
+	for i := range 3 {
+		if err := MigrateTraceURLColumnToText(); err != nil {
+			t.Errorf("Trace URL migration run %d failed: %v", i+1, err)
+		}
+	}
+}
+
 func TestCheckIfFieldMigrationNeeded_SQLite(t *testing.T) {
 	// Setup test database
 	testDB := setupMigrationTestDB(t)

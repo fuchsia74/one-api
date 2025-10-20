@@ -33,6 +33,7 @@ const (
 	fallbackTokenID             = 99002
 	fallbackChannelID           = 99003
 	fallbackCompatibleChannelID = 99004
+	fallbackAnthropicChannelID  = 99005
 )
 
 func TestRenderChatResponseAsResponseAPI(t *testing.T) {
@@ -397,6 +398,274 @@ func TestRelayResponseAPIHelper_FallbackStreaming(t *testing.T) {
 	}
 }
 
+func TestRelayResponseAPIHelper_FallbackStreamingToolCalls(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ensureResponseFallbackFixtures(t)
+
+	prevRedis := common.IsRedisEnabled()
+	common.SetRedisEnabled(false)
+	t.Cleanup(func() { common.SetRedisEnabled(prevRedis) })
+
+	prevLogConsume := config.IsLogConsumeEnabled()
+	config.SetLogConsumeEnabled(false)
+	t.Cleanup(func() { config.SetLogConsumeEnabled(prevLogConsume) })
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		flusher, ok := w.(http.Flusher)
+		if !ok {
+			t.Fatalf("response writer does not support flushing")
+		}
+
+		chunks := []string{
+			`{"id":"chatcmpl-tool","object":"chat.completion.chunk","created":1741036800,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"id":"call_delta","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}`,
+			`{"id":"chatcmpl-tool","object":"chat.completion.chunk","created":1741036801,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"type":"function","function":{"arguments":"{\"location\":\"San Francisco, CA\",\"unit\":\"celsius\"}"}}]},"finish_reason":null}]}`,
+			`{"id":"chatcmpl-tool","object":"chat.completion.chunk","created":1741036802,"model":"gpt-4o-mini","choices":[{"index":0,"delta":{},"finish_reason":"tool_calls"}],"usage":{"prompt_tokens":18,"completion_tokens":9,"total_tokens":27}}`,
+		}
+		for _, chunk := range chunks {
+			fmt.Fprintf(w, "data: %s\n\n", chunk)
+			flusher.Flush()
+		}
+		fmt.Fprint(w, "data: [DONE]\n\n")
+		flusher.Flush()
+	}))
+	defer upstream.Close()
+
+	prevClient := client.HTTPClient
+	client.HTTPClient = upstream.Client()
+	t.Cleanup(func() { client.HTTPClient = prevClient })
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	requestPayload := `{"model":"gpt-4o-mini","stream":true,"instructions":"You are helpful.","input":[{"role":"user","content":[{"type":"input_text","text":"Please call get_weather for San Francisco, CA."}]}],"tools":[{"type":"function","name":"get_weather","description":"Get the current weather for a location","parameters":{"type":"object","properties":{"location":{"type":"string"},"unit":{"type":"string"}},"required":["location"]}}],"tool_choice":{"type":"tool","name":"get_weather"}}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(requestPayload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer compat-key")
+	c.Request = req
+
+	gmw.SetLogger(c, logger.Logger)
+
+	c.Set(ctxkey.Channel, channeltype.OpenAICompatible)
+	c.Set(ctxkey.ChannelId, fallbackCompatibleChannelID)
+	c.Set(ctxkey.TokenId, fallbackTokenID)
+	c.Set(ctxkey.TokenName, "fallback-token")
+	c.Set(ctxkey.Id, fallbackUserID)
+	c.Set(ctxkey.Group, "default")
+	c.Set(ctxkey.ModelMapping, map[string]string{})
+	c.Set(ctxkey.ChannelRatio, 1.0)
+	c.Set(ctxkey.RequestModel, "gpt-4o-mini")
+	c.Set(ctxkey.BaseURL, upstream.URL)
+	c.Set(ctxkey.ContentType, "application/json")
+	c.Set(ctxkey.RequestId, "req_fallback_stream_tool")
+	c.Set(ctxkey.TokenQuotaUnlimited, true)
+	c.Set(ctxkey.TokenQuota, int64(0))
+	c.Set(ctxkey.Username, "response-fallback")
+	c.Set(ctxkey.UserQuota, int64(1_000_000))
+	c.Set(ctxkey.ChannelModel, &model.Channel{Id: fallbackCompatibleChannelID, Type: channeltype.OpenAICompatible})
+	c.Set(ctxkey.Config, model.ChannelConfig{})
+
+	if err := RelayResponseAPIHelper(c); err != nil {
+		t.Fatalf("RelayResponseAPIHelper returned error: %v", err)
+	}
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("unexpected status code: %d", recorder.Code)
+	}
+
+	events := parseSSEEvents(recorder.Body.String())
+	if len(events) == 0 {
+		t.Fatalf("expected SSE events, got none")
+	}
+
+	var (
+		seenRequiredAction bool
+		finalResponse      *openai.ResponseAPIResponse
+	)
+
+	for _, ev := range events {
+		switch ev.event {
+		case "response.required_action.added", "response.required_action.delta", "response.required_action.done":
+			var streamEvent openai.ResponseAPIStreamEvent
+			if err := json.Unmarshal([]byte(ev.data), &streamEvent); err != nil {
+				t.Fatalf("failed to decode required_action event: %v", err)
+			}
+			if streamEvent.RequiredAction == nil || streamEvent.RequiredAction.SubmitToolOutputs == nil || len(streamEvent.RequiredAction.SubmitToolOutputs.ToolCalls) == 0 {
+				t.Fatalf("expected tool call in required_action event, got %#v", streamEvent.RequiredAction)
+			}
+			seenRequiredAction = true
+		case "response.completed":
+			var streamEvent openai.ResponseAPIStreamEvent
+			if err := json.Unmarshal([]byte(ev.data), &streamEvent); err != nil {
+				t.Fatalf("failed to decode response.completed event: %v", err)
+			}
+			if streamEvent.Response == nil {
+				t.Fatalf("expected response payload in response.completed event")
+			}
+			finalResponse = streamEvent.Response
+		}
+	}
+
+	if !seenRequiredAction {
+		t.Fatalf("expected required_action events in stream, got %v", events)
+	}
+	if finalResponse == nil {
+		t.Fatalf("missing final response payload")
+	}
+	if finalResponse.RequiredAction == nil || finalResponse.RequiredAction.SubmitToolOutputs == nil {
+		t.Fatalf("expected required_action in final response, got %#v", finalResponse.RequiredAction)
+	}
+	toolCalls := finalResponse.RequiredAction.SubmitToolOutputs.ToolCalls
+	if len(toolCalls) != 1 {
+		t.Fatalf("expected single tool call in final response, got %d", len(toolCalls))
+	}
+	fn := toolCalls[0].Function
+	if fn == nil || fn.Name != "get_weather" {
+		t.Fatalf("unexpected tool call function: %#v", fn)
+	}
+	if fn.Arguments == "" {
+		t.Fatalf("expected arguments in tool call function")
+	}
+}
+
+func TestRelayResponseAPIHelper_FallbackAnthropicStreamingHandled(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ensureResponseFallbackFixtures(t)
+
+	prevRedis := common.IsRedisEnabled()
+	common.SetRedisEnabled(false)
+	t.Cleanup(func() { common.SetRedisEnabled(prevRedis) })
+
+	prevLogConsume := config.IsLogConsumeEnabled()
+	config.SetLogConsumeEnabled(false)
+	t.Cleanup(func() { config.SetLogConsumeEnabled(prevLogConsume) })
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("x-api-key") != "anthropic-key" {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusUnauthorized)
+			_, _ = w.Write([]byte(`{"type":"error","error":{"type":"invalid_request_error","message":"invalid x-api-key"}}`))
+			return
+		}
+
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		flusher, _ := w.(http.Flusher)
+
+		events := []string{
+			`{"type":"message_start","message":{"id":"msg_123","type":"message","role":"assistant","model":"claude-3-5-haiku","usage":{"input_tokens":5,"output_tokens":0}}}`,
+			`{"type":"content_block_start","index":0,"content_block":{"id":"cb_1","type":"text","text":""}}`,
+			`{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}`,
+			`{"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":" world!"}}`,
+			`{"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"input_tokens":5,"output_tokens":7}}`,
+			`{"type":"message_stop"}`,
+		}
+
+		for _, ev := range events {
+			fmt.Fprintf(w, "data: %s\n\n", ev)
+			if flusher != nil {
+				flusher.Flush()
+			}
+		}
+	}))
+	t.Cleanup(upstream.Close)
+
+	prevClient := client.HTTPClient
+	client.HTTPClient = upstream.Client()
+	t.Cleanup(func() { client.HTTPClient = prevClient })
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+
+	requestPayload := `{"model":"claude-3.5-haiku","stream":true,"instructions":"You are helpful.","input":[{"role":"user","content":[{"type":"input_text","text":"Hello via response API stream"}]}]}`
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(requestPayload))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer anthropic-key")
+	c.Request = req
+
+	gmw.SetLogger(c, logger.Logger)
+
+	c.Set(ctxkey.Channel, channeltype.Anthropic)
+	c.Set(ctxkey.ChannelId, fallbackAnthropicChannelID)
+	c.Set(ctxkey.TokenId, fallbackTokenID)
+	c.Set(ctxkey.TokenName, "fallback-token")
+	c.Set(ctxkey.Id, fallbackUserID)
+	c.Set(ctxkey.Group, "default")
+	c.Set(ctxkey.ModelMapping, map[string]string{})
+	c.Set(ctxkey.ChannelRatio, 1.0)
+	c.Set(ctxkey.RequestModel, "claude-3.5-haiku")
+	c.Set(ctxkey.BaseURL, upstream.URL)
+	c.Set(ctxkey.ContentType, "application/json")
+	c.Set(ctxkey.RequestId, "req_fallback_stream_anthropic")
+	c.Set(ctxkey.TokenQuotaUnlimited, true)
+	c.Set(ctxkey.TokenQuota, int64(0))
+	c.Set(ctxkey.Username, "response-fallback")
+	c.Set(ctxkey.UserQuota, int64(1_000_000))
+	c.Set(ctxkey.ChannelModel, &model.Channel{Id: fallbackAnthropicChannelID, Type: channeltype.Anthropic})
+	c.Set(ctxkey.Config, model.ChannelConfig{})
+
+	err := RelayResponseAPIHelper(c)
+	if err != nil {
+		t.Fatalf("expected anthropic streaming fallback to succeed, got error: %v", err)
+	}
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", recorder.Code)
+	}
+
+	if ct := recorder.Header().Get("Content-Type"); !strings.Contains(ct, "text/event-stream") {
+		t.Fatalf("expected text/event-stream content type, got %q", ct)
+	}
+
+	body := recorder.Body.String()
+	events := parseSSEEvents(body)
+	if len(events) == 0 {
+		t.Fatalf("expected SSE events from anthropic stream, got none. body=%q", body)
+	}
+
+	var (
+		seenCreated   bool
+		seenCompleted bool
+		finalResponse *openai.ResponseAPIResponse
+	)
+
+	for _, ev := range events {
+		switch ev.event {
+		case "response.created":
+			seenCreated = true
+		case "response.completed":
+			seenCompleted = true
+			var streamEvent openai.ResponseAPIStreamEvent
+			if err := json.Unmarshal([]byte(ev.data), &streamEvent); err != nil {
+				t.Fatalf("failed to decode response.completed event: %v", err)
+			}
+			if streamEvent.Response == nil {
+				t.Fatalf("expected response payload in response.completed event")
+			}
+			finalResponse = streamEvent.Response
+		}
+	}
+
+	if !seenCreated {
+		t.Fatalf("missing response.created event from anthropic stream. events=%#v", events)
+	}
+	if !seenCompleted {
+		t.Fatalf("missing response.completed event from anthropic stream. events=%#v", events)
+	}
+	if finalResponse == nil {
+		t.Fatalf("missing final response payload")
+	}
+	if finalResponse.Status != "completed" {
+		t.Fatalf("expected completed status, got %s", finalResponse.Status)
+	}
+	if len(finalResponse.Output) == 0 || len(finalResponse.Output[0].Content) == 0 {
+		t.Fatalf("expected final output content, got %#v", finalResponse.Output)
+	}
+	if text := finalResponse.Output[0].Content[0].Text; text != "Hello world!" {
+		t.Fatalf("unexpected final response text: %q", text)
+	}
+}
+
 func TestNormalizeResponseAPIRawBody_RemovesUnsupportedParams(t *testing.T) {
 	temp := 0.7
 	topP := 0.9
@@ -513,6 +782,14 @@ func ensureResponseFallbackFixtures(t *testing.T) {
 	compatibleChannel := &model.Channel{Id: fallbackCompatibleChannelID, Type: channeltype.OpenAICompatible, Name: "compatible-fallback", Status: model.ChannelStatusEnabled}
 	if err := model.DB.Create(compatibleChannel).Error; err != nil {
 		t.Fatalf("failed to create openai-compatible channel fixture: %v", err)
+	}
+
+	if err := model.DB.Where("id = ?", fallbackAnthropicChannelID).Delete(&model.Channel{}).Error; err != nil {
+		t.Fatalf("failed to clean anthropic channel fixture: %v", err)
+	}
+	anthropicChannel := &model.Channel{Id: fallbackAnthropicChannelID, Type: channeltype.Anthropic, Name: "anthropic-fallback", Status: model.ChannelStatusEnabled}
+	if err := model.DB.Create(anthropicChannel).Error; err != nil {
+		t.Fatalf("failed to create anthropic channel fixture: %v", err)
 	}
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { useAuthStore } from '@/lib/stores/auth'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -134,8 +134,21 @@ export function DashboardPage() {
   const [statisticsMetric, setStatisticsMetric] = useState<'tokens' | 'requests' | 'expenses'>('tokens')
   const [dateError, setDateError] = useState<string>('')
 
-  type Row = { day: string; model_name: string; request_count: number; quota: number; prompt_tokens: number; completion_tokens: number }
-  const [rows, setRows] = useState<Row[]>([])
+  type BaseMetricRow = {
+    day: string
+    request_count: number
+    quota: number
+    prompt_tokens: number
+    completion_tokens: number
+  }
+
+  type ModelRow = BaseMetricRow & { model_name: string }
+  type UserRow = BaseMetricRow & { username: string; user_id: number }
+  type TokenRow = BaseMetricRow & { token_name: string; username: string; user_id: number }
+
+  const [rows, setRows] = useState<ModelRow[]>([])
+  const [userRows, setUserRows] = useState<UserRow[]>([])
+  const [tokenRows, setTokenRows] = useState<TokenRow[]>([])
 
 
 
@@ -226,10 +239,35 @@ export function DashboardPage() {
       if (success) {
         // Handle new API response structure
         const logs = data?.logs || data || []
+        const userLogs = data?.user_logs || []
+        const tokenLogs = data?.token_logs || []
         setRows(
           logs.map((row: any) => ({
             day: row.Day,
             model_name: row.ModelName,
+            request_count: row.RequestCount,
+            quota: row.Quota,
+            prompt_tokens: row.PromptTokens,
+            completion_tokens: row.CompletionTokens,
+          }))
+        )
+        setUserRows(
+          userLogs.map((row: any) => ({
+            day: row.Day,
+            username: row.Username,
+            user_id: Number(row.UserId ?? 0),
+            request_count: row.RequestCount,
+            quota: row.Quota,
+            prompt_tokens: row.PromptTokens,
+            completion_tokens: row.CompletionTokens,
+          }))
+        )
+        setTokenRows(
+          tokenLogs.map((row: any) => ({
+            day: row.Day,
+            username: row.Username,
+            token_name: row.TokenName,
+            user_id: Number(row.UserId ?? 0),
             request_count: row.RequestCount,
             quota: row.Quota,
             prompt_tokens: row.PromptTokens,
@@ -242,11 +280,15 @@ export function DashboardPage() {
       } else {
         setDateError(message || 'Failed to fetch dashboard data')
         setRows([])
+        setUserRows([])
+        setTokenRows([])
       }
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
       setDateError('Failed to fetch dashboard data')
       setRows([])
+      setUserRows([])
+      setTokenRows([])
     } finally {
       setLoading(false)
     }
@@ -286,7 +328,25 @@ export function DashboardPage() {
     return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
   }, [rows])
 
-  const days = useMemo(() => dailyAgg.map(d => d.date), [dailyAgg])
+  const xAxisDays = useMemo(() => {
+    const values = new Set<string>()
+    for (const row of rows) {
+      if (row.day) {
+        values.add(row.day)
+      }
+    }
+    for (const row of userRows) {
+      if (row.day) {
+        values.add(row.day)
+      }
+    }
+    for (const row of tokenRows) {
+      if (row.day) {
+        values.add(row.day)
+      }
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b))
+  }, [rows, userRows, tokenRows])
 
   const timeSeries = useMemo(() => {
     const quotaPerUnit = getQuotaPerUnit()
@@ -299,34 +359,174 @@ export function DashboardPage() {
     }))
   }, [dailyAgg])
 
-  // Model stacked bar per day - supports different metrics
-  const uniqueModels = useMemo(() => Array.from(new Set(rows.map(r => r.model_name))), [rows])
-  const stackedData = useMemo(() => {
+  const computeStackedSeries = <T extends BaseMetricRow>(rowsSource: T[], daysList: string[], labelFn: (row: T) => string | null) => {
     const quotaPerUnit = getQuotaPerUnit()
     const displayInCurrency = getDisplayInCurrency()
-    const map: Record<string, Record<string, number>> = {}
-    for (const d of days) map[d] = {}
-    for (const r of rows) {
+    const dayToValues: Record<string, Record<string, number>> = {}
+    for (const day of daysList) {
+      dayToValues[day] = {}
+    }
+
+    const uniqueKeys: string[] = []
+    const seen = new Set<string>()
+
+    for (const row of rowsSource) {
+      const label = labelFn(row)
+      if (!label) {
+        continue
+      }
+      if (!seen.has(label)) {
+        uniqueKeys.push(label)
+        seen.add(label)
+      }
+
+      const day = row.day
+      if (!dayToValues[day]) {
+        dayToValues[day] = {}
+      }
+
       let value: number
       switch (statisticsMetric) {
         case 'requests':
-          value = r.request_count || 0
+          value = row.request_count || 0
           break
         case 'expenses':
-          value = r.quota || 0
+          value = row.quota || 0
           if (displayInCurrency) {
             value = value / quotaPerUnit
           }
           break
         case 'tokens':
         default:
-          value = (r.prompt_tokens || 0) + (r.completion_tokens || 0)
+          value = (row.prompt_tokens || 0) + (row.completion_tokens || 0)
           break
       }
-      map[r.day][r.model_name] = (map[r.day][r.model_name] || 0) + value
+
+      dayToValues[day][label] = (dayToValues[day][label] || 0) + value
     }
-    return days.map(d => ({ date: d, ...(map[d] || {}) }))
-  }, [rows, days, statisticsMetric])
+
+    const stackedData = daysList.map(day => ({ date: day, ...(dayToValues[day] || {}) }))
+
+    return { uniqueKeys, stackedData }
+  }
+
+  const { uniqueKeys: modelKeys, stackedData: modelStackedData } = useMemo(
+    () => computeStackedSeries(rows, xAxisDays, (row) => (row.model_name ? row.model_name : 'Unknown model')),
+    [rows, xAxisDays, statisticsMetric]
+  )
+
+  const { uniqueKeys: userKeys, stackedData: userStackedData } = useMemo(
+    () => computeStackedSeries(userRows, xAxisDays, (row) => (row.username ? row.username : 'Unknown user')),
+    [userRows, xAxisDays, statisticsMetric]
+  )
+
+  const { uniqueKeys: tokenKeys, stackedData: tokenStackedData } = useMemo(
+    () =>
+      computeStackedSeries(tokenRows, xAxisDays, (row) => {
+        const token = row.token_name && row.token_name.trim().length > 0 ? row.token_name : 'unnamed token'
+        const owner = row.username && row.username.trim().length > 0 ? row.username : 'unknown'
+        return `${token}(${owner})`
+      }),
+    [tokenRows, xAxisDays, statisticsMetric]
+  )
+
+  const metricLabel = useMemo(() => {
+    switch (statisticsMetric) {
+      case 'requests':
+        return 'Requests'
+      case 'expenses':
+        return 'Expenses'
+      default:
+        return 'Tokens'
+    }
+  }, [statisticsMetric])
+
+  const formatStackedTick = useCallback((value: number) => {
+    switch (statisticsMetric) {
+      case 'requests':
+        return formatNumber(value)
+      case 'expenses':
+        return getDisplayInCurrency()
+          ? `$${Number(value).toFixed(2)}`
+          : formatNumber(value)
+      case 'tokens':
+      default:
+        return formatNumber(value)
+    }
+  }, [statisticsMetric])
+
+  const stackedTooltip = useMemo(() => {
+    return ({ active, payload, label }: any) => {
+      if (active && payload && payload.length) {
+        const filtered = payload
+          .filter((entry: any) => entry.value && typeof entry.value === 'number' && entry.value > 0)
+          .sort((a: any, b: any) => (b.value as number) - (a.value as number))
+
+        if (!filtered.length) {
+          return null
+        }
+
+        const formatValue = (value: number) => {
+          switch (statisticsMetric) {
+            case 'requests':
+              return formatNumber(value)
+            case 'expenses':
+              return getDisplayInCurrency()
+                ? `$${value.toFixed(6)}`
+                : formatNumber(value)
+            case 'tokens':
+            default:
+              return formatNumber(value)
+          }
+        }
+
+        const isDark =
+          typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+        const tooltipBg = isDark ? 'rgba(17,24,39,1)' : 'rgba(255,255,255,1)'
+        const tooltipText = isDark ? 'rgba(255,255,255,0.95)' : 'rgba(17,24,39,0.9)'
+
+        return (
+          <div
+            style={{
+              backgroundColor: tooltipBg,
+              border: '1px solid var(--border)',
+              borderRadius: '8px',
+              padding: '12px 16px',
+              fontSize: '12px',
+              color: tooltipText,
+              boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)',
+            }}
+          >
+            <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--foreground)' }}>
+              {label}
+            </div>
+            {filtered.map((entry: any, index: number) => (
+              <div
+                key={`${entry.name ?? 'series'}-${index}`}
+                style={{ marginBottom: '4px', display: 'flex', alignItems: 'center' }}
+              >
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '12px',
+                    height: '12px',
+                    backgroundColor: entry.color,
+                    borderRadius: '50%',
+                    marginRight: '8px',
+                  }}
+                ></span>
+                <span style={{ fontWeight: '600', color: 'var(--foreground)' }}>
+                  {entry.name}: {formatValue(entry.value as number)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )
+      }
+
+      return null
+    }
+  }, [statisticsMetric])
 
   const rangeTotals = useMemo(() => {
     let requests = 0
@@ -557,7 +757,7 @@ export function DashboardPage() {
         </div>
       )}
       {/* Usage Overview */}
-      <div className="mb-8">
+      <div className="mb-6">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold">Usage Overview</h2>
@@ -663,7 +863,7 @@ export function DashboardPage() {
         </div>
 
         {/* Time Series */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
           <div className="bg-white dark:bg-gray-900 rounded-lg border p-4">
             <h3 className="font-medium mb-4 text-blue-600">Requests</h3>
             <ResponsiveContainer width="100%" height={140}>
@@ -750,7 +950,7 @@ export function DashboardPage() {
         </div>
 
         {/* Model Usage Statistics */}
-        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-8">
+        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-6">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-lg font-semibold">Model Usage</h3>
             <Select
@@ -768,7 +968,7 @@ export function DashboardPage() {
             </Select>
           </div>
           <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={stackedData}>
+            <BarChart data={modelStackedData}>
               <CartesianGrid strokeOpacity={0.1} vertical={false} />
               <XAxis
                 dataKey="date"
@@ -781,85 +981,74 @@ export function DashboardPage() {
                 axisLine={false}
                 width={60}
                 fontSize={12}
-                tickFormatter={(value) => {
-                  switch (statisticsMetric) {
-                    case 'requests':
-                      return formatNumber(value)
-                    case 'expenses':
-                      return getDisplayInCurrency()
-                        ? `$${Number(value).toFixed(2)}`
-                        : formatNumber(value)
-                    case 'tokens':
-                    default:
-                      return formatNumber(value)
-                  }
-                }}
+                tickFormatter={formatStackedTick}
               />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    // Filter out entries with zero values and sort by value in descending order
-                    const filteredAndSortedPayload = payload
-                      .filter(entry => entry.value && typeof entry.value === 'number' && entry.value > 0)
-                      .sort((a, b) => (b.value as number) - (a.value as number))
-
-                    // Format value based on selected metric
-                    const formatValue = (value: number) => {
-                      switch (statisticsMetric) {
-                        case 'requests':
-                          return formatNumber(value)
-                        case 'expenses':
-                          return getDisplayInCurrency()
-                            ? `$${value.toFixed(6)}`
-                            : formatNumber(value)
-                        case 'tokens':
-                        default:
-                          return formatNumber(value)
-                      }
-                    }
-
-                    // Determine theme (light/dark) to set an opaque background for readability
-                    const isDark = typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
-                    const tooltipBg = isDark ? 'rgba(17,24,39,1)' : 'rgba(255,255,255,1)' // gray-900 or white
-                    const tooltipText = isDark ? 'rgba(255,255,255,0.95)' : 'rgba(17,24,39,0.9)'
-
-                    return (
-                      <div style={{
-                        backgroundColor: tooltipBg,
-                        border: '1px solid var(--border)',
-                        borderRadius: '8px',
-                        padding: '12px 16px',
-                        fontSize: '12px',
-                        color: tooltipText,
-                        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.12)'
-                      }}>
-                        <div style={{ fontWeight: '600', marginBottom: '8px', color: 'var(--foreground)' }}>
-                          {label}
-                        </div>
-                        {filteredAndSortedPayload.map((entry, index) => (
-                          <div key={index} style={{ marginBottom: '4px', display: 'flex', alignItems: 'center' }}>
-                            <span style={{
-                              display: 'inline-block',
-                              width: '12px',
-                              height: '12px',
-                              backgroundColor: entry.color,
-                              borderRadius: '50%',
-                              marginRight: '8px'
-                            }}></span>
-                            <span style={{ fontWeight: '600', color: 'var(--foreground)' }}>
-                              {entry.name}: {formatValue(entry.value as number)}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  }
-                  return null
-                }}
-              />
+              <Tooltip content={stackedTooltip} />
               <Legend />
-              {uniqueModels.map((m, idx) => (
-                <Bar key={m} dataKey={m} stackId="statistics" fill={barColor(idx)} radius={[2, 2, 0, 0]} />
+              {modelKeys.map((m, idx) => (
+                <Bar key={m} dataKey={m} stackId="statistics-models" fill={barColor(idx)} radius={[2, 2, 0, 0]} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold">User Usage</h3>
+            <span className="text-xs text-muted-foreground">Metric: {metricLabel}</span>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={userStackedData}>
+              <CartesianGrid strokeOpacity={0.1} vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={12} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={60}
+                fontSize={12}
+                tickFormatter={formatStackedTick}
+              />
+              <Tooltip content={stackedTooltip} />
+              <Legend />
+              {userKeys.map((userKey, idx) => (
+                <Bar
+                  key={userKey}
+                  dataKey={userKey}
+                  stackId="statistics-users"
+                  fill={barColor(idx)}
+                  radius={[2, 2, 0, 0]}
+                />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="bg-white dark:bg-gray-900 rounded-lg border p-6 mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-semibold">Token Usage</h3>
+            <span className="text-xs text-muted-foreground">Metric: {metricLabel}</span>
+          </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={tokenStackedData}>
+              <CartesianGrid strokeOpacity={0.1} vertical={false} />
+              <XAxis dataKey="date" tickLine={false} axisLine={false} fontSize={12} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                width={60}
+                fontSize={12}
+                tickFormatter={formatStackedTick}
+              />
+              <Tooltip content={stackedTooltip} />
+              <Legend />
+              {tokenKeys.map((tokenKey, idx) => (
+                <Bar
+                  key={tokenKey}
+                  dataKey={tokenKey}
+                  stackId="statistics-tokens"
+                  fill={barColor(idx)}
+                  radius={[2, 2, 0, 0]}
+                />
               ))}
             </BarChart>
           </ResponsiveContainer>

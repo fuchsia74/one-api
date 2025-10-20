@@ -66,6 +66,7 @@ func main() {
 	// Initialize SQL Database
 	model.InitDB()
 	model.InitLogDB()
+	model.StartTraceRetentionCleaner(ctx, config.TraceRetentionDays)
 
 	var err error
 	err = model.CreateRootAccountIfNeed()

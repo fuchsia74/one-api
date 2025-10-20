@@ -40,6 +40,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	lg := gmw.GetLogger(c)
 	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
+	if err := logClientRequestPayload(c, "claude_messages"); err != nil {
+		return openai.ErrorWrapper(err, "invalid_claude_messages_request", http.StatusBadRequest)
+	}
 
 	// get & validate Claude Messages API request
 	claudeRequest, err := getAndValidateClaudeMessagesRequest(c)
@@ -58,6 +61,8 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.ActualModelName = claudeRequest.Model
 	metalib.Set2Context(c, meta)
 
+	sanitizeClaudeMessagesRequest(claudeRequest)
+
 	// get channel model ratio
 	channelModelRatio, channelCompletionRatio := getChannelRatios(c)
 
@@ -73,7 +78,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeClaudeMessagesQuota(c, claudeRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeClaudeMessagesQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeClaudeMessagesQuota failed",
+			zap.Int("status_code", bizErr.StatusCode),
+			zap.Error(bizErr.RawError))
 		return bizErr
 	}
 
@@ -108,16 +115,11 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		if gerr != nil {
 			return openai.ErrorWrapper(gerr, "get_original_body_failed", http.StatusInternalServerError)
 		}
-		// If a mapping changed the model name, rewrite it in the raw JSON for upstream compatibility
-		if meta.ActualModelName != meta.OriginModelName {
-			rewritten, rerr := rewriteClaudeModelInJSON(rawBody, meta.ActualModelName)
-			if rerr != nil {
-				return openai.ErrorWrapper(rerr, "rewrite_model_in_body_failed", http.StatusInternalServerError)
-			}
-			requestBody = bytes.NewReader(rewritten)
-		} else {
-			requestBody = bytes.NewReader(rawBody)
+		rewritten, rerr := rewriteClaudeRequestBody(rawBody, claudeRequest)
+		if rerr != nil {
+			return openai.ErrorWrapper(rerr, "rewrite_claude_body_failed", http.StatusInternalServerError)
 		}
+		requestBody = bytes.NewReader(rewritten)
 	} else {
 		requestBytes, merr := json.Marshal(convertedRequest)
 		if merr != nil {
@@ -153,6 +155,8 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	origResp := resp
+	upstreamCapture := wrapUpstreamResponse(resp)
 	// Immediately record a provisional request cost using estimated base quota
 	// even if the trusted path skipped physical pre-consume.
 	{
@@ -184,7 +188,7 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
 			lg.Warn("update user request cost to zero failed", zap.Error(err))
 		}
-		return RelayErrorHandler(resp)
+		return RelayErrorHandlerWithContext(c, resp)
 	}
 
 	// Set context flag to indicate Claude Messages native mode
@@ -261,6 +265,11 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	} else {
 		// Call the adapter's DoResponse method to handle response conversion
 		usage, respErr = adaptorInstance.DoResponse(c, resp, meta)
+	}
+	if upstreamCapture != nil {
+		logUpstreamResponseFromCapture(lg, origResp, upstreamCapture, "claude_messages")
+	} else {
+		logUpstreamResponseFromBytes(lg, origResp, nil, "claude_messages")
 	}
 
 	// If the adapter didn't handle the conversion (e.g., for native Anthropic),
@@ -383,7 +392,9 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 
 	if respErr != nil {
-		lg.Error("Claude native response handler failed", zap.Any("error", *respErr))
+		lg.Error("Claude native response handler failed",
+			zap.Int("status_code", respErr.StatusCode),
+			zap.Error(respErr.RawError))
 		// If usage is available (e.g., client disconnected after upstream response),
 		// proceed with billing; otherwise, refund pre-consumed quota and return error.
 		if usage == nil {
@@ -453,19 +464,31 @@ func RelayClaudeMessagesHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 
 // Removed redundant getChannelRatiosForClaude; use getChannelRatios from response.go to keep DRY.
 
-// rewriteClaudeModelInJSON rewrites the top-level "model" field in a Claude Messages JSON payload.
-// It preserves the rest of the body intact to avoid conversion artifacts.
-func rewriteClaudeModelInJSON(raw []byte, mappedModel string) ([]byte, error) {
-	if len(raw) == 0 {
+// sanitizeClaudeMessagesRequest enforces parameter constraints required by upstream providers.
+func sanitizeClaudeMessagesRequest(request *ClaudeMessagesRequest) {
+	if request == nil {
+		return
+	}
+	if request.Temperature != nil && request.TopP != nil {
+		request.TopP = nil
+	}
+}
+
+// rewriteClaudeRequestBody updates the raw JSON payload to reflect sanitized request fields.
+func rewriteClaudeRequestBody(raw []byte, request *ClaudeMessagesRequest) ([]byte, error) {
+	if len(raw) == 0 || request == nil {
 		return raw, nil
 	}
 	var obj map[string]any
 	if err := json.Unmarshal(raw, &obj); err != nil {
-		return nil, errors.Wrap(err, "unmarshal raw claude body for model rewrite")
+		return nil, errors.Wrap(err, "unmarshal raw claude body for rewrite")
 	}
-	// Only rewrite when the field exists or when adding is required for correctness.
-	// Claude requires model; validator already checked, so set it directly.
-	obj["model"] = mappedModel
+	if request.Model != "" {
+		obj["model"] = request.Model
+	}
+	if request.TopP == nil {
+		delete(obj, "top_p")
+	}
 	out, err := json.Marshal(obj)
 	if err != nil {
 		return nil, errors.Wrap(err, "marshal rewritten claude body")

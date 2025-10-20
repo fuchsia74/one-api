@@ -37,6 +37,9 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	lg := gmw.GetLogger(c)
 	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
+	if err := logClientRequestPayload(c, "chat_completions"); err != nil {
+		return openai.ErrorWrapper(err, "invalid_text_request", http.StatusBadRequest)
+	}
 
 	// BUG: should not override meta.BaseURL and meta.ChannelId outside of metalib.GetByContext
 	// meta.BaseURL = c.GetString(ctxkey.BaseURL)
@@ -54,6 +57,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.OriginModelName = textRequest.Model
 	textRequest.Model = meta.ActualModelName
 	meta.ActualModelName = textRequest.Model
+	applyThinkingQueryToChatRequest(c, textRequest, meta)
 	// set system prompt if not empty
 	systemPromptReset := setSystemPrompt(ctx, textRequest, meta.ForcedSystemPrompt)
 
@@ -80,7 +84,10 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeQuota(c, textRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeQuota failed",
+			zap.Error(bizErr.RawError),
+			zap.Int("status_code", bizErr.StatusCode),
+			zap.String("err_msg", bizErr.Message))
 		return bizErr
 	}
 
@@ -134,6 +141,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	upstreamCapture := wrapUpstreamResponse(resp)
 	// Immediately record a provisional request cost using the estimated base quota
 	// even if we decided not to pre-consume physically (trusted user/token path).
 	// This ensures user-cancelled requests are still tracked and later reconciled.
@@ -159,11 +167,16 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
 			lg.Warn("update user request cost to zero failed", zap.Error(err))
 		}
-		return RelayErrorHandler(resp)
+		return RelayErrorHandlerWithContext(c, resp)
 	}
 
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
+	if upstreamCapture != nil {
+		logUpstreamResponseFromCapture(lg, resp, upstreamCapture, "chat_completions")
+	} else {
+		logUpstreamResponseFromBytes(lg, resp, nil, "chat_completions")
+	}
 	if respErr != nil {
 		// If usage is available even though writing to client failed (e.g., client cancelled),
 		// proceed to billing to ensure forwarded requests are charged; do not refund pre-consumed quota.

@@ -10,10 +10,8 @@ import (
 
 	"github.com/Laisky/errors/v2"
 	gmw "github.com/Laisky/gin-middlewares/v6"
-	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
 
-	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -134,12 +132,7 @@ func RelayErrorHandlerWithContext(c *gin.Context, resp *http.Response) *model.Er
 	// Read and restore response body for downstream use
 	responseBody, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	if config.DebugEnabled {
-		gmw.GetLogger(c).Info("error happened",
-			zap.Int("status_code", resp.StatusCode),
-			zap.ByteString("response", responseBody),
-		)
-	}
+	logUpstreamResponseFromBytes(gmw.GetLogger(c), resp, responseBody, "upstream_error")
 	// Reconstruct a new ReadCloser for any further reads (not commonly needed here)
 	resp.Body = io.NopCloser(bytes.NewReader(responseBody))
 	return RelayErrorHandler(resp)

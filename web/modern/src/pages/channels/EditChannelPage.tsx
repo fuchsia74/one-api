@@ -47,11 +47,13 @@ const channelSchema = z.object({
     vertex_ai_project_id: z.string().optional(),
     vertex_ai_adc: z.string().optional(),
     auth_type: z.string().default('personal_access_token'),
+    api_format: z.enum(['chat_completion', 'response']).default('chat_completion'),
   }).default({}),
   inference_profile_arn_map: z.string().optional(),
 })
 
 type ChannelForm = z.infer<typeof channelSchema>
+type ChannelConfigForm = NonNullable<ChannelForm['config']>
 
 interface ChannelType {
   key: number
@@ -128,7 +130,6 @@ const CHANNEL_TYPES: ChannelType[] = [
   { key: 44, text: 'SiliconFlow', value: 44, color: 'blue' },
   { key: 45, text: 'xAI', value: 45, color: 'blue' },
   { key: 46, text: 'Replicate', value: 46, color: 'blue' },
-  { key: 8, text: 'Custom Channel', value: 8, color: 'pink', description: 'Not recommended, use OpenAI Compatible instead' },
   { key: 22, text: 'Knowledge Base: FastGPT', value: 22, color: 'blue' },
   { key: 21, text: 'Knowledge Base: AI Proxy', value: 21, color: 'purple' },
   { key: 20, text: 'OpenRouter', value: 20, color: 'black' },
@@ -141,6 +142,14 @@ const CHANNEL_TYPES: ChannelType[] = [
   { key: 9, text: 'Proxy: AI.LS', value: 9, color: 'yellow' },
   { key: 12, text: 'Proxy: API2GPT', value: 12, color: 'blue' },
   { key: 13, text: 'Proxy: AIGC2D', value: 13, color: 'purple' },
+]
+
+const CHANNEL_TYPES_WITH_DEDICATED_BASE_URL = new Set<number>([3, 50])
+const CHANNEL_TYPES_WITH_CUSTOM_KEY_FIELD = new Set<number>([34])
+
+const OPENAI_COMPATIBLE_API_FORMAT_OPTIONS = [
+  { value: 'chat_completion', label: 'ChatCompletion (default)' },
+  { value: 'response', label: 'Response' },
 ]
 
 const COZE_AUTH_OPTIONS = [
@@ -287,7 +296,6 @@ export function EditChannelPage() {
   const [customModel, setCustomModel] = useState('')
   const [formInitialized, setFormInitialized] = useState(!isEdit) // Track if form has been properly initialized
   const [loadedChannelType, setLoadedChannelType] = useState<number | null>(null) // Track the loaded channel type
-  const [autoFilledType, setAutoFilledType] = useState<number | null>(null) // Prevent repeated auto-fill per type
 
   const form = useForm<ChannelForm>({
     resolver: zodResolver(channelSchema),
@@ -315,6 +323,7 @@ export function EditChannelPage() {
         vertex_ai_project_id: '',
         vertex_ai_adc: '',
         auth_type: 'personal_access_token',
+        api_format: 'chat_completion',
       },
       inference_profile_arn_map: '',
     },
@@ -338,6 +347,8 @@ export function EditChannelPage() {
 
   const selectedChannelType = CHANNEL_TYPES.find(t => t.value === normalizedChannelType)
   const hasSelectedType = normalizedChannelType !== null && !!selectedChannelType
+  const channelTypeRequiresDedicatedBaseURL = normalizedChannelType !== null && CHANNEL_TYPES_WITH_DEDICATED_BASE_URL.has(normalizedChannelType)
+  const channelTypeOverridesKeyField = normalizedChannelType !== null && CHANNEL_TYPES_WITH_CUSTOM_KEY_FIELD.has(normalizedChannelType)
 
   // Debug logging for watchType changes
   useEffect(() => {
@@ -356,13 +367,6 @@ export function EditChannelPage() {
         const base = (res.data?.data?.default_base_url as string) || ''
         if (!cancelled) {
           setDefaultBaseURL(base)
-          // Prefill only on create when user left it blank and server has a default
-          if (!isEdit) {
-            const current = form.getValues('base_url') || ''
-            if (!current.trim() && base) {
-              form.setValue('base_url', base)
-            }
-          }
         }
       } catch (_) {
         // ignore
@@ -426,7 +430,7 @@ export function EditChannelPage() {
         }
 
         // Parse JSON configuration
-        let config = {
+        let config: ChannelConfigForm = {
           region: '',
           ak: '',
           sk: '',
@@ -434,10 +438,16 @@ export function EditChannelPage() {
           vertex_ai_project_id: '',
           vertex_ai_adc: '',
           auth_type: 'personal_access_token',
+          api_format: 'chat_completion',
         }
         if (data.config && typeof data.config === 'string' && data.config.trim() !== '') {
           try {
-            config = { ...config, ...JSON.parse(data.config) }
+            const parsed = JSON.parse(data.config) as Partial<ChannelConfigForm>
+            config = {
+              ...config,
+              ...parsed,
+              api_format: parsed.api_format === 'response' ? 'response' : 'chat_completion',
+            }
           } catch (e) {
             console.error('Failed to parse config JSON:', e)
           }
@@ -724,6 +734,20 @@ export function EditChannelPage() {
         delete payload.key
       }
 
+      const normalizedSubmitType = normalizeChannelType(payload.type)
+      const baseURLRawValue = typeof payload.base_url === 'string' ? payload.base_url : ''
+      const trimmedBaseURL = baseURLRawValue.trim()
+      const baseURLRequired = normalizedSubmitType !== null && CHANNEL_TYPES_WITH_DEDICATED_BASE_URL.has(normalizedSubmitType)
+
+      if (baseURLRequired && !trimmedBaseURL) {
+        form.setError('base_url', { message: 'Base URL is required for this channel type' })
+        notify({ type: 'error', title: 'Validation error', message: 'Base URL is required for this channel type.' })
+        return
+      }
+
+      payload.base_url = trimmedBaseURL
+      form.clearErrors('base_url')
+
       // Handle base_url - remove trailing slash
       if (payload.base_url && payload.base_url.endsWith('/')) {
         payload.base_url = payload.base_url.slice(0, -1)
@@ -909,6 +933,18 @@ export function EditChannelPage() {
   const fieldHasError = (name: string) => !!(form.formState.errors as any)?.[name]
   const errorClass = (name: string) => (fieldHasError(name) ? 'border-destructive focus-visible:ring-destructive' : '')
 
+  const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
+    <div className="flex items-center gap-1">
+      <FormLabel>{label}</FormLabel>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
+        </TooltipTrigger>
+        <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
+      </Tooltip>
+    </div>
+  )
+
   // Render channel-specific configuration fields
   const renderChannelSpecificFields = () => {
     const channelType = normalizedChannelType
@@ -931,6 +967,7 @@ export function EditChannelPage() {
                     <Input
                       placeholder={defaultBaseURL || 'https://your-resource.openai.azure.com'}
                       className={errorClass('base_url')}
+                      required
                       {...field}
                     />
                   </FormControl>
@@ -1278,23 +1315,10 @@ export function EditChannelPage() {
           />
         )
 
-      case 8: // Custom Channel (Deprecated)
       case 50: // OpenAI Compatible
         return (
           <div className="space-y-4 p-4 border rounded-lg bg-purple-50/50">
-            <h4 className="font-medium text-purple-900">
-              {channelType === 8 ? 'Custom Channel Configuration' : 'OpenAI Compatible Configuration'}
-            </h4>
-            {channelType === 8 && (
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <AlertCircle className="h-4 w-4 text-yellow-600" />
-                  <span className="text-sm text-yellow-800">
-                    <strong>Deprecated:</strong> Use OpenAI Compatible channel instead.
-                  </span>
-                </div>
-              </div>
-            )}
+            <h4 className="font-medium text-purple-900">OpenAI Compatible Configuration</h4>
             <FormField
               control={form.control}
               name="base_url"
@@ -1307,8 +1331,37 @@ export function EditChannelPage() {
                   <FormControl>
                     <Input
                       placeholder={defaultBaseURL || 'https://api.your-provider.com/v1'}
+                      className={errorClass('base_url')}
+                      required
                       {...field}
                     />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="config.api_format"
+              render={({ field }) => (
+                <FormItem>
+                  <LabelWithHelp
+                    label="Upstream API Format *"
+                    help={'Select which upstream API surface should handle requests. ChatCompletion is the historical default; choose Response when the upstream expects OpenAI Response API payloads.'}
+                  />
+                  <FormControl>
+                    <Select value={field.value ?? 'chat_completion'} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select upstream API format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {OPENAI_COMPATIBLE_API_FORMAT_OPTIONS.map(option => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -1344,17 +1397,6 @@ export function EditChannelPage() {
     // Re-run when channel type changes as sections expand/collapse
   }, [shouldShowLoading, watchType])
 
-  // Default pricing auto-fill: when Model Configs is empty, auto-populate once per type (no preview shown)
-  useEffect(() => {
-    if (normalizedChannelType !== null && defaultPricing && autoFilledType !== normalizedChannelType) {
-      const current = form.getValues('model_configs') || ''
-      if (!current.trim()) {
-        form.setValue('model_configs', defaultPricing, { shouldDirty: true })
-        setAutoFilledType(normalizedChannelType)
-      }
-    }
-  }, [normalizedChannelType, defaultPricing, autoFilledType, form])
-
   if (shouldShowLoading) {
     console.log('[CHANNEL_TYPE_DEBUG] Showing loading screen')
     return (
@@ -1370,19 +1412,6 @@ export function EditChannelPage() {
   }
 
   console.log('[CHANNEL_TYPE_DEBUG] Rendering main form')
-
-  // Small helper to render a label with a tooltip icon
-  const LabelWithHelp = ({ label, help }: { label: string; help: string }) => (
-    <div className="flex items-center gap-1">
-      <FormLabel>{label}</FormLabel>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Info className="h-4 w-4 text-muted-foreground cursor-help" aria-label={`Help: ${label}`} />
-        </TooltipTrigger>
-        <TooltipContent className="max-w-xs whitespace-pre-line">{help}</TooltipContent>
-      </Tooltip>
-    </div>
-  )
 
   return (
     <div className="container mx-auto px-4 py-6">
@@ -1471,53 +1500,59 @@ export function EditChannelPage() {
                   />
                 </div>
 
-                <FormField
-                  control={form.control}
-                  name="key"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="API Key"
-                        help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
-                      />
-                      <FormControl>
-                        <Input
-                          type="password"
-                          placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
-                          className={errorClass('key')}
-                          {...field}
+                {!channelTypeOverridesKeyField && (
+                  <FormField
+                    control={form.control}
+                    name="key"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="API Key"
+                          help={'Credentials for the selected provider. Stored encrypted. Leave empty on edit to keep existing.'}
                         />
-                      </FormControl>
-                      {isEdit && (
-                        <div className="text-xs text-muted-foreground">
-                          Current API key is hidden for security. Enter a new key only if you want to update it.
-                        </div>
-                      )}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Input
+                            type="password"
+                            placeholder={isEdit ? "Leave empty to keep existing key" : "Enter API key"}
+                            className={errorClass('key')}
+                            {...field}
+                          />
+                        </FormControl>
+                        {isEdit && (
+                          <div className="text-xs text-muted-foreground">
+                            Current API key is hidden for security. Enter a new key only if you want to update it.
+                          </div>
+                        )}
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
 
-                <FormField
-                  control={form.control}
-                  name="base_url"
-                  render={({ field }) => (
-                    <FormItem>
-                      <LabelWithHelp
-                        label="Base URL (Optional)"
-                        help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
-                      />
-                      <FormControl>
-                        <Input
-                          placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
-                          className={errorClass('base_url')}
-                          {...field}
+                {!channelTypeRequiresDedicatedBaseURL && (
+                  <FormField
+                    control={form.control}
+                    name="base_url"
+                    render={({ field }) => (
+                      <FormItem>
+                        <LabelWithHelp
+                          label="Base URL (Optional)"
+                          help={'Provider API endpoint (e.g., https://api.openai.com). Leave empty to use the default for the chosen provider.'}
                         />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                        <FormControl>
+                          <Input
+                            placeholder={defaultBaseURL || 'e.g., https://api.openai.com'}
+                            className={errorClass('base_url')}
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+
+                {renderChannelSpecificFields()}
 
                 {(!isEdit && !hasSelectedType) ? (
                   <div className="p-4 border rounded-lg bg-muted/30 text-muted-foreground">
@@ -1882,10 +1917,6 @@ export function EditChannelPage() {
                     )}
                   />
                 )}
-
-                {/* Channel-specific configuration sections */}
-                {renderChannelSpecificFields()}
-
                 <FormField
                   control={form.control}
                   name="system_prompt"

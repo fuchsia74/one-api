@@ -101,7 +101,7 @@ type UsageOrResponseText struct {
 type SlimTextResponse struct {
 	Choices     []TextResponseChoice `json:"choices"`
 	model.Usage `json:"usage"`
-	Error       model.Error `json:"error"`
+	Error       *model.Error `json:"error,omitempty"`
 }
 
 type TextResponseChoice struct {

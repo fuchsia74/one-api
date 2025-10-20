@@ -32,8 +32,9 @@ func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.G
 	if claudeReq.MaxTokens == 0 {
 		claudeReq.MaxTokens = config.DefaultMaxToken
 	}
-	claudeReq.TopK = request.TopK
-	claudeReq.TopP = request.TopP
+	if request.Temperature != nil && request.TopP != nil {
+		claudeReq.TopP = nil
+	}
 	c.Set(ctxkey.RequestModel, request.Model)
 	c.Set(ctxkey.ConvertedRequest, claudeReq)
 	return claudeReq, nil

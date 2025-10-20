@@ -22,6 +22,7 @@ import (
 	"github.com/songquanpeng/one-api/common/image"
 	"github.com/songquanpeng/one-api/common/render"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
+	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -196,6 +197,10 @@ func ConvertClaudeRequest(c *gin.Context, claudeRequest model.ClaudeRequest) (*R
 	// Handle TopK (convert from *int to int)
 	if claudeRequest.TopK != nil {
 		request.TopK = claudeRequest.TopK
+	}
+
+	if request.Temperature != nil && request.TopP != nil {
+		request.TopP = nil
 	}
 
 	return request, nil
@@ -737,6 +742,8 @@ func ResponseClaude2OpenAI(c *gin.Context, claudeResponse *Response) *openai.Tex
 			}
 		case "text":
 			responseText += v.Text
+		case "tool_use":
+			// handled below when building tool call payloads
 		default:
 			logger.Warn("unknown response type", zap.String("type", v.Type))
 		}
@@ -885,6 +892,13 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 	var modelName string
 	var id string
 	var lastToolCallChoice openai.ChatCompletionsStreamResponseChoice
+	var streamRewriter openai_compatible.StreamRewriteHandler
+	if rewriteAny, exists := c.Get(ctxkey.ResponseStreamRewriteHandler); exists {
+		if rewriter, ok := rewriteAny.(openai_compatible.StreamRewriteHandler); ok {
+			streamRewriter = rewriter
+		}
+	}
+	doneRendered := false
 
 	for scanner.Scan() {
 		data := scanner.Text()
@@ -921,6 +935,7 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 				logger.Error("error rendering stream error response", zap.Error(e))
 			}
 			render.Done(c)
+			doneRendered = true
 			_ = resp.Body.Close()
 			return nil, &usage
 		}
@@ -981,6 +996,31 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 				lastToolCallChoice = choice
 			}
 		}
+
+		if streamRewriter != nil {
+			compatChunk := openai_compatible.ChatCompletionsStreamResponse{
+				Id:      response.Id,
+				Object:  response.Object,
+				Created: response.Created,
+				Model:   response.Model,
+				Usage:   response.Usage,
+				Choices: make([]openai_compatible.ChatCompletionsStreamResponseChoice, len(response.Choices)),
+			}
+			for i, choice := range response.Choices {
+				compatChunk.Choices[i] = openai_compatible.ChatCompletionsStreamResponseChoice{
+					Index:        choice.Index,
+					Delta:        choice.Delta,
+					FinishReason: choice.FinishReason,
+				}
+			}
+			handled, handledDone := streamRewriter.HandleChunk(c, &compatChunk)
+			if handled {
+				if handledDone {
+					doneRendered = true
+				}
+				continue
+			}
+		}
 		err = render.ObjectData(c, response)
 		if err != nil {
 			logger.Error("error rendering stream response", zap.Error(err))
@@ -991,7 +1031,21 @@ func StreamHandler(c *gin.Context, resp *http.Response) (*model.ErrorWithStatusC
 		logger.Error("error reading stream", zap.Error(err))
 	}
 
-	render.Done(c)
+	if streamRewriter != nil {
+		streamRewriter.FinalizeUsage(&usage)
+		handled, handledDone := streamRewriter.HandleDone(c)
+		if handled {
+			if handledDone {
+				doneRendered = true
+			}
+		} else if !doneRendered {
+			render.Done(c)
+			doneRendered = true
+		}
+	} else if !doneRendered {
+		render.Done(c)
+		doneRendered = true
+	}
 
 	err := resp.Body.Close()
 	if err != nil {

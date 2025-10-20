@@ -320,7 +320,9 @@ func updateChannelBalance(channel *model.Channel) (float64, error) {
 		}
 	case channeltype.Azure:
 		return 0, errors.New("Not yet implemented")
-	case channeltype.Custom:
+	case channeltype.Custom: // Legacy fallback; runtime migration upgrades these to OpenAICompatible
+		baseURL = channel.GetBaseURL()
+	case channeltype.OpenAICompatible:
 		baseURL = channel.GetBaseURL()
 	case channeltype.CloseAI:
 		return updateChannelCloseAIBalance(channel)
@@ -416,7 +418,7 @@ func updateAllChannelsBalance() error {
 			continue
 		}
 		// TODO: support Azure
-		if channel.Type != channeltype.OpenAI && channel.Type != channeltype.Custom {
+		if channel.Type != channeltype.OpenAI && !channeltype.IsOpenAICompatible(channel.Type) {
 			continue
 		}
 		balance, err := updateChannelBalance(channel)

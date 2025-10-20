@@ -504,6 +504,43 @@ func sanitizeFunctionForRequest(tool ResponseAPITool) *model.Function {
 	return &clone
 }
 
+func sanitizeResponseAPIFunctionParameters(params any) any {
+	return sanitizeResponseAPIFunctionParametersWithDepth(params, 0)
+}
+
+func sanitizeResponseAPIFunctionParametersWithDepth(params any, depth int) any {
+	switch v := params.(type) {
+	case map[string]any:
+		cleaned := make(map[string]any, len(v))
+		for key, raw := range v {
+			lowerKey := strings.ToLower(key)
+			if key == "$schema" || lowerKey == "additionalproperties" {
+				continue
+			}
+			if depth == 0 && (lowerKey == "description" || lowerKey == "strict") {
+				continue
+			}
+			cleaned[key] = sanitizeResponseAPIFunctionParametersWithDepth(raw, depth+1)
+		}
+		if len(cleaned) == 0 {
+			return map[string]any{}
+		}
+		return cleaned
+	case []any:
+		cleaned := make([]any, 0, len(v))
+		for _, item := range v {
+			cleaned = append(cleaned, sanitizeResponseAPIFunctionParametersWithDepth(item, depth+1))
+		}
+		return cleaned
+	default:
+		return params
+	}
+}
+
+func sanitizeResponseAPIJSONSchema(schema any) any {
+	return sanitizeResponseAPIFunctionParameters(schema)
+}
+
 func sanitizeDecodedFunction(fn *model.Function) *model.Function {
 	if fn == nil {
 		return nil
@@ -1107,17 +1144,26 @@ func ConvertResponseAPIToChatCompletionRequest(request *ResponseAPIRequest) (*mo
 	if request.Text != nil && request.Text.Format != nil {
 		chatReq.ResponseFormat = &model.ResponseFormat{Type: request.Text.Format.Type}
 		if strings.EqualFold(request.Text.Format.Type, "json_schema") {
+			sanitized := sanitizeResponseAPIJSONSchema(request.Text.Format.Schema)
+			schemaMap, _ := sanitized.(map[string]any)
 			chatReq.ResponseFormat.JsonSchema = &model.JSONSchema{
 				Name:        request.Text.Format.Name,
 				Description: request.Text.Format.Description,
-				Schema:      request.Text.Format.Schema,
-				Strict:      request.Text.Format.Strict,
+				Schema:      schemaMap,
 			}
+			chatReq.ResponseFormat.JsonSchema.Strict = nil
 		}
 	}
 
 	if len(request.Tools) > 0 {
 		chatReq.Tools = convertResponseAPITools(request.Tools)
+		if len(chatReq.Tools) == 0 {
+			chatReq.Tools = nil
+		}
+	}
+
+	if chatReq.ToolChoice != nil {
+		chatReq.ToolChoice = sanitizeToolChoiceAgainstTools(chatReq.ToolChoice, chatReq.Tools)
 	}
 
 	if request.Instructions != nil && *request.Instructions != "" {
@@ -1245,37 +1291,85 @@ func convertResponseAPITools(tools []ResponseAPITool) []model.Tool {
 	}
 	converted := make([]model.Tool, 0, len(tools))
 	for _, tool := range tools {
-		switch strings.ToLower(tool.Type) {
+		toolType := strings.ToLower(strings.TrimSpace(tool.Type))
+		switch toolType {
 		case "function":
+			fn := sanitizeFunctionForRequest(tool)
+			if fn == nil {
+				continue
+			}
+			fn.Strict = nil
+			if fn.Parameters != nil {
+				sanitized := sanitizeResponseAPIFunctionParameters(fn.Parameters)
+				if paramsMap, ok := sanitized.(map[string]any); ok {
+					if len(paramsMap) == 0 {
+						fn.Parameters = map[string]any{}
+					} else {
+						fn.Parameters = paramsMap
+					}
+				} else {
+					fn.Parameters = sanitized
+				}
+			}
 			converted = append(converted, model.Tool{
-				Type: "function",
-				Function: &model.Function{
-					Name:        tool.Name,
-					Description: tool.Description,
-					Parameters:  tool.Parameters,
-				},
+				Type:     "function",
+				Function: fn,
 			})
-		case "web_search":
-			converted = append(converted, model.Tool{
-				Type:              "web_search",
-				SearchContextSize: tool.SearchContextSize,
-				Filters:           tool.Filters,
-				UserLocation:      tool.UserLocation,
-			})
-		case "mcp":
-			converted = append(converted, model.Tool{
-				Type:            "mcp",
-				ServerLabel:     tool.ServerLabel,
-				ServerUrl:       tool.ServerUrl,
-				RequireApproval: tool.RequireApproval,
-				AllowedTools:    tool.AllowedTools,
-				Headers:         tool.Headers,
-			})
+		case "web_search", "web_search_preview":
+			// Web search tools are not supported when downgrading Response API requests
+			// to Chat Completions. Skip them to avoid upstream validation errors.
+			continue
 		default:
-			converted = append(converted, model.Tool{Type: tool.Type})
+			// Non-function tools (e.g. MCP, code interpreter) cannot be expressed for
+			// channels that only understand Chat Completions. Drop them so fallback
+			// requests remain compatible.
+			continue
 		}
 	}
 	return converted
+}
+
+func sanitizeToolChoiceAgainstTools(choice any, tools []model.Tool) any {
+	if choice == nil {
+		return nil
+	}
+
+	normalized, _ := NormalizeToolChoice(choice)
+	asMap, ok := normalized.(map[string]any)
+	if !ok {
+		return normalized
+	}
+
+	typeVal, _ := asMap["type"].(string)
+	switch strings.ToLower(strings.TrimSpace(typeVal)) {
+	case "", "auto", "none":
+		return normalized
+	case "tool":
+		name, _ := asMap["name"].(string)
+		if name == "" {
+			return normalized
+		}
+		for _, tool := range tools {
+			if tool.Function != nil && tool.Function.Name == name {
+				return normalized
+			}
+		}
+		return map[string]any{"type": "auto"}
+	case "function":
+		functionPayload, _ := asMap["function"].(map[string]any)
+		name, _ := functionPayload["name"].(string)
+		if name == "" {
+			return normalized
+		}
+		for _, tool := range tools {
+			if tool.Function != nil && tool.Function.Name == name {
+				return normalized
+			}
+		}
+		return map[string]any{"type": "auto"}
+	default:
+		return normalized
+	}
 }
 
 func isChargeableWebSearchAction(item OutputItem) bool {
@@ -1982,6 +2076,8 @@ type ResponseAPIStreamEvent struct {
 
 	// Response-level events (type starts with "response.")
 	Response *ResponseAPIResponse `json:"response,omitempty"` // Full response object for response-level events
+	// Required action events (response.required_action.*)
+	RequiredAction *ResponseAPIRequiredAction `json:"required_action,omitempty"`
 
 	// Output item events (type contains "output_item")
 	OutputIndex int         `json:"output_index,omitempty"` // Index of the output item

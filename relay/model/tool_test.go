@@ -3,6 +3,8 @@ package model
 import (
 	"encoding/json"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 // TestToolIndexField tests that the Index field is properly serialized in streaming tool calls
@@ -504,4 +506,48 @@ func TestMCPToolEdgeCases(t *testing.T) {
 	if _, exists := result["allowed_tools"]; exists {
 		t.Error("Empty allowed_tools slice should be omitted")
 	}
+}
+
+func TestToolUnmarshalFlattenedFunction(t *testing.T) {
+	jsonStr := `{
+		"type": "function",
+		"name": "get_weather",
+		"description": "Get current temperature for a given location.",
+		"parameters": {
+			"type": "object",
+			"properties": {
+				"location": {
+					"type": "string"
+				}
+			},
+			"required": ["location"],
+			"additionalProperties": false
+		},
+		"strict": true
+	}`
+
+	var tool Tool
+	require.NoError(t, json.Unmarshal([]byte(jsonStr), &tool))
+	require.NotNil(t, tool.Function)
+	require.Equal(t, "function", tool.Type)
+	require.Equal(t, "get_weather", tool.Function.Name)
+	require.Equal(t, "Get current temperature for a given location.", tool.Function.Description)
+	require.NotNil(t, tool.Function.Strict)
+	require.True(t, *tool.Function.Strict)
+	require.NotNil(t, tool.Function.Parameters)
+
+	encoded, err := json.Marshal(tool)
+	require.NoError(t, err)
+
+	var serialized map[string]any
+	require.NoError(t, json.Unmarshal(encoded, &serialized))
+	require.Equal(t, "function", serialized["type"])
+
+	fn, ok := serialized["function"].(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "get_weather", fn["name"])
+	require.Equal(t, true, fn["strict"])
+
+	_, hasName := serialized["name"]
+	require.False(t, hasName)
 }

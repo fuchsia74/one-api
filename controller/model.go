@@ -383,10 +383,10 @@ func ListModels(c *gin.Context) {
 	}
 
 	// fix(#39): Previously, to fix #31, I concatenated model_name with adaptor name to return models.
-	// But this caused an issue with custom channels, where the returned adaptor is "openai",
+	// But this caused an issue with OpenAI-compatible channels (including legacy custom entries), where the returned adaptor is "openai",
 	// resulting in adaptor name and ownedBy field mismatches when matching against allModels.
 	// For deepseek example, the adaptor is "openai" but ownedBy is "deepseek", causing mismatch.
-	// Our current solution: for models from custom channels, don't concatenate adaptor name,
+	// Our current solution: for models from OpenAI-compatible channels, don't concatenate adaptor name,
 	// just match by model name only. However, this may reintroduce the duplicate models bug
 	// mentioned in #31. A complete fix would require significant changes, so I'll leave it for now.
 

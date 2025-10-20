@@ -66,7 +66,7 @@ type StreamRewriteHandler interface {
 type SlimTextResponse struct {
 	Choices     []TextResponseChoice `json:"choices"`
 	model.Usage `json:"usage"`
-	Error       model.Error `json:"error"`
+	Error       *model.Error `json:"error,omitempty"`
 }
 
 type TextResponseChoice struct {
@@ -106,7 +106,21 @@ func CountTokenText(text string, modelName string) int {
 // GetFullRequestURL constructs the full request URL for OpenAI-compatible APIs
 func GetFullRequestURL(baseURL string, requestURL string, channelType int) string {
 	if channelType == channeltype.OpenAICompatible {
-		return fmt.Sprintf("%s%s", strings.TrimSuffix(baseURL, "/"), strings.TrimPrefix(requestURL, "/v1"))
+		trimmedBase := strings.TrimRight(baseURL, "/")
+		path := requestURL
+		if !strings.HasPrefix(path, "/") {
+			path = "/" + path
+		}
+		if strings.HasSuffix(trimmedBase, "/v1") {
+			path = strings.TrimPrefix(path, "/v1")
+			if path == "" {
+				path = "/"
+			}
+			if !strings.HasPrefix(path, "/") {
+				path = "/" + path
+			}
+		}
+		return trimmedBase + path
 	}
 	return fmt.Sprintf("%s%s", baseURL, requestURL)
 }
@@ -234,7 +248,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	if textResponse.Error.Type != "" {
+	if textResponse.Error != nil && textResponse.Error.Type != "" {
 		if textResponse.Error.RawError == nil && textResponse.Error.Message != "" {
 			textResponse.Error.RawError = errors.New(textResponse.Error.Message)
 		}
@@ -244,7 +258,7 @@ func Handler(c *gin.Context, resp *http.Response, promptTokens int, modelName st
 			// Prefer recording the raw upstream error for diagnostics
 			zap.Error(textResponse.Error.RawError))
 		return &model.ErrorWithStatusCode{
-			Error:      textResponse.Error,
+			Error:      *textResponse.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
 	}
@@ -410,7 +424,7 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 		return ErrorWrapper(err, "unmarshal_response_body_failed", http.StatusInternalServerError), nil
 	}
 
-	if textResponse.Error.Type != "" {
+	if textResponse.Error != nil && textResponse.Error.Type != "" {
 		if textResponse.Error.RawError == nil && textResponse.Error.Message != "" {
 			textResponse.Error.RawError = errors.New(textResponse.Error.Message)
 		}
@@ -420,7 +434,7 @@ func HandlerWithThinking(c *gin.Context, resp *http.Response, promptTokens int, 
 			// Prefer recording the raw upstream error for diagnostics
 			zap.Error(textResponse.Error.RawError))
 		return &model.ErrorWithStatusCode{
-			Error:      textResponse.Error,
+			Error:      *textResponse.Error,
 			StatusCode: resp.StatusCode,
 		}, nil
 	}

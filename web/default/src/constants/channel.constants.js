@@ -7,11 +7,11 @@ export const CHANNEL_OPTIONS = [
     color: 'olive',
     description: 'OpenAI compatible channel, supports custom Base URL',
   },
-  {key: 14, text: 'Anthropic', value: 14, color: 'black'},
+  { key: 14, text: 'Anthropic', value: 14, color: 'black' },
   { key: 33, text: 'AWS', value: 33, color: 'black' },
-  {key: 3, text: 'Azure', value: 3, color: 'olive'},
-  {key: 11, text: 'PaLM2', value: 11, color: 'orange'},
-  {key: 24, text: 'Gemini', value: 24, color: 'orange'},
+  { key: 3, text: 'Azure', value: 3, color: 'olive' },
+  { key: 11, text: 'PaLM2', value: 11, color: 'orange' },
+  { key: 24, text: 'Gemini', value: 24, color: 'orange' },
   {
     key: 51,
     text: 'Gemini (OpenAI)',
@@ -85,14 +85,6 @@ export const CHANNEL_OPTIONS = [
   { key: 44, text: 'SiliconFlow', value: 44, color: 'blue' },
   { key: 45, text: 'xAI', value: 45, color: 'blue' },
   { key: 46, text: 'Replicate', value: 46, color: 'blue' },
-  {
-    key: 8,
-    text: 'Custom Channel',
-    value: 8,
-    color: 'pink',
-    tip: 'Not recommended. Please use <strong>OpenAI Compatible</strong> channel type. Note: the proxy address filled in here will only replace the domain part during actual requests. If you want to fill in the Base URL required by OpenAI SDK, please use OpenAI Compatible channel type',
-    description: 'Not recommended, please use OpenAI Compatible channel type',
-  },
   { key: 22, text: 'Knowledge Base: FastGPT', value: 22, color: 'blue' },
   { key: 21, text: 'Knowledge Base: AI Proxy', value: 21, color: 'purple' },
   { key: 20, text: 'OpenRouter', value: 20, color: 'black' },
@@ -108,6 +100,6 @@ export const CHANNEL_OPTIONS = [
 ];
 
 export const COZE_AUTH_OPTIONS = [
-  {key: 'personal_access_token', text: 'personal_access_token', value: 'personal_access_token'},
-  {key: 'oauth_jwt', text: 'oauth_jwt', value: 'oauth_jwt' },
+  { key: 'personal_access_token', text: 'personal_access_token', value: 'personal_access_token' },
+  { key: 'oauth_jwt', text: 'oauth_jwt', value: 'oauth_jwt' },
 ];

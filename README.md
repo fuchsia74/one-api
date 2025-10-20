@@ -9,18 +9,23 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ```plain
 === One-API Regression Matrix ===
 
-Variant                  gpt-4o-mini  gpt-5-mini   claude-3.5-haiku  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat
-Chat (stream=false)      PASS 3.40s   PASS 11.81s  PASS 1.37s        PASS 0.96s        PASS 1.96s          PASS 1.84s
-Chat (stream=true)       PASS 1.56s   PASS 7.91s   PASS 1.60s        PASS 0.86s        PASS 0.51s          PASS 1.49s
-Chat Tools               PASS 1.75s   PASS 4.87s   PASS 1.42s        PASS 2.47s        PASS 0.70s          PASS 2.12s
-Response (stream=false)  PASS 2.58s   PASS 10.23s  PASS 1.30s        PASS 0.90s        PASS 0.64s          PASS 2.60s
-Response (stream=true)   PASS 2.08s   PASS 3.76s   PASS 1.28s        PASS 1.15s        PASS 0.49s          PASS 1.23s
-Response Tools           PASS 2.04s   PASS 2.87s   PASS 2.05s        PASS 1.49s        PASS 0.73s          PASS 3.40s
-Claude (stream=false)    PASS 1.26s   PASS 3.33s   PASS 1.71s        PASS 1.02s        PASS 0.75s          PASS 1.77s
-Claude (stream=true)     PASS 2.91s   PASS 9.68s   PASS 1.12s        PASS 1.66s        PASS 1.18s          PASS 2.65s
-Claude Tools             PASS 3.21s   PASS 9.05s   PASS 1.54s        PASS 1.68s        PASS 0.53s          PASS 2.81s
+Variant                        gpt-4o-mini  gpt-5-mini   claude-haiku-4-5  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat  grok-4-fast-non-reasoning  azure-gpt-5-nano
+Chat (stream=false)            PASS 12.02s  PASS 18.68s  PASS 7.13s        PASS 3.32s        PASS 5.08s          PASS 7.13s     PASS 10.96s                PASS 18.68s
+Chat (stream=true)             PASS 13.14s  PASS 22.24s  PASS 2.76s        PASS 7.13s        PASS 0.72s          PASS 9.86s     PASS 9.85s                 PASS 33.11s
+Chat Tools (stream=false)      PASS 7.14s   PASS 13.14s  PASS 8.87s        PASS 15.41s       PASS 13.14s         PASS 7.14s     PASS 15.41s                PASS 18.67s
+Chat Tools (stream=true)       PASS 8.88s   PASS 15.42s  PASS 23.76s       PASS 7.12s        PASS 0.61s          PASS 3.19s     PASS 12.01s                PASS 31.78s
+Response (stream=false)        PASS 7.14s   PASS 18.67s  PASS 17.66s       PASS 14.26s       PASS 3.41s          PASS 16.55s    PASS 14.26s                PASS 18.67s
+Response (stream=true)         PASS 26.80s  PASS 26.80s  PASS 7.15s        PASS 4.00s        PASS 3.26s          PASS 25.77s    PASS 5.06s                 PASS 33.08s
+Response Tools (stream=false)  PASS 3.57s   PASS 8.87s   PASS 10.95s       PASS 4.00s        PASS 9.85s          PASS 3.56s     PASS 7.12s                 PASS 18.68s
+Response Tools (stream=true)   PASS 21.75s  PASS 12.02s  PASS 4.03s        PASS 5.08s        PASS 19.00s         PASS 3.20s     PASS 3.18s                 PASS 9.87s
+Claude (stream=false)          PASS 10.96s  PASS 18.16s  PASS 12.02s       PASS 3.54s        PASS 6.66s          PASS 7.94s     PASS 3.22s                 PASS 17.67s
+Claude (stream=true)           PASS 2.01s   PASS 6.80s   PASS 3.19s        PASS 5.07s        PASS 2.74s          PASS 1.85s     PASS 0.96s                 PASS 8.77s
+Claude Tools (stream=false)    PASS 3.32s   PASS 18.16s  PASS 7.94s        PASS 7.12s        PASS 6.14s          PASS 7.14s     PASS 5.06s                 PASS 12.02s
+Claude Tools (stream=true)     PASS 4.85s   PASS 5.02s   PASS 24.90s       PASS 7.93s        PASS 3.37s          PASS 3.10s     PASS 7.94s                 PASS 8.21s
 
-Totals  | Requests: 54 | Passed: 54 | Failed: 0 | Skipped: 0
+Totals  | Requests: 96 | Passed: 96 | Failed: 0 | Skipped: 0
+
+2025-10-19T23:57:47Z    INFO    oneapi-test     test/main.go:31 all tests passed
 
 ```
 
@@ -87,7 +92,7 @@ Also welcome to register and use my deployed one-api gateway, which supports var
         - [Non-Stream](#non-stream)
       - [Support /v1/messages Claude Messages API](#support-v1messages-claude-messages-api)
         - [Support Claude Code](#support-claude-code)
-    - [Support claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5](#support-claude-opus-4-0--claude-opus-4-1--claude-sonnet-4-0--claude-sonnet-4-5)
+    - [Support Claude 4.x Models](#support-claude-4x-models)
     - [Google (Gemini \& Vertex) Features](#google-gemini--vertex-features)
       - [Support gemini-2.0-flash-exp](#support-gemini-20-flash-exp)
       - [Support gemini-2.0-flash](#support-gemini-20-flash)
@@ -154,6 +159,8 @@ oneapi:
     ENABLE_PROMETHEUS_METRICS: "true"
     # (optional) LOG_RETENTION_DAYS set log retention days; default is not to delete any logs
     LOG_RETENTION_DAYS: 7
+    # (optional) TRACE_RENTATION_DAYS retain trace records for the specified number of days; default is 30 and 0 disables cleanup
+    TRACE_RENTATION_DAYS: 30
 
     # --- Storage & Cache ---
     # (optional) SQL_DSN set SQL database connection; leave empty to use SQLite (supports mysql, postgresql, sqlite3)
@@ -442,9 +449,11 @@ export ANTHROPIC_AUTH_TOKEN="sk-xxxxxxx"
 
 You can use any model you like for Claude Code, even if the model doesn’t natively support the Claude Messages API.
 
-### Support claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5
+### Support Claude 4.x Models
 
 ![](https://s3.laisky.com/uploads/2025/09/claude-sonnet-4-5.png)
+
+claude-opus-4-0 / claude-opus-4-1 / claude-sonnet-4-0 / claude-sonnet-4-5 / claude-haiku-4-5
 
 ### Google (Gemini & Vertex) Features
 

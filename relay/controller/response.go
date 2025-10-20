@@ -42,6 +42,9 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	lg := gmw.GetLogger(c)
 	ctx := gmw.Ctx(c)
 	meta := metalib.GetByContext(c)
+	if err := logClientRequestPayload(c, "response_api"); err != nil {
+		return openai.ErrorWrapper(err, "invalid_response_api_request", http.StatusBadRequest)
+	}
 
 	// get & validate Response API request
 	responseAPIRequest, err := getAndValidateResponseAPIRequest(c)
@@ -50,6 +53,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
 	sanitizeResponseAPIRequest(responseAPIRequest)
+	applyThinkingQueryToResponseRequest(c, responseAPIRequest, meta)
 	if normalized, changed := openai.NormalizeToolChoiceForResponse(responseAPIRequest.ToolChoice); changed {
 		responseAPIRequest.ToolChoice = normalized
 	}
@@ -89,7 +93,10 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeResponseAPIQuota(c, responseAPIRequest, promptTokens, ratio, outputRatio, backgroundEnabled, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeResponseAPIQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeResponseAPIQuota failed",
+			zap.Error(bizErr.RawError),
+			zap.String("err_msg", bizErr.Message),
+			zap.Int("status_code", bizErr.StatusCode))
 		return bizErr
 	}
 
@@ -126,6 +133,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		// ErrorWrapper will log the error, so we don't need to log it here
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	upstreamCapture := wrapUpstreamResponse(resp)
 	// Immediately record a provisional request cost even if pre-consume was skipped (trusted path)
 	// using the estimated base quota; reconcile when usage arrives.
 	{
@@ -158,11 +166,16 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		if err := model.UpdateUserRequestCostQuotaByRequestID(quotaId, requestId, 0); err != nil {
 			lg.Warn("update user request cost to zero failed", zap.Error(err))
 		}
-		return RelayErrorHandler(resp)
+		return RelayErrorHandlerWithContext(c, resp)
 	}
 
 	// do response
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
+	if upstreamCapture != nil {
+		logUpstreamResponseFromCapture(lg, resp, upstreamCapture, "response_api")
+	} else {
+		logUpstreamResponseFromBytes(lg, resp, nil, "response_api")
+	}
 	if respErr != nil {
 		// If usage is available even though writing to client failed (e.g., client cancelled),
 		// proceed to billing to ensure forwarded requests are charged; do not refund pre-consumed quota.
@@ -248,6 +261,7 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	meta.OriginModelName = chatRequest.Model
 	chatRequest.Model = metalib.GetMappedModelName(meta.OriginModelName, meta.ModelMapping)
 	meta.ActualModelName = chatRequest.Model
+	applyThinkingQueryToChatRequest(c, chatRequest, meta)
 	meta.RequestURLPath = "/v1/chat/completions"
 	meta.ResponseAPIFallback = true
 	if c.Request != nil && c.Request.URL != nil {
@@ -292,7 +306,10 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	meta.PromptTokens = promptTokens
 	preConsumedQuota, bizErr := preConsumeQuota(c, chatRequest, promptTokens, ratio, meta)
 	if bizErr != nil {
-		lg.Warn("preConsumeQuota failed", zap.Any("error", *bizErr))
+		lg.Warn("preConsumeQuota failed",
+			zap.Error(bizErr.RawError),
+			zap.String("err_msg", bizErr.Message),
+			zap.Int("status_code", bizErr.StatusCode))
 		return bizErr
 	}
 
@@ -322,6 +339,7 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 		billing.ReturnPreConsumedQuota(ctx, preConsumedQuota, meta.TokenId)
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
+	upstreamCapture := wrapUpstreamResponse(resp)
 
 	// Record provisional quota usage for reconciliation
 	if requestId := c.GetString(ctxkey.RequestId); requestId != "" {
@@ -336,10 +354,15 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 		graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
 			billing.ReturnPreConsumedQuota(cctx, preConsumedQuota, meta.TokenId)
 		})
-		return RelayErrorHandler(resp)
+		return RelayErrorHandlerWithContext(c, resp)
 	}
 
 	usage, respErr := adaptor.DoResponse(c, resp, meta)
+	if upstreamCapture != nil {
+		logUpstreamResponseFromCapture(lg, resp, upstreamCapture, "response_api_fallback")
+	} else {
+		logUpstreamResponseFromBytes(lg, resp, nil, "response_api_fallback")
+	}
 	if respErr != nil {
 		if usage == nil {
 			graceful.GoCritical(ctx, "returnPreConsumedQuota", func(cctx context.Context) {
@@ -922,14 +945,18 @@ func supportsNativeResponseAPI(meta *metalib.Meta) bool {
 	if meta == nil {
 		return false
 	}
-	if meta.ChannelType != channeltype.OpenAI {
+	switch meta.ChannelType {
+	case channeltype.OpenAI:
+		base := strings.TrimSpace(strings.ToLower(meta.BaseURL))
+		if base == "" {
+			return true
+		}
+		return strings.Contains(base, "api.openai.com")
+	case channeltype.OpenAICompatible:
+		return channeltype.UseOpenAICompatibleResponseAPI(meta.Config.APIFormat)
+	default:
 		return false
 	}
-	base := strings.TrimSpace(strings.ToLower(meta.BaseURL))
-	if base == "" {
-		return true
-	}
-	return strings.Contains(base, "api.openai.com")
 }
 
 func isReasoningModel(modelName string) bool {

@@ -13,6 +13,7 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/helper"
 	"github.com/songquanpeng/one-api/common/logger"
+	"github.com/songquanpeng/one-api/dto"
 )
 
 type Log struct {
@@ -449,28 +450,25 @@ func GetLogById(id int) (*Log, error) {
 	return &log, nil
 }
 
-type LogStatistic struct {
-	Day              string `gorm:"column:day"`
-	ModelName        string `gorm:"column:model_name"`
-	RequestCount     int    `gorm:"column:request_count"`
-	Quota            int    `gorm:"column:quota"`
-	PromptTokens     int    `gorm:"column:prompt_tokens"`
-	CompletionTokens int    `gorm:"column:completion_tokens"`
+// dayAggregationSelect returns the SQL expression that normalizes log timestamps
+// into YYYY-MM-DD strings, accounting for the configured database engine.
+func dayAggregationSelect() string {
+	if common.UsingPostgreSQL {
+		return "TO_CHAR(date_trunc('day', to_timestamp(created_at)), 'YYYY-MM-DD') as day"
+	}
+
+	if common.UsingSQLite {
+		return "strftime('%Y-%m-%d', datetime(created_at, 'unixepoch')) as day"
+	}
+
+	return "DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-%d') as day"
 }
 
 // SearchLogsByDayAndModel returns per-day, per-model aggregates for logs in the
 // half-open timestamp range [start, endExclusive). `start` and `endExclusive`
 // are Unix seconds.
-func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*LogStatistic, err error) {
-	groupSelect := "DATE_FORMAT(FROM_UNIXTIME(created_at), '%Y-%m-%d') as day"
-
-	if common.UsingPostgreSQL {
-		groupSelect = "TO_CHAR(date_trunc('day', to_timestamp(created_at)), 'YYYY-MM-DD') as day"
-	}
-
-	if common.UsingSQLite {
-		groupSelect = "strftime('%Y-%m-%d', datetime(created_at, 'unixepoch')) as day"
-	}
+func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*dto.LogStatistic, err error) {
+	groupSelect := dayAggregationSelect()
 
 	// If userId is 0, query all users (site-wide statistics)
 	var query string
@@ -511,4 +509,99 @@ func SearchLogsByDayAndModel(userId, start, endExclusive int) (LogStatistics []*
 	err = LOG_DB.Raw(query, args...).Scan(&LogStatistics).Error
 
 	return LogStatistics, err
+}
+
+// SearchLogsByDayAndUser returns per-day, per-user aggregates for logs within
+// the half-open timestamp range [start, endExclusive).
+func SearchLogsByDayAndUser(userId, start, endExclusive int) ([]*dto.LogStatisticByUser, error) {
+	groupSelect := dayAggregationSelect()
+
+	var query string
+	var args []any
+
+	if userId == 0 {
+		query = `
+			SELECT ` + groupSelect + `,
+			username, user_id,
+			count(1) as request_count,
+			sum(quota) as quota,
+			sum(prompt_tokens) as prompt_tokens,
+			sum(completion_tokens) as completion_tokens
+			FROM logs
+			WHERE type=2
+			AND created_at >= ? AND created_at < ?
+			GROUP BY day, username, user_id
+			ORDER BY day, username
+		`
+		args = []any{start, endExclusive}
+	} else {
+		query = `
+			SELECT ` + groupSelect + `,
+			username, user_id,
+			count(1) as request_count,
+			sum(quota) as quota,
+			sum(prompt_tokens) as prompt_tokens,
+			sum(completion_tokens) as completion_tokens
+			FROM logs
+			WHERE type=2
+			AND user_id = ?
+			AND created_at >= ? AND created_at < ?
+			GROUP BY day, username, user_id
+			ORDER BY day, username
+		`
+		args = []any{userId, start, endExclusive}
+	}
+
+	var stats []*dto.LogStatisticByUser
+	err := LOG_DB.Raw(query, args...).Scan(&stats).Error
+	return stats, err
+}
+
+// SearchLogsByDayAndToken returns per-day, per-token aggregates (scoped by
+// username to disambiguate tokens with identical names) for the half-open
+// range [start, endExclusive).
+func SearchLogsByDayAndToken(userId, start, endExclusive int) ([]*dto.LogStatisticByToken, error) {
+	groupSelect := dayAggregationSelect()
+
+	var query string
+	var args []any
+
+	if userId == 0 {
+		query = `
+			SELECT ` + groupSelect + `,
+			COALESCE(token_name, '') as token_name,
+			username, user_id,
+			count(1) as request_count,
+			sum(quota) as quota,
+			sum(prompt_tokens) as prompt_tokens,
+			sum(completion_tokens) as completion_tokens
+			FROM logs
+			WHERE type=2
+			AND created_at >= ? AND created_at < ?
+			GROUP BY day, token_name, username, user_id
+			ORDER BY day, username, token_name
+		`
+		args = []any{start, endExclusive}
+	} else {
+		query = `
+			SELECT ` + groupSelect + `,
+			COALESCE(token_name, '') as token_name,
+			username, user_id,
+			count(1) as request_count,
+			sum(quota) as quota,
+			sum(prompt_tokens) as prompt_tokens,
+			sum(completion_tokens) as completion_tokens
+			FROM logs
+			WHERE type=2
+			AND user_id = ?
+			AND created_at >= ? AND created_at < ?
+			GROUP BY day, token_name, username, user_id
+			ORDER BY day, username, token_name
+		`
+		args = []any{userId, start, endExclusive}
+	}
+
+	var stats []*dto.LogStatisticByToken
+	err := LOG_DB.Raw(query, args...).Scan(&stats).Error
+	return stats, err
 }

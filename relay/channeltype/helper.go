@@ -56,6 +56,13 @@ func ToAPIType(channelType int) int {
 	return apiType
 }
 
+// IsOpenAICompatible reports whether the provided channel type should use the OpenAI-compatible
+// adaptor stack. Legacy custom channels (type 8) are treated as OpenAI-compatible to preserve
+// backward compatibility after the migration to the unified type.
+func IsOpenAICompatible(channelType int) bool {
+	return channelType == OpenAICompatible || channelType == Custom
+}
+
 // IdToName converts channel type ID to readable name
 func IdToName(channelType int) string {
 	switch channelType {
