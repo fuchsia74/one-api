@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -304,6 +305,8 @@ func TestTotpReplayProtection(t *testing.T) {
 	secret := "JBSWY3DPEHPK3PXP"
 	userId := 123
 
+	ctx := context.Background()
+
 	totp, err := gcrypto.NewTOTP(gcrypto.OTPArgs{
 		Base32Secret: secret,
 	})
@@ -312,13 +315,13 @@ func TestTotpReplayProtection(t *testing.T) {
 	code := totp.Key()
 
 	// First verification should succeed
-	assert.True(t, verifyTotpCode(userId, secret, code))
+	assert.True(t, verifyTotpCode(ctx, userId, secret, code))
 
 	// Second verification with same code should fail (replay protection)
-	assert.False(t, verifyTotpCode(userId, secret, code))
+	assert.False(t, verifyTotpCode(ctx, userId, secret, code))
 
 	// Different user should still be able to use the same code
-	assert.True(t, verifyTotpCode(userId+1, secret, code))
+	assert.True(t, verifyTotpCode(ctx, userId+1, secret, code))
 }
 
 func TestTotpSecurityFunctions(t *testing.T) {
@@ -328,21 +331,23 @@ func TestTotpSecurityFunctions(t *testing.T) {
 	userId := 456
 	code := "123456"
 
+	ctx := context.Background()
+
 	// Initially, code should not be marked as used
-	assert.False(t, common.IsTotpCodeUsed(userId, code))
+	assert.False(t, common.IsTotpCodeUsed(ctx, userId, code))
 
 	// Mark code as used
-	err := common.MarkTotpCodeAsUsed(userId, code)
+	err := common.MarkTotpCodeAsUsed(ctx, userId, code)
 	assert.NoError(t, err)
 
 	// Now code should be marked as used
-	assert.True(t, common.IsTotpCodeUsed(userId, code))
+	assert.True(t, common.IsTotpCodeUsed(ctx, userId, code))
 
 	// Different user should not be affected
-	assert.False(t, common.IsTotpCodeUsed(userId+1, code))
+	assert.False(t, common.IsTotpCodeUsed(ctx, userId+1, code))
 
 	// Different code should not be affected
-	assert.False(t, common.IsTotpCodeUsed(userId, "654321"))
+	assert.False(t, common.IsTotpCodeUsed(ctx, userId, "654321"))
 }
 
 func TestAdminDisableUserTotp(t *testing.T) {

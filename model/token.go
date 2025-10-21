@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -90,9 +91,12 @@ func (t Token) MarshalJSON() ([]byte, error) {
 	return json.Marshal(dto)
 }
 
-func clearTokenCache(key string) {
+func clearTokenCache(ctx context.Context, key string) {
 	if common.IsRedisEnabled() {
-		err := common.RedisDel(fmt.Sprintf("token:%s", key))
+		if ctx == nil {
+			ctx = context.Background()
+		}
+		err := common.RedisDel(ctx, fmt.Sprintf("token:%s", key))
 		if err != nil {
 			logger.Logger.Warn("failed to clear token cache, continuing", zap.String("key", key), zap.Error(err))
 		}
@@ -152,11 +156,14 @@ func SearchUserTokens(userId int, keyword string, startIdx int, num int, sortBy 
 	return tokens, total, err
 }
 
-func ValidateUserToken(key string) (token *Token, err error) {
+func ValidateUserToken(ctx context.Context, key string) (token *Token, err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if key == "" {
 		return nil, errors.New("No token provided")
 	}
-	token, err = CacheGetTokenByKey(key)
+	token, err = CacheGetTokenByKey(ctx, key)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.Wrapf(err, "token not found for key: %s", key)
@@ -178,7 +185,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 	if token.ExpiredTime != -1 && token.ExpiredTime < helper.GetTimestamp() {
 		if !common.IsRedisEnabled() {
 			token.Status = TokenStatusExpired
-			err := token.SelectUpdate()
+			err := token.SelectUpdate(ctx)
 			if err != nil {
 				logger.Logger.Error("failed to update token status", zap.Int("token_id", token.Id), zap.Error(err))
 			}
@@ -188,7 +195,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 			// For consistency with other operations, let SelectUpdate handle it if it's called.
 			// However, SelectUpdate is only called if Redis is NOT enabled in this block.
 			// So, if Redis IS enabled, and token is expired, we should clear it.
-			clearTokenCache(token.Key)
+			clearTokenCache(ctx, token.Key)
 		}
 		return nil, errors.Errorf("token %s (#%d) has expired at timestamp %d", token.Name, token.Id, token.ExpiredTime)
 	}
@@ -196,13 +203,13 @@ func ValidateUserToken(key string) (token *Token, err error) {
 		if !common.IsRedisEnabled() {
 			// in this case, we can make sure the token is exhausted
 			token.Status = TokenStatusExhausted
-			err := token.SelectUpdate()
+			err := token.SelectUpdate(ctx)
 			if err != nil {
 				logger.Logger.Error("failed to update token status", zap.Int("token_id", token.Id), zap.Error(err))
 			}
 		} else {
 			// If Redis IS enabled, and token is exhausted, we should clear it.
-			clearTokenCache(token.Key)
+			clearTokenCache(ctx, token.Key)
 		}
 		return nil, errors.Errorf("token %s (#%d) quota has been used up (remaining: %d)", token.Name, token.Id, token.RemainQuota)
 	}
@@ -234,42 +241,54 @@ func GetTokenById(id int) (*Token, error) {
 	return &token, nil
 }
 
-func (t *Token) Insert() error {
+func (t *Token) Insert(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var err error
 	err = DB.Create(t).Error
 	if err == nil {
-		clearTokenCache(t.Key)
+		clearTokenCache(ctx, t.Key)
 		return nil
 	}
 	return errors.Wrapf(err, "failed to insert token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
-func (t *Token) Update() error {
+func (t *Token) Update(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var err error
 	err = DB.Model(t).Select("name", "status", "expired_time", "remain_quota", "unlimited_quota", "models", "subnet").Updates(t).Error
 	if err == nil {
-		clearTokenCache(t.Key)
+		clearTokenCache(ctx, t.Key)
 		return nil
 	}
 	return errors.Wrapf(err, "failed to update token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
-func (t *Token) SelectUpdate() error {
+func (t *Token) SelectUpdate(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	// This can update zero values
 	err := DB.Model(t).Select("accessed_time", "status").Updates(t).Error
 	if err == nil {
-		clearTokenCache(t.Key)
+		clearTokenCache(ctx, t.Key)
 		return nil
 	}
 	return errors.Wrapf(err, "failed to select update token: id=%d, user_id=%d", t.Id, t.UserId)
 }
 
-func (t *Token) Delete() error {
+func (t *Token) Delete(ctx context.Context) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	var err error
 	err = DB.Delete(t).Error
 	if err == nil {
-		clearTokenCache(t.Key)
+		clearTokenCache(ctx, t.Key)
 		return nil
 	}
 	return errors.Wrapf(err, "failed to delete token: id=%d, user_id=%d", t.Id, t.UserId)
@@ -285,7 +304,7 @@ func (t *Token) GetModels() string {
 	return *t.Models
 }
 
-func DeleteTokenById(id int, userId int) (err error) {
+func DeleteTokenById(ctx context.Context, id int, userId int) (err error) {
 	// Why we need userId here? In case user want to delete other's token.
 	if id == 0 || userId == 0 {
 		return errors.Errorf("invalid parameters: id=%d, userId=%d", id, userId)
@@ -297,14 +316,14 @@ func DeleteTokenById(id int, userId int) (err error) {
 	}
 	// The key is now populated in token object
 	// token.Delete() will handle clearing the cache
-	err = token.Delete()
+	err = token.Delete(ctx)
 	if err != nil {
 		return errors.Wrapf(err, "failed to delete token: id=%d, userId=%d", id, userId)
 	}
 	return nil
 }
 
-func IncreaseTokenQuota(id int, quota int64) (err error) {
+func IncreaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
 	if quota < 0 {
 		return errors.Errorf("quota cannot be negative: %d", quota)
 	}
@@ -312,10 +331,13 @@ func IncreaseTokenQuota(id int, quota int64) (err error) {
 		addNewRecord(BatchUpdateTypeTokenQuota, id, quota)
 		return nil
 	}
-	return increaseTokenQuota(id, quota)
+	return increaseTokenQuota(ctx, id, quota)
 }
 
-func increaseTokenQuota(id int, quota int64) (err error) {
+func increaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
 		map[string]any{
 			"remain_quota":  gorm.Expr("remain_quota + ?", quota),
@@ -326,7 +348,7 @@ func increaseTokenQuota(id int, quota int64) (err error) {
 	if err == nil {
 		token, fetchErr := GetTokenById(id)
 		if fetchErr == nil && token != nil {
-			clearTokenCache(token.Key)
+			clearTokenCache(ctx, token.Key)
 		} else if fetchErr != nil {
 			logger.Logger.Error("failed to fetch token for cache clearing after quota increase", zap.Int("token_id", id), zap.Error(fetchErr))
 		}
@@ -335,7 +357,7 @@ func increaseTokenQuota(id int, quota int64) (err error) {
 	return errors.Wrapf(err, "failed to increase token quota: id=%d", id)
 }
 
-func DecreaseTokenQuota(id int, quota int64) (err error) {
+func DecreaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
 	if quota < 0 {
 		return errors.Errorf("quota cannot be negative: %d", quota)
 	}
@@ -343,10 +365,13 @@ func DecreaseTokenQuota(id int, quota int64) (err error) {
 		addNewRecord(BatchUpdateTypeTokenQuota, id, -quota)
 		return nil
 	}
-	return decreaseTokenQuota(id, quota)
+	return decreaseTokenQuota(ctx, id, quota)
 }
 
-func decreaseTokenQuota(id int, quota int64) (err error) {
+func decreaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	result := DB.Model(&Token{}).
 		Where("id = ? AND remain_quota >= ?", id, quota).
 		Updates(map[string]any{
@@ -363,14 +388,17 @@ func decreaseTokenQuota(id int, quota int64) (err error) {
 
 	token, fetchErr := GetTokenById(id)
 	if fetchErr == nil && token != nil {
-		clearTokenCache(token.Key)
+		clearTokenCache(ctx, token.Key)
 	} else if fetchErr != nil {
 		logger.Logger.Error("failed to fetch token for cache clearing after quota decrease", zap.Int("token_id", id), zap.Error(fetchErr))
 	}
 	return nil
 }
 
-func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
+func PreConsumeTokenQuota(ctx context.Context, tokenId int, quota int64) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if quota < 0 {
 		return errors.Errorf("quota cannot be negative: %d", quota)
 	}
@@ -428,7 +456,7 @@ func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 		}(reminderEmail, noMoreQuota, userQuota)
 	}
 	if !token.UnlimitedQuota {
-		if err = DecreaseTokenQuota(tokenId, quota); err != nil {
+		if err = DecreaseTokenQuota(ctx, tokenId, quota); err != nil {
 			return errors.Wrapf(err, "decrease quota for token %d", tokenId)
 		}
 	}
@@ -438,7 +466,10 @@ func PreConsumeTokenQuota(tokenId int, quota int64) (err error) {
 	return nil
 }
 
-func PostConsumeTokenQuota(tokenId int, quota int64) (err error) {
+func PostConsumeTokenQuota(ctx context.Context, tokenId int, quota int64) (err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	token, err := GetTokenById(tokenId)
 	if err != nil {
 		return errors.Wrapf(err, "get token %d for post-consume", tokenId)
@@ -450,9 +481,9 @@ func PostConsumeTokenQuota(tokenId int, quota int64) (err error) {
 	}
 	if !token.UnlimitedQuota {
 		if quota > 0 {
-			err = DecreaseTokenQuota(tokenId, quota)
+			err = DecreaseTokenQuota(ctx, tokenId, quota)
 		} else {
-			err = IncreaseTokenQuota(tokenId, -quota)
+			err = IncreaseTokenQuota(ctx, tokenId, -quota)
 		}
 		if err != nil {
 			return errors.Wrapf(err, "adjust token %d quota in post-consume", tokenId)

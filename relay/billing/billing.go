@@ -42,7 +42,7 @@ func PostConsumeQuotaWithLog(ctx context.Context, tokenId int, quotaDelta int64,
 	}
 
 	// Consume remaining quota
-	if err := model.PostConsumeTokenQuota(tokenId, quotaDelta); err != nil {
+	if err := model.PostConsumeTokenQuota(ctx, tokenId, quotaDelta); err != nil {
 		logger.Logger.Error("CRITICAL: upstream request was sent but billing failed - unbilled request detected",
 			zap.Error(err),
 			zap.Int("tokenId", tokenId),
@@ -95,7 +95,7 @@ func ReturnPreConsumedQuota(ctx context.Context, preConsumedQuota int64, tokenId
 	}
 	// Return pre-consumed quota synchronously; callers should wrap this in a lifecycle-managed goroutine
 	// if they do not want to block the handler. This ensures graceful drain can account for it.
-	if err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota); err != nil {
+	if err := model.PostConsumeTokenQuota(ctx, tokenId, -preConsumedQuota); err != nil {
 		logger.Logger.Warn("failed to return pre-consumed quota - cleanup operation failed",
 			zap.Error(err),
 			zap.Int("tokenId", tokenId),

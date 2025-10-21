@@ -319,12 +319,13 @@ func GetModelsDisplay(c *gin.Context) {
 	}
 
 	// Logged-in path: show only models allowed for the user group
-	userGroup, err := model.CacheGetUserGroup(userId)
+	ctx := gmw.Ctx(c)
+	userGroup, err := model.CacheGetUserGroup(ctx, userId)
 	if err != nil {
 		c.JSON(http.StatusOK, ModelsDisplayResponse{Success: false, Message: "Failed to get user group: " + err.Error()})
 		return
 	}
-	abilities, err := model.CacheGetGroupModelsV2(gmw.Ctx(c), userGroup)
+	abilities, err := model.CacheGetGroupModelsV2(ctx, userGroup)
 	if err != nil {
 		c.JSON(http.StatusOK, ModelsDisplayResponse{Success: false, Message: "Failed to get available models: " + err.Error()})
 		return
@@ -369,14 +370,15 @@ func GetModelsDisplay(c *gin.Context) {
 func ListModels(c *gin.Context) {
 	userId := c.GetInt(ctxkey.Id)
 
-	userGroup, err := model.CacheGetUserGroup(userId)
+	ctx := gmw.Ctx(c)
+	userGroup, err := model.CacheGetUserGroup(ctx, userId)
 	if err != nil {
 		middleware.AbortWithError(c, http.StatusBadRequest, err)
 		return
 	}
 
 	// Get available models with their channel names
-	availableAbilities, err := model.CacheGetGroupModelsV2(gmw.Ctx(c), userGroup)
+	availableAbilities, err := model.CacheGetGroupModelsV2(ctx, userGroup)
 	if err != nil {
 		middleware.AbortWithError(c, http.StatusBadRequest, err)
 		return
@@ -459,7 +461,7 @@ func RetrieveModel(c *gin.Context) {
 func GetUserAvailableModels(c *gin.Context) {
 	ctx := gmw.Ctx(c)
 	id := c.GetInt(ctxkey.Id)
-	userGroup, err := model.CacheGetUserGroup(id)
+	userGroup, err := model.CacheGetUserGroup(ctx, id)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,

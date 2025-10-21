@@ -29,7 +29,7 @@ var (
 	GroupModelsCacheSeconds   = config.SyncFrequency
 )
 
-func CacheGetTokenByKey(key string) (*Token, error) {
+func CacheGetTokenByKey(ctx context.Context, key string) (*Token, error) {
 	keyCol := "`key`"
 	if common.UsingPostgreSQL.Load() {
 		keyCol = `"key"`
@@ -45,7 +45,7 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 		}
 		return &token, nil
 	}
-	tokenObjectString, err := common.RedisGet(fmt.Sprintf("token:%s", key))
+	tokenObjectString, err := common.RedisGet(ctx, fmt.Sprintf("token:%s", key))
 	if err != nil {
 		if DB == nil {
 			return nil, errors.Wrap(err, "database not initialized")
@@ -60,7 +60,7 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 		if err != nil {
 			return nil, errors.Wrapf(err, "marshal token %d for cache", token.Id)
 		}
-		err = common.RedisSet(fmt.Sprintf("token:%s", key), string(jsonBytes), time.Duration(TokenCacheSeconds)*time.Second)
+		err = common.RedisSet(ctx, fmt.Sprintf("token:%s", key), string(jsonBytes), time.Duration(TokenCacheSeconds)*time.Second)
 		if err != nil {
 			logger.Logger.Warn("Redis set token failed, continuing without cache", zap.String("key", key), zap.Error(err))
 		}
@@ -74,17 +74,17 @@ func CacheGetTokenByKey(key string) (*Token, error) {
 	return &token, nil
 }
 
-func CacheGetUserGroup(id int) (group string, err error) {
+func CacheGetUserGroup(ctx context.Context, id int) (group string, err error) {
 	if !common.IsRedisEnabled() {
 		return GetUserGroup(id)
 	}
-	group, err = common.RedisGet(fmt.Sprintf("user_group:%d", id))
+	group, err = common.RedisGet(ctx, fmt.Sprintf("user_group:%d", id))
 	if err != nil {
 		group, err = GetUserGroup(id)
 		if err != nil {
 			return "", errors.Wrapf(err, "get user group for user %d", id)
 		}
-		err = common.RedisSet(fmt.Sprintf("user_group:%d", id), group, time.Duration(UserId2GroupCacheSeconds)*time.Second)
+		err = common.RedisSet(ctx, fmt.Sprintf("user_group:%d", id), group, time.Duration(UserId2GroupCacheSeconds)*time.Second)
 		if err != nil {
 			logger.Logger.Warn("Redis set user group failed, continuing without cache", zap.Int("user_id", id), zap.Error(err))
 		}
@@ -100,7 +100,7 @@ func fetchAndUpdateUserQuota(ctx context.Context, id int) (quota int64, err erro
 	if err != nil {
 		return 0, err
 	}
-	err = common.RedisSet(fmt.Sprintf("user_quota:%d", id), fmt.Sprintf("%d", quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
+	err = common.RedisSet(ctx, fmt.Sprintf("user_quota:%d", id), fmt.Sprintf("%d", quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
 	if err != nil {
 		logger.Logger.Warn("Redis set user quota failed, continuing without cache", zap.Int("user_id", id), zap.Error(err))
 	}
@@ -111,7 +111,7 @@ func CacheGetUserQuota(ctx context.Context, id int) (quota int64, err error) {
 	if !common.IsRedisEnabled() {
 		return GetUserQuota(id)
 	}
-	quotaString, err := common.RedisGet(fmt.Sprintf("user_quota:%d", id))
+	quotaString, err := common.RedisGet(ctx, fmt.Sprintf("user_quota:%d", id))
 	if err != nil {
 		return fetchAndUpdateUserQuota(ctx, id)
 	}
@@ -134,29 +134,29 @@ func CacheUpdateUserQuota(ctx context.Context, id int) error {
 	if err != nil {
 		return errors.Wrapf(err, "get cached quota for user %d", id)
 	}
-	err = common.RedisSet(fmt.Sprintf("user_quota:%d", id), fmt.Sprintf("%d", quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
+	err = common.RedisSet(ctx, fmt.Sprintf("user_quota:%d", id), fmt.Sprintf("%d", quota), time.Duration(UserId2QuotaCacheSeconds)*time.Second)
 	if err != nil {
 		return errors.Wrapf(err, "set cached quota for user %d", id)
 	}
 	return nil
 }
 
-func CacheDecreaseUserQuota(id int, quota int64) error {
+func CacheDecreaseUserQuota(ctx context.Context, id int, quota int64) error {
 	if !common.IsRedisEnabled() {
 		return nil
 	}
-	err := common.RedisDecrease(fmt.Sprintf("user_quota:%d", id), int64(quota))
+	err := common.RedisDecrease(ctx, fmt.Sprintf("user_quota:%d", id), int64(quota))
 	if err != nil {
 		return errors.Wrapf(err, "decrease cached quota for user %d", id)
 	}
 	return nil
 }
 
-func CacheIsUserEnabled(userId int) (bool, error) {
+func CacheIsUserEnabled(ctx context.Context, userId int) (bool, error) {
 	if !common.IsRedisEnabled() {
 		return IsUserEnabled(userId)
 	}
-	enabled, err := common.RedisGet(fmt.Sprintf("user_enabled:%d", userId))
+	enabled, err := common.RedisGet(ctx, fmt.Sprintf("user_enabled:%d", userId))
 	if err == nil {
 		return enabled == "1", nil
 	}
@@ -169,7 +169,7 @@ func CacheIsUserEnabled(userId int) (bool, error) {
 	if userEnabled {
 		enabled = "1"
 	}
-	err = common.RedisSet(fmt.Sprintf("user_enabled:%d", userId), enabled, time.Duration(UserId2StatusCacheSeconds)*time.Second)
+	err = common.RedisSet(ctx, fmt.Sprintf("user_enabled:%d", userId), enabled, time.Duration(UserId2StatusCacheSeconds)*time.Second)
 	if err != nil {
 		logger.Logger.Warn("Redis set user enabled failed, continuing without cache", zap.Int("user_id", userId), zap.Error(err))
 	}
@@ -186,7 +186,7 @@ func CacheGetGroupModels(ctx context.Context, group string) (models []string, er
 	if !common.IsRedisEnabled() {
 		return GetGroupModels(ctx, group)
 	}
-	modelsStr, err := common.RedisGet(fmt.Sprintf("group_models:%s", group))
+	modelsStr, err := common.RedisGet(ctx, fmt.Sprintf("group_models:%s", group))
 	if err == nil {
 		return strings.Split(modelsStr, ","), nil
 	}
@@ -194,7 +194,7 @@ func CacheGetGroupModels(ctx context.Context, group string) (models []string, er
 	if err != nil {
 		return nil, errors.Wrap(err, "get group models")
 	}
-	err = common.RedisSet(fmt.Sprintf("group_models:%s", group), strings.Join(models, ","), time.Duration(GroupModelsCacheSeconds)*time.Second)
+	err = common.RedisSet(ctx, fmt.Sprintf("group_models:%s", group), strings.Join(models, ","), time.Duration(GroupModelsCacheSeconds)*time.Second)
 	if err != nil {
 		logger.Logger.Warn("Redis set group models failed, continuing without cache", zap.String("group", group), zap.Error(err))
 	}
@@ -206,7 +206,7 @@ func CacheGetGroupModelsV2(ctx context.Context, group string) (models []dto.Enab
 	if !common.IsRedisEnabled() {
 		return GetGroupModelsV2(ctx, group)
 	}
-	modelsStr, err := common.RedisGet(fmt.Sprintf("group_models_v2:%s", group))
+	modelsStr, err := common.RedisGet(ctx, fmt.Sprintf("group_models_v2:%s", group))
 	if err != nil {
 		logger.Logger.Debug("Redis cache miss for group models, falling back to database", zap.String("group", group), zap.Error(err))
 	} else {
@@ -228,7 +228,7 @@ func CacheGetGroupModelsV2(ctx context.Context, group string) (models []dto.Enab
 		return models, nil
 	}
 
-	err = common.RedisSet(fmt.Sprintf("group_models_v2:%s", group), string(cachePayload),
+	err = common.RedisSet(ctx, fmt.Sprintf("group_models_v2:%s", group), string(cachePayload),
 		time.Duration(GroupModelsCacheSeconds)*time.Second)
 	if err != nil {
 		logger.Logger.Warn("Redis set group models failed, continuing without cache", zap.String("group", group), zap.Error(err))

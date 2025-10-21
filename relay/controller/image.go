@@ -375,7 +375,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	// If using per-image billing, pre-consume the estimated quota now
 	if imagePriceUsd > 0 && usedQuota > 0 {
 		preConsumedQuota = usedQuota
-		if err := model.PreConsumeTokenQuota(meta.TokenId, preConsumedQuota); err != nil {
+		if err := model.PreConsumeTokenQuota(ctx, meta.TokenId, preConsumedQuota); err != nil {
 			return openai.ErrorWrapper(err, "pre_consume_failed", http.StatusInternalServerError)
 		}
 		// Record provisional request cost so user-cancel before upstream usage still gets tracked
@@ -392,7 +392,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		// ErrorWrapper will log the error, so we don't need to log it here
 		// Refund any pre-consumed quota if request failed
 		if preConsumedQuota > 0 {
-			_ = model.PostConsumeTokenQuota(meta.TokenId, -preConsumedQuota)
+			_ = model.PostConsumeTokenQuota(ctx, meta.TokenId, -preConsumedQuota)
 		}
 		return openai.ErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
@@ -402,7 +402,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	requestId := c.GetString(ctxkey.RequestId)
 	traceId := tracing.GetTraceID(c)
 	defer func() {
-		ctx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), time.Minute)
+		bgCtx, cancel := context.WithTimeout(gmw.BackgroundCtx(c), time.Minute)
 		defer cancel()
 
 		if resp != nil &&
@@ -410,7 +410,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			resp.StatusCode != http.StatusOK {
 			// Refund pre-consumed quota when upstream not successful
 			if preConsumedQuota > 0 {
-				_ = model.PostConsumeTokenQuota(meta.TokenId, -preConsumedQuota)
+				_ = model.PostConsumeTokenQuota(bgCtx, meta.TokenId, -preConsumedQuota)
 			}
 			// Reconcile provisional record to 0
 			if err := model.UpdateUserRequestCostQuotaByRequestID(
@@ -428,11 +428,11 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		if preConsumedQuota > 0 {
 			quotaDelta = usedQuota - preConsumedQuota
 		}
-		err := model.PostConsumeTokenQuota(meta.TokenId, quotaDelta)
+		err := model.PostConsumeTokenQuota(bgCtx, meta.TokenId, quotaDelta)
 		if err != nil {
 			lg.Error("error consuming token remain quota", zap.Error(err))
 		}
-		err = model.CacheUpdateUserQuota(ctx, meta.UserId)
+		err = model.CacheUpdateUserQuota(bgCtx, meta.UserId)
 		if err != nil {
 			lg.Error("error update user quota cache", zap.Error(err))
 		}
@@ -446,7 +446,7 @@ func RelayImageHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 				logContent = fmt.Sprintf("model rate %.2f, group rate %.2f, num %d", modelRatio, groupRatio, imageRequest.N)
 			}
 			// Record log with RequestId/TraceId set directly on the log
-			model.RecordConsumeLog(ctx, &model.Log{
+			model.RecordConsumeLog(bgCtx, &model.Log{
 				UserId:           meta.UserId,
 				ChannelId:        meta.ChannelId,
 				PromptTokens:     promptTokens,

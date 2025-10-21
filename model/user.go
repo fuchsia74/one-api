@@ -187,7 +187,7 @@ func (user *User) Insert(ctx context.Context, inviterId int) error {
 		RemainQuota:    -1,
 		UnlimitedQuota: true,
 	}
-	result.Error = cleanToken.Insert()
+	result.Error = cleanToken.Insert(ctx)
 	if result.Error != nil {
 		// do not block
 		logger.Logger.Error("create default token for user failed",

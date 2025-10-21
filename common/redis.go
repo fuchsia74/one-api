@@ -79,8 +79,7 @@ func ParseRedisOption() *redis.Options {
 	return opt
 }
 
-func RedisSet(key string, value string, expiration time.Duration) error {
-	ctx := context.Background()
+func RedisSet(ctx context.Context, key string, value string, expiration time.Duration) error {
 	if RDB == nil {
 		return errors.New("redis not initialized")
 	}
@@ -91,8 +90,7 @@ func RedisSet(key string, value string, expiration time.Duration) error {
 	return nil
 }
 
-func RedisGet(key string) (string, error) {
-	ctx := context.Background()
+func RedisGet(ctx context.Context, key string) (string, error) {
 	if RDB == nil {
 		return "", errors.New("redis not initialized")
 	}
@@ -103,8 +101,7 @@ func RedisGet(key string) (string, error) {
 	return val, nil
 }
 
-func RedisDel(key string) error {
-	ctx := context.Background()
+func RedisDel(ctx context.Context, key string) error {
 	if RDB == nil {
 		return errors.New("redis not initialized")
 	}
@@ -115,8 +112,7 @@ func RedisDel(key string) error {
 	return nil
 }
 
-func RedisDecrease(key string, value int64) error {
-	ctx := context.Background()
+func RedisDecrease(ctx context.Context, key string, value int64) error {
 	if RDB == nil {
 		return errors.New("redis not initialized")
 	}

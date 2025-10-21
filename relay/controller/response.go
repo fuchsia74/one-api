@@ -980,11 +980,12 @@ func preConsumeResponseAPIQuota(
 	background bool,
 	meta *metalib.Meta,
 ) (int64, *relaymodel.ErrorWithStatusCode) {
+	ctx := gmw.Ctx(c)
 	baseQuota := calculateResponseAPIPreconsumeQuota(promptTokens, responseAPIRequest.MaxOutputTokens, inputRatio, outputRatio, background)
 
 	tokenQuota := c.GetInt64(ctxkey.TokenQuota)
 	tokenQuotaUnlimited := c.GetBool(ctxkey.TokenQuotaUnlimited)
-	userQuota, err := model.CacheGetUserQuota(gmw.Ctx(c), meta.UserId)
+	userQuota, err := model.CacheGetUserQuota(ctx, meta.UserId)
 	if err != nil {
 		return baseQuota, openai.ErrorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
 	}
@@ -996,7 +997,7 @@ func preConsumeResponseAPIQuota(
 		return baseQuota, openai.ErrorWrapper(errors.New("token quota is not enough"), "insufficient_token_quota", http.StatusForbidden)
 	}
 
-	err = model.PreConsumeTokenQuota(c.GetInt(ctxkey.TokenId), baseQuota)
+	err = model.PreConsumeTokenQuota(ctx, c.GetInt(ctxkey.TokenId), baseQuota)
 	if err != nil {
 		return baseQuota, openai.ErrorWrapper(err, "pre_consume_token_quota_failed", http.StatusForbidden)
 	}

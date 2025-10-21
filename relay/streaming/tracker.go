@@ -1,6 +1,7 @@
 package streaming
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -33,6 +34,7 @@ type QuotaTrackerParams struct {
 	PricingAdaptor         adaptor.Adaptor
 	FlushInterval          time.Duration
 	Logger                 *zap.Logger
+	Ctx                    context.Context
 }
 
 // QuotaTracker incrementally accounts for completion tokens during streaming
@@ -54,6 +56,9 @@ type QuotaTracker struct {
 func NewQuotaTracker(params QuotaTrackerParams) *QuotaTracker {
 	if params.FlushInterval <= 0 {
 		params.FlushInterval = 3 * time.Second
+	}
+	if params.Ctx == nil {
+		params.Ctx = context.Background()
 	}
 	tracker := &QuotaTracker{
 		params:    params,
@@ -193,13 +198,14 @@ func (t *QuotaTracker) flushLocked(force bool) error {
 		return wrappedErr
 	}
 
-	if err := model.PostConsumeTokenQuota(t.params.TokenID, delta); err != nil {
+	ctx := t.params.Ctx
+	if err := model.PostConsumeTokenQuota(ctx, t.params.TokenID, delta); err != nil {
 		err = errors.Wrap(err, "post consume token quota during streaming flush")
 		t.abortErr = err
 		return err
 	}
 
-	if err := model.CacheDecreaseUserQuota(t.params.UserID, delta); err != nil {
+	if err := model.CacheDecreaseUserQuota(ctx, t.params.UserID, delta); err != nil {
 		t.params.Logger.Warn("streaming quota tracker failed to update user cache",
 			zap.Int("user_id", t.params.UserID),
 			zap.Error(err))

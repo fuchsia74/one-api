@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -43,6 +44,7 @@ type TotpSetupResponse struct {
 }
 
 func Login(c *gin.Context) {
+	ctx := gmw.Ctx(c)
 	var loginRequest LoginRequest
 	err := json.NewDecoder(c.Request.Body).Decode(&loginRequest)
 	if err != nil {
@@ -100,7 +102,7 @@ func Login(c *gin.Context) {
 		}
 
 		// Verify TOTP code
-		if !verifyTotpCode(user.Id, user.TotpSecret, loginRequest.TotpCode) {
+		if !verifyTotpCode(ctx, user.Id, user.TotpSecret, loginRequest.TotpCode) {
 			c.JSON(http.StatusOK, gin.H{
 				"message": "Invalid TOTP code",
 				"success": false,
@@ -1151,7 +1153,6 @@ func SetupTotp(c *gin.Context) {
 		})
 		return
 	}
-
 	// Generate a new secret
 	secret := gcrypto.Base32Secret([]byte(random.GetRandomString(20)))
 
@@ -1217,6 +1218,7 @@ func SetupTotp(c *gin.Context) {
 
 // ConfirmTotp verifies the TOTP code and enables TOTP for the user
 func ConfirmTotp(c *gin.Context) {
+	ctx := gmw.Ctx(c)
 	userId := c.GetInt(ctxkey.Id)
 
 	// Check rate limit for TOTP verification
@@ -1269,7 +1271,7 @@ func ConfirmTotp(c *gin.Context) {
 	secret := tempSecret.(string)
 
 	// Verify the TOTP code
-	if !verifyTotpCode(user.Id, secret, req.TotpCode) {
+	if !verifyTotpCode(ctx, user.Id, secret, req.TotpCode) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "Invalid TOTP code",
@@ -1300,6 +1302,7 @@ func ConfirmTotp(c *gin.Context) {
 
 // DisableTotp disables TOTP for the user
 func DisableTotp(c *gin.Context) {
+	ctx := gmw.Ctx(c)
 	userId := c.GetInt(ctxkey.Id)
 
 	// Check rate limit for TOTP verification
@@ -1339,7 +1342,7 @@ func DisableTotp(c *gin.Context) {
 	}
 
 	// Verify the TOTP code before disabling
-	if !verifyTotpCode(user.Id, user.TotpSecret, req.TotpCode) {
+	if !verifyTotpCode(ctx, user.Id, user.TotpSecret, req.TotpCode) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": false,
 			"message": "Invalid TOTP code",
@@ -1364,13 +1367,16 @@ func DisableTotp(c *gin.Context) {
 }
 
 // verifyTotpCode verifies a TOTP code against a secret with rate limiting and replay protection
-func verifyTotpCode(uid int, secret, code string) bool {
+func verifyTotpCode(ctx context.Context, uid int, secret, code string) bool {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if code == "" || secret == "" {
 		return false
 	}
 
 	// Check if this TOTP code has been used recently (replay protection)
-	if common.IsTotpCodeUsed(uid, code) {
+	if common.IsTotpCodeUsed(ctx, uid, code) {
 		logger.Logger.Warn(fmt.Sprintf("TOTP code replay attempt detected for user %d", uid))
 		return false
 	}
@@ -1389,7 +1395,7 @@ func verifyTotpCode(uid int, secret, code string) bool {
 	}
 
 	// Mark the code as used to prevent replay attacks
-	err = common.MarkTotpCodeAsUsed(uid, code)
+	err = common.MarkTotpCodeAsUsed(ctx, uid, code)
 	if err != nil {
 		logger.Logger.Error("Failed to mark TOTP code as used", zap.Error(err))
 		// Don't fail the verification if we can't mark it as used

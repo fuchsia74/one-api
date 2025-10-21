@@ -24,6 +24,7 @@ import (
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
 	"github.com/songquanpeng/one-api/common/helper"
+	"github.com/songquanpeng/one-api/common/logger"
 	"github.com/songquanpeng/one-api/common/message"
 	"github.com/songquanpeng/one-api/middleware"
 	"github.com/songquanpeng/one-api/model"
@@ -506,8 +507,10 @@ func TestChannels(c *gin.Context) {
 }
 
 func AutomaticallyTestChannels(frequency int) {
+	lg := logger.Logger.Named("auto_test_channels")
 	ctx := context.Background()
-	lg := gmw.GetLogger(ctx)
+	ctx = gmw.SetLogger(ctx, lg)
+
 	for {
 		time.Sleep(time.Duration(frequency) * time.Minute)
 		lg.Info("testing all channels")

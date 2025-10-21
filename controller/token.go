@@ -213,7 +213,7 @@ func AddToken(c *gin.Context) {
 		Models:         token.Models,
 		Subnet:         token.Subnet,
 	}
-	err = cleanToken.Insert()
+	err = cleanToken.Insert(gmw.Ctx(c))
 	if err != nil {
 		helper.RespondError(c, err)
 		return
@@ -228,7 +228,7 @@ func AddToken(c *gin.Context) {
 func DeleteToken(c *gin.Context) {
 	id, _ := strconv.Atoi(c.Param("id"))
 	userId := c.GetInt(ctxkey.Id)
-	err := model.DeleteTokenById(id, userId)
+	err := model.DeleteTokenById(gmw.Ctx(c), id, userId)
 	if err != nil {
 		helper.RespondError(c, err)
 		return
@@ -386,7 +386,7 @@ func processPreConsume(ctx context.Context, _ *gin.Context, token *model.Token, 
 	timeoutSeconds := normalizeTimeoutSeconds(req.TimeoutSeconds)
 	expiresAt := helper.GetTimestamp() + timeoutSeconds
 
-	if err = model.PreConsumeTokenQuota(token.Id, preQuota); err != nil {
+	if err = model.PreConsumeTokenQuota(ctx, token.Id, preQuota); err != nil {
 		return nil, nil, err
 	}
 
@@ -421,7 +421,7 @@ func processPreConsume(ctx context.Context, _ *gin.Context, token *model.Token, 
 	}
 
 	if err = model.CreateTokenTransaction(ctx, transaction); err != nil {
-		_ = model.PostConsumeTokenQuota(token.Id, -preQuota)
+		_ = model.PostConsumeTokenQuota(ctx, token.Id, -preQuota)
 		if logEntry.Id > 0 {
 			_ = model.UpdateConsumeLogByID(ctx, logEntry.Id, map[string]any{
 				"quota":   0,
@@ -477,7 +477,7 @@ func processPostConsume(ctx context.Context, c *gin.Context, token *model.Token,
 	delta := finalQuota - existingTxn.PreQuota
 	quotaAdjusted := false
 	if delta != 0 {
-		if err = model.PostConsumeTokenQuota(token.Id, delta); err != nil {
+		if err = model.PostConsumeTokenQuota(ctx, token.Id, delta); err != nil {
 			return nil, nil, err
 		}
 		quotaAdjusted = true
@@ -499,7 +499,7 @@ func processPostConsume(ctx context.Context, c *gin.Context, token *model.Token,
 
 	if err = model.UpdateTokenTransaction(ctx, existingTxn.Id, updates); err != nil {
 		if quotaAdjusted {
-			_ = model.PostConsumeTokenQuota(token.Id, -delta)
+			_ = model.PostConsumeTokenQuota(ctx, token.Id, -delta)
 		}
 		return nil, nil, err
 	}
@@ -559,7 +559,7 @@ func processCancelConsume(ctx context.Context, c *gin.Context, token *model.Toke
 		return nil, nil, errors.Errorf("transaction %s cannot be canceled because it is %s", transactionID, model.TokenTransactionStatusString(txn.Status))
 	}
 
-	if err = model.PostConsumeTokenQuota(token.Id, -txn.PreQuota); err != nil {
+	if err = model.PostConsumeTokenQuota(ctx, token.Id, -txn.PreQuota); err != nil {
 		return nil, nil, err
 	}
 
@@ -572,7 +572,7 @@ func processCancelConsume(ctx context.Context, c *gin.Context, token *model.Toke
 	}
 
 	if err = model.UpdateTokenTransaction(ctx, txn.Id, updates); err != nil {
-		_ = model.PostConsumeTokenQuota(token.Id, txn.PreQuota)
+		_ = model.PostConsumeTokenQuota(ctx, token.Id, txn.PreQuota)
 		return nil, nil, err
 	}
 
@@ -897,7 +897,7 @@ func UpdateToken(c *gin.Context) {
 		cleanToken.Status = token.Status
 	}
 
-	err = cleanToken.Update()
+	err = cleanToken.Update(gmw.Ctx(c))
 	if err != nil {
 		helper.RespondError(c, err)
 		return

@@ -144,7 +144,7 @@ func TokenAuth() func(c *gin.Context) {
 		key := parts[0]
 
 		// Validate the API token against the database
-		token, err := model.ValidateUserToken(key)
+		token, err := model.ValidateUserToken(ctx, key)
 		if err != nil {
 			AbortWithError(c, http.StatusUnauthorized, err)
 			return
@@ -159,7 +159,7 @@ func TokenAuth() func(c *gin.Context) {
 		}
 
 		// Verify the token owner (user) is still enabled and not banned
-		userEnabled, err := model.CacheIsUserEnabled(token.UserId)
+		userEnabled, err := model.CacheIsUserEnabled(ctx, token.UserId)
 		if err != nil {
 			AbortWithError(c, http.StatusInternalServerError, err)
 			return

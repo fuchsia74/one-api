@@ -18,7 +18,7 @@ const (
 )
 
 // IsTotpCodeUsed checks if a TOTP code has been used recently (within 30 seconds)
-func IsTotpCodeUsed(userId int, totpCode string) bool {
+func IsTotpCodeUsed(ctx context.Context, userId int, totpCode string) bool {
 	if totpCode == "" {
 		return false
 	}
@@ -26,7 +26,7 @@ func IsTotpCodeUsed(userId int, totpCode string) bool {
 	key := fmt.Sprintf("%s:%d:%s", TotpCodeCacheKeyPrefix, userId, totpCode)
 
 	if IsRedisEnabled() {
-		return isRedisKeyExists(key)
+		return isRedisKeyExists(ctx, key)
 	} else {
 		// For memory cache, we'll use a simple in-memory map
 		return isMemoryKeyExists(key)
@@ -34,7 +34,7 @@ func IsTotpCodeUsed(userId int, totpCode string) bool {
 }
 
 // MarkTotpCodeAsUsed marks a TOTP code as used to prevent replay attacks
-func MarkTotpCodeAsUsed(userId int, totpCode string) error {
+func MarkTotpCodeAsUsed(ctx context.Context, userId int, totpCode string) error {
 	if totpCode == "" {
 		return nil
 	}
@@ -42,7 +42,7 @@ func MarkTotpCodeAsUsed(userId int, totpCode string) error {
 	key := fmt.Sprintf("%s:%d:%s", TotpCodeCacheKeyPrefix, userId, totpCode)
 
 	if IsRedisEnabled() {
-		return RedisSet(key, "1", TotpCodeCacheDuration)
+		return RedisSet(ctx, key, "1", TotpCodeCacheDuration)
 	} else {
 		// For memory cache, we'll use a simple in-memory map
 		return setMemoryKey(key, TotpCodeCacheDuration)
@@ -50,8 +50,7 @@ func MarkTotpCodeAsUsed(userId int, totpCode string) error {
 }
 
 // isRedisKeyExists checks if a key exists in Redis
-func isRedisKeyExists(key string) bool {
-	ctx := context.Background()
+func isRedisKeyExists(ctx context.Context, key string) bool {
 	exists, err := RDB.Exists(ctx, key).Result()
 	if err != nil {
 		logger.Logger.Error("Redis exists check failed", zap.Error(err))

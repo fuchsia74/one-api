@@ -105,6 +105,7 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 			ChannelCompletionRatio: channelCompletionRatio,
 			PricingAdaptor:         pricingAdaptor,
 			FlushInterval:          time.Duration(config.StreamingBillingIntervalSec) * time.Second,
+			Ctx:                    gmw.Ctx(c),
 		})
 		streaming.StoreTracker(c, tracker)
 	}

@@ -162,7 +162,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 	if userQuota-preConsumedQuota < 0 {
 		return openai.ErrorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusForbidden)
 	}
-	err = model.CacheDecreaseUserQuota(userId, preConsumedQuota)
+	err = model.CacheDecreaseUserQuota(ctx, userId, preConsumedQuota)
 	if err != nil {
 		return openai.ErrorWrapper(err, "decrease_user_quota_failed", http.StatusInternalServerError)
 	}
@@ -173,7 +173,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 		preConsumedQuota = 0
 	}
 	if preConsumedQuota > 0 {
-		err := model.PreConsumeTokenQuota(tokenId, preConsumedQuota)
+		err := model.PreConsumeTokenQuota(ctx, tokenId, preConsumedQuota)
 		if err != nil {
 			return openai.ErrorWrapper(err, "pre_consume_token_quota_failed", http.StatusForbidden)
 		}
@@ -187,7 +187,7 @@ func RelayAudioHelper(c *gin.Context, relayMode int) *relaymodel.ErrorWithStatus
 			// we need to roll back the pre-consumed quota under lifecycle tracking
 			defer func() {
 				graceful.GoCritical(ctx, "audioRollbackPreConsumed", func(cctx context.Context) {
-					if err := model.PostConsumeTokenQuota(tokenId, -preConsumedQuota); err != nil {
+					if err := model.PostConsumeTokenQuota(cctx, tokenId, -preConsumedQuota); err != nil {
 						gmw.GetLogger(cctx).Error("error rollback pre-consumed quota", zap.Error(err))
 					}
 				})

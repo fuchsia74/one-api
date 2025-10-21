@@ -1,6 +1,7 @@
 package model
 
 import (
+	"context"
 	"sync"
 	"time"
 
@@ -64,7 +65,7 @@ func batchUpdate() {
 					logger.Logger.Error("failed to batch update user quota", zap.Error(err))
 				}
 			case BatchUpdateTypeTokenQuota:
-				err := increaseTokenQuota(key, value)
+				err := increaseTokenQuota(context.Background(), key, value)
 				if err != nil {
 					logger.Logger.Error("failed to batch update token quota", zap.Error(err))
 				}

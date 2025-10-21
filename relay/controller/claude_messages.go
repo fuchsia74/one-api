@@ -859,6 +859,7 @@ func estimateTokensFromMessages(messages []relaymodel.Message) int {
 // preConsumeClaudeMessagesQuota pre-consumes quota for Claude Messages API requests
 func preConsumeClaudeMessagesQuota(c *gin.Context, request *ClaudeMessagesRequest, promptTokens int, ratio float64, meta *metalib.Meta) (int64, *relaymodel.ErrorWithStatusCode) {
 	// Use similar logic to ChatCompletion pre-consumption
+	ctx := gmw.Ctx(c)
 	preConsumedTokens := int64(promptTokens)
 	if request.MaxTokens > 0 {
 		preConsumedTokens += int64(request.MaxTokens)
@@ -872,14 +873,14 @@ func preConsumeClaudeMessagesQuota(c *gin.Context, request *ClaudeMessagesReques
 	// Check user quota first
 	tokenQuota := c.GetInt64(ctxkey.TokenQuota)
 	tokenQuotaUnlimited := c.GetBool(ctxkey.TokenQuotaUnlimited)
-	userQuota, err := model.CacheGetUserQuota(gmw.Ctx(c), meta.UserId)
+	userQuota, err := model.CacheGetUserQuota(ctx, meta.UserId)
 	if err != nil {
 		return baseQuota, openai.ErrorWrapper(err, "get_user_quota_failed", http.StatusInternalServerError)
 	}
 	if userQuota-baseQuota < 0 {
 		return baseQuota, openai.ErrorWrapper(errors.New("user quota is not enough"), "insufficient_user_quota", http.StatusForbidden)
 	}
-	err = model.CacheDecreaseUserQuota(meta.UserId, baseQuota)
+	err = model.CacheDecreaseUserQuota(ctx, meta.UserId, baseQuota)
 	if err != nil {
 		return baseQuota, openai.ErrorWrapper(err, "decrease_user_quota_failed", http.StatusInternalServerError)
 	}
@@ -891,7 +892,7 @@ func preConsumeClaudeMessagesQuota(c *gin.Context, request *ClaudeMessagesReques
 		gmw.GetLogger(c).Info(fmt.Sprintf("user %d has enough quota %d, trusted and no need to pre-consume", meta.UserId, userQuota))
 	}
 	if baseQuota > 0 {
-		err := model.PreConsumeTokenQuota(meta.TokenId, baseQuota)
+		err := model.PreConsumeTokenQuota(ctx, meta.TokenId, baseQuota)
 		if err != nil {
 			return baseQuota, openai.ErrorWrapper(err, "pre_consume_token_quota_failed", http.StatusForbidden)
 		}

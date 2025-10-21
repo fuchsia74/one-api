@@ -16,8 +16,9 @@ func TestCacheMissLogging(t *testing.T) {
 	// but we can verify the functions handle cache misses gracefully
 
 	t.Run("CacheGetTokenByKey_miss", func(t *testing.T) {
+		ctx := context.Background()
 		// This should trigger a cache miss (assuming the key doesn't exist)
-		token, err := CacheGetTokenByKey("nonexistent_key_12345")
+		token, err := CacheGetTokenByKey(ctx, "nonexistent_key_12345")
 
 		// Should handle cache miss gracefully - either return nil token with error, or valid token
 		if token == nil {
@@ -28,8 +29,9 @@ func TestCacheMissLogging(t *testing.T) {
 	})
 
 	t.Run("CacheGetUserGroup_miss", func(t *testing.T) {
+		ctx := context.Background()
 		// This should trigger a cache miss
-		group, err := CacheGetUserGroup(99999) // Non-existent user ID
+		group, err := CacheGetUserGroup(ctx, 99999) // Non-existent user ID
 
 		// Should handle cache miss gracefully
 		if group == "" {
@@ -62,8 +64,9 @@ func TestCacheMissLogging(t *testing.T) {
 // TestTokenValidationLogging verifies that token validation handles invalid tokens gracefully
 func TestTokenValidationLogging(t *testing.T) {
 	t.Run("ValidateUserToken_not_found", func(t *testing.T) {
+		ctx := context.Background()
 		// This should trigger a "token not found" scenario
-		user, err := ValidateUserToken("nonexistent_token_12345")
+		user, err := ValidateUserToken(ctx, "nonexistent_token_12345")
 
 		// Should handle invalid token gracefully
 		if user == nil {
@@ -89,7 +92,7 @@ func TestRedisOperationGracefulHandling(t *testing.T) {
 		}, "CacheUpdateUserQuota should not panic")
 
 		assert.NotPanics(t, func() {
-			CacheIsUserEnabled(99999)
+			CacheIsUserEnabled(ctx, 99999)
 		}, "CacheIsUserEnabled should not panic")
 	})
 }

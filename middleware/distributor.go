@@ -25,7 +25,8 @@ func Distribute() func(c *gin.Context) {
 	return func(c *gin.Context) {
 		lg := gmw.GetLogger(c)
 		userId := c.GetInt(ctxkey.Id)
-		userGroup, _ := model.CacheGetUserGroup(userId)
+		ctx := gmw.Ctx(c)
+		userGroup, _ := model.CacheGetUserGroup(ctx, userId)
 		c.Set(ctxkey.Group, userGroup)
 		var requestModel string
 		var channel *model.Channel
