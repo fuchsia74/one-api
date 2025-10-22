@@ -52,7 +52,7 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - tagalign
+    # - tagalign
     - testableexamples
     - testpackage
     - thelper

@@ -232,7 +232,7 @@ func xunfeiMakeRequest(textRequest model.GeneralOpenAIRequest, domain, authUrl, 
 		HandshakeTimeout: 5 * time.Second,
 	}
 	conn, resp, err := d.Dial(authUrl, nil)
-	if err != nil || resp.StatusCode != 101 {
+	if err != nil || resp.StatusCode != http.StatusSwitchingProtocols {
 		return nil, nil, err
 	}
 	data := requestOpenAI2Xunfei(textRequest, appId, domain)

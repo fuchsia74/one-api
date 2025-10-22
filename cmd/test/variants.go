@@ -8,6 +8,8 @@ var requestVariants = []requestVariant{
 
 	{Key: "response_stream_false", Header: "Response (stream=false)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: false, Expectation: expectationDefault},
 	{Key: "response_stream_true", Header: "Response (stream=true)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: true, Expectation: expectationDefault},
+	{Key: "response_vision_stream_false", Header: "Response Vision (stream=false)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: false, Expectation: expectationVision, Aliases: []string{"response_vision"}},
+	{Key: "response_vision_stream_true", Header: "Response Vision (stream=true)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: true, Expectation: expectationVision, Aliases: []string{"response_vision_stream"}},
 	{Key: "response_tools_stream_false", Header: "Response Tools (stream=false)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: false, Expectation: expectationToolInvocation, Aliases: []string{"response_tools"}},
 	{Key: "response_tools_stream_true", Header: "Response Tools (stream=true)", Type: requestTypeResponseAPI, Path: "/v1/responses", Stream: true, Expectation: expectationToolInvocation, Aliases: []string{"response_tools_stream"}},
 

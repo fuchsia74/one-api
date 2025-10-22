@@ -9,23 +9,31 @@ One‑API is a **single‑endpoint gateway** that lets you manage and call dozen
 ```plain
 === One-API Regression Matrix ===
 
-Variant                        gpt-4o-mini  gpt-5-mini   claude-haiku-4-5  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat  grok-4-fast-non-reasoning  azure-gpt-5-nano
-Chat (stream=false)            PASS 12.02s  PASS 18.68s  PASS 7.13s        PASS 3.32s        PASS 5.08s          PASS 7.13s     PASS 10.96s                PASS 18.68s
-Chat (stream=true)             PASS 13.14s  PASS 22.24s  PASS 2.76s        PASS 7.13s        PASS 0.72s          PASS 9.86s     PASS 9.85s                 PASS 33.11s
-Chat Tools (stream=false)      PASS 7.14s   PASS 13.14s  PASS 8.87s        PASS 15.41s       PASS 13.14s         PASS 7.14s     PASS 15.41s                PASS 18.67s
-Chat Tools (stream=true)       PASS 8.88s   PASS 15.42s  PASS 23.76s       PASS 7.12s        PASS 0.61s          PASS 3.19s     PASS 12.01s                PASS 31.78s
-Response (stream=false)        PASS 7.14s   PASS 18.67s  PASS 17.66s       PASS 14.26s       PASS 3.41s          PASS 16.55s    PASS 14.26s                PASS 18.67s
-Response (stream=true)         PASS 26.80s  PASS 26.80s  PASS 7.15s        PASS 4.00s        PASS 3.26s          PASS 25.77s    PASS 5.06s                 PASS 33.08s
-Response Tools (stream=false)  PASS 3.57s   PASS 8.87s   PASS 10.95s       PASS 4.00s        PASS 9.85s          PASS 3.56s     PASS 7.12s                 PASS 18.68s
-Response Tools (stream=true)   PASS 21.75s  PASS 12.02s  PASS 4.03s        PASS 5.08s        PASS 19.00s         PASS 3.20s     PASS 3.18s                 PASS 9.87s
-Claude (stream=false)          PASS 10.96s  PASS 18.16s  PASS 12.02s       PASS 3.54s        PASS 6.66s          PASS 7.94s     PASS 3.22s                 PASS 17.67s
-Claude (stream=true)           PASS 2.01s   PASS 6.80s   PASS 3.19s        PASS 5.07s        PASS 2.74s          PASS 1.85s     PASS 0.96s                 PASS 8.77s
-Claude Tools (stream=false)    PASS 3.32s   PASS 18.16s  PASS 7.94s        PASS 7.12s        PASS 6.14s          PASS 7.14s     PASS 5.06s                 PASS 12.02s
-Claude Tools (stream=true)     PASS 4.85s   PASS 5.02s   PASS 24.90s       PASS 7.93s        PASS 3.37s          PASS 3.10s     PASS 7.94s                 PASS 8.21s
+Variant                         gpt-4o-mini  gpt-5-mini   claude-haiku-4-5  gemini-2.5-flash  openai/gpt-oss-20b                      deepseek-chat                           grok-4-fast-non-reasoning  azure-gpt-5-nano
+Chat (stream=false)             PASS 2.07s   PASS 5.57s   PASS 1.73s        PASS 1.44s        PASS 3.46s                              PASS 2.79s                              PASS 1.06s                 PASS 19.76s
+Chat (stream=true)              PASS 2.89s   PASS 14.27s  PASS 4.85s        PASS 3.47s        PASS 1.04s                              PASS 2.39s                              PASS 2.79s                 PASS 19.94s
+Chat Tools (stream=false)       PASS 3.93s   PASS 9.89s   PASS 2.01s        PASS 2.38s        PASS 1.83s                              PASS 2.10s                              PASS 3.41s                 PASS 14.55s
+Chat Tools (stream=true)        PASS 4.09s   PASS 8.35s   PASS 2.73s        PASS 4.46s        PASS 1.71s                              PASS 3.75s                              PASS 2.08s                 PASS 9.41s
+Response (stream=false)         PASS 2.24s   PASS 17.20s  PASS 3.39s        PASS 3.99s        PASS 3.59s                              PASS 4.86s                              PASS 2.76s                 PASS 22.78s
+Response (stream=true)          PASS 3.02s   PASS 14.44s  PASS 4.13s        PASS 3.16s        PASS 1.39s                              PASS 4.56s                              PASS 4.48s                 PASS 21.33s
+Response Vision (stream=false)  PASS 3.63s   PASS 8.70s   PASS 4.18s        PASS 5.13s        SKIP                                    SKIP                                    PASS 2.61s                 PASS 37.45s
+Response Vision (stream=true)   PASS 5.34s   PASS 9.25s   PASS 3.90s        PASS 5.47s        SKIP                                    SKIP                                    PASS 1.87s                 PASS 34.58s
+Response Tools (stream=false)   PASS 3.34s   PASS 3.99s   PASS 2.98s        PASS 2.77s        PASS 1.04s                              PASS 3.87s                              PASS 2.63s                 PASS 11.31s
+Response Tools (stream=true)    PASS 2.16s   PASS 7.84s   PASS 3.02s        PASS 2.30s        PASS 2.51s                              PASS 2.51s                              PASS 3.84s                 PASS 11.21s
+Claude (stream=false)           PASS 3.30s   PASS 6.54s   PASS 2.82s        PASS 8.20s        PASS 3.20s                              PASS 3.80s                              PASS 1.35s                 PASS 13.19s
+Claude (stream=true)            PASS 2.40s   PASS 14.96s  PASS 4.48s        PASS 3.38s        PASS 1.32s                              PASS 2.14s                              PASS 1.65s                 PASS 12.39s
+Claude Tools (stream=false)     PASS 1.86s   PASS 9.56s   PASS 6.32s        PASS 2.49s        PASS 2.42s                              PASS 2.76s                              PASS 2.34s                 PASS 9.96s
+Claude Tools (stream=true)      PASS 2.18s   PASS 6.07s   PASS 2.51s        PASS 3.30s        PASS 1.17s                              PASS 3.73s                              PASS 3.14s                 PASS 14.76s
 
-Totals  | Requests: 96 | Passed: 96 | Failed: 0 | Skipped: 0
+Totals  | Requests: 112 | Passed: 108 | Failed: 0 | Skipped: 4
 
-2025-10-19T23:57:47Z    INFO    oneapi-test     test/main.go:31 all tests passed
+Skipped (unsupported combinations):
+- deepseek-chat · Response Vision (stream=false) → vision input unsupported by model deepseek-chat
+- deepseek-chat · Response Vision (stream=true) → vision input unsupported by model deepseek-chat
+- openai/gpt-oss-20b · Response Vision (stream=false) → vision input unsupported by model openai/gpt-oss-20b
+- openai/gpt-oss-20b · Response Vision (stream=true) → vision input unsupported by model openai/gpt-oss-20b
+
+2025-10-22T17:37:58Z    INFO    oneapi-test     test/main.go:31 all tests passed
 
 ```
 

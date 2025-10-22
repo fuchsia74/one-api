@@ -13,3 +13,9 @@ const (
 	maxResponseBodySize = 1 << 20 // 1 MiB
 	maxLoggedBodyBytes  = 2048
 )
+
+// visionUnsupportedModels enumerates models that are known to reject vision payloads.
+var visionUnsupportedModels = map[string]struct{}{
+	"deepseek-chat":      {},
+	"openai/gpt-oss-20b": {},
+}

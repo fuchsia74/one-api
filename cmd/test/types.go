@@ -28,6 +28,7 @@ type expectation int
 const (
 	expectationDefault expectation = iota
 	expectationToolInvocation
+	expectationVision
 )
 
 // testResult captures the outcome for a single request.

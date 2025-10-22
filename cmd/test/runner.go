@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -112,6 +113,22 @@ func executeModelSweep(ctx context.Context, client *http.Client, cfg config, mod
 	innerGrp, innerCtx := errgroup.WithContext(ctx)
 	for _, spec := range specs {
 		s := spec
+		if skip, reason := shouldSkipVariant(model, s); skip {
+			outcome := testResult{
+				Model:       model,
+				Variant:     s.Variant,
+				Label:       s.Label,
+				Type:        s.Type,
+				Stream:      s.Stream,
+				Skipped:     true,
+				ErrorReason: reason,
+			}
+			select {
+			case results <- outcome:
+			case <-innerCtx.Done():
+			}
+			continue
+		}
 		innerGrp.Go(func() error {
 			res := performRequest(innerCtx, client, cfg.APIBase, cfg.Token, s, model)
 			select {
@@ -138,7 +155,6 @@ func buildRequestSpecs(model string, variants []requestVariant) []requestSpec {
 		case requestTypeClaudeMessages:
 			body = claudeMessagesPayload(model, variant.Stream, variant.Expectation)
 		}
-
 		specs = append(specs, requestSpec{
 			Variant:     variant.Key,
 			Label:       variant.Header,
@@ -151,4 +167,19 @@ func buildRequestSpecs(model string, variants []requestVariant) []requestSpec {
 	}
 
 	return specs
+}
+
+// shouldSkipVariant reports whether the provided request specification should be skipped for the model.
+// The second return value describes the reason when the combination is unsupported.
+func shouldSkipVariant(model string, spec requestSpec) (bool, string) {
+	if spec.Expectation != expectationVision {
+		return false, ""
+	}
+
+	lower := strings.ToLower(model)
+	if _, unsupported := visionUnsupportedModels[lower]; unsupported {
+		return true, "vision input unsupported by model " + model
+	}
+
+	return false, ""
 }
