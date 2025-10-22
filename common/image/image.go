@@ -250,6 +250,19 @@ func GenerateTextImage(text string) (imageData []byte, mimeType string, err erro
 	return buf.Bytes(), "image/png", nil
 }
 
+// ValidateDataURLImage checks whether the provided data URL contains a decodable image.
+func ValidateDataURLImage(dataURL string) error {
+	if !strings.HasPrefix(dataURL, "data:image/") {
+		return errors.New("data URL does not start with data:image/")
+	}
+
+	if _, _, err := GetImageSizeFromBase64(dataURL); err != nil {
+		return errors.Wrap(err, "decode data URL image")
+	}
+
+	return nil
+}
+
 // GenerateTextImageBase64 creates a PNG image with the specified text and returns it as base64 encoded string.
 // This is a convenience function that wraps GenerateTextImage and returns base64 encoded data.
 func GenerateTextImageBase64(text string) (base64Data string, mimeType string, err error) {

@@ -246,6 +246,72 @@ func TestApplyRequestTransformations_ResponseAPIRemovesSampling(t *testing.T) {
 	}
 }
 
+func TestApplyRequestTransformations_ValidDataURLImage(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "gpt-5-codex",
+	}
+
+	dataURL := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-5-codex",
+		Messages: []model.Message{
+			{
+				Role: "user",
+				Content: []model.MessageContent{
+					{
+						Type: model.ContentTypeText,
+						Text: stringPtrRT("Describe the image"),
+					},
+					{
+						Type:     model.ContentTypeImageURL,
+						ImageURL: &model.ImageURL{Url: dataURL},
+					},
+				},
+			},
+		},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err != nil {
+		t.Fatalf("applyRequestTransformations returned error for valid data URL: %v", err)
+	}
+}
+
+func TestApplyRequestTransformations_InvalidDataURLImage(t *testing.T) {
+	adaptor := &Adaptor{}
+
+	meta := &relaymeta.Meta{
+		ChannelType:     channeltype.OpenAI,
+		ActualModelName: "gpt-5-codex",
+	}
+
+	req := &model.GeneralOpenAIRequest{
+		Model: "gpt-5-codex",
+		Messages: []model.Message{
+			{
+				Role: "user",
+				Content: []model.MessageContent{
+					{
+						Type: model.ContentTypeText,
+						Text: stringPtrRT("Describe the image"),
+					},
+					{
+						Type:     model.ContentTypeImageURL,
+						ImageURL: &model.ImageURL{Url: "data:image/png;base64,not-an-image"},
+					},
+				},
+			},
+		},
+	}
+
+	if err := adaptor.applyRequestTransformations(meta, req); err == nil {
+		t.Fatalf("expected error for invalid data URL image, got nil")
+	}
+}
+
 func TestApplyRequestTransformations_PopulatesMetaActualModel(t *testing.T) {
 	adaptor := &Adaptor{}
 

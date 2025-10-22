@@ -2,6 +2,7 @@ package controller
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
 	"net/http"
 
@@ -14,7 +15,10 @@ import (
 	"github.com/songquanpeng/one-api/common/ctxkey"
 )
 
-const debugLogBodyLimit = 4096
+const (
+	debugLogBodyLimit        = 4096
+	debugLogTruncationSuffix = "...[truncated]"
+)
 
 // DebugResponseWriter wraps gin.ResponseWriter and captures a preview of the outbound body for debug logging.
 type DebugResponseWriter struct {
@@ -110,7 +114,7 @@ func logClientRequestPayload(c *gin.Context, label string) error {
 	if err != nil {
 		return err
 	}
-	preview, truncated := truncateBytes(body, debugLogBodyLimit)
+	preview, truncated := sanitizeRequestBodyForLogging(body, debugLogBodyLimit)
 	lg.Debug("client request received",
 		zap.String("label", label),
 		zap.String("method", c.Request.Method),
@@ -178,6 +182,92 @@ func truncateBytes(input []byte, limit int) ([]byte, bool) {
 		return input, false
 	}
 	return input[:limit], true
+}
+
+// sanitizeRequestBodyForLogging ensures logged payload values do not exceed the limit by
+// recursively truncating oversized string fields within JSON bodies. Non-JSON payloads
+// fall back to simple byte truncation.
+func sanitizeRequestBodyForLogging(body []byte, limit int) ([]byte, bool) {
+	if limit <= 0 {
+		return body, false
+	}
+
+	trimmed := bytes.TrimSpace(body)
+	if len(trimmed) > 0 && (trimmed[0] == '{' || trimmed[0] == '[') {
+		var payload any
+		if err := json.Unmarshal(body, &payload); err == nil {
+			sanitized := sanitizeJSONValue(payload, limit)
+			if sanitizedBytes, err := json.Marshal(sanitized); err == nil {
+				truncated := len(sanitizedBytes) > limit
+				if truncated {
+					sanitizedBytes = truncateWithSuffix(sanitizedBytes, limit)
+				}
+				return sanitizedBytes, truncated
+			}
+		}
+	}
+
+	return truncateBytes(body, limit)
+}
+
+// sanitizeJSONValue walks arbitrary JSON data and truncates string leaves that exceed the limit.
+func sanitizeJSONValue(value any, limit int) any {
+	switch v := value.(type) {
+	case map[string]any:
+		sanitized := make(map[string]any, len(v))
+		for key, inner := range v {
+			sanitized[key] = sanitizeJSONValue(inner, limit)
+		}
+		return sanitized
+	case []any:
+		sanitized := make([]any, len(v))
+		for i, inner := range v {
+			sanitized[i] = sanitizeJSONValue(inner, limit)
+		}
+		return sanitized
+	case string:
+		if len(v) <= limit {
+			return v
+		}
+		return truncateStringWithSuffix(v, limit)
+	default:
+		return v
+	}
+}
+
+// truncateStringWithSuffix truncates a string to the limit and appends a suffix indicating truncation.
+func truncateStringWithSuffix(value string, limit int) string {
+	if limit <= 0 {
+		return ""
+	}
+
+	if len(value) <= limit {
+		return value
+	}
+
+	if limit <= len(debugLogTruncationSuffix) {
+		return debugLogTruncationSuffix[:limit]
+	}
+
+	headLen := limit - len(debugLogTruncationSuffix)
+	return value[:headLen] + debugLogTruncationSuffix
+}
+
+// truncateWithSuffix truncates byte slices and appends the standard truncation suffix.
+func truncateWithSuffix(data []byte, limit int) []byte {
+	if limit <= 0 {
+		return nil
+	}
+
+	suffix := []byte(debugLogTruncationSuffix)
+	if limit <= len(suffix) {
+		return append([]byte{}, suffix[:limit]...)
+	}
+	headLen := limit - len(suffix)
+	truncated := make([]byte, 0, limit)
+	truncated = append(truncated, data[:headLen]...)
+	truncated = append(truncated, suffix...)
+	return truncated
 }
 
 type loggingReadCloser struct {

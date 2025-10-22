@@ -745,9 +745,6 @@ func convertMessageToResponseAPIFormat(message model.Message) map[string]any {
 						if iu, ok := itemMap["image_url"].(map[string]any); ok {
 							if urlVal, ok2 := iu["url"].(string); ok2 {
 								convertedItem["image_url"] = urlVal
-							} else {
-								// If not a map with url string, try direct cast below
-								convertedItem["image_url"] = iu
 							}
 							if detailVal, ok2 := iu["detail"].(string); ok2 && detailVal != "" {
 								convertedItem["detail"] = detailVal
@@ -822,7 +819,6 @@ func sanitizeResponseAPIContentItem(item map[string]any, textContentType string)
 
 	return []map[string]any{item}
 }
-
 func extractReasoningSummaryText(item map[string]any) string {
 	summary, ok := item["summary"].([]any)
 	if !ok {

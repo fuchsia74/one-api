@@ -15,6 +15,7 @@ import (
 	gmw "github.com/Laisky/gin-middlewares/v6"
 	"github.com/Laisky/zap"
 	"github.com/gin-gonic/gin"
+	"github.com/songquanpeng/one-api/common/image"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/ctxkey"
@@ -577,6 +578,11 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 					if dataURL, err := toDataURL(url); err == nil && dataURL != "" {
 						parts[pi].ImageURL.Url = dataURL
 						changed = true
+					}
+				}
+				if parts[pi].ImageURL.Url != "" && strings.HasPrefix(parts[pi].ImageURL.Url, "data:image/") {
+					if err := image.ValidateDataURLImage(parts[pi].ImageURL.Url); err != nil {
+						return errors.Wrap(err, "validate inline image data")
 					}
 				}
 			}

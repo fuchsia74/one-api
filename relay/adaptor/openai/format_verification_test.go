@@ -2,6 +2,7 @@ package openai
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/songquanpeng/one-api/relay/model"
@@ -201,6 +202,80 @@ func TestResponseAPIImageURLFlattening(t *testing.T) {
 	}
 	if gotDetail, ok := item["detail"].(string); !ok || gotDetail != detail {
 		t.Fatalf("detail should be preserved as '%s', got %#v", detail, item["detail"])
+	}
+}
+
+func TestResponseAPIImageDataURLPreserved(t *testing.T) {
+	const detail = "low"
+	const prefix = "data:image/png;base64,"
+	const payload = "QUJDREVGR0hJSktMTU5PUFFSU1RVVldYWVo="
+
+	chatRequest := &model.GeneralOpenAIRequest{
+		Model: "gpt-5-codex",
+		Messages: []model.Message{
+			{
+				Role: "user",
+				Content: []model.MessageContent{
+					{
+						Type: model.ContentTypeText,
+						Text: strPtr("Describe the inline image."),
+					},
+					{
+						Type: model.ContentTypeImageURL,
+						ImageURL: &model.ImageURL{
+							Url:    prefix + payload,
+							Detail: detail,
+						},
+					},
+				},
+			},
+		},
+	}
+
+	resp := ConvertChatCompletionToResponseAPI(chatRequest)
+	data, err := json.Marshal(resp)
+	if err != nil {
+		t.Fatalf("marshal response: %v", err)
+	}
+
+	var parsed map[string]any
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+
+	input, ok := parsed["input"].([]any)
+	if !ok || len(input) != 1 {
+		t.Fatalf("input malformed: %#v", parsed["input"])
+	}
+	msg, ok := input[0].(map[string]any)
+	if !ok {
+		t.Fatalf("input[0] not object: %T", input[0])
+	}
+	content, ok := msg["content"].([]any)
+	if !ok || len(content) != 2 {
+		t.Fatalf("content malformed: %#v", msg["content"])
+	}
+	item, ok := content[1].(map[string]any)
+	if !ok {
+		t.Fatalf("content[1] not object: %T", content[1])
+	}
+	if item["type"] != "input_image" {
+		t.Fatalf("expected type input_image, got %v", item["type"])
+	}
+	gotURL, ok := item["image_url"].(string)
+	if !ok {
+		t.Fatalf("image_url missing or wrong type: %#v", item["image_url"])
+	}
+	if gotURL != prefix+payload {
+		t.Fatalf("image_url mismatch: expected %s, got %s", prefix+payload, gotURL)
+	}
+	if detailVal, ok := item["detail"].(string); !ok || detailVal != detail {
+		t.Fatalf("detail should be preserved as '%s', got %#v", detail, item["detail"])
+	}
+
+	// Ensure JSON still contains the data URI prefix as documented.
+	if !strings.Contains(string(data), prefix) {
+		t.Fatalf("serialized payload should include the data URI prefix; got %s", string(data))
 	}
 }
 

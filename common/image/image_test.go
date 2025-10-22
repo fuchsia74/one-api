@@ -202,6 +202,21 @@ func TestBase64(t *testing.T) {
 	}
 }
 
+func TestValidateDataURLImage(t *testing.T) {
+	validDataURL := "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg=="
+	require.NoError(t, img.ValidateDataURLImage(validDataURL))
+
+	invalidPayload := "data:image/png;base64,this-is-not-base64"
+	err := img.ValidateDataURLImage(invalidPayload)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "decode data URL image")
+
+	wrongPrefix := "data:text/plain;base64,SGVsbG8gV29ybGQ="
+	errp := img.ValidateDataURLImage(wrongPrefix)
+	require.Error(t, errp)
+	require.Contains(t, errp.Error(), "data:image/")
+}
+
 func TestGetImageSize(t *testing.T) {
 	t.Parallel()
 
