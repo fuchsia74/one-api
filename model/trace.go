@@ -220,7 +220,13 @@ func GetTraceByTraceId(traceId string) (*Trace, error) {
 func traceDBWithGin(ctx *gin.Context) *gorm.DB {
 	var base *gorm.DB
 	if ctx != nil && ctx.Request != nil {
-		base = DB.WithContext(ctx.Request.Context())
+		requestCtx := gmw.Ctx(ctx)
+		if requestCtx != nil {
+			requestCtx = context.WithoutCancel(requestCtx)
+			base = DB.WithContext(requestCtx)
+		} else {
+			base = DB
+		}
 	} else {
 		base = DB
 	}
@@ -231,7 +237,8 @@ func traceDBWithGin(ctx *gin.Context) *gorm.DB {
 // outside the Gin execution flow.
 func traceDBWithContext(ctx context.Context) *gorm.DB {
 	if ctx != nil {
-		return applyTraceDBSession(DB.WithContext(ctx))
+		detachedCtx := context.WithoutCancel(ctx)
+		return applyTraceDBSession(DB.WithContext(detachedCtx))
 	}
 	return applyTraceDBSession(DB)
 }

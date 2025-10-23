@@ -93,3 +93,24 @@ func TestUpdateTraceTimestampWithPostgresSession(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(stored.Timestamps), &parsed))
 	require.NotNil(t, parsed.RequestCompleted)
 }
+
+func TestUpdateTraceStatusWithCanceledContext(t *testing.T) {
+	setupTestDatabase(t)
+
+	const traceID = "test-trace-status-canceled"
+	require.NoError(t, DB.Exec("DELETE FROM traces WHERE trace_id = ?", traceID).Error)
+
+	baseCtx := gmw.SetLogger(context.Background(), logger.Logger)
+	_, err := CreateTrace(baseCtx, traceID, "/api/test", "GET", 0)
+	require.NoError(t, err)
+
+	canceledCtx, cancel := context.WithCancel(baseCtx)
+	cancel()
+
+	err = UpdateTraceStatus(canceledCtx, traceID, 207)
+	require.NoError(t, err)
+
+	var stored Trace
+	require.NoError(t, DB.Where("trace_id = ?", traceID).First(&stored).Error)
+	require.Equal(t, 207, stored.Status)
+}
