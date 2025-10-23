@@ -204,3 +204,30 @@ func TestConvertOpenAIStreamToClaudeSSE_ResponseAPIToolCall(t *testing.T) {
 	assert.Contains(t, out, `"delta":{"partial_json":"{\"location\":\"SF\"}","type":"input_json_delta"}`)
 	assert.Contains(t, out, `"type":"message_stop"`)
 }
+
+func TestConvertOpenAIStreamToClaudeSSE_ResponseAPIStructuredJSON(t *testing.T) {
+	c, w := newGinTestContext()
+
+	chunks := []string{
+		`data: {"type":"response.output_json.delta","output_index":0,"delta":{"partial_json":"{\"topic\":\"AI\""}}`,
+		`data: {"type":"response.output_json.delta","output_index":0,"delta":{"partial_json":",\"confidence\":0.9}"}}`,
+		`data: {"type":"response.output_json.done","output_index":0,"output":{"json":"{\"topic\":\"AI\",\"confidence\":0.9}"}}`,
+		`data: {"type":"response.completed","response":{"id":"resp_json","object":"response","model":"gpt-5-mini","status":"completed","usage":{"input_tokens":5,"output_tokens":5,"total_tokens":10}}}`,
+		`data: [DONE]`,
+	}
+	body := strings.Join(chunks, "\n\n") + "\n\n"
+	resp := &http.Response{StatusCode: 200, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body))}
+
+	usage, errResp := ConvertOpenAIStreamToClaudeSSE(c, resp, 4, "gpt-5-mini")
+	require.Nil(t, errResp)
+	require.NotNil(t, usage)
+	require.GreaterOrEqual(t, usage.PromptTokens, 0)
+	require.Greater(t, usage.CompletionTokens, 0)
+
+	out := w.Body.String()
+	require.NotEmpty(t, out)
+	assert.Contains(t, out, "\"content_block_start\"")
+	assert.Contains(t, out, "topic")
+	assert.Contains(t, out, "confidence")
+	assert.Contains(t, out, "\"message_stop\"")
+}

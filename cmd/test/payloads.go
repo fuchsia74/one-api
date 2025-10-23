@@ -115,6 +115,29 @@ func chatCompletionPayload(model string, stream bool, exp expectation) any {
 		return base
 	}
 
+	if exp == expectationStructuredOutput {
+		base["max_tokens"] = 512
+		base["messages"] = []map[string]any{
+			{
+				"role":    "system",
+				"content": "You extract topics from user requests. Always respond with JSON that follows the provided schema.",
+			},
+			{
+				"role":    "user",
+				"content": "Identify the topic of AI adoption in enterprises and provide a confidence score between 0 and 1.",
+			},
+		}
+		base["response_format"] = map[string]any{
+			"type": "json_schema",
+			"json_schema": map[string]any{
+				"name":   "topic_classification",
+				"strict": true,
+				"schema": structuredOutputSchema(),
+			},
+		}
+		return base
+	}
+
 	base["messages"] = []map[string]any{
 		{
 			"role":    "user",
@@ -171,6 +194,31 @@ func responseAPIPayload(model string, stream bool, exp expectation) any {
 						"detail":    "low",
 					},
 				},
+			},
+		}
+		return base
+	}
+
+	if exp == expectationStructuredOutput {
+		base["max_output_tokens"] = 1024
+		base["input"] = []map[string]any{
+			{
+				"role": "user",
+				"content": []map[string]any{
+					{
+						"type": "input_text",
+						"text": "Summarize the article theme 'AI in enterprises' and provide a numeric confidence between 0 and 1.",
+					},
+				},
+			},
+		}
+		base["text"] = map[string]any{
+			"format": map[string]any{
+				"type":        "json_schema",
+				"name":        "topic_classification",
+				"description": "Structured topic and confidence response",
+				"strict":      true,
+				"schema":      structuredOutputSchema(),
 			},
 		}
 		return base
@@ -247,6 +295,33 @@ func claudeMessagesPayload(model string, stream bool, exp expectation) any {
 		return base
 	}
 
+	if exp == expectationStructuredOutput {
+		base["max_tokens"] = 512
+		base["messages"] = []map[string]any{
+			{
+				"role": "user",
+				"content": []map[string]any{
+					{
+						"type": "text",
+						"text": "Provide a JSON object with fields topic and confidence (0-1) describing AI adoption in enterprises.",
+					},
+				},
+			},
+		}
+		base["tools"] = []map[string]any{
+			{
+				"name":         "topic_classifier",
+				"description":  "Return structured topic and confidence data",
+				"input_schema": structuredOutputSchema(),
+			},
+		}
+		base["tool_choice"] = map[string]any{
+			"type": "tool",
+			"name": "topic_classifier",
+		}
+		return base
+	}
+
 	base["messages"] = []map[string]any{
 		{
 			"role": "user",
@@ -259,6 +334,25 @@ func claudeMessagesPayload(model string, stream bool, exp expectation) any {
 		},
 	}
 	return base
+}
+
+// structuredOutputSchema defines the shared JSON schema used for structured output tests.
+func structuredOutputSchema() map[string]any {
+	return map[string]any{
+		"type":                 "object",
+		"additionalProperties": false,
+		"properties": map[string]any{
+			"topic": map[string]any{
+				"type":        "string",
+				"description": "Primary topic extracted from the prompt",
+			},
+			"confidence": map[string]any{
+				"type":        "number",
+				"description": "Confidence score between 0 and 1",
+			},
+		},
+		"required": []string{"topic", "confidence"},
+	}
 }
 
 func chatWeatherToolDefinition() map[string]any {

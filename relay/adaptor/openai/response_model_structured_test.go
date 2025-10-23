@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/stretchr/testify/require"
+
 	"github.com/songquanpeng/one-api/relay/model"
 )
 
@@ -294,6 +296,37 @@ func TestStructuredOutputWithReasoningAndFunctionCalls(t *testing.T) {
 		// This might need to be enhanced to detect function calls and set "tool_calls"
 		t.Logf("Note: finish_reason is '%s', might want to enhance to detect function calls", choice.FinishReason)
 	}
+}
+
+func TestConvertResponseAPIToChatCompletionHandlesOutputJSON(t *testing.T) {
+	resp := &ResponseAPIResponse{
+		Id:        "resp_json",
+		Object:    "response",
+		CreatedAt: 1700000000,
+		Status:    "completed",
+		Model:     "gpt-5-mini",
+		Output: []OutputItem{
+			{
+				Type: "message",
+				Role: "assistant",
+				Content: []OutputContent{
+					{
+						Type: "output_json",
+						JSON: json.RawMessage(`{"topic":"AI","confidence":0.93}`),
+					},
+				},
+			},
+		},
+	}
+
+	chat := ConvertResponseAPIToChatCompletion(resp)
+	require.NotNil(t, chat)
+	require.Len(t, chat.Choices, 1)
+	choice := chat.Choices[0]
+	content, ok := choice.Message.Content.(string)
+	require.True(t, ok, "expected content to be string")
+	require.Contains(t, content, "\"topic\"")
+	require.Contains(t, content, "\"confidence\"")
 }
 
 // TestStreamingStructuredOutputWithEvents tests streaming conversion with different event types

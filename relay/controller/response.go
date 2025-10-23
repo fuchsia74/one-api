@@ -52,7 +52,7 @@ func RelayResponseAPIHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		return openai.ErrorWrapper(err, "invalid_response_api_request", http.StatusBadRequest)
 	}
 	meta.IsStream = responseAPIRequest.Stream != nil && *responseAPIRequest.Stream
-	sanitizeResponseAPIRequest(responseAPIRequest)
+	sanitizeResponseAPIRequest(responseAPIRequest, meta.ChannelType)
 	applyThinkingQueryToResponseRequest(c, responseAPIRequest, meta)
 	if normalized, changed := openai.NormalizeToolChoiceForResponse(responseAPIRequest.ToolChoice); changed {
 		responseAPIRequest.ToolChoice = normalized
@@ -917,7 +917,7 @@ func getResponseAPIPromptTokens(ctx context.Context, responseAPIRequest *openai.
 	return totalTokens
 }
 
-func sanitizeResponseAPIRequest(request *openai.ResponseAPIRequest) {
+func sanitizeResponseAPIRequest(request *openai.ResponseAPIRequest, channelType int) {
 	if request == nil {
 		return
 	}
@@ -926,6 +926,26 @@ func sanitizeResponseAPIRequest(request *openai.ResponseAPIRequest) {
 	if isReasoningModel(modelName) {
 		request.Temperature = nil
 		request.TopP = nil
+	}
+
+	if request.Text != nil && request.Text.Format != nil && request.Text.Format.Schema != nil {
+		if normalized, changed := openai.NormalizeStructuredJSONSchema(request.Text.Format.Schema, channelType); changed {
+			request.Text.Format.Schema = normalized
+		}
+	}
+
+	for idx := range request.Tools {
+		tool := &request.Tools[idx]
+		if tool.Parameters != nil {
+			tool.Parameters, _ = openai.NormalizeStructuredJSONSchema(tool.Parameters, channelType)
+		}
+		if tool.Function != nil {
+			if params, ok := tool.Function.Parameters.(map[string]any); ok && params != nil {
+				if normalized, changed := openai.NormalizeStructuredJSONSchema(params, channelType); changed {
+					tool.Function.Parameters = normalized
+				}
+			}
+		}
 	}
 }
 
@@ -1193,6 +1213,38 @@ func normalizeResponseAPIRawBody(rawBody []byte, request *openai.ResponseAPIRequ
 	if request.TopP == nil {
 		if _, ok := root["top_p"]; ok {
 			delete(root, "top_p")
+			changed = true
+		}
+	}
+
+	if request.Text == nil {
+		if _, ok := root["text"]; ok {
+			delete(root, "text")
+			changed = true
+		}
+	} else {
+		textBytes, err := json.Marshal(request.Text)
+		if err != nil {
+			return nil, errors.Wrap(err, "marshal sanitized response text config")
+		}
+		if existing, ok := root["text"]; !ok || !bytes.Equal(existing, textBytes) {
+			root["text"] = textBytes
+			changed = true
+		}
+	}
+
+	if len(request.Tools) == 0 {
+		if _, ok := root["tools"]; ok {
+			delete(root, "tools")
+			changed = true
+		}
+	} else {
+		toolsBytes, err := json.Marshal(request.Tools)
+		if err != nil {
+			return nil, errors.Wrap(err, "marshal sanitized response tools")
+		}
+		if existing, ok := root["tools"]; !ok || !bytes.Equal(existing, toolsBytes) {
+			root["tools"] = toolsBytes
 			changed = true
 		}
 	}

@@ -507,6 +507,10 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 	if strings.TrimSpace(actualModel) == "" {
 		actualModel = request.Model
 	}
+	channelType := 0
+	if meta != nil {
+		channelType = meta.ChannelType
+	}
 
 	// o1/o3/o4/gpt-5 do not support system prompt/temperature variations
 	if isModelSupportedReasoning(actualModel) {
@@ -555,7 +559,39 @@ func (a *Adaptor) applyRequestTransformations(meta *meta.Meta, request *model.Ge
 
 	if request.ToolChoice != nil {
 		normalized, _ := NormalizeToolChoice(request.ToolChoice)
+		if meta != nil && (meta.ChannelType == channeltype.OpenAI || meta.ChannelType == channeltype.Azure) {
+			flattened, _ := NormalizeToolChoiceForResponse(normalized)
+			normalized = flattened
+		}
 		request.ToolChoice = normalized
+	}
+
+	if request.ResponseFormat != nil && request.ResponseFormat.JsonSchema != nil && request.ResponseFormat.JsonSchema.Schema != nil {
+		if normalized, changed := NormalizeStructuredJSONSchema(request.ResponseFormat.JsonSchema.Schema, channelType); changed {
+			request.ResponseFormat.JsonSchema.Schema = normalized
+		}
+	}
+
+	if len(request.Functions) > 0 {
+		for idx := range request.Functions {
+			if params, ok := request.Functions[idx].Parameters.(map[string]any); ok && params != nil {
+				if normalized, changed := NormalizeStructuredJSONSchema(params, channelType); changed {
+					request.Functions[idx].Parameters = normalized
+				}
+			}
+		}
+	}
+
+	if len(request.Tools) > 0 {
+		for idx := range request.Tools {
+			if fn := request.Tools[idx].Function; fn != nil {
+				if paramMap, ok := fn.Parameters.(map[string]any); ok && paramMap != nil {
+					if normalized, changed := NormalizeStructuredJSONSchema(paramMap, channelType); changed {
+						fn.Parameters = normalized
+					}
+				}
+			}
+		}
 	}
 
 	if request.Stream && !config.EnforceIncludeUsage &&
@@ -1193,6 +1229,20 @@ func (a *Adaptor) ConvertResponseAPIToClaudeResponse(c *gin.Context, resp *http.
 						Text: content.Text,
 					}
 					claudeResp.Content = append(claudeResp.Content, claudeContent)
+				} else if content.Type == "output_json" {
+					var jsonText string
+					if len(content.JSON) > 0 {
+						jsonText = string(content.JSON)
+					} else {
+						jsonText = content.Text
+					}
+					jsonText = strings.TrimSpace(jsonText)
+					if jsonText != "" {
+						claudeResp.Content = append(claudeResp.Content, model.ClaudeContent{
+							Type: "text",
+							Text: jsonText,
+						})
+					}
 				}
 			}
 		} else if outputItem.Type == "function_call" {

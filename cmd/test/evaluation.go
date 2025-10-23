@@ -27,6 +27,11 @@ func evaluateResponse(spec requestSpec, body []byte) (bool, string) {
 	switch spec.Type {
 	case requestTypeChatCompletion:
 		switch spec.Expectation {
+		case expectationStructuredOutput:
+			if structuredOutputSatisfied(payload) || structuredOutputSatisfiedBytes(body) {
+				return true, ""
+			}
+			return false, "structured output fields missing"
 		case expectationToolInvocation:
 			if choices, ok := payload["choices"].([]any); ok {
 				for _, choice := range choices {
@@ -50,6 +55,15 @@ func evaluateResponse(spec requestSpec, body []byte) (bool, string) {
 		}
 	case requestTypeResponseAPI:
 		switch spec.Expectation {
+		case expectationStructuredOutput:
+			if structuredOutputSatisfied(payload) || structuredOutputSatisfiedBytes(body) {
+				status := stringValue(payload, "status")
+				if status == "failed" {
+					return false, snippet(body)
+				}
+				return true, ""
+			}
+			return false, "structured output fields missing"
 		case expectationToolInvocation:
 			if required, ok := payload["required_action"].(map[string]any); ok {
 				if stringValue(required, "type") == "submit_tool_outputs" {
@@ -85,7 +99,25 @@ func evaluateResponse(spec requestSpec, body []byte) (bool, string) {
 		}
 	case requestTypeClaudeMessages:
 		switch spec.Expectation {
+		case expectationStructuredOutput:
+			if structuredOutputSatisfied(payload) || structuredOutputSatisfiedBytes(body) {
+				return true, ""
+			}
+			return false, "structured output fields missing"
 		case expectationToolInvocation:
+			if choices, ok := payload["choices"].([]any); ok {
+				for _, choice := range choices {
+					choiceMap, ok := choice.(map[string]any)
+					if !ok {
+						continue
+					}
+					if message, ok := choiceMap["message"].(map[string]any); ok {
+						if calls, ok := message["tool_calls"].([]any); ok && len(calls) > 0 {
+							return true, ""
+						}
+					}
+				}
+			}
 			if content, ok := payload["content"].([]any); ok {
 				for _, entry := range content {
 					entryMap, ok := entry.(map[string]any)
@@ -145,6 +177,16 @@ func evaluateStreamResponse(spec requestSpec, data []byte) (bool, string) {
 		hasPayload   bool
 		toolDetected bool
 	)
+	var (
+		structuredMarkers   map[string]bool
+		structuredBuffer    *bytes.Buffer
+		structuredFragments *strings.Builder
+	)
+	if spec.Expectation == expectationStructuredOutput {
+		structuredMarkers = map[string]bool{"topic": false, "confidence": false}
+		structuredBuffer = &bytes.Buffer{}
+		structuredFragments = &strings.Builder{}
+	}
 
 	for _, rawLine := range lines {
 		line := bytes.TrimSpace(rawLine)
@@ -158,6 +200,9 @@ func evaluateStreamResponse(spec requestSpec, data []byte) (bool, string) {
 		}
 
 		hasPayload = true
+		if structuredBuffer != nil {
+			structuredBuffer.Write(payload)
+		}
 
 		var obj map[string]any
 		if err := json.Unmarshal(payload, &obj); err == nil {
@@ -166,6 +211,10 @@ func evaluateStreamResponse(spec requestSpec, data []byte) (bool, string) {
 			}
 			if spec.Expectation == expectationToolInvocation && detectToolInvocationInStream(spec, obj) {
 				toolDetected = true
+			}
+			if spec.Expectation == expectationStructuredOutput {
+				collectStructuredMarkers(obj, structuredMarkers)
+				appendStructuredFragments(obj, structuredFragments)
 			}
 		}
 	}
@@ -181,6 +230,22 @@ func evaluateStreamResponse(spec requestSpec, data []byte) (bool, string) {
 	lower := bytes.ToLower(trimmed)
 	if bytes.Contains(lower, []byte("\"error\"")) && !bytes.Contains(lower, []byte("\"error\":null")) {
 		return false, snippet(trimmed)
+	}
+
+	if spec.Expectation == expectationStructuredOutput {
+		if structuredMarkers != nil && structuredMarkers["topic"] && structuredMarkers["confidence"] {
+			return true, ""
+		}
+		if structuredFragments != nil && structuredOutputSatisfiedBytes([]byte(structuredFragments.String())) {
+			return true, ""
+		}
+		if structuredBuffer != nil && structuredOutputSatisfiedBytes(structuredBuffer.Bytes()) {
+			return true, ""
+		}
+		if structuredOutputSatisfiedBytes(trimmed) {
+			return true, ""
+		}
+		return false, "stream missing structured output fields"
 	}
 
 	return true, ""
@@ -225,6 +290,16 @@ func detectToolInvocationInStream(spec requestSpec, obj map[string]any) bool {
 						return true
 					}
 				}
+			}
+		}
+		if item, ok := obj["item"].(map[string]any); ok {
+			if stringValue(item, "type") == "function_call" {
+				return true
+			}
+		}
+		if outputItem, ok := obj["output_item"].(map[string]any); ok {
+			if stringValue(outputItem, "type") == "function_call" {
+				return true
 			}
 		}
 		if responseObj, ok := obj["response"].(map[string]any); ok {
@@ -365,22 +440,26 @@ func isUnsupportedCombination(reqType requestType, stream bool, statusCode int, 
 		text = snippet(body)
 	}
 	lower := strings.ToLower(text)
+	bodyLower := strings.ToLower(string(body))
 
 	switch reqType {
 	case requestTypeResponseAPI:
 		if strings.Contains(lower, "unknown field `messages`") ||
 			strings.Contains(lower, "does not support responses") ||
-			strings.Contains(lower, "response api is not available") {
+			strings.Contains(lower, "response api is not available") ||
+			strings.Contains(bodyLower, "does not support responses") {
 			return true
 		}
 	case requestTypeChatCompletion:
 		if strings.Contains(lower, "only supports response") ||
-			strings.Contains(lower, "chat completions unsupported") {
+			strings.Contains(lower, "chat completions unsupported") ||
+			strings.Contains(bodyLower, "chat completions unsupported") {
 			return true
 		}
 	case requestTypeClaudeMessages:
 		if strings.Contains(lower, "does not support claude") ||
-			strings.Contains(lower, "claude messages unsupported") {
+			strings.Contains(lower, "claude messages unsupported") ||
+			strings.Contains(bodyLower, "claude messages unsupported") {
 			return true
 		}
 	}
@@ -408,4 +487,89 @@ func isUnsupportedCombination(reqType requestType, stream bool, statusCode int, 
 	}
 
 	return false
+}
+
+// structuredOutputSatisfied reports whether the payload contains the expected structured output fields.
+func structuredOutputSatisfied(payload any) bool {
+	found := map[string]bool{"topic": false, "confidence": false}
+	collectStructuredMarkers(payload, found)
+	return found["topic"] && found["confidence"]
+}
+
+// structuredOutputSatisfiedBytes checks for structured output fields in the raw JSON bytes.
+func structuredOutputSatisfiedBytes(body []byte) bool {
+	lower := strings.ToLower(string(body))
+	lower = strings.ReplaceAll(lower, " ", "")
+	lower = strings.ReplaceAll(lower, "\n", "")
+	lower = strings.ReplaceAll(lower, "\t", "")
+	lower = strings.ReplaceAll(lower, "\r", "")
+	lower = strings.ReplaceAll(lower, "\\", "")
+	lower = strings.ReplaceAll(lower, "\"", "")
+	topicPresent := strings.Contains(lower, "\"topic\"") || strings.Contains(lower, "topic")
+	confidencePresent := strings.Contains(lower, "\"confidence\"") || strings.Contains(lower, "confidence") || strings.Contains(lower, "confidence_score")
+	return topicPresent && confidencePresent
+}
+
+// collectStructuredMarkers recursively scans arbitrary JSON-like data for structured output markers.
+func collectStructuredMarkers(node any, found map[string]bool) {
+	switch val := node.(type) {
+	case map[string]any:
+		for key, child := range val {
+			lowerKey := strings.ToLower(key)
+			if lowerKey == "topic" {
+				found["topic"] = true
+			}
+			if lowerKey == "confidence" || lowerKey == "confidence_score" {
+				found["confidence"] = true
+			}
+			collectStructuredMarkers(child, found)
+		}
+	case []any:
+		for _, child := range val {
+			collectStructuredMarkers(child, found)
+		}
+	case string:
+		lower := strings.ToLower(val)
+		sanitized := strings.NewReplacer(" ", "", "\n", "", "\t", "", "\r", "").Replace(lower)
+		sanitized = strings.ReplaceAll(sanitized, "\\", "")
+		sanitized = strings.ReplaceAll(sanitized, "\"", "")
+		if strings.Contains(sanitized, "\"topic\"") || strings.Contains(sanitized, "topic") {
+			found["topic"] = true
+		}
+		if strings.Contains(sanitized, "\"confidence\"") || strings.Contains(sanitized, "confidence_score") || strings.Contains(sanitized, "confidence") {
+			found["confidence"] = true
+		}
+		if !(found["topic"] && found["confidence"]) {
+			var nested any
+			if err := json.Unmarshal([]byte(val), &nested); err == nil {
+				collectStructuredMarkers(nested, found)
+			}
+		}
+	}
+}
+
+// appendStructuredFragments accumulates partial_json segments emitted during streaming structured output.
+func appendStructuredFragments(node any, builder *strings.Builder) {
+	if builder == nil {
+		return
+	}
+	switch val := node.(type) {
+	case map[string]any:
+		for key, child := range val {
+			if strings.EqualFold(key, "partial_json") ||
+				strings.EqualFold(key, "arguments") ||
+				strings.EqualFold(key, "text") ||
+				strings.EqualFold(key, "output_text") ||
+				strings.EqualFold(key, "reasoning") {
+				if str, ok := child.(string); ok {
+					builder.WriteString(str)
+				}
+			}
+			appendStructuredFragments(child, builder)
+		}
+	case []any:
+		for _, child := range val {
+			appendStructuredFragments(child, builder)
+		}
+	}
 }

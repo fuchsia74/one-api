@@ -23,6 +23,7 @@ import (
 	"github.com/songquanpeng/one-api/model"
 	"github.com/songquanpeng/one-api/relay"
 	"github.com/songquanpeng/one-api/relay/adaptor"
+	"github.com/songquanpeng/one-api/relay/adaptor/common/structuredjson"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/apitype"
 	"github.com/songquanpeng/one-api/relay/billing"
@@ -115,6 +116,12 @@ func RelayTextHelper(c *gin.Context) *relaymodel.ErrorWithStatusCode {
 		return openai.ErrorWrapper(errors.Errorf("invalid api type: %d", meta.APIType), "invalid_api_type", http.StatusBadRequest)
 	}
 	adaptor.Init(meta)
+
+	// Downgrade structured JSON schema for providers that reject response_format
+	if requiresJSONSchemaDowngrade(meta, textRequest) {
+		structuredjson.EnsureInstruction(textRequest)
+		textRequest.ResponseFormat = nil
+	}
 
 	// get request body
 	requestBody, err := getRequestBody(c, meta, textRequest, adaptor, systemPromptReset)
@@ -304,7 +311,8 @@ func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.
 		return nil, errors.Wrap(err, "get raw request body")
 	}
 
-	if !config.EnforceIncludeUsage &&
+	if textRequest.ResponseFormat == nil &&
+		!config.EnforceIncludeUsage &&
 		meta.APIType == apitype.OpenAI &&
 		meta.OriginModelName == meta.ActualModelName &&
 		meta.ChannelType != channeltype.OpenAI &&
@@ -343,6 +351,31 @@ func getRequestBody(c *gin.Context, meta *metalib.Meta, textRequest *relaymodel.
 	lg := gmw.GetLogger(c)
 	lg.Debug("converted request", zap.ByteString("json", jsonData))
 	return bytes.NewBuffer(jsonData), nil
+}
+
+func requiresJSONSchemaDowngrade(meta *metalib.Meta, request *relaymodel.GeneralOpenAIRequest) bool {
+	if meta == nil || request == nil {
+		return false
+	}
+	if request.ResponseFormat == nil || request.ResponseFormat.JsonSchema == nil {
+		return false
+	}
+
+	modelName := strings.ToLower(strings.TrimSpace(request.Model))
+	if strings.HasPrefix(modelName, "deepseek") {
+		return true
+	}
+
+	baseURL := strings.ToLower(strings.TrimSpace(meta.BaseURL))
+	if strings.Contains(baseURL, "deepseek.com") {
+		return true
+	}
+
+	if meta.ChannelType == channeltype.DeepSeek {
+		return true
+	}
+
+	return false
 }
 
 func mergeJSONPreservingUnknown(original, updated []byte) ([]byte, error) {

@@ -210,10 +210,13 @@ func NormalizeToolChoiceForResponse(choice any) (any, bool) {
 	}
 
 	normalized, changed := NormalizeToolChoice(choice)
+	return normalizeToolChoiceForResponseValue(normalized, changed)
+}
 
-	switch typed := normalized.(type) {
+func normalizeToolChoiceForResponseValue(value any, alreadyChanged bool) (any, bool) {
+	switch typed := value.(type) {
 	case nil:
-		return nil, changed
+		return nil, alreadyChanged
 	case string:
 		trimmed := strings.TrimSpace(typed)
 		if trimmed == "" {
@@ -222,33 +225,26 @@ func NormalizeToolChoiceForResponse(choice any) (any, bool) {
 		if trimmed != typed {
 			return trimmed, true
 		}
-		return trimmed, changed
+		return trimmed, alreadyChanged
 	case map[string]any:
+		changed := alreadyChanged
 		typeName := strings.ToLower(strings.TrimSpace(stringFromAny(typed["type"])))
-		if typeName == "" || typeName != "function" {
+		if typeName == "" || typeName == "tool" {
 			typed["type"] = "function"
-			typeName = "function"
+			changed = true
+		} else if typeName != "function" {
+			typed["type"] = "function"
 			changed = true
 		}
 
-		var name string
-		if fn, ok := typed["function"].(map[string]any); ok {
-			name = strings.TrimSpace(stringFromAny(fn["name"]))
-		}
+		name := strings.TrimSpace(stringFromAny(typed["name"]))
 		if name == "" {
-			name = strings.TrimSpace(stringFromAny(typed["name"]))
-		}
-		if name == "" {
-			if originalMap, ok := choice.(map[string]any); ok {
-				if fn, ok := originalMap["function"].(map[string]any); ok {
-					name = strings.TrimSpace(stringFromAny(fn["name"]))
-				}
-				if name == "" {
-					name = strings.TrimSpace(stringFromAny(originalMap["name"]))
-				}
+			if fn, ok := typed["function"].(map[string]any); ok {
+				name = strings.TrimSpace(stringFromAny(fn["name"]))
+			} else if fnStr := strings.TrimSpace(stringFromAny(typed["function"])); fnStr != "" {
+				name = fnStr
 			}
 		}
-
 		if name != "" {
 			if current := strings.TrimSpace(stringFromAny(typed["name"])); current != name {
 				typed["name"] = name
@@ -269,19 +265,15 @@ func NormalizeToolChoiceForResponse(choice any) (any, bool) {
 
 		return typed, changed
 	default:
-		data, err := json.Marshal(normalized)
+		data, err := json.Marshal(value)
 		if err != nil {
-			return normalized, changed
+			return value, alreadyChanged
 		}
 		var asMap map[string]any
 		if err := json.Unmarshal(data, &asMap); err != nil {
-			return normalized, changed
+			return value, alreadyChanged
 		}
-		res, innerChanged := NormalizeToolChoiceForResponse(asMap)
-		if innerChanged {
-			return res, true
-		}
-		return normalized, changed
+		return normalizeToolChoiceForResponseValue(asMap, alreadyChanged)
 	}
 }
 
@@ -1794,9 +1786,10 @@ type OutputItem struct {
 
 // OutputContent represents content within an output item
 type OutputContent struct {
-	Type        string `json:"type"`                  // Type of content (e.g., "output_text", "summary_text")
-	Text        string `json:"text,omitempty"`        // Text content
-	Annotations []any  `json:"annotations,omitempty"` // Annotations for the content
+	Type        string          `json:"type"`                  // Type of content (e.g., "output_text", "summary_text")
+	Text        string          `json:"text,omitempty"`        // Text content
+	JSON        json.RawMessage `json:"json,omitempty"`        // Structured JSON content for structured outputs
+	Annotations []any           `json:"annotations,omitempty"` // Annotations for the content
 }
 
 // IncompleteDetails provides details about why a response is incomplete
@@ -1820,6 +1813,12 @@ func ConvertResponseAPIToChatCompletion(responseAPIResp *ResponseAPIResponse) *T
 					switch content.Type {
 					case "output_text":
 						responseText += content.Text
+					case "output_json":
+						if len(content.JSON) > 0 {
+							responseText += string(content.JSON)
+						} else if content.Text != "" {
+							responseText += content.Text
+						}
 					case "reasoning":
 						reasoningText += content.Text
 					default:
@@ -1954,6 +1953,12 @@ func ConvertResponseAPIStreamToChatCompletionWithIndex(responseAPIChunk *Respons
 					switch content.Type {
 					case "output_text":
 						deltaContent += content.Text
+					case "output_json":
+						if len(content.JSON) > 0 {
+							deltaContent += string(content.JSON)
+						} else if content.Text != "" {
+							deltaContent += content.Text
+						}
 					case "reasoning":
 						reasoningText += content.Text
 					default:
@@ -2080,14 +2085,16 @@ type ResponseAPIStreamEvent struct {
 	Item        *OutputItem `json:"item,omitempty"`         // Output item for item-level events
 
 	// Content events (type contains "content" or "output_text")
-	ItemId       string         `json:"item_id,omitempty"`       // ID of the item containing the content
-	ContentIndex int            `json:"content_index,omitempty"` // Index of the content within the item
-	Part         *OutputContent `json:"part,omitempty"`          // Content part for part-level events
-	Delta        string         `json:"delta,omitempty"`         // Delta content for streaming
-	Text         string         `json:"text,omitempty"`          // Full text content (for done events)
+	ItemId       string          `json:"item_id,omitempty"`       // ID of the item containing the content
+	ContentIndex int             `json:"content_index,omitempty"` // Index of the content within the item
+	Part         *OutputContent  `json:"part,omitempty"`          // Content part for part-level events
+	Delta        json.RawMessage `json:"delta,omitempty"`         // Delta payload (string or object)
+	Text         string          `json:"text,omitempty"`          // Full text content (for done events)
 
 	// Function call events (type contains "function_call")
-	Arguments string `json:"arguments,omitempty"` // Complete function arguments (for done events)
+	Arguments string          `json:"arguments,omitempty"` // Complete function arguments (for done events)
+	Output    json.RawMessage `json:"output,omitempty"`    // Output payload for structured data events
+	JSON      json.RawMessage `json:"json,omitempty"`      // Direct JSON payload field when provided
 
 	// General fields that might be in any event
 	Id     string       `json:"id,omitempty"`     // Event ID
@@ -2143,13 +2150,13 @@ func ConvertStreamEventToResponse(event *ResponseAPIStreamEvent) ResponseAPIResp
 
 	case strings.HasPrefix(event.Type, "response.reasoning_summary_text.delta"):
 		// Handle reasoning summary text delta events
-		if event.Delta != "" {
+		if delta := extractStringFromRaw(event.Delta, "text", "delta"); delta != "" {
 			outputItem := OutputItem{
 				Type: "reasoning",
 				Summary: []OutputContent{
 					{
 						Type: "summary_text",
-						Text: event.Delta,
+						Text: delta,
 					},
 				},
 			}
@@ -2173,14 +2180,30 @@ func ConvertStreamEventToResponse(event *ResponseAPIStreamEvent) ResponseAPIResp
 
 	case strings.HasPrefix(event.Type, "response.output_text.delta"):
 		// Handle text delta events
-		if event.Delta != "" {
+		if delta := extractStringFromRaw(event.Delta, "text", "delta"); delta != "" {
 			outputItem := OutputItem{
 				Type: "message",
 				Role: "assistant",
 				Content: []OutputContent{
 					{
 						Type: "output_text",
-						Text: event.Delta,
+						Text: delta,
+					},
+				},
+			}
+			response.Output = []OutputItem{outputItem}
+		}
+
+	case strings.HasPrefix(event.Type, "response.output_json.delta"):
+		// Handle structured JSON delta events
+		if partial := extractStringFromRaw(event.Delta, "partial_json", "json", "text"); partial != "" {
+			outputItem := OutputItem{
+				Type: "message",
+				Role: "assistant",
+				Content: []OutputContent{
+					{
+						Type: "output_json",
+						Text: partial,
 					},
 				},
 			}
@@ -2203,6 +2226,25 @@ func ConvertStreamEventToResponse(event *ResponseAPIStreamEvent) ResponseAPIResp
 			response.Output = []OutputItem{outputItem}
 		}
 
+	case strings.HasPrefix(event.Type, "response.output_json.done"):
+		// Handle structured JSON completion events
+		if jsonPayload := extractJSONPayloadFromEvent(event); len(jsonPayload) > 0 {
+			outputItem := OutputItem{
+				Type: "message",
+				Role: "assistant",
+				Content: []OutputContent{
+					{
+						Type: "output_json",
+						JSON: jsonPayload,
+					},
+				},
+			}
+			response.Output = []OutputItem{outputItem}
+			if response.Status == "in_progress" {
+				response.Status = "completed"
+			}
+		}
+
 	case strings.HasPrefix(event.Type, "response.output_item"):
 		// Handle output item events (added, done)
 		if event.Item != nil {
@@ -2211,10 +2253,10 @@ func ConvertStreamEventToResponse(event *ResponseAPIStreamEvent) ResponseAPIResp
 
 	case strings.HasPrefix(event.Type, "response.function_call_arguments.delta"):
 		// Handle function call arguments delta events
-		if event.Delta != "" {
+		if delta := extractStringFromRaw(event.Delta, "partial_json", "text", "arguments", "delta"); delta != "" {
 			outputItem := OutputItem{
 				Type:      "function_call",
-				Arguments: event.Delta, // This is a delta, not complete arguments
+				Arguments: delta, // This is a delta, not complete arguments
 			}
 			response.Output = []OutputItem{outputItem}
 		}
@@ -2261,4 +2303,153 @@ func ConvertStreamEventToResponse(event *ResponseAPIStreamEvent) ResponseAPIResp
 	}
 
 	return response
+}
+
+func extractStringFromRaw(raw json.RawMessage, keys ...string) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		return str
+	}
+
+	var obj map[string]any
+	if err := json.Unmarshal(raw, &obj); err == nil {
+		for _, key := range keys {
+			if key == "" {
+				continue
+			}
+			if val, ok := obj[key]; ok {
+				switch v := val.(type) {
+				case string:
+					return v
+				case []byte:
+					return string(v)
+				default:
+					if b, err := json.Marshal(v); err == nil {
+						return string(b)
+					}
+				}
+			}
+		}
+	}
+
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return ""
+	}
+	if unquoted, err := strconv.Unquote(trimmed); err == nil {
+		trimmed = unquoted
+	}
+	return trimmed
+}
+
+func extractJSONPayloadFromEvent(event *ResponseAPIStreamEvent) json.RawMessage {
+	if event == nil {
+		return nil
+	}
+	if len(event.JSON) > 0 {
+		return cloneRawMessage(event.JSON)
+	}
+	if event.Part != nil {
+		if len(event.Part.JSON) > 0 {
+			return cloneRawMessage(event.Part.JSON)
+		}
+		if event.Part.Text != "" {
+			return normalizeJSONRaw(event.Part.Text)
+		}
+	}
+	if len(event.Output) > 0 {
+		if payload := decodeJSONBlob(event.Output); len(payload) > 0 {
+			return payload
+		}
+	}
+	if event.Text != "" {
+		return normalizeJSONRaw(event.Text)
+	}
+	if len(event.Delta) > 0 {
+		if partial := extractStringFromRaw(event.Delta, "json", "partial_json", "text"); partial != "" {
+			return normalizeJSONRaw(partial)
+		}
+	}
+	return nil
+}
+
+func decodeJSONBlob(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return nil
+	}
+	var node any
+	if err := json.Unmarshal(raw, &node); err != nil {
+		return cloneRawMessage(raw)
+	}
+	if payload := extractJSONValue(node); len(payload) > 0 {
+		return payload
+	}
+	return cloneRawMessage(raw)
+}
+
+func extractJSONValue(node any) json.RawMessage {
+	switch v := node.(type) {
+	case map[string]any:
+		if val, ok := v["json"]; ok {
+			if payload := extractJSONValue(val); len(payload) > 0 {
+				return payload
+			}
+		}
+		if val, ok := v["text"]; ok {
+			if payload := extractJSONValue(val); len(payload) > 0 {
+				return payload
+			}
+		}
+		if val, ok := v["content"]; ok {
+			if payload := extractJSONValue(val); len(payload) > 0 {
+				return payload
+			}
+		}
+		if b, err := json.Marshal(v); err == nil {
+			return b
+		}
+	case []any:
+		for _, child := range v {
+			if payload := extractJSONValue(child); len(payload) > 0 {
+				return payload
+			}
+		}
+		if b, err := json.Marshal(v); err == nil {
+			return b
+		}
+	case string:
+		return normalizeJSONRaw(v)
+	case json.RawMessage:
+		return cloneRawMessage(v)
+	}
+	return nil
+}
+
+func normalizeJSONRaw(text string) json.RawMessage {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return nil
+	}
+	if len(trimmed) >= 2 && ((trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"') || (trimmed[0] == '\'' && trimmed[len(trimmed)-1] == '\'')) {
+		if unquoted, err := strconv.Unquote(trimmed); err == nil {
+			trimmed = unquoted
+		}
+	}
+	bytes := []byte(trimmed)
+	cloned := make([]byte, len(bytes))
+	copy(cloned, bytes)
+	return json.RawMessage(cloned)
+}
+
+func cloneRawMessage(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return nil
+	}
+	cloned := make([]byte, len(raw))
+	copy(cloned, raw)
+	return json.RawMessage(cloned)
 }

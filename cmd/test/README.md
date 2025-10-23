@@ -15,10 +15,10 @@
 
 ## What the harness does
 
-- Sends _twelve_ requests per model:
-  - Chat Completions with `stream=false`, `stream=true`, `tool` + `stream=false`, and `tool` + `stream=true`.
-  - Response API with `stream=false`, `stream=true`, `tool` + `stream=false`, and `tool` + `stream=true`.
-  - Claude Messages with `stream=false`, `stream=true`, `tool` + `stream=false`, and `tool` + `stream=true`.
+- Sends _eighteen_ requests per model:
+  - Chat Completions with `stream=false`, `stream=true`, `tool` + `stream=false`, `tool` + `stream=true`, `structured` + `stream=false`, and `structured` + `stream=true`.
+  - Response API with `stream=false`, `stream=true`, `tool` + `stream=false`, `tool` + `stream=true`, `structured` + `stream=false`, and `structured` + `stream=true`.
+  - Claude Messages with `stream=false`, `stream=true`, `tool` + `stream=false`, `tool` + `stream=true`, `structured` + `stream=false`, and `structured` + `stream=true`.
 - Applies consistent sampling parameters:
   - `temperature = 0.7`
   - `top_p = 0.9`

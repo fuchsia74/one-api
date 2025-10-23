@@ -91,9 +91,11 @@ data: [DONE]`
 			responseAPIChunk = ConvertStreamEventToResponse(streamEvent)
 
 			// Track delta events specifically
-			if strings.Contains(streamEvent.Type, "delta") && streamEvent.Delta != "" {
-				deltaCount++
-				responseText += streamEvent.Delta
+			if strings.Contains(streamEvent.Type, "delta") {
+				if delta := extractStringFromRaw(streamEvent.Delta, "partial_json", "json", "text", "delta"); delta != "" {
+					deltaCount++
+					responseText += delta
+				}
 			}
 		}
 
@@ -175,8 +177,9 @@ func TestResponseAPIStreamingEvents(t *testing.T) {
 			t.Errorf("Expected type 'response.output_text.delta', got '%s'", streamEvent.Type)
 		}
 
-		if streamEvent.Delta != "Why" {
-			t.Errorf("Expected delta 'Why', got '%s'", streamEvent.Delta)
+		delta := extractStringFromRaw(streamEvent.Delta, "text", "delta")
+		if delta != "Why" {
+			t.Errorf("Expected delta 'Why', got '%s'", delta)
 		}
 
 		// Test conversion
@@ -511,8 +514,10 @@ data: [DONE]`
 			}
 
 			// Apply the fix: Only accumulate from delta events to prevent duplication
-			if strings.Contains(streamEvent.Type, "delta") && streamEvent.Delta != "" {
-				accumulatedText += streamEvent.Delta
+			if strings.Contains(streamEvent.Type, "delta") {
+				if delta := extractStringFromRaw(streamEvent.Delta, "partial_json", "json", "text", "delta"); delta != "" {
+					accumulatedText += delta
+				}
 			}
 		}
 
@@ -625,8 +630,8 @@ data: [DONE]`
 			// Process delta events
 			if strings.Contains(eventType, "delta") {
 				// Accumulate response text
-				if streamEvent.Delta != "" {
-					responseText += streamEvent.Delta
+				if delta := extractStringFromRaw(streamEvent.Delta, "partial_json", "json", "text", "delta"); delta != "" {
+					responseText += delta
 				}
 
 				// Convert and store delta event

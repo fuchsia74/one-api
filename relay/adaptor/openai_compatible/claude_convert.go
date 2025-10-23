@@ -8,6 +8,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/Laisky/errors/v2"
@@ -546,6 +547,12 @@ func responseAPIChunkToChatStream(resp *responseAPIResponse, outputIndex *int) *
 					switch part.Type {
 					case "output_text", "input_text", "text":
 						deltaContent.WriteString(part.Text)
+					case "output_json":
+						if len(part.JSON) > 0 {
+							deltaContent.Write(part.JSON)
+						} else if part.Text != "" {
+							deltaContent.WriteString(part.Text)
+						}
 					case "reasoning":
 						reasoningBuilder.WriteString(part.Text)
 					}
@@ -640,9 +647,11 @@ type responseAPIStreamEvent struct {
 	OutputIndex *int                 `json:"output_index,omitempty"`
 	Item        *responseAPIOutput   `json:"item,omitempty"`
 	Part        *responseAPIContent  `json:"part,omitempty"`
-	Delta       string               `json:"delta,omitempty"`
+	Delta       json.RawMessage      `json:"delta,omitempty"`
 	Text        string               `json:"text,omitempty"`
 	Arguments   string               `json:"arguments,omitempty"`
+	Output      json.RawMessage      `json:"output,omitempty"`
+	JSON        json.RawMessage      `json:"json,omitempty"`
 	Usage       *responseAPIUsage    `json:"usage,omitempty"`
 	Status      string               `json:"status,omitempty"`
 	Id          string               `json:"id,omitempty"`
@@ -671,12 +680,12 @@ func convertResponseAPIStreamEventToResponse(event *responseAPIStreamEvent) resp
 
 	switch {
 	case strings.HasPrefix(event.Type, "response.reasoning_summary_text.delta"):
-		if event.Delta != "" {
+		if delta := extractStringFromRawMessage(event.Delta, "text", "delta"); delta != "" {
 			resp.Output = []responseAPIOutput{{
 				Type: "reasoning",
 				Summary: []responseAPIContent{{
 					Type: "summary_text",
-					Text: event.Delta,
+					Text: delta,
 				}},
 			}}
 		}
@@ -698,13 +707,13 @@ func convertResponseAPIStreamEventToResponse(event *responseAPIStreamEvent) resp
 			}}
 		}
 	case strings.HasPrefix(event.Type, "response.output_text.delta"):
-		if event.Delta != "" {
+		if delta := extractStringFromRawMessage(event.Delta, "text", "delta"); delta != "" {
 			resp.Output = []responseAPIOutput{{
 				Type: "message",
 				Role: "assistant",
 				Content: []responseAPIContent{{
 					Type: "output_text",
-					Text: event.Delta,
+					Text: delta,
 				}},
 			}}
 		}
@@ -718,6 +727,31 @@ func convertResponseAPIStreamEventToResponse(event *responseAPIStreamEvent) resp
 					Text: event.Text,
 				}},
 			}}
+		}
+	case strings.HasPrefix(event.Type, "response.output_json.delta"):
+		if partial := extractStringFromRawMessage(event.Delta, "partial_json", "json", "text"); partial != "" {
+			resp.Output = []responseAPIOutput{{
+				Type: "message",
+				Role: "assistant",
+				Content: []responseAPIContent{{
+					Type: "output_json",
+					Text: partial,
+				}},
+			}}
+		}
+	case strings.HasPrefix(event.Type, "response.output_json.done"):
+		if payload := extractJSONFromStreamEvent(event); len(payload) > 0 {
+			resp.Output = []responseAPIOutput{{
+				Type: "message",
+				Role: "assistant",
+				Content: []responseAPIContent{{
+					Type: "output_json",
+					JSON: payload,
+				}},
+			}}
+			if strings.EqualFold(resp.Status, "in_progress") {
+				resp.Status = "completed"
+			}
 		}
 	case strings.HasPrefix(event.Type, "response.content_part"):
 		if event.Part != nil {
@@ -734,7 +768,7 @@ func convertResponseAPIStreamEventToResponse(event *responseAPIStreamEvent) resp
 	case strings.HasPrefix(event.Type, "response.function_call_arguments.delta"):
 		output := responseAPIOutput{
 			Type:      "function_call",
-			Arguments: event.Delta,
+			Arguments: extractStringFromRawMessage(event.Delta, "partial_json", "text", "arguments", "delta"),
 		}
 		if event.Item != nil {
 			output.CallId = event.Item.CallId
@@ -760,6 +794,155 @@ func convertResponseAPIStreamEventToResponse(event *responseAPIStreamEvent) resp
 	}
 
 	return resp
+}
+
+func extractStringFromRawMessage(raw json.RawMessage, keys ...string) string {
+	if len(raw) == 0 {
+		return ""
+	}
+
+	var str string
+	if err := json.Unmarshal(raw, &str); err == nil {
+		return str
+	}
+
+	var obj map[string]any
+	if err := json.Unmarshal(raw, &obj); err == nil {
+		for _, key := range keys {
+			if key == "" {
+				continue
+			}
+			if val, ok := obj[key]; ok {
+				switch v := val.(type) {
+				case string:
+					return v
+				case []byte:
+					return string(v)
+				default:
+					if b, err := json.Marshal(v); err == nil {
+						return string(b)
+					}
+				}
+			}
+		}
+	}
+
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return ""
+	}
+	if unquoted, err := strconv.Unquote(trimmed); err == nil {
+		trimmed = unquoted
+	}
+	return trimmed
+}
+
+func extractJSONFromStreamEvent(event *responseAPIStreamEvent) json.RawMessage {
+	if event == nil {
+		return nil
+	}
+	if len(event.JSON) > 0 {
+		return cloneRawMessageBytes(event.JSON)
+	}
+	if event.Part != nil {
+		if len(event.Part.JSON) > 0 {
+			return cloneRawMessageBytes(event.Part.JSON)
+		}
+		if event.Part.Text != "" {
+			return normalizeJSONRawString(event.Part.Text)
+		}
+	}
+	if len(event.Output) > 0 {
+		if payload := decodeJSONBlobBytes(event.Output); len(payload) > 0 {
+			return payload
+		}
+	}
+	if event.Text != "" {
+		return normalizeJSONRawString(event.Text)
+	}
+	if len(event.Delta) > 0 {
+		if partial := extractStringFromRawMessage(event.Delta, "json", "partial_json", "text"); partial != "" {
+			return normalizeJSONRawString(partial)
+		}
+	}
+	return nil
+}
+
+func decodeJSONBlobBytes(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return nil
+	}
+	var node any
+	if err := json.Unmarshal(raw, &node); err != nil {
+		return cloneRawMessageBytes(raw)
+	}
+	if payload := extractJSONValueNode(node); len(payload) > 0 {
+		return payload
+	}
+	return cloneRawMessageBytes(raw)
+}
+
+func extractJSONValueNode(node any) json.RawMessage {
+	switch v := node.(type) {
+	case map[string]any:
+		if val, ok := v["json"]; ok {
+			if payload := extractJSONValueNode(val); len(payload) > 0 {
+				return payload
+			}
+		}
+		if val, ok := v["text"]; ok {
+			if payload := extractJSONValueNode(val); len(payload) > 0 {
+				return payload
+			}
+		}
+		if val, ok := v["content"]; ok {
+			if payload := extractJSONValueNode(val); len(payload) > 0 {
+				return payload
+			}
+		}
+		if b, err := json.Marshal(v); err == nil {
+			return b
+		}
+	case []any:
+		for _, child := range v {
+			if payload := extractJSONValueNode(child); len(payload) > 0 {
+				return payload
+			}
+		}
+		if b, err := json.Marshal(v); err == nil {
+			return b
+		}
+	case string:
+		return normalizeJSONRawString(v)
+	case json.RawMessage:
+		return cloneRawMessageBytes(v)
+	}
+	return nil
+}
+
+func normalizeJSONRawString(text string) json.RawMessage {
+	trimmed := strings.TrimSpace(text)
+	if trimmed == "" {
+		return nil
+	}
+	if len(trimmed) >= 2 && ((trimmed[0] == '"' && trimmed[len(trimmed)-1] == '"') || (trimmed[0] == '\'' && trimmed[len(trimmed)-1] == '\'')) {
+		if unquoted, err := strconv.Unquote(trimmed); err == nil {
+			trimmed = unquoted
+		}
+	}
+	bytes := []byte(trimmed)
+	dup := make([]byte, len(bytes))
+	copy(dup, bytes)
+	return json.RawMessage(dup)
+}
+
+func cloneRawMessageBytes(raw json.RawMessage) json.RawMessage {
+	if len(raw) == 0 {
+		return nil
+	}
+	dup := make([]byte, len(raw))
+	copy(dup, raw)
+	return json.RawMessage(dup)
 }
 
 // --- Minimal local response types to avoid import cycles ---
@@ -793,8 +976,9 @@ type responseAPIOutput struct {
 }
 
 type responseAPIContent struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
+	Type string          `json:"type"`
+	Text string          `json:"text,omitempty"`
+	JSON json.RawMessage `json:"json,omitempty"`
 }
 
 type chatTextResponse struct {

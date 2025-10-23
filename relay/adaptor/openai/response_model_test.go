@@ -113,7 +113,7 @@ func TestNormalizeToolChoiceForResponse_Map(t *testing.T) {
 	}
 
 	if _, exists := resultMap["function"]; exists {
-		t.Fatalf("function block should be removed after flattening")
+		t.Fatalf("expected function payload to be removed for Response API")
 	}
 }
 
@@ -1432,8 +1432,9 @@ func TestParseResponseAPIStreamEvent(t *testing.T) {
 			t.Errorf("Expected type 'response.output_text.delta', got '%s'", streamEvent.Type)
 		}
 
-		if streamEvent.Delta != "Why" {
-			t.Errorf("Expected delta 'Why', got '%s'", streamEvent.Delta)
+		delta := extractStringFromRaw(streamEvent.Delta, "text", "delta")
+		if delta != "Why" {
+			t.Errorf("Expected delta 'Why', got '%s'", delta)
 		}
 	})
 
@@ -1536,7 +1537,7 @@ func TestConvertStreamEventToResponse(t *testing.T) {
 			ItemId:         "msg_123",
 			OutputIndex:    1,
 			ContentIndex:   0,
-			Delta:          "Hello",
+			Delta:          json.RawMessage(`"Hello"`),
 		}
 
 		response := ConvertStreamEventToResponse(streamEvent)

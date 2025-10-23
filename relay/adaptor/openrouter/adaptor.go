@@ -9,6 +9,7 @@ import (
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/relay/adaptor"
+	"github.com/songquanpeng/one-api/relay/adaptor/common/structuredjson"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
 	"github.com/songquanpeng/one-api/relay/meta"
 	"github.com/songquanpeng/one-api/relay/model"
@@ -106,6 +107,12 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Request, meta *me
 func (a *Adaptor) ConvertRequest(c *gin.Context, relayMode int, request *model.GeneralOpenAIRequest) (any, error) {
 	// OpenRouter is OpenAI-compatible, so we can pass the request through unchanged
 	// No transformation is needed as OpenRouter accepts standard OpenAI request format
+	if request.ResponseFormat != nil && request.ResponseFormat.JsonSchema != nil {
+		if requiresStructuredDowngrade(request.Model) {
+			structuredjson.EnsureInstruction(request)
+			request.ResponseFormat = nil
+		}
+	}
 	return request, nil
 }
 
@@ -274,4 +281,17 @@ func (a *Adaptor) GetCompletionRatio(modelName string) float64 {
 	// Use default fallback completion ratio from DefaultPricingMethods
 	// This ensures unknown models still have reasonable output pricing
 	return a.DefaultPricingMethods.GetCompletionRatio(modelName)
+}
+
+func requiresStructuredDowngrade(modelName string) bool {
+	lower := strings.ToLower(strings.TrimSpace(modelName))
+	if lower == "" {
+		return false
+	}
+
+	if strings.Contains(lower, "deepseek") {
+		return true
+	}
+
+	return false
 }

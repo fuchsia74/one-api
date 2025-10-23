@@ -1,6 +1,5 @@
 # Messages
 
-
 Send a structured list of input messages with text and/or image content, and the model will generate the next message in the conversation.
 
 The Messages API can be used for either single queries or stateless multi-turn conversations.
@@ -49,7 +48,7 @@ response:
 
 ## OpenAPI
 
-````yaml post /v1/messages
+```yaml post /v1/messages
 paths:
   path: /v1/messages
   method: post
@@ -247,14 +246,14 @@ paths:
 
                       There is a limit of 100,000 messages in a single request.
                     items:
-                      $ref: '#/components/schemas/InputMessage'
+                      $ref: "#/components/schemas/InputMessage"
                     title: Messages
                     type: array
               container:
                 allOf:
                   - anyOf:
                       - type: string
-                      - type: 'null'
+                      - type: "null"
                     description: Container identifier for reuse across requests.
                     title: Container
               max_tokens:
@@ -281,13 +280,13 @@ paths:
                 allOf:
                   - description: MCP servers to be utilized in this request
                     items:
-                      $ref: '#/components/schemas/RequestMCPServerURLDefinition'
+                      $ref: "#/components/schemas/RequestMCPServerURLDefinition"
                     maxItems: 20
                     title: Mcp Servers
                     type: array
               metadata:
                 allOf:
-                  - $ref: '#/components/schemas/Metadata'
+                  - $ref: "#/components/schemas/Metadata"
                     description: An object describing metadata about the request.
               service_tier:
                 allOf:
@@ -344,7 +343,7 @@ paths:
                   - anyOf:
                       - type: string
                       - items:
-                          $ref: '#/components/schemas/RequestTextBlock'
+                          $ref: "#/components/schemas/RequestTextBlock"
                         type: array
                     description: >-
                       System prompt.
@@ -396,12 +395,12 @@ paths:
                       for details.
                     discriminator:
                       mapping:
-                        disabled: '#/components/schemas/ThinkingConfigDisabled'
-                        enabled: '#/components/schemas/ThinkingConfigEnabled'
+                        disabled: "#/components/schemas/ThinkingConfigDisabled"
+                        enabled: "#/components/schemas/ThinkingConfigEnabled"
                       propertyName: type
                     oneOf:
-                      - $ref: '#/components/schemas/ThinkingConfigEnabled'
-                      - $ref: '#/components/schemas/ThinkingConfigDisabled'
+                      - $ref: "#/components/schemas/ThinkingConfigEnabled"
+                      - $ref: "#/components/schemas/ThinkingConfigDisabled"
               tool_choice:
                 allOf:
                   - description: >-
@@ -410,16 +409,16 @@ paths:
                       or not use tools at all.
                     discriminator:
                       mapping:
-                        any: '#/components/schemas/ToolChoiceAny'
-                        auto: '#/components/schemas/ToolChoiceAuto'
-                        none: '#/components/schemas/ToolChoiceNone'
-                        tool: '#/components/schemas/ToolChoiceTool'
+                        any: "#/components/schemas/ToolChoiceAny"
+                        auto: "#/components/schemas/ToolChoiceAuto"
+                        none: "#/components/schemas/ToolChoiceNone"
+                        tool: "#/components/schemas/ToolChoiceTool"
                       propertyName: type
                     oneOf:
-                      - $ref: '#/components/schemas/ToolChoiceAuto'
-                      - $ref: '#/components/schemas/ToolChoiceAny'
-                      - $ref: '#/components/schemas/ToolChoiceTool'
-                      - $ref: '#/components/schemas/ToolChoiceNone'
+                      - $ref: "#/components/schemas/ToolChoiceAuto"
+                      - $ref: "#/components/schemas/ToolChoiceAny"
+                      - $ref: "#/components/schemas/ToolChoiceTool"
+                      - $ref: "#/components/schemas/ToolChoiceNone"
               tools:
                 allOf:
                   - description: >-
@@ -547,16 +546,16 @@ paths:
                         name: get_weather
                     items:
                       oneOf:
-                        - $ref: '#/components/schemas/Tool'
-                        - $ref: '#/components/schemas/BashTool_20241022'
-                        - $ref: '#/components/schemas/BashTool_20250124'
-                        - $ref: '#/components/schemas/CodeExecutionTool_20250522'
-                        - $ref: '#/components/schemas/ComputerUseTool_20241022'
-                        - $ref: '#/components/schemas/ComputerUseTool_20250124'
-                        - $ref: '#/components/schemas/TextEditor_20241022'
-                        - $ref: '#/components/schemas/TextEditor_20250124'
-                        - $ref: '#/components/schemas/TextEditor_20250429'
-                        - $ref: '#/components/schemas/WebSearchTool_20250305'
+                        - $ref: "#/components/schemas/Tool"
+                        - $ref: "#/components/schemas/BashTool_20241022"
+                        - $ref: "#/components/schemas/BashTool_20250124"
+                        - $ref: "#/components/schemas/CodeExecutionTool_20250522"
+                        - $ref: "#/components/schemas/ComputerUseTool_20241022"
+                        - $ref: "#/components/schemas/ComputerUseTool_20250124"
+                        - $ref: "#/components/schemas/TextEditor_20241022"
+                        - $ref: "#/components/schemas/TextEditor_20250124"
+                        - $ref: "#/components/schemas/TextEditor_20250429"
+                        - $ref: "#/components/schemas/WebSearchTool_20250305"
                     title: Tools
                     type: array
               top_k:
@@ -661,7 +660,7 @@ paths:
             ]
           });
   response:
-    '200':
+    "200":
       application/json:
         schemaArray:
           - type: object
@@ -754,30 +753,30 @@ paths:
                         mapping:
                           code_execution_tool_result: >-
                             #/components/schemas/ResponseCodeExecutionToolResultBlock
-                          container_upload: '#/components/schemas/ResponseContainerUploadBlock'
-                          mcp_tool_result: '#/components/schemas/ResponseMCPToolResultBlock'
-                          mcp_tool_use: '#/components/schemas/ResponseMCPToolUseBlock'
-                          redacted_thinking: '#/components/schemas/ResponseRedactedThinkingBlock'
-                          server_tool_use: '#/components/schemas/ResponseServerToolUseBlock'
-                          text: '#/components/schemas/ResponseTextBlock'
-                          thinking: '#/components/schemas/ResponseThinkingBlock'
-                          tool_use: '#/components/schemas/ResponseToolUseBlock'
+                          container_upload: "#/components/schemas/ResponseContainerUploadBlock"
+                          mcp_tool_result: "#/components/schemas/ResponseMCPToolResultBlock"
+                          mcp_tool_use: "#/components/schemas/ResponseMCPToolUseBlock"
+                          redacted_thinking: "#/components/schemas/ResponseRedactedThinkingBlock"
+                          server_tool_use: "#/components/schemas/ResponseServerToolUseBlock"
+                          text: "#/components/schemas/ResponseTextBlock"
+                          thinking: "#/components/schemas/ResponseThinkingBlock"
+                          tool_use: "#/components/schemas/ResponseToolUseBlock"
                           web_search_tool_result: >-
                             #/components/schemas/ResponseWebSearchToolResultBlock
                         propertyName: type
                       oneOf:
-                        - $ref: '#/components/schemas/ResponseTextBlock'
-                        - $ref: '#/components/schemas/ResponseThinkingBlock'
-                        - $ref: '#/components/schemas/ResponseRedactedThinkingBlock'
-                        - $ref: '#/components/schemas/ResponseToolUseBlock'
-                        - $ref: '#/components/schemas/ResponseServerToolUseBlock'
+                        - $ref: "#/components/schemas/ResponseTextBlock"
+                        - $ref: "#/components/schemas/ResponseThinkingBlock"
+                        - $ref: "#/components/schemas/ResponseRedactedThinkingBlock"
+                        - $ref: "#/components/schemas/ResponseToolUseBlock"
+                        - $ref: "#/components/schemas/ResponseServerToolUseBlock"
                         - $ref: >-
                             #/components/schemas/ResponseWebSearchToolResultBlock
                         - $ref: >-
                             #/components/schemas/ResponseCodeExecutionToolResultBlock
-                        - $ref: '#/components/schemas/ResponseMCPToolUseBlock'
-                        - $ref: '#/components/schemas/ResponseMCPToolResultBlock'
-                        - $ref: '#/components/schemas/ResponseContainerUploadBlock'
+                        - $ref: "#/components/schemas/ResponseMCPToolUseBlock"
+                        - $ref: "#/components/schemas/ResponseMCPToolResultBlock"
+                        - $ref: "#/components/schemas/ResponseContainerUploadBlock"
                     title: Content
                     type: array
               model:
@@ -800,7 +799,7 @@ paths:
                           - pause_turn
                           - refusal
                         type: string
-                      - type: 'null'
+                      - type: "null"
                     description: >-
                       The reason that we stopped.
 
@@ -833,7 +832,7 @@ paths:
                 allOf:
                   - anyOf:
                       - type: string
-                      - type: 'null'
+                      - type: "null"
                     default: null
                     description: >-
                       Which custom stop sequence was generated, if any.
@@ -844,7 +843,7 @@ paths:
                     title: Stop Sequence
               usage:
                 allOf:
-                  - $ref: '#/components/schemas/Usage'
+                  - $ref: "#/components/schemas/Usage"
                     description: >-
                       Billing and rate-limit usage.
 
@@ -874,8 +873,8 @@ paths:
               container:
                 allOf:
                   - anyOf:
-                      - $ref: '#/components/schemas/Container'
-                      - type: 'null'
+                      - $ref: "#/components/schemas/Container"
+                      - type: "null"
                     default: null
                     description: >-
                       Information about the container used in this request.
@@ -941,26 +940,26 @@ paths:
                 allOf:
                   - discriminator:
                       mapping:
-                        api_error: '#/components/schemas/APIError'
-                        authentication_error: '#/components/schemas/AuthenticationError'
-                        billing_error: '#/components/schemas/BillingError'
-                        invalid_request_error: '#/components/schemas/InvalidRequestError'
-                        not_found_error: '#/components/schemas/NotFoundError'
-                        overloaded_error: '#/components/schemas/OverloadedError'
-                        permission_error: '#/components/schemas/PermissionError'
-                        rate_limit_error: '#/components/schemas/RateLimitError'
-                        timeout_error: '#/components/schemas/GatewayTimeoutError'
+                        api_error: "#/components/schemas/APIError"
+                        authentication_error: "#/components/schemas/AuthenticationError"
+                        billing_error: "#/components/schemas/BillingError"
+                        invalid_request_error: "#/components/schemas/InvalidRequestError"
+                        not_found_error: "#/components/schemas/NotFoundError"
+                        overloaded_error: "#/components/schemas/OverloadedError"
+                        permission_error: "#/components/schemas/PermissionError"
+                        rate_limit_error: "#/components/schemas/RateLimitError"
+                        timeout_error: "#/components/schemas/GatewayTimeoutError"
                       propertyName: type
                     oneOf:
-                      - $ref: '#/components/schemas/InvalidRequestError'
-                      - $ref: '#/components/schemas/AuthenticationError'
-                      - $ref: '#/components/schemas/BillingError'
-                      - $ref: '#/components/schemas/PermissionError'
-                      - $ref: '#/components/schemas/NotFoundError'
-                      - $ref: '#/components/schemas/RateLimitError'
-                      - $ref: '#/components/schemas/GatewayTimeoutError'
-                      - $ref: '#/components/schemas/APIError'
-                      - $ref: '#/components/schemas/OverloadedError'
+                      - $ref: "#/components/schemas/InvalidRequestError"
+                      - $ref: "#/components/schemas/AuthenticationError"
+                      - $ref: "#/components/schemas/BillingError"
+                      - $ref: "#/components/schemas/PermissionError"
+                      - $ref: "#/components/schemas/NotFoundError"
+                      - $ref: "#/components/schemas/RateLimitError"
+                      - $ref: "#/components/schemas/GatewayTimeoutError"
+                      - $ref: "#/components/schemas/APIError"
+                      - $ref: "#/components/schemas/OverloadedError"
                     title: Error
               type:
                 allOf:
@@ -1087,11 +1086,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         name:
@@ -1124,11 +1123,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         name:
@@ -1233,11 +1232,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         name:
@@ -1270,11 +1269,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         display_height_px:
@@ -1286,7 +1285,7 @@ components:
           anyOf:
             - minimum: 0
               type: integer
-            - type: 'null'
+            - type: "null"
           description: The X11 display number (e.g. 0, 1) for the display.
           title: Display Number
         display_width_px:
@@ -1326,11 +1325,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         display_height_px:
@@ -1342,7 +1341,7 @@ components:
           anyOf:
             - minimum: 0
               type: integer
-            - type: 'null'
+            - type: "null"
           description: The X11 display number (e.g. 0, 1) for the display.
           title: Display Number
         display_width_px:
@@ -1403,12 +1402,12 @@ components:
             - items:
                 discriminator:
                   mapping:
-                    image: '#/components/schemas/RequestImageBlock'
-                    text: '#/components/schemas/RequestTextBlock'
+                    image: "#/components/schemas/RequestImageBlock"
+                    text: "#/components/schemas/RequestTextBlock"
                   propertyName: type
                 oneOf:
-                  - $ref: '#/components/schemas/RequestTextBlock'
-                  - $ref: '#/components/schemas/RequestImageBlock'
+                  - $ref: "#/components/schemas/RequestTextBlock"
+                  - $ref: "#/components/schemas/RequestImageBlock"
               type: array
           title: Content
         type:
@@ -1483,52 +1482,52 @@ components:
             - items:
                 discriminator:
                   mapping:
-                    code_execution_tool_result: '#/components/schemas/RequestCodeExecutionToolResultBlock'
-                    container_upload: '#/components/schemas/RequestContainerUploadBlock'
-                    document: '#/components/schemas/RequestDocumentBlock'
-                    image: '#/components/schemas/RequestImageBlock'
-                    mcp_tool_result: '#/components/schemas/RequestMCPToolResultBlock'
-                    mcp_tool_use: '#/components/schemas/RequestMCPToolUseBlock'
-                    redacted_thinking: '#/components/schemas/RequestRedactedThinkingBlock'
-                    search_result: '#/components/schemas/RequestSearchResultBlock'
-                    server_tool_use: '#/components/schemas/RequestServerToolUseBlock'
-                    text: '#/components/schemas/RequestTextBlock'
-                    thinking: '#/components/schemas/RequestThinkingBlock'
-                    tool_result: '#/components/schemas/RequestToolResultBlock'
-                    tool_use: '#/components/schemas/RequestToolUseBlock'
-                    web_search_tool_result: '#/components/schemas/RequestWebSearchToolResultBlock'
+                    code_execution_tool_result: "#/components/schemas/RequestCodeExecutionToolResultBlock"
+                    container_upload: "#/components/schemas/RequestContainerUploadBlock"
+                    document: "#/components/schemas/RequestDocumentBlock"
+                    image: "#/components/schemas/RequestImageBlock"
+                    mcp_tool_result: "#/components/schemas/RequestMCPToolResultBlock"
+                    mcp_tool_use: "#/components/schemas/RequestMCPToolUseBlock"
+                    redacted_thinking: "#/components/schemas/RequestRedactedThinkingBlock"
+                    search_result: "#/components/schemas/RequestSearchResultBlock"
+                    server_tool_use: "#/components/schemas/RequestServerToolUseBlock"
+                    text: "#/components/schemas/RequestTextBlock"
+                    thinking: "#/components/schemas/RequestThinkingBlock"
+                    tool_result: "#/components/schemas/RequestToolResultBlock"
+                    tool_use: "#/components/schemas/RequestToolUseBlock"
+                    web_search_tool_result: "#/components/schemas/RequestWebSearchToolResultBlock"
                   propertyName: type
                 oneOf:
-                  - $ref: '#/components/schemas/RequestTextBlock'
+                  - $ref: "#/components/schemas/RequestTextBlock"
                     description: Regular text content.
-                  - $ref: '#/components/schemas/RequestImageBlock'
+                  - $ref: "#/components/schemas/RequestImageBlock"
                     description: >-
                       Image content specified directly as base64 data or as a
                       reference via a URL.
-                  - $ref: '#/components/schemas/RequestDocumentBlock'
+                  - $ref: "#/components/schemas/RequestDocumentBlock"
                     description: >-
                       Document content, either specified directly as base64
                       data, as text, or as a reference via a URL.
-                  - $ref: '#/components/schemas/RequestSearchResultBlock'
+                  - $ref: "#/components/schemas/RequestSearchResultBlock"
                     description: >-
                       A search result block containing source, title, and
                       content from search operations.
-                  - $ref: '#/components/schemas/RequestThinkingBlock'
+                  - $ref: "#/components/schemas/RequestThinkingBlock"
                     description: A block specifying internal thinking by the model.
-                  - $ref: '#/components/schemas/RequestRedactedThinkingBlock'
+                  - $ref: "#/components/schemas/RequestRedactedThinkingBlock"
                     description: >-
                       A block specifying internal, redacted thinking by the
                       model.
-                  - $ref: '#/components/schemas/RequestToolUseBlock'
+                  - $ref: "#/components/schemas/RequestToolUseBlock"
                     description: A block indicating a tool use by the model.
-                  - $ref: '#/components/schemas/RequestToolResultBlock'
+                  - $ref: "#/components/schemas/RequestToolResultBlock"
                     description: A block specifying the results of a tool use by the model.
-                  - $ref: '#/components/schemas/RequestServerToolUseBlock'
-                  - $ref: '#/components/schemas/RequestWebSearchToolResultBlock'
-                  - $ref: '#/components/schemas/RequestCodeExecutionToolResultBlock'
-                  - $ref: '#/components/schemas/RequestMCPToolUseBlock'
-                  - $ref: '#/components/schemas/RequestMCPToolResultBlock'
-                  - $ref: '#/components/schemas/RequestContainerUploadBlock'
+                  - $ref: "#/components/schemas/RequestServerToolUseBlock"
+                  - $ref: "#/components/schemas/RequestWebSearchToolResultBlock"
+                  - $ref: "#/components/schemas/RequestCodeExecutionToolResultBlock"
+                  - $ref: "#/components/schemas/RequestMCPToolUseBlock"
+                  - $ref: "#/components/schemas/RequestMCPToolResultBlock"
+                  - $ref: "#/components/schemas/RequestContainerUploadBlock"
               type: array
           title: Content
         role:
@@ -1548,14 +1547,14 @@ components:
         properties:
           anyOf:
             - type: object
-            - type: 'null'
+            - type: "null"
           title: Properties
         required:
           anyOf:
             - items:
                 type: string
               type: array
-            - type: 'null'
+            - type: "null"
           title: Required
         type:
           const: object
@@ -1592,7 +1591,7 @@ components:
           anyOf:
             - maxLength: 256
               type: string
-            - type: 'null'
+            - type: "null"
           description: >-
             An external identifier for the user who is associated with the
             request.
@@ -1718,7 +1717,7 @@ components:
             - maxLength: 255
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           title: Document Title
         end_char_index:
           title: End Char Index
@@ -1772,7 +1771,7 @@ components:
       properties:
         content:
           items:
-            $ref: '#/components/schemas/RequestCodeExecutionOutputBlock'
+            $ref: "#/components/schemas/RequestCodeExecutionOutputBlock"
           title: Content
           type: array
         return_code:
@@ -1805,17 +1804,17 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         content:
           anyOf:
-            - $ref: '#/components/schemas/RequestCodeExecutionToolResultError'
-            - $ref: '#/components/schemas/RequestCodeExecutionResultBlock'
+            - $ref: "#/components/schemas/RequestCodeExecutionToolResultError"
+            - $ref: "#/components/schemas/RequestCodeExecutionResultBlock"
           title: Content
         tool_use_id:
           pattern: ^srvtoolu_[a-zA-Z0-9_]+$
@@ -1837,7 +1836,7 @@ components:
       additionalProperties: false
       properties:
         error_code:
-          $ref: '#/components/schemas/CodeExecutionToolResultErrorCode'
+          $ref: "#/components/schemas/CodeExecutionToolResultErrorCode"
         type:
           const: code_execution_tool_result_error
           enum:
@@ -1861,11 +1860,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         file_id:
@@ -1897,7 +1896,7 @@ components:
             - maxLength: 255
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           title: Document Title
         end_block_index:
           title: End Block Index
@@ -1928,42 +1927,42 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         citations:
-          $ref: '#/components/schemas/RequestCitationsConfig'
+          $ref: "#/components/schemas/RequestCitationsConfig"
         context:
           anyOf:
             - minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           title: Context
         source:
           discriminator:
             mapping:
-              base64: '#/components/schemas/Base64PDFSource'
-              content: '#/components/schemas/ContentBlockSource'
-              file: '#/components/schemas/FileDocumentSource'
-              text: '#/components/schemas/PlainTextSource'
-              url: '#/components/schemas/URLPDFSource'
+              base64: "#/components/schemas/Base64PDFSource"
+              content: "#/components/schemas/ContentBlockSource"
+              file: "#/components/schemas/FileDocumentSource"
+              text: "#/components/schemas/PlainTextSource"
+              url: "#/components/schemas/URLPDFSource"
             propertyName: type
           oneOf:
-            - $ref: '#/components/schemas/Base64PDFSource'
-            - $ref: '#/components/schemas/PlainTextSource'
-            - $ref: '#/components/schemas/ContentBlockSource'
-            - $ref: '#/components/schemas/URLPDFSource'
-            - $ref: '#/components/schemas/FileDocumentSource'
+            - $ref: "#/components/schemas/Base64PDFSource"
+            - $ref: "#/components/schemas/PlainTextSource"
+            - $ref: "#/components/schemas/ContentBlockSource"
+            - $ref: "#/components/schemas/URLPDFSource"
+            - $ref: "#/components/schemas/FileDocumentSource"
         title:
           anyOf:
             - maxLength: 500
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           title: Title
         type:
           const: document
@@ -1983,24 +1982,24 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         source:
           discriminator:
             mapping:
-              base64: '#/components/schemas/Base64ImageSource'
-              file: '#/components/schemas/FileImageSource'
-              url: '#/components/schemas/URLImageSource'
+              base64: "#/components/schemas/Base64ImageSource"
+              file: "#/components/schemas/FileImageSource"
+              url: "#/components/schemas/URLImageSource"
             propertyName: type
           oneOf:
-            - $ref: '#/components/schemas/Base64ImageSource'
-            - $ref: '#/components/schemas/URLImageSource'
-            - $ref: '#/components/schemas/FileImageSource'
+            - $ref: "#/components/schemas/Base64ImageSource"
+            - $ref: "#/components/schemas/URLImageSource"
+            - $ref: "#/components/schemas/FileImageSource"
           title: Source
         type:
           const: image
@@ -2021,12 +2020,12 @@ components:
             - items:
                 type: string
               type: array
-            - type: 'null'
+            - type: "null"
           title: Allowed Tools
         enabled:
           anyOf:
             - type: boolean
-            - type: 'null'
+            - type: "null"
           title: Enabled
       title: RequestMCPServerToolConfiguration
       type: object
@@ -2036,15 +2035,15 @@ components:
         authorization_token:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Authorization Token
         name:
           title: Name
           type: string
         tool_configuration:
           anyOf:
-            - $ref: '#/components/schemas/RequestMCPServerToolConfiguration'
-            - type: 'null'
+            - $ref: "#/components/schemas/RequestMCPServerToolConfiguration"
+            - type: "null"
         type:
           const: url
           enum:
@@ -2067,18 +2066,18 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         content:
           anyOf:
             - type: string
             - items:
-                $ref: '#/components/schemas/RequestTextBlock'
+                $ref: "#/components/schemas/RequestTextBlock"
               type: array
           title: Content
         is_error:
@@ -2106,11 +2105,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         id:
@@ -2156,7 +2155,7 @@ components:
             - maxLength: 255
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           title: Document Title
         end_page_number:
           title: End Page Number
@@ -2204,18 +2203,18 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         citations:
-          $ref: '#/components/schemas/RequestCitationsConfig'
+          $ref: "#/components/schemas/RequestCitationsConfig"
         content:
           items:
-            $ref: '#/components/schemas/RequestTextBlock'
+            $ref: "#/components/schemas/RequestTextBlock"
           title: Content
           type: array
         source:
@@ -2259,7 +2258,7 @@ components:
         title:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Title
         type:
           const: search_result_location
@@ -2285,11 +2284,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         id:
@@ -2325,11 +2324,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         citations:
@@ -2337,22 +2336,22 @@ components:
             - items:
                 discriminator:
                   mapping:
-                    char_location: '#/components/schemas/RequestCharLocationCitation'
-                    content_block_location: '#/components/schemas/RequestContentBlockLocationCitation'
-                    page_location: '#/components/schemas/RequestPageLocationCitation'
-                    search_result_location: '#/components/schemas/RequestSearchResultLocationCitation'
+                    char_location: "#/components/schemas/RequestCharLocationCitation"
+                    content_block_location: "#/components/schemas/RequestContentBlockLocationCitation"
+                    page_location: "#/components/schemas/RequestPageLocationCitation"
+                    search_result_location: "#/components/schemas/RequestSearchResultLocationCitation"
                     web_search_result_location: >-
                       #/components/schemas/RequestWebSearchResultLocationCitation
                   propertyName: type
                 oneOf:
-                  - $ref: '#/components/schemas/RequestCharLocationCitation'
-                  - $ref: '#/components/schemas/RequestPageLocationCitation'
-                  - $ref: '#/components/schemas/RequestContentBlockLocationCitation'
+                  - $ref: "#/components/schemas/RequestCharLocationCitation"
+                  - $ref: "#/components/schemas/RequestPageLocationCitation"
+                  - $ref: "#/components/schemas/RequestContentBlockLocationCitation"
                   - $ref: >-
                       #/components/schemas/RequestWebSearchResultLocationCitation
-                  - $ref: '#/components/schemas/RequestSearchResultLocationCitation'
+                  - $ref: "#/components/schemas/RequestSearchResultLocationCitation"
               type: array
-            - type: 'null'
+            - type: "null"
           title: Citations
         text:
           minLength: 1
@@ -2397,11 +2396,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         content:
@@ -2410,14 +2409,14 @@ components:
             - items:
                 discriminator:
                   mapping:
-                    image: '#/components/schemas/RequestImageBlock'
-                    search_result: '#/components/schemas/RequestSearchResultBlock'
-                    text: '#/components/schemas/RequestTextBlock'
+                    image: "#/components/schemas/RequestImageBlock"
+                    search_result: "#/components/schemas/RequestSearchResultBlock"
+                    text: "#/components/schemas/RequestTextBlock"
                   propertyName: type
                 oneOf:
-                  - $ref: '#/components/schemas/RequestTextBlock'
-                  - $ref: '#/components/schemas/RequestImageBlock'
-                  - $ref: '#/components/schemas/RequestSearchResultBlock'
+                  - $ref: "#/components/schemas/RequestTextBlock"
+                  - $ref: "#/components/schemas/RequestImageBlock"
+                  - $ref: "#/components/schemas/RequestSearchResultBlock"
               type: array
           title: Content
         is_error:
@@ -2445,11 +2444,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         id:
@@ -2486,7 +2485,7 @@ components:
         page_age:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Page Age
         title:
           title: Title
@@ -2521,7 +2520,7 @@ components:
             - maxLength: 512
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           title: Title
         type:
           const: web_search_result_location
@@ -2549,19 +2548,19 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         content:
           anyOf:
             - items:
-                $ref: '#/components/schemas/RequestWebSearchResultBlock'
+                $ref: "#/components/schemas/RequestWebSearchResultBlock"
               type: array
-            - $ref: '#/components/schemas/RequestWebSearchToolResultError'
+            - $ref: "#/components/schemas/RequestWebSearchToolResultError"
           title: Content
         tool_use_id:
           pattern: ^srvtoolu_[a-zA-Z0-9_]+$
@@ -2583,7 +2582,7 @@ components:
       additionalProperties: false
       properties:
         error_code:
-          $ref: '#/components/schemas/WebSearchToolResultErrorCode'
+          $ref: "#/components/schemas/WebSearchToolResultErrorCode"
         type:
           const: web_search_tool_result_error
           enum:
@@ -2607,7 +2606,7 @@ components:
         document_title:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Document Title
         end_char_index:
           title: End Char Index
@@ -2653,7 +2652,7 @@ components:
       properties:
         content:
           items:
-            $ref: '#/components/schemas/ResponseCodeExecutionOutputBlock'
+            $ref: "#/components/schemas/ResponseCodeExecutionOutputBlock"
           title: Content
           type: array
         return_code:
@@ -2684,8 +2683,8 @@ components:
       properties:
         content:
           anyOf:
-            - $ref: '#/components/schemas/ResponseCodeExecutionToolResultError'
-            - $ref: '#/components/schemas/ResponseCodeExecutionResultBlock'
+            - $ref: "#/components/schemas/ResponseCodeExecutionToolResultError"
+            - $ref: "#/components/schemas/ResponseCodeExecutionResultBlock"
           title: Content
         tool_use_id:
           pattern: ^srvtoolu_[a-zA-Z0-9_]+$
@@ -2707,7 +2706,7 @@ components:
     ResponseCodeExecutionToolResultError:
       properties:
         error_code:
-          $ref: '#/components/schemas/CodeExecutionToolResultErrorCode'
+          $ref: "#/components/schemas/CodeExecutionToolResultErrorCode"
         type:
           const: code_execution_tool_result_error
           default: code_execution_tool_result_error
@@ -2750,7 +2749,7 @@ components:
         document_title:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Document Title
         end_block_index:
           title: End Block Index
@@ -2781,7 +2780,7 @@ components:
           anyOf:
             - type: string
             - items:
-                $ref: '#/components/schemas/ResponseTextBlock'
+                $ref: "#/components/schemas/ResponseTextBlock"
               type: array
           title: Content
         is_error:
@@ -2850,7 +2849,7 @@ components:
         document_title:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Document Title
         end_page_number:
           title: End Page Number
@@ -2914,7 +2913,7 @@ components:
         title:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           title: Title
         type:
           const: search_result_location
@@ -2969,22 +2968,22 @@ components:
             - items:
                 discriminator:
                   mapping:
-                    char_location: '#/components/schemas/ResponseCharLocationCitation'
-                    content_block_location: '#/components/schemas/ResponseContentBlockLocationCitation'
-                    page_location: '#/components/schemas/ResponsePageLocationCitation'
-                    search_result_location: '#/components/schemas/ResponseSearchResultLocationCitation'
+                    char_location: "#/components/schemas/ResponseCharLocationCitation"
+                    content_block_location: "#/components/schemas/ResponseContentBlockLocationCitation"
+                    page_location: "#/components/schemas/ResponsePageLocationCitation"
+                    search_result_location: "#/components/schemas/ResponseSearchResultLocationCitation"
                     web_search_result_location: >-
                       #/components/schemas/ResponseWebSearchResultLocationCitation
                   propertyName: type
                 oneOf:
-                  - $ref: '#/components/schemas/ResponseCharLocationCitation'
-                  - $ref: '#/components/schemas/ResponsePageLocationCitation'
-                  - $ref: '#/components/schemas/ResponseContentBlockLocationCitation'
+                  - $ref: "#/components/schemas/ResponseCharLocationCitation"
+                  - $ref: "#/components/schemas/ResponsePageLocationCitation"
+                  - $ref: "#/components/schemas/ResponseContentBlockLocationCitation"
                   - $ref: >-
                       #/components/schemas/ResponseWebSearchResultLocationCitation
-                  - $ref: '#/components/schemas/ResponseSearchResultLocationCitation'
+                  - $ref: "#/components/schemas/ResponseSearchResultLocationCitation"
               type: array
-            - type: 'null'
+            - type: "null"
           default: null
           description: >-
             Citations supporting the text block.
@@ -3069,7 +3068,7 @@ components:
         page_age:
           anyOf:
             - type: string
-            - type: 'null'
+            - type: "null"
           default: null
           title: Page Age
         title:
@@ -3105,7 +3104,7 @@ components:
           anyOf:
             - maxLength: 512
               type: string
-            - type: 'null'
+            - type: "null"
           title: Title
         type:
           const: web_search_result_location
@@ -3129,9 +3128,9 @@ components:
       properties:
         content:
           anyOf:
-            - $ref: '#/components/schemas/ResponseWebSearchToolResultError'
+            - $ref: "#/components/schemas/ResponseWebSearchToolResultError"
             - items:
-                $ref: '#/components/schemas/ResponseWebSearchResultBlock'
+                $ref: "#/components/schemas/ResponseWebSearchResultBlock"
               type: array
           title: Content
         tool_use_id:
@@ -3154,7 +3153,7 @@ components:
     ResponseWebSearchToolResultError:
       properties:
         error_code:
-          $ref: '#/components/schemas/WebSearchToolResultErrorCode'
+          $ref: "#/components/schemas/WebSearchToolResultErrorCode"
         type:
           const: web_search_tool_result_error
           default: web_search_tool_result_error
@@ -3188,11 +3187,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         name:
@@ -3225,11 +3224,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         name:
@@ -3262,11 +3261,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         name:
@@ -3340,7 +3339,7 @@ components:
       properties:
         type:
           anyOf:
-            - type: 'null'
+            - type: "null"
             - const: custom
               enum:
                 - custom
@@ -3373,7 +3372,7 @@ components:
           title: Name
           type: string
         input_schema:
-          $ref: '#/components/schemas/InputSchema'
+          $ref: "#/components/schemas/InputSchema"
           description: >-
             [JSON schema](https://json-schema.org/draft/2020-12) for this tool's
             input.
@@ -3396,11 +3395,11 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
       required:
@@ -3534,15 +3533,15 @@ components:
       properties:
         cache_creation:
           anyOf:
-            - $ref: '#/components/schemas/CacheCreation'
-            - type: 'null'
+            - $ref: "#/components/schemas/CacheCreation"
+            - type: "null"
           default: null
           description: Breakdown of cached tokens by TTL
         cache_creation_input_tokens:
           anyOf:
             - minimum: 0
               type: integer
-            - type: 'null'
+            - type: "null"
           default: null
           description: The number of input tokens used to create the cache entry.
           examples:
@@ -3552,7 +3551,7 @@ components:
           anyOf:
             - minimum: 0
               type: integer
-            - type: 'null'
+            - type: "null"
           default: null
           description: The number of input tokens read from the cache.
           examples:
@@ -3574,8 +3573,8 @@ components:
           type: integer
         server_tool_use:
           anyOf:
-            - $ref: '#/components/schemas/ServerToolUsage'
-            - type: 'null'
+            - $ref: "#/components/schemas/ServerToolUsage"
+            - type: "null"
           default: null
           description: The number of server tool requests.
         service_tier:
@@ -3585,7 +3584,7 @@ components:
                 - priority
                 - batch
               type: string
-            - type: 'null'
+            - type: "null"
           default: null
           description: If the request used the priority, standard, or batch tier.
           title: Service Tier
@@ -3607,7 +3606,7 @@ components:
             - maxLength: 255
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           description: The city of the user.
           examples:
             - New York
@@ -3619,7 +3618,7 @@ components:
             - maxLength: 2
               minLength: 2
               type: string
-            - type: 'null'
+            - type: "null"
           description: >-
             The two letter [ISO country
             code](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) of the user.
@@ -3633,7 +3632,7 @@ components:
             - maxLength: 255
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           description: The region of the user.
           examples:
             - California
@@ -3645,7 +3644,7 @@ components:
             - maxLength: 255
               minLength: 1
               type: string
-            - type: 'null'
+            - type: "null"
           description: The [IANA timezone](https://nodatime.org/TimeZones) of the user.
           examples:
             - America/New_York
@@ -3679,7 +3678,7 @@ components:
             - items:
                 type: string
               type: array
-            - type: 'null'
+            - type: "null"
           description: >-
             If provided, only these domains will be included in results. Cannot
             be used alongside `blocked_domains`.
@@ -3689,7 +3688,7 @@ components:
             - items:
                 type: string
               type: array
-            - type: 'null'
+            - type: "null"
           description: >-
             If provided, these domains will never appear in results. Cannot be
             used alongside `allowed_domains`.
@@ -3698,18 +3697,18 @@ components:
           anyOf:
             - discriminator:
                 mapping:
-                  ephemeral: '#/components/schemas/CacheControlEphemeral'
+                  ephemeral: "#/components/schemas/CacheControlEphemeral"
                 propertyName: type
               oneOf:
-                - $ref: '#/components/schemas/CacheControlEphemeral'
-            - type: 'null'
+                - $ref: "#/components/schemas/CacheControlEphemeral"
+            - type: "null"
           description: Create a cache control breakpoint at this content block.
           title: Cache Control
         max_uses:
           anyOf:
             - exclusiveMinimum: 0
               type: integer
-            - type: 'null'
+            - type: "null"
           description: Maximum number of times the tool can be used in the API request.
           title: Max Uses
         name:
@@ -3732,8 +3731,8 @@ components:
           type: string
         user_location:
           anyOf:
-            - $ref: '#/components/schemas/UserLocation'
-            - type: 'null'
+            - $ref: "#/components/schemas/UserLocation"
+            - type: "null"
           description: >-
             Parameters for the user's location. Used to provide more relevant
             search results.
@@ -3742,8 +3741,7 @@ components:
         - type
       title: Web search tool (2025-03-05)
       type: object
-
-````
+```
 
 # Vision
 
@@ -3751,17 +3749,17 @@ components:
 
 This guide describes how to work with images in Claude, including best practices, code examples, and limitations to keep in mind.
 
-***
+---
 
 ## How to use vision
 
 Use Claude’s vision capabilities via:
 
-* [claude.ai](https://claude.ai/). Upload an image like you would a file, or drag and drop an image directly into the chat window.
-* The [Console Workbench](https://console.anthropic.com/workbench/). If you select a model that accepts images (Claude 3 and 4 models only), a button to add images appears at the top right of every User message block.
-* **API request**. See the examples in this guide.
+- [claude.ai](https://claude.ai/). Upload an image like you would a file, or drag and drop an image directly into the chat window.
+- The [Console Workbench](https://console.anthropic.com/workbench/). If you select a model that accepts images (Claude 3 and 4 models only), a button to add images appears at the top right of every User message block.
+- **API request**. See the examples in this guide.
 
-***
+---
 
 ## Before you upload
 
@@ -3811,11 +3809,11 @@ Here are examples of approximate tokenization and costs for different image size
 
 When providing images to Claude, keep the following in mind for best results:
 
-* **Image format**: Use a supported image format: JPEG, PNG, GIF, or WebP.
-* **Image clarity**: Ensure images are clear and not too blurry or pixelated.
-* **Text**: If the image contains important text, make sure it’s legible and not too small. Avoid cropping out key visual context just to enlarge the text.
+- **Image format**: Use a supported image format: JPEG, PNG, GIF, or WebP.
+- **Image clarity**: Ensure images are clear and not too blurry or pixelated.
+- **Text**: If the image contains important text, make sure it’s legible and not too small. Avoid cropping out key visual context just to enlarge the text.
 
-***
+---
 
 ## Prompt examples
 
@@ -3849,71 +3847,73 @@ The base64 example prompts use these variables:
       BASE64_IMAGE_DATA=$(curl -s "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg" | base64)
 
       # The encoded data can now be used in your API calls
-  ```
 
-  ```Python Python
-  import base64
-  import httpx
+```
 
-  # For base64-encoded images
-  image1_url = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg"
-  image1_media_type = "image/jpeg"
-  image1_data = base64.standard_b64encode(httpx.get(image1_url).content).decode("utf-8")
+```Python Python
+import base64
+import httpx
 
-  image2_url = "https://upload.wikimedia.org/wikipedia/commons/b/b5/Iridescent.green.sweat.bee1.jpg"
-  image2_media_type = "image/jpeg"
-  image2_data = base64.standard_b64encode(httpx.get(image2_url).content).decode("utf-8")
+# For base64-encoded images
+image1_url = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg"
+image1_media_type = "image/jpeg"
+image1_data = base64.standard_b64encode(httpx.get(image1_url).content).decode("utf-8")
 
-  # For URL-based images, you can use the URLs directly in your requests
-  ```
+image2_url = "https://upload.wikimedia.org/wikipedia/commons/b/b5/Iridescent.green.sweat.bee1.jpg"
+image2_media_type = "image/jpeg"
+image2_data = base64.standard_b64encode(httpx.get(image2_url).content).decode("utf-8")
 
-  ```TypeScript TypeScript
-  import axios from 'axios';
+# For URL-based images, you can use the URLs directly in your requests
+```
 
-  // For base64-encoded images
-  async function getBase64Image(url: string): Promise<string> {
-    const response = await axios.get(url, { responseType: 'arraybuffer' });
-    return Buffer.from(response.data, 'binary').toString('base64');
-  }
+```TypeScript TypeScript
+import axios from 'axios';
 
-  // Usage
-  async function prepareImages() {
-    const imageData = await getBase64Image('https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg');
-    // Now you can use imageData in your API calls
-  }
+// For base64-encoded images
+async function getBase64Image(url: string): Promise<string> {
+  const response = await axios.get(url, { responseType: 'arraybuffer' });
+  return Buffer.from(response.data, 'binary').toString('base64');
+}
 
-  // For URL-based images, you can use the URLs directly in your requests
-  ```
+// Usage
+async function prepareImages() {
+  const imageData = await getBase64Image('https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg');
+  // Now you can use imageData in your API calls
+}
 
-  ```java Java
-  import java.io.IOException;
-  import java.util.Base64;
-  import java.io.InputStream;
-  import java.net.URL;
+// For URL-based images, you can use the URLs directly in your requests
+```
 
-  public class ImageHandlingExample {
+```java Java
+import java.io.IOException;
+import java.util.Base64;
+import java.io.InputStream;
+import java.net.URL;
 
-      public static void main(String[] args) throws IOException, InterruptedException {
-          // For base64-encoded images
-          String image1Url = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg";
-          String image1MediaType = "image/jpeg";
-          String image1Data = downloadAndEncodeImage(image1Url);
+public class ImageHandlingExample {
 
-          String image2Url = "https://upload.wikimedia.org/wikipedia/commons/b/b5/Iridescent.green.sweat.bee1.jpg";
-          String image2MediaType = "image/jpeg";
-          String image2Data = downloadAndEncodeImage(image2Url);
+    public static void main(String[] args) throws IOException, InterruptedException {
+        // For base64-encoded images
+        String image1Url = "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg";
+        String image1MediaType = "image/jpeg";
+        String image1Data = downloadAndEncodeImage(image1Url);
 
-          // For URL-based images, you can use the URLs directly in your requests
-      }
+        String image2Url = "https://upload.wikimedia.org/wikipedia/commons/b/b5/Iridescent.green.sweat.bee1.jpg";
+        String image2MediaType = "image/jpeg";
+        String image2Data = downloadAndEncodeImage(image2Url);
 
-      private static String downloadAndEncodeImage(String imageUrl) throws IOException {
-          try (InputStream inputStream = new URL(imageUrl).openStream()) {
-              return Base64.getEncoder().encodeToString(inputStream.readAllBytes());
-          }
-      }
+        // For URL-based images, you can use the URLs directly in your requests
+    }
 
-  }
-  ```
+    private static String downloadAndEncodeImage(String imageUrl) throws IOException {
+        try (InputStream inputStream = new URL(imageUrl).openStream()) {
+            return Base64.getEncoder().encodeToString(inputStream.readAllBytes());
+        }
+    }
+
+}
+```
+
 </CodeGroup>
 
 Below are examples of how to include images in a Messages API request using base64-encoded images and URL references:
@@ -3951,111 +3951,112 @@ Below are examples of how to include images in a Messages API request using base
     }'
   ```
 
-  ```Python Python
-  import anthropic
+```Python Python
+import anthropic
 
-  client = anthropic.Anthropic()
-  message = client.messages.create(
-      model="claude-sonnet-4-20250514",
-      max_tokens=1024,
-      messages=[
+client = anthropic.Anthropic()
+message = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "base64",
+                        "media_type": image1_media_type,
+                        "data": image1_data,
+                    },
+                },
+                {
+                    "type": "text",
+                    "text": "Describe this image."
+                }
+            ],
+        }
+    ],
+)
+print(message)
+```
+
+```TypeScript TypeScript
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+async function main() {
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: [
           {
-              "role": "user",
-              "content": [
-                  {
-                      "type": "image",
-                      "source": {
-                          "type": "base64",
-                          "media_type": image1_media_type,
-                          "data": image1_data,
-                      },
-                  },
-                  {
-                      "type": "text",
-                      "text": "Describe this image."
-                  }
-              ],
+            type: "image",
+            source: {
+              type: "base64",
+              media_type: "image/jpeg",
+              data: imageData, // Base64-encoded image data as string
+            }
+          },
+          {
+            type: "text",
+            text: "Describe this image."
           }
-      ],
-  )
-  print(message)
-  ```
-
-  ```TypeScript TypeScript
-  import Anthropic from '@anthropic-ai/sdk';
-
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
+        ]
+      }
+    ]
   });
 
-  async function main() {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "base64",
-                media_type: "image/jpeg",
-                data: imageData, // Base64-encoded image data as string
-              }
-            },
-            {
-              type: "text",
-              text: "Describe this image."
-            }
-          ]
-        }
-      ]
-    });
+  console.log(message);
+}
 
-    console.log(message);
-  }
+main();
+```
 
-  main();
-  ```
+```Java Java
+import java.io.IOException;
+import java.util.List;
 
-  ```Java Java
-  import java.io.IOException;
-  import java.util.List;
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.models.messages.*;
 
-  import com.anthropic.client.AnthropicClient;
-  import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-  import com.anthropic.models.messages.*;
+public class VisionExample {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        AnthropicClient client = AnthropicOkHttpClient.fromEnv();
+        String imageData = ""; // // Base64-encoded image data as string
 
-  public class VisionExample {
-      public static void main(String[] args) throws IOException, InterruptedException {
-          AnthropicClient client = AnthropicOkHttpClient.fromEnv();
-          String imageData = ""; // // Base64-encoded image data as string
+        List<ContentBlockParam> contentBlockParams = List.of(
+                ContentBlockParam.ofImage(
+                        ImageBlockParam.builder()
+                                .source(Base64ImageSource.builder()
+                                        .data(imageData)
+                                        .build())
+                                .build()
+                ),
+                ContentBlockParam.ofText(TextBlockParam.builder()
+                        .text("Describe this image.")
+                        .build())
+        );
+        Message message = client.messages().create(
+                MessageCreateParams.builder()
+                        .model(Model.CLAUDE_3_7_SONNET_LATEST)
+                        .maxTokens(1024)
+                        .addUserMessageOfBlockParams(contentBlockParams)
+                        .build()
+        );
 
-          List<ContentBlockParam> contentBlockParams = List.of(
-                  ContentBlockParam.ofImage(
-                          ImageBlockParam.builder()
-                                  .source(Base64ImageSource.builder()
-                                          .data(imageData)
-                                          .build())
-                                  .build()
-                  ),
-                  ContentBlockParam.ofText(TextBlockParam.builder()
-                          .text("Describe this image.")
-                          .build())
-          );
-          Message message = client.messages().create(
-                  MessageCreateParams.builder()
-                          .model(Model.CLAUDE_3_7_SONNET_LATEST)
-                          .maxTokens(1024)
-                          .addUserMessageOfBlockParams(contentBlockParams)
-                          .build()
-          );
+        System.out.println(message);
+    }
+}
+```
 
-          System.out.println(message);
-      }
-  }
-  ```
 </CodeGroup>
 
 ### URL-based image example
@@ -4090,108 +4091,109 @@ Below are examples of how to include images in a Messages API request using base
     }'
   ```
 
-  ```Python Python
-  import anthropic
+```Python Python
+import anthropic
 
-  client = anthropic.Anthropic()
-  message = client.messages.create(
-      model="claude-sonnet-4-20250514",
-      max_tokens=1024,
-      messages=[
+client = anthropic.Anthropic()
+message = client.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    messages=[
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "url",
+                        "url": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg",
+                    },
+                },
+                {
+                    "type": "text",
+                    "text": "Describe this image."
+                }
+            ],
+        }
+    ],
+)
+print(message)
+```
+
+```TypeScript TypeScript
+import Anthropic from '@anthropic-ai/sdk';
+
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+});
+
+async function main() {
+  const message = await anthropic.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    messages: [
+      {
+        role: "user",
+        content: [
           {
-              "role": "user",
-              "content": [
-                  {
-                      "type": "image",
-                      "source": {
-                          "type": "url",
-                          "url": "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg",
-                      },
-                  },
-                  {
-                      "type": "text",
-                      "text": "Describe this image."
-                  }
-              ],
+            type: "image",
+            source: {
+              type: "url",
+              url: "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg"
+            }
+          },
+          {
+            type: "text",
+            text: "Describe this image."
           }
-      ],
-  )
-  print(message)
-  ```
-
-  ```TypeScript TypeScript
-  import Anthropic from '@anthropic-ai/sdk';
-
-  const anthropic = new Anthropic({
-    apiKey: process.env.ANTHROPIC_API_KEY,
+        ]
+      }
+    ]
   });
 
-  async function main() {
-    const message = await anthropic.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1024,
-      messages: [
-        {
-          role: "user",
-          content: [
-            {
-              type: "image",
-              source: {
-                type: "url",
-                url: "https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg"
-              }
-            },
-            {
-              type: "text",
-              text: "Describe this image."
-            }
-          ]
-        }
-      ]
-    });
+  console.log(message);
+}
 
-    console.log(message);
-  }
+main();
+```
 
-  main();
-  ```
+```Java Java
+import java.io.IOException;
+import java.util.List;
 
-  ```Java Java
-  import java.io.IOException;
-  import java.util.List;
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.models.messages.*;
 
-  import com.anthropic.client.AnthropicClient;
-  import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-  import com.anthropic.models.messages.*;
+public class VisionExample {
 
-  public class VisionExample {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        AnthropicClient client = AnthropicOkHttpClient.fromEnv();
 
-      public static void main(String[] args) throws IOException, InterruptedException {
-          AnthropicClient client = AnthropicOkHttpClient.fromEnv();
+        List<ContentBlockParam> contentBlockParams = List.of(
+                ContentBlockParam.ofImage(
+                        ImageBlockParam.builder()
+                                .source(UrlImageSource.builder()
+                                        .url("https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg")
+                                        .build())
+                                .build()
+                ),
+                ContentBlockParam.ofText(TextBlockParam.builder()
+                        .text("Describe this image.")
+                        .build())
+        );
+        Message message = client.messages().create(
+                MessageCreateParams.builder()
+                        .model(Model.CLAUDE_3_7_SONNET_LATEST)
+                        .maxTokens(1024)
+                        .addUserMessageOfBlockParams(contentBlockParams)
+                        .build()
+        );
+        System.out.println(message);
+    }
+}
+```
 
-          List<ContentBlockParam> contentBlockParams = List.of(
-                  ContentBlockParam.ofImage(
-                          ImageBlockParam.builder()
-                                  .source(UrlImageSource.builder()
-                                          .url("https://upload.wikimedia.org/wikipedia/commons/a/a7/Camponotus_flavomarginatus_ant.jpg")
-                                          .build())
-                                  .build()
-                  ),
-                  ContentBlockParam.ofText(TextBlockParam.builder()
-                          .text("Describe this image.")
-                          .build())
-          );
-          Message message = client.messages().create(
-                  MessageCreateParams.builder()
-                          .model(Model.CLAUDE_3_7_SONNET_LATEST)
-                          .maxTokens(1024)
-                          .addUserMessageOfBlockParams(contentBlockParams)
-                          .build()
-          );
-          System.out.println(message);
-      }
-  }
-  ```
 </CodeGroup>
 
 ### Files API image example
@@ -4199,172 +4201,180 @@ Below are examples of how to include images in a Messages API request using base
 For images you'll use repeatedly or when you want to avoid encoding overhead, use the [Files API](/en/docs/build-with-claude/files):
 
 <CodeGroup>
-  ```bash Shell
-  # First, upload your image to the Files API
-  curl -X POST https://api.anthropic.com/v1/files \
-    -H "x-api-key: $ANTHROPIC_API_KEY" \
-    -H "anthropic-version: 2023-06-01" \
-    -H "anthropic-beta: files-api-2025-04-14" \
-    -F "file=@image.jpg"
+```bash Shell
+# First, upload your image to the Files API
+curl -X POST https://api.anthropic.com/v1/files \
+ -H "x-api-key: $ANTHROPIC_API_KEY" \
+ -H "anthropic-version: 2023-06-01" \
+ -H "anthropic-beta: files-api-2025-04-14" \
+ -F "file=@image.jpg"
 
-  # Then use the returned file_id in your message
-  curl https://api.anthropic.com/v1/messages \
-    -H "x-api-key: $ANTHROPIC_API_KEY" \
-    -H "anthropic-version: 2023-06-01" \
-    -H "anthropic-beta: files-api-2025-04-14" \
-    -H "content-type: application/json" \
-    -d '{
-      "model": "claude-sonnet-4-20250514",
-      "max_tokens": 1024,
-      "messages": [
+# Then use the returned file_id in your message
+
+curl https://api.anthropic.com/v1/messages \
+ -H "x-api-key: $ANTHROPIC_API_KEY" \
+ -H "anthropic-version: 2023-06-01" \
+ -H "anthropic-beta: files-api-2025-04-14" \
+ -H "content-type: application/json" \
+ -d '{
+"model": "claude-sonnet-4-20250514",
+"max_tokens": 1024,
+"messages": [
+{
+"role": "user",
+"content": [
+{
+"type": "image",
+"source": {
+"type": "file",
+"file_id": "file_abc123"
+}
+},
+{
+"type": "text",
+"text": "Describe this image."
+}
+]
+}
+]
+}'
+
+```
+
+```python Python
+import anthropic
+
+client = anthropic.Anthropic()
+
+# Upload the image file
+with open("image.jpg", "rb") as f:
+    file_upload = client.beta.files.upload(file=("image.jpg", f, "image/jpeg"))
+
+# Use the uploaded file in a message
+message = client.beta.messages.create(
+    model="claude-sonnet-4-20250514",
+    max_tokens=1024,
+    betas=["files-api-2025-04-14"],
+    messages=[
         {
-          "role": "user",
-          "content": [
-            {
-              "type": "image",
-              "source": {
-                "type": "file",
-                "file_id": "file_abc123"
-              }
-            },
-            {
-              "type": "text",
-              "text": "Describe this image."
-            }
-          ]
+            "role": "user",
+            "content": [
+                {
+                    "type": "image",
+                    "source": {
+                        "type": "file",
+                        "file_id": file_upload.id
+                    }
+                },
+                {
+                    "type": "text",
+                    "text": "Describe this image."
+                }
+            ]
         }
-      ]
-    }'
-  ```
+    ],
+)
 
-  ```python Python
-  import anthropic
+print(message.content)
+```
 
-  client = anthropic.Anthropic()
+```typescript TypeScript
+import { Anthropic, toFile } from "@anthropic-ai/sdk";
+import fs from "fs";
 
-  # Upload the image file
-  with open("image.jpg", "rb") as f:
-      file_upload = client.beta.files.upload(file=("image.jpg", f, "image/jpeg"))
+const anthropic = new Anthropic();
 
-  # Use the uploaded file in a message
-  message = client.beta.messages.create(
-      model="claude-sonnet-4-20250514",
-      max_tokens=1024,
-      betas=["files-api-2025-04-14"],
-      messages=[
+async function main() {
+  // Upload the image file
+  const fileUpload = await anthropic.beta.files.upload(
+    {
+      file: toFile(fs.createReadStream("image.jpg"), undefined, {
+        type: "image/jpeg",
+      }),
+    },
+    {
+      betas: ["files-api-2025-04-14"],
+    }
+  );
+
+  // Use the uploaded file in a message
+  const response = await anthropic.beta.messages.create({
+    model: "claude-sonnet-4-20250514",
+    max_tokens: 1024,
+    betas: ["files-api-2025-04-14"],
+    messages: [
+      {
+        role: "user",
+        content: [
           {
-              "role": "user",
-              "content": [
-                  {
-                      "type": "image",
-                      "source": {
-                          "type": "file",
-                          "file_id": file_upload.id
-                      }
-                  },
-                  {
-                      "type": "text",
-                      "text": "Describe this image."
-                  }
-              ]
-          }
-      ],
-  )
-
-  print(message.content)
-  ```
-
-  ```typescript TypeScript
-  import { Anthropic, toFile } from '@anthropic-ai/sdk';
-  import fs from 'fs';
-
-  const anthropic = new Anthropic();
-
-  async function main() {
-    // Upload the image file
-    const fileUpload = await anthropic.beta.files.upload({
-      file: toFile(fs.createReadStream('image.jpg'), undefined, { type: "image/jpeg" })
-    }, {
-      betas: ['files-api-2025-04-14']
-    });
-
-    // Use the uploaded file in a message
-    const response = await anthropic.beta.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 1024,
-      betas: ['files-api-2025-04-14'],
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'image',
-              source: {
-                type: 'file',
-                file_id: fileUpload.id
-              }
+            type: "image",
+            source: {
+              type: "file",
+              file_id: fileUpload.id,
             },
-            {
-              type: 'text',
-              text: 'Describe this image.'
-            }
-          ]
-        }
-      ]
-    });
+          },
+          {
+            type: "text",
+            text: "Describe this image.",
+          },
+        ],
+      },
+    ],
+  });
 
-    console.log(response);
-  }
+  console.log(response);
+}
 
-  main();
-  ```
+main();
+```
 
-  ```java Java
-  import java.io.IOException;
-  import java.nio.file.Files;
-  import java.nio.file.Path;
-  import java.util.List;
+```java Java
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.List;
 
-  import com.anthropic.client.AnthropicClient;
-  import com.anthropic.client.okhttp.AnthropicOkHttpClient;
-  import com.anthropic.models.File;
-  import com.anthropic.models.files.FileUploadParams;
-  import com.anthropic.models.messages.*;
+import com.anthropic.client.AnthropicClient;
+import com.anthropic.client.okhttp.AnthropicOkHttpClient;
+import com.anthropic.models.File;
+import com.anthropic.models.files.FileUploadParams;
+import com.anthropic.models.messages.*;
 
-  public class ImageFilesExample {
-      public static void main(String[] args) throws IOException {
-          AnthropicClient client = AnthropicOkHttpClient.fromEnv();
+public class ImageFilesExample {
+    public static void main(String[] args) throws IOException {
+        AnthropicClient client = AnthropicOkHttpClient.fromEnv();
 
-          // Upload the image file
-          File file = client.beta().files().upload(FileUploadParams.builder()
-                  .file(Files.newInputStream(Path.of("image.jpg")))
-                  .build());
+        // Upload the image file
+        File file = client.beta().files().upload(FileUploadParams.builder()
+                .file(Files.newInputStream(Path.of("image.jpg")))
+                .build());
 
-          // Use the uploaded file in a message
-          ImageBlockParam imageParam = ImageBlockParam.builder()
-                  .fileSource(file.id())
-                  .build();
+        // Use the uploaded file in a message
+        ImageBlockParam imageParam = ImageBlockParam.builder()
+                .fileSource(file.id())
+                .build();
 
-          MessageCreateParams params = MessageCreateParams.builder()
-                  .model(Model.CLAUDE_3_7_SONNET_LATEST)
-                  .maxTokens(1024)
-                  .addUserMessageOfBlockParams(
-                          List.of(
-                                  ContentBlockParam.ofImage(imageParam),
-                                  ContentBlockParam.ofText(
-                                          TextBlockParam.builder()
-                                                  .text("Describe this image.")
-                                                  .build()
-                                  )
-                          )
-                  )
-                  .build();
+        MessageCreateParams params = MessageCreateParams.builder()
+                .model(Model.CLAUDE_3_7_SONNET_LATEST)
+                .maxTokens(1024)
+                .addUserMessageOfBlockParams(
+                        List.of(
+                                ContentBlockParam.ofImage(imageParam),
+                                ContentBlockParam.ofText(
+                                        TextBlockParam.builder()
+                                                .text("Describe this image.")
+                                                .build()
+                                )
+                        )
+                )
+                .build();
 
-          Message message = client.messages().create(params);
-          System.out.println(message.content());
-      }
-  }
-  ```
+        Message message = client.messages().create(params);
+        System.out.println(message.content());
+    }
+}
+```
+
 </CodeGroup>
 
 See [Messages API examples](/en/api/messages) for more example code and parameter details.
@@ -4437,6 +4447,7 @@ See [Messages API examples](/en/api/messages) for more example code and paramete
         ```
       </Tab>
     </Tabs>
+
   </Accordion>
 
   <Accordion title="Example: Multiple images">
@@ -4537,6 +4548,7 @@ See [Messages API examples](/en/api/messages) for more example code and paramete
         ```
       </Tab>
     </Tabs>
+
   </Accordion>
 
   <Accordion title="Example: Multiple images with a system prompt">
@@ -4638,6 +4650,7 @@ See [Messages API examples](/en/api/messages) for more example code and paramete
         ```
       </Tab>
     </Tabs>
+
   </Accordion>
 
   <Accordion title="Example: Four images across two conversation turns">
@@ -4653,26 +4666,27 @@ See [Messages API examples](/en/api/messages) for more example code and paramete
     | Assistant | \[Claude's response]                                                               |
 
     When using the API, simply insert new images into the array of Messages in the `user` role as part of any standard [multiturn conversation](/en/api/messages-examples#multiple-conversational-turns) structure.
+
   </Accordion>
 </AccordionGroup>
 
-***
+---
 
 ## Limitations
 
 While Claude's image understanding capabilities are cutting-edge, there are some limitations to be aware of:
 
-* **People identification**: Claude [cannot be used](https://www.anthropic.com/legal/aup) to identify (i.e., name) people in images and will refuse to do so.
-* **Accuracy**: Claude may hallucinate or make mistakes when interpreting low-quality, rotated, or very small images under 200 pixels.
-* **Spatial reasoning**: Claude's spatial reasoning abilities are limited. It may struggle with tasks requiring precise localization or layouts, like reading an analog clock face or describing exact positions of chess pieces.
-* **Counting**: Claude can give approximate counts of objects in an image but may not always be precisely accurate, especially with large numbers of small objects.
-* **AI generated images**: Claude does not know if an image is AI-generated and may be incorrect if asked. Do not rely on it to detect fake or synthetic images.
-* **Inappropriate content**: Claude will not process inappropriate or explicit images that violate our [Acceptable Use Policy](https://www.anthropic.com/legal/aup).
-* **Healthcare applications**: While Claude can analyze general medical images, it is not designed to interpret complex diagnostic scans such as CTs or MRIs. Claude's outputs should not be considered a substitute for professional medical advice or diagnosis.
+- **People identification**: Claude [cannot be used](https://www.anthropic.com/legal/aup) to identify (i.e., name) people in images and will refuse to do so.
+- **Accuracy**: Claude may hallucinate or make mistakes when interpreting low-quality, rotated, or very small images under 200 pixels.
+- **Spatial reasoning**: Claude's spatial reasoning abilities are limited. It may struggle with tasks requiring precise localization or layouts, like reading an analog clock face or describing exact positions of chess pieces.
+- **Counting**: Claude can give approximate counts of objects in an image but may not always be precisely accurate, especially with large numbers of small objects.
+- **AI generated images**: Claude does not know if an image is AI-generated and may be incorrect if asked. Do not rely on it to detect fake or synthetic images.
+- **Inappropriate content**: Claude will not process inappropriate or explicit images that violate our [Acceptable Use Policy](https://www.anthropic.com/legal/aup).
+- **Healthcare applications**: While Claude can analyze general medical images, it is not designed to interpret complex diagnostic scans such as CTs or MRIs. Claude's outputs should not be considered a substitute for professional medical advice or diagnosis.
 
 Always carefully review and verify Claude's image interpretations, especially for high-stakes use cases. Do not use Claude for tasks requiring perfect precision or sensitive image analysis without human oversight.
 
-***
+---
 
 ## FAQ
 
@@ -4684,9 +4698,10 @@ Always carefully review and verify Claude's image interpretations, especially fo
     * `image/png`
     * `image/gif`
     * `image/webp`
+
   </Accordion>
 
-  {" "}
+{" "}
 
   <Accordion title="Can Claude read image URLs?">
     Yes, Claude can now process images from URLs with our URL image source blocks in the API.
@@ -4702,6 +4717,7 @@ Always carefully review and verify Claude's image interpretations, especially fo
       }
     }
     ```
+
   </Accordion>
 
   <Accordion title="Is there a limit to the image file size I can upload?">
@@ -4711,6 +4727,7 @@ Always carefully review and verify Claude's image interpretations, especially fo
     * claude.ai: Maximum 10MB per image
 
     Images larger than these limits will be rejected and return an error when using our API.
+
   </Accordion>
 
   <Accordion title="How many images can I include in one request?">
@@ -4720,15 +4737,16 @@ Always carefully review and verify Claude's image interpretations, especially fo
     * claude.ai: Up to 20 images per turn
 
     Requests exceeding these limits will be rejected and return an error.
+
   </Accordion>
 
-  {" "}
+{" "}
 
   <Accordion title="Does Claude read image metadata?">
     No, Claude does not parse or receive any metadata from images passed to it.
   </Accordion>
 
-  {" "}
+{" "}
 
   <Accordion title="Can I delete images I've uploaded?">
     No. Image uploads are ephemeral and not stored beyond the duration of the API
@@ -4736,7 +4754,7 @@ Always carefully review and verify Claude's image interpretations, especially fo
     processed.
   </Accordion>
 
-  {" "}
+{" "}
 
   <Accordion title="Where can I find details on data privacy for image uploads?">
     Please refer to our privacy policy page for information on how we handle
@@ -4752,6 +4770,7 @@ Always carefully review and verify Claude's image interpretations, especially fo
     3. If the issue persists, flag the output in claude.ai (thumbs up/down) or contact our support team.
 
     Your feedback helps us improve!
+
   </Accordion>
 
   <Accordion title="Can Claude generate or edit images?">
@@ -4759,13 +4778,66 @@ Always carefully review and verify Claude's image interpretations, especially fo
   </Accordion>
 </AccordionGroup>
 
-***
+---
 
 ## Dive deeper into vision
 
 Ready to start building with images using Claude? Here are a few helpful resources:
 
-* [Multimodal cookbook](https://github.com/anthropics/anthropic-cookbook/tree/main/multimodal): This cookbook has tips on [getting started with images](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/getting%5Fstarted%5Fwith%5Fvision.ipynb) and [best practice techniques](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/best%5Fpractices%5Ffor%5Fvision.ipynb) to ensure the highest quality performance with images. See how you can effectively prompt Claude with images to carry out tasks such as [interpreting and analyzing charts](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/reading%5Fcharts%5Fgraphs%5Fpowerpoints.ipynb) or [extracting content from forms](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/how%5Fto%5Ftranscribe%5Ftext.ipynb).
-* [API reference](/en/api/messages): Visit our documentation for the Messages API, including example [API calls involving images](/en/api/messages-examples).
+- [Multimodal cookbook](https://github.com/anthropics/anthropic-cookbook/tree/main/multimodal): This cookbook has tips on [getting started with images](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/getting%5Fstarted%5Fwith%5Fvision.ipynb) and [best practice techniques](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/best%5Fpractices%5Ffor%5Fvision.ipynb) to ensure the highest quality performance with images. See how you can effectively prompt Claude with images to carry out tasks such as [interpreting and analyzing charts](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/reading%5Fcharts%5Fgraphs%5Fpowerpoints.ipynb) or [extracting content from forms](https://github.com/anthropics/anthropic-cookbook/blob/main/multimodal/how%5Fto%5Ftranscribe%5Ftext.ipynb).
+- [API reference](/en/api/messages): Visit our documentation for the Messages API, including example [API calls involving images](/en/api/messages-examples).
 
 If you have any other questions, feel free to reach out to our [support team](https://support.anthropic.com/). You can also join our [developer community](https://www.anthropic.com/discord) to connect with other creators and get help from Anthropic experts.
+
+# Increase output consistency (JSON mode)
+
+Here's how to make Claude's responses more consistent:
+
+## Specify the desired output format
+
+Precisely define your desired output format using JSON, XML, or custom templates so that Claude understands every output formatting element you require.
+
+<Accordion title="Example: Standardizing customer feedback">
+  | Role      | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+  | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | User      | You're a Customer Insights AI. Analyze this feedback and output in JSON format with keys: "sentiment" (positive/negative/neutral), "key\_issues" (list), and "action\_items" (list of dicts with "team" and "task").<br /><br />"I've been a loyal user for 3 years, but the recent UI update is a disaster. Finding basic features is now a scavenger hunt. Plus, the new 'premium' pricing is outrageous. I'm considering switching unless this is fixed ASAP."                                                                                                                                                                                                                                                                                                                                                |
+  | Assistant | \{<br />  "sentiment": "negative",<br />  "key\_issues": \[<br />    "Poor UI/UX in recent update",<br />    "Difficulty finding basic features",<br />    "Perceived high pricing (new 'premium' tier)"<br />  ],<br />  "action\_items": \[<br />    \{<br />      "team": "Product",<br />      "task": "Conduct usability testing and iterate on UI based on findings"<br />    },<br />    \{<br />      "team": "UX",<br />      "task": "Create a feature discovery guide or onboarding flow"<br />    },<br />    \{<br />      "team": "Marketing",<br />      "task": "Review pricing strategy and communicate value proposition"<br />    },<br />    \{<br />      "team": "Customer Success",<br />      "task": "Reach out to user, offer concessions to prevent churn"<br />    }<br />  ]<br />} |
+</Accordion>
+
+## Prefill Claude's response
+
+Prefill the `Assistant` turn with your desired format. This trick bypasses Claude's friendly preamble and enforces your structure.
+
+<Accordion title="Example: Daily sales report">
+  | Role                | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+  | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | User                | You're an insightful Sales Intelligence AI. Generate today's sales report.<br /><br />Structure the report like this:<br /><br />\<report><br />    \<summary><br />        \<metric name="total\_revenue">\$0.00\</metric><br />        \<metric name="units\_sold">0\</metric><br />        \<metric name="avg\_order\_value">\$0.00\</metric><br />    \</summary><br />    \<top\_products><br />        \<product><br />            \<name>Product Name\</name><br />            \<revenue>\$0.00\</revenue><br />            \<units>0\</units><br />        \</product><br />        ...<br />    \</top\_products><br />    \<regional\_performance><br />        \<region><br />            \<name>Region Name\</name><br />            \<revenue>\$0.00\</revenue><br />            \<growth>0.0%\</growth><br />        \</region><br />        ...<br />    \</regional\_performance><br />    \<action\_items><br />        \<item>Action item.\</item><br />        ...<br />    \</action\_items><br />\</report>                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+  | Assistant (prefill) | \<report><br />    \<summary><br />        \<metric name=                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+  | Assistant           | "total\_revenue">\$842,567.00\</metric><br />        \<metric name="units\_sold">15,238\</metric><br />        \<metric name="avg\_order\_value">\$55.29\</metric><br />    \</summary><br />    \<top\_products><br />        \<product><br />            \<name>AcmeGuard Pro\</name><br />            \<revenue>\$325,890.00\</revenue><br />            \<units>3,621\</units><br />        \</product><br />        \<product><br />            \<name>AcmeVault Enterprise\</name><br />            \<revenue>\$254,400.00\</revenue><br />            \<units>1,272\</units><br />        \</product><br />        \<product><br />            \<name>AcmeBoost XL\</name><br />            \<revenue>\$147,690.00\</revenue><br />            \<units>4,923\</units><br />        \</product><br />    \</top\_products><br />    \<regional\_performance><br />        \<region><br />            \<name>APAC\</name><br />            \<revenue>\$258,960.00\</revenue><br />            \<growth>12.8%\</growth><br />        \</region><br />        \<region><br />            \<name>EMEA\</name><br />            \<revenue>\$325,478.00\</revenue><br />            \<growth>3.2%\</growth><br />        \</region><br />        \<region><br />            \<name>Americas\</name><br />            \<revenue>\$258,129.00\</revenue><br />            \<growth>-2.1%\</growth><br />        \</region><br />    \</regional\_performance><br />    \<action\_items><br />        \<item>Investigate Americas revenue drop; schedule regional sales team meeting.\</item><br />        \<item>Accelerate CloudGuard Pro rollout in APAC to capitalize on growth.\</item><br />        \<item>Review NetBoost XL pricing; high volume but lower revenue.\</item><br />    \</action\_items><br />\</report> |
+</Accordion>
+
+## Constrain with examples
+
+Provide examples of your desired output. This trains Claude's understanding better than abstract instructions.
+
+<Accordion title="Example: Generating consistent market intelligence">
+  | Role      | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+  | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | User      | As a Market Intelligence AI, your task is to analyze data about our competitors. Here is our competitor data:<br />\<data><br />\{\{DATA}}<br />\</data><br /><br />Output following this example format:<br /><br />\<competitor><br />  \<name>Rival Inc\</name><br />  \<overview>A 50-word summary.\</overview><br />  \<swot><br />    \<strengths>- Bullet points\</strengths><br />    \<weaknesses>- Bullet points\</weaknesses><br />    \<opportunities>- Bullet points\</opportunities><br />    \<threats>- Bullet points\</threats><br />  \</swot><br />  \<strategy>A 30-word strategic response.\</strategy><br />\</competitor><br /><br />Now, analyze AcmeGiant and AcmeDataCo using this format.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+  | Assistant | \<competitor><br />  \<name>AcmeGiant\</name><br />  \<overview>Global tech leader with a vast ecosystem of consumer and enterprise products. Known for innovation, strong brand, and deep customer lock-in through integrated hardware, software, and services.\</overview><br />  \<swot><br />    \<strengths><br />      - Massive R\&D budget fuels continuous innovation<br />      - Loyal customer base and powerful brand recognition<br />      - Synergistic product ecosystem increases switching costs<br />    \</strengths><br />    \<weaknesses><br />      - High prices may deter cost-sensitive customers<br />      - Slow to address enterprise-specific customization needs<br />      - Privacy concerns and regulatory scrutiny in multiple markets<br />    \</weaknesses><br />    \<opportunities><br />      - Growing demand for AI and ML capabilities<br />      - Expansion into emerging markets<br />      - Acquisitions to fill product or talent gaps<br />    \</opportunities><br />    \<threats><br />      - Rapid rise of cloud-native competitors<br />      - Antitrust lawsuits and regulatory actions<br />      - Talent poaching by startups and competitors<br />    \</threats><br />  \</swot><br />  \<strategy>Focus on our agility and customization. Target TechGiant's slow enterprise response and privacy issues in our marketing.\</strategy><br />\</competitor><br /><br />\<competitor><br />  \<name>AcmeDataCo\</name><br />  \<overview>Rising star in data analytics and visualization. Offers intuitive, self-service BI tools with a freemium model, appealing to startups and enterprise teams alike.\</overview><br />  \<swot><br />    \<strengths><br />      - User-friendly interface reduces need for specialized training<br />      - Freemium model lowers barrier to entry, drives viral growth<br />      - Strong product-market fit with rise of data-driven decisions<br />    \</strengths><br />    \<weaknesses><br />      - Limited advanced analytics compared to established BI tools<br />      - Scaling issues reported with very large datasets<br />      - Dependent on third-party cloud infrastructure (AWS)<br />    \</weaknesses><br />    \<opportunities><br />      - Expanding into predictive analytics and AI-driven insights<br />      - Forming strategic alliances with complementary tech vendors<br />      - Customizable dashboards for industry-specific solutions<br />    \</opportunities><br />    \<threats><br />      - Market saturation; many new entrants in self-service BI<br />      - Enterprise BI giants developing more user-friendly tools<br />      - Data privacy regulations increasing compliance complexity<br />    \</threats><br />  \</swot><br />  \<strategy>Highlight our robust enterprise features and data governance. Target accounts struggling with DataCo's scale limitations.\</strategy><br />\</competitor> |
+</Accordion>
+
+## Use retrieval for contextual consistency
+
+For tasks requiring consistent context (e.g., chatbots, knowledge bases), use retrieval to ground Claude's responses in a fixed information set.
+
+<Accordion title="Example: Enhancing IT support consistency">
+  | Role      | Content                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+  | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+  | User      | You're our IT Support AI that draws on knowledge base data. Here are entries from your knowledge base:<br /><br />\<kb><br />  \<entry><br />    \<id>1\</id><br />    \<title>Reset Active Directory password\</title><br />    \<content>1. Go to password.ourcompany.com<br />2. Enter your username<br />3. Click "Forgot Password"<br />4. Follow email instructions\</content><br />  \</entry><br />  \<entry><br />    \<id>2\</id><br />    \<title>Connect to VPN\</title><br />    \<content>1. Install GlobalProtect from software center<br />2. Open GlobalProtect, enter "vpn.ourcompany.com"<br />3. Use AD credentials to log in\</content><br />  \</entry><br />\</kb><br /><br />When helping users, always check the knowledge base first. Respond in this format:<br /><br />\<response><br />  \<kb\_entry>Knowledge base entry used\</kb\_entry><br />  \<answer>Your response\</answer><br />\</response> Write some test questions for yourself and answer them using the knowledge base, just to make sure you understand how to use the knowledge base properly.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+  | Assistant | Understood. I'll use the knowledge base for consistent responses. Let's test with a couple of scenarios.<br /><br />User: Hey, I can't log into my email. I think I forgot my password.<br /><br />\<response><br />  \<kb\_entry>1: Reset Active Directory password\</entry><br />  \<answer>I understand you're having trouble logging into your email due to a forgotten password. No worries, this is a common issue. To reset your Active Directory password, which is used for email access, follow these steps:<br /><br />1. Go to password.ourcompany.com<br />2. Enter your username (same as your email address)<br />3. Click on the "Forgot Password" link<br />4. You'll receive an email with instructions. Follow them to reset your password.<br /><br />After resetting, you should be able to log into your email. Let me know if you need any further assistance.\</answer><br />\</response><br /><br />User: I'm working from home today. How do I access internal resources?<br /><br />\<response><br />  \<kb\_entry>2: Connect to VPN\</entry><br />  \<answer>Great question! To access internal resources while working from home, you'll need to connect to our company VPN (Virtual Private Network). Here's how to set that up:<br /><br />1. First, install the GlobalProtect VPN client. You can find this in our software center.<br />2. Once installed, open the GlobalProtect application.<br />3. In the server field, enter "vpn.ourcompany.com".<br />4. Use your Active Directory (AD) credentials to log in - the same username and password you use for your email.<br /><br />Once connected, you'll have secure access to all internal resources as if you were in the office. Let me know if you run into any issues during setup.\</answer><br />\</response> |
+</Accordion>
+
+## Chain prompts for complex tasks
+
+Break down complex tasks into smaller, consistent subtasks. Each subtask gets Claude's full attention, reducing inconsistency errors across scaled workflows.

@@ -372,16 +372,11 @@ func TestApplyRequestTransformations_NormalizesToolChoice(t *testing.T) {
 		t.Fatalf("expected normalized tool_choice type 'function', got %v", typ)
 	}
 
-	fn, _ := toolChoice["function"].(map[string]any)
-	if fn == nil {
-		t.Fatalf("expected nested function map to be present")
+	if name := toolChoice["name"]; name != "get_weather" {
+		t.Fatalf("expected top-level name 'get_weather', got %v", name)
 	}
 
-	if name := fn["name"]; name != "get_weather" {
-		t.Fatalf("expected function name 'get_weather', got %v", name)
-	}
-
-	if _, exists := toolChoice["name"]; exists {
-		t.Fatalf("top-level name should remain unset before Response API flattening")
+	if _, exists := toolChoice["function"]; exists {
+		t.Fatalf("function block should be stripped for OpenAI upstream requests")
 	}
 }

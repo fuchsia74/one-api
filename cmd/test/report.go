@@ -131,7 +131,7 @@ func formatMatrixCell(res testResult) string {
 		if reason == "" {
 			reason = "skipped"
 		}
-		return fmt.Sprintf("SKIP %s", shorten(reason, 32))
+		return "SKIP"
 	default:
 		reason := res.ErrorReason
 		if reason == "" {

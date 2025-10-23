@@ -58,6 +58,17 @@ type streamToolCallState struct {
 	orderPos    int
 }
 
+func rawMessageFromString(value string) json.RawMessage {
+	if value == "" {
+		return nil
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return nil
+	}
+	return json.RawMessage(encoded)
+}
+
 func newChatToResponseStreamBridge(c *gin.Context, meta *metalib.Meta, request *openai.ResponseAPIRequest) openai_compatible.StreamRewriteHandler {
 	handler := &chatToResponseStreamBridge{
 		meta:       meta,
@@ -339,7 +350,7 @@ func (h *chatToResponseStreamBridge) appendTextDelta(c *gin.Context, delta strin
 		ItemId:       h.messageItemID,
 		OutputIndex:  h.messageOutputIndex,
 		ContentIndex: 0,
-		Delta:        delta,
+		Delta:        rawMessageFromString(delta),
 	})
 }
 
@@ -360,7 +371,7 @@ func (h *chatToResponseStreamBridge) appendReasoningDelta(c *gin.Context, delta 
 	h.reasoningBuilder.WriteString(trimmed)
 	h.emitEvent(c, "response.reasoning_summary_text.delta", openai.ResponseAPIStreamEvent{
 		Type:  "response.reasoning_summary_text.delta",
-		Delta: trimmed,
+		Delta: rawMessageFromString(trimmed),
 	})
 }
 
@@ -382,7 +393,7 @@ func (h *chatToResponseStreamBridge) handleToolCalls(c *gin.Context, tools []mod
 			Type:        "response.function_call_arguments.delta",
 			ItemId:      state.id,
 			OutputIndex: state.index,
-			Delta:       args,
+			Delta:       rawMessageFromString(args),
 		})
 		h.emitRequiredActionDelta(c, false)
 	}

@@ -671,7 +671,7 @@ func TestNormalizeResponseAPIRawBody_RemovesUnsupportedParams(t *testing.T) {
 	topP := 0.9
 	req := &openai.ResponseAPIRequest{Model: "gpt-5-mini", Temperature: &temp, TopP: &topP}
 
-	sanitizeResponseAPIRequest(req)
+	sanitizeResponseAPIRequest(req, channeltype.OpenAI)
 	if req.Temperature != nil {
 		t.Fatalf("expected temperature pointer to be nil after sanitization")
 	}

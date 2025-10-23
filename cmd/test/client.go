@@ -62,6 +62,17 @@ func performRequest(ctx context.Context, client *http.Client, baseURL, token str
 			return
 		}
 
+		if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+			reason := fmt.Sprintf("status %s: %s", resp.Status, snippet(streamData))
+			if isUnsupportedCombination(spec.Type, spec.Stream, resp.StatusCode, streamData, reason) {
+				result.Skipped = true
+				result.ErrorReason = reason
+				return
+			}
+			result.ErrorReason = reason
+			return
+		}
+
 		success, reason := evaluateStreamResponse(spec, streamData)
 		if success {
 			result.Success = true

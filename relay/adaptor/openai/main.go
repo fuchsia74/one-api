@@ -705,13 +705,13 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 		// Solution: Only accumulate delta events for final response text counting.
 		if streamEvent != nil && strings.Contains(streamEvent.Type, "delta") {
 			// Only accumulate content from delta events to prevent duplication
-			if streamEvent.Delta != "" {
+			if delta := extractStringFromRaw(streamEvent.Delta, "partial_json", "json", "text", "delta"); delta != "" {
 				if strings.Contains(streamEvent.Type, "reasoning_summary_text") {
 					// This is reasoning content
-					reasoningText += streamEvent.Delta
+					reasoningText += delta
 				} else {
 					// This is regular content
-					responseText += streamEvent.Delta
+					responseText += delta
 				}
 			}
 		}
@@ -735,7 +735,7 @@ func ResponseAPIStreamHandler(c *gin.Context, resp *http.Response, relayMode int
 					if streamEvent.OutputIndex >= 0 {
 						state.setIndex(streamEvent.OutputIndex)
 					}
-					state.appendArgs(streamEvent.Delta)
+					state.appendArgs(extractStringFromRaw(streamEvent.Delta, "partial_json", "text", "arguments", "delta"))
 				}
 			}
 			if strings.HasPrefix(eventType, "response.function_call_arguments.done") {
@@ -1081,8 +1081,8 @@ func ResponseAPIDirectStreamHandler(c *gin.Context, resp *http.Response, relayMo
 		// Accumulate response text for token counting - only from delta events to avoid duplicates
 		if streamEvent != nil && strings.Contains(streamEvent.Type, "delta") {
 			// Only accumulate content from delta events to prevent duplication
-			if streamEvent.Delta != "" {
-				responseText += streamEvent.Delta
+			if delta := extractStringFromRaw(streamEvent.Delta, "partial_json", "json", "text", "delta"); delta != "" {
+				responseText += delta
 			}
 		}
 

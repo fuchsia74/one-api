@@ -1,7 +1,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
+	"strings"
 	"testing"
 )
 
@@ -95,6 +98,15 @@ func TestEvaluateResponseClaudeToolInvocation(t *testing.T) {
 	}
 }
 
+func TestEvaluateResponseClaudeToolInvocationChoices(t *testing.T) {
+	body := []byte(`{"choices":[{"message":{"tool_calls":[{"type":"function","function":{"name":"get_weather"}}]}}]}`)
+	spec := requestSpec{Type: requestTypeClaudeMessages, Expectation: expectationToolInvocation}
+	success, reason := evaluateResponse(spec, body)
+	if !success {
+		t.Fatalf("expected Claude choices tool invocation success, got: %s", reason)
+	}
+}
+
 func TestIsUnsupportedCombinationResponse(t *testing.T) {
 	body := []byte("{\"error\":{\"message\":\"unknown field `messages`\"}}")
 	if !isUnsupportedCombination(requestTypeResponseAPI, false, http.StatusBadRequest, body, "") {
@@ -120,6 +132,15 @@ func TestEvaluateStreamResponseToolInvocationChat(t *testing.T) {
 	}
 }
 
+func TestEvaluateStreamResponseToolInvocationResponseAPIItem(t *testing.T) {
+	data := []byte("data: {\"type\":\"response.output_item.added\",\"item\":{\"type\":\"function_call\",\"name\":\"get_weather\"}}\n\n")
+	spec := requestSpec{Type: requestTypeResponseAPI, Expectation: expectationToolInvocation}
+	success, reason := evaluateStreamResponse(spec, data)
+	if !success {
+		t.Fatalf("expected Response API item tool invocation success, got failure: %s", reason)
+	}
+}
+
 func TestEvaluateStreamResponseToolInvocationMissing(t *testing.T) {
 	data := []byte("data: {\"choices\":[{\"delta\":{}}]}\n\n")
 	spec := requestSpec{Type: requestTypeChatCompletion, Expectation: expectationToolInvocation}
@@ -136,5 +157,65 @@ func TestIsUnsupportedCombinationStream(t *testing.T) {
 	body := []byte("streaming is not supported")
 	if !isUnsupportedCombination(requestTypeChatCompletion, true, http.StatusBadRequest, body, "") {
 		t.Fatalf("expected streaming combination to be marked unsupported")
+	}
+}
+
+func TestIsUnsupportedCombinationResponseFormatUnavailable(t *testing.T) {
+	body := []byte("{\"error\":{\"message\":\"This response_format type is unavailable now\"}}")
+	if isUnsupportedCombination(requestTypeChatCompletion, false, http.StatusBadRequest, body, "") {
+		t.Fatalf("response_format unavailable should be treated as failure now")
+	}
+}
+
+func TestEvaluateStreamResponseStructuredSplitTokens(t *testing.T) {
+	partials := []string{
+		`{"topic"`,
+		`": "AI adoption"`,
+		`", "conf"`,
+		`idence":0.95"`,
+	}
+	var buf bytes.Buffer
+	for _, fragment := range partials {
+		chunk := map[string]any{
+			"type": "content_block_delta",
+			"delta": map[string]any{
+				"type":         "input_json_delta",
+				"partial_json": fragment,
+			},
+		}
+		payload, err := json.Marshal(chunk)
+		if err != nil {
+			t.Fatalf("failed to marshal chunk: %v", err)
+		}
+		buf.WriteString("data: ")
+		buf.Write(payload)
+		buf.WriteByte('\n')
+	}
+	buf.WriteString("data: [DONE]\n")
+	data := buf.Bytes()
+	lines := bytes.Split(bytes.TrimSpace(data), []byte("\n"))
+	fragments := &strings.Builder{}
+	for _, raw := range lines {
+		line := bytes.TrimSpace(raw)
+		if len(line) == 0 || !bytes.HasPrefix(line, []byte("data:")) {
+			continue
+		}
+		payload := bytes.TrimSpace(line[len("data:"):])
+		if bytes.Equal(payload, []byte("[DONE]")) {
+			continue
+		}
+		var obj map[string]any
+		if err := json.Unmarshal(payload, &obj); err != nil {
+			t.Fatalf("failed to unmarshal payload %q: %v", payload, err)
+		}
+		appendStructuredFragments(obj, fragments)
+	}
+	if !structuredOutputSatisfiedBytes([]byte(fragments.String())) {
+		t.Fatalf("expected fragments to satisfy structured detection, fragments=%q", fragments.String())
+	}
+	spec := requestSpec{Type: requestTypeClaudeMessages, Expectation: expectationStructuredOutput}
+	success, reason := evaluateStreamResponse(spec, data)
+	if !success {
+		t.Fatalf("expected structured stream success despite split tokens, got: %s", reason)
 	}
 }
