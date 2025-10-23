@@ -2,6 +2,11 @@
 
 ## Synopsis
 
+One‑API is a **single‑endpoint gateway** that lets you manage and call dozens of AI SaaS models without the headache of custom adapters. 🌐 Simply change the `model_name` and you can reach OpenAI, Anthropic, Gemini, Groq, DeepSeek, and many others—all through the same request format.
+
+![](https://s3.laisky.com/uploads/2025/07/oneapi.drawio.png)
+
+```plain
 === One-API Regression Matrix ===
 
 Variant                             gpt-4o-mini  gpt-5-mini                              claude-haiku-4-5  gemini-2.5-flash  openai/gpt-oss-20b  deepseek-chat                           grok-4-fast-non-reasoning  azure-gpt-5-nano
