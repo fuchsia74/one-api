@@ -82,6 +82,8 @@
 	body {
 		@apply bg-background text-foreground;
 		/* Do not force overflow-x hidden globally; allow tables and toolbars to scroll when needed */
+
+		text-autospace: normal;
 	}
 
 	input,

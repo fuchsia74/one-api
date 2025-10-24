@@ -128,3 +128,114 @@ func TestHandler_NonStream_ComputeUsageFromContent(t *testing.T) {
 	assert.Equal(t, 2, usage.CompletionTokens)
 	assert.Equal(t, 11, usage.TotalTokens)
 }
+
+func TestConvertClaudeRequest_StructuredToolPromoted(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	schema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"topic":      map[string]any{"type": "string"},
+			"confidence": map[string]any{"type": "number"},
+		},
+		"required": []any{"topic", "confidence"},
+	}
+	schema["additionalProperties"] = false
+
+	req := &relaymodel.ClaudeRequest{
+		Model:     "claude-structured",
+		MaxTokens: 512,
+		Messages: []relaymodel.ClaudeMessage{
+			{
+				Role: "user",
+				Content: []any{
+					map[string]any{"type": "text", "text": "Provide topic and confidence JSON."},
+				},
+			},
+		},
+		Tools: []relaymodel.ClaudeTool{
+			{
+				Name:        "topic_classifier",
+				Description: "Return structured topic and confidence data",
+				InputSchema: schema,
+			},
+		},
+		ToolChoice: map[string]any{"type": "tool", "name": "topic_classifier"},
+	}
+
+	convertedAny, err := ConvertClaudeRequest(c, req)
+	require.NoError(t, err)
+	converted, ok := convertedAny.(*relaymodel.GeneralOpenAIRequest)
+	require.True(t, ok)
+
+	require.NotNil(t, converted.ResponseFormat)
+	assert.Equal(t, "json_schema", converted.ResponseFormat.Type)
+	require.NotNil(t, converted.ResponseFormat.JsonSchema)
+	assert.Equal(t, "topic_classifier", converted.ResponseFormat.JsonSchema.Name)
+	assert.Equal(t, "Return structured topic and confidence data", converted.ResponseFormat.JsonSchema.Description)
+	require.NotNil(t, converted.ResponseFormat.JsonSchema.Strict)
+	assert.True(t, *converted.ResponseFormat.JsonSchema.Strict)
+	assert.Equal(t, schema, converted.ResponseFormat.JsonSchema.Schema)
+	assert.Nil(t, converted.ToolChoice)
+	assert.Empty(t, converted.Tools)
+	require.NotNil(t, converted.MaxCompletionTokens)
+	assert.Equal(t, 512, *converted.MaxCompletionTokens)
+
+	// Ensure original request remains unchanged
+	require.Len(t, req.Tools, 1)
+	assert.NotNil(t, req.ToolChoice)
+}
+
+func TestConvertClaudeRequest_ToolNotPromoted(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+
+	req := &relaymodel.ClaudeRequest{
+		Model:     "gpt-tool",
+		MaxTokens: 2048,
+		Messages: []relaymodel.ClaudeMessage{
+			{
+				Role: "user",
+				Content: []any{
+					map[string]any{"type": "text", "text": "Use the get_weather tool to retrieve today's weather in San Francisco, CA."},
+				},
+			},
+		},
+		Tools: []relaymodel.ClaudeTool{
+			{
+				Name:        "get_weather",
+				Description: "Get the current weather for a location",
+				InputSchema: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"location": map[string]any{
+							"type":        "string",
+							"description": "City and region to look up (example: San Francisco, CA)",
+						},
+						"unit": map[string]any{
+							"type":        "string",
+							"description": "Temperature unit to use",
+							"enum":        []any{"celsius", "fahrenheit"},
+						},
+					},
+					"required": []any{"location"},
+				},
+			},
+		},
+		ToolChoice: map[string]any{"type": "tool", "name": "get_weather"},
+	}
+
+	convertedAny, err := ConvertClaudeRequest(c, req)
+	require.NoError(t, err)
+	converted, ok := convertedAny.(*relaymodel.GeneralOpenAIRequest)
+	require.True(t, ok)
+
+	assert.Nil(t, converted.ResponseFormat)
+	require.NotNil(t, converted.ToolChoice)
+	assert.NotEmpty(t, converted.Tools)
+	require.NotNil(t, converted.MaxCompletionTokens)
+	assert.Equal(t, 2048, *converted.MaxCompletionTokens)
+}
