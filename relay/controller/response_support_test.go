@@ -22,3 +22,18 @@ func TestSupportsNativeResponseAPIOpenAICompatible(t *testing.T) {
 	metaInfo.Config.APIFormat = channeltype.OpenAICompatibleAPIFormatChatCompletion
 	require.False(t, supportsNativeResponseAPI(metaInfo))
 }
+
+func TestSupportsNativeResponseAPIDeepSeekForcesFallback(t *testing.T) {
+	t.Parallel()
+
+	metaInfo := &metalib.Meta{
+		ChannelType:     channeltype.OpenAICompatible,
+		Config:          model.ChannelConfig{APIFormat: channeltype.OpenAICompatibleAPIFormatResponse},
+		ActualModelName: "deepseek-chat",
+	}
+	require.False(t, supportsNativeResponseAPI(metaInfo))
+
+	metaInfo.ActualModelName = ""
+	metaInfo.OriginModelName = "DeepSeek-Coder"
+	require.False(t, supportsNativeResponseAPI(metaInfo))
+}

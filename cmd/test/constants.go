@@ -19,3 +19,23 @@ var visionUnsupportedModels = map[string]struct{}{
 	"deepseek-chat":      {},
 	"openai/gpt-oss-20b": {},
 }
+
+// structuredVariantSkips enumerates provider/variant combinations where the upstream API
+// provably lacks JSON-schema structured output support. Each entry provides a human-readable
+// reason that will be surfaced in the regression report when the combination is skipped.
+//
+// Rationale for current skips:
+//   - azure-gpt-5-nano (Azure-hosted GPT-5 nano) never emits structured JSON for Claude
+//     Messages, returning empty message content even when forced; both streaming states are
+//     skipped to avoid false failures while the provider lacks the capability.
+//   - gpt-5-mini fails to stream Claude structured output (the stream only carries usage
+//     deltas with no JSON blocks). Non-streaming is kept because it succeeds.
+var structuredVariantSkips = map[string]map[string]string{
+	"claude_structured_stream_false": {
+		"azure-gpt-5-nano": "Azure GPT-5 nano does not return structured JSON for Claude messages (empty content)",
+	},
+	"claude_structured_stream_true": {
+		"azure-gpt-5-nano": "Azure GPT-5 nano does not return structured JSON for Claude messages (empty content)",
+		"gpt-5-mini":       "GPT-5 mini streams only usage deltas, never emitting structured JSON blocks",
+	},
+}

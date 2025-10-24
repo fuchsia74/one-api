@@ -172,6 +172,14 @@ func buildRequestSpecs(model string, variants []requestVariant) []requestSpec {
 // shouldSkipVariant reports whether the provided request specification should be skipped for the model.
 // The second return value describes the reason when the combination is unsupported.
 func shouldSkipVariant(model string, spec requestSpec) (bool, string) {
+	if spec.Expectation == expectationStructuredOutput {
+		if reasons, ok := structuredVariantSkips[spec.Variant]; ok {
+			if reason, exists := reasons[strings.ToLower(model)]; exists {
+				return true, reason
+			}
+		}
+	}
+
 	if spec.Expectation != expectationVision {
 		return false, ""
 	}

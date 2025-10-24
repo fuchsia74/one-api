@@ -28,6 +28,7 @@ import (
 	"github.com/songquanpeng/one-api/relay/adaptor"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai"
 	"github.com/songquanpeng/one-api/relay/adaptor/openai_compatible"
+	"github.com/songquanpeng/one-api/relay/apitype"
 	"github.com/songquanpeng/one-api/relay/billing"
 	"github.com/songquanpeng/one-api/relay/channeltype"
 	metalib "github.com/songquanpeng/one-api/relay/meta"
@@ -261,6 +262,9 @@ func relayResponseAPIThroughChat(c *gin.Context, meta *metalib.Meta, responseAPI
 	meta.OriginModelName = chatRequest.Model
 	chatRequest.Model = metalib.GetMappedModelName(meta.OriginModelName, meta.ModelMapping)
 	meta.ActualModelName = chatRequest.Model
+	if isDeepSeekModel(meta.ActualModelName) || isDeepSeekModel(meta.OriginModelName) {
+		meta.APIType = apitype.DeepSeek
+	}
 	applyThinkingQueryToChatRequest(c, chatRequest, meta)
 	meta.RequestURLPath = "/v1/chat/completions"
 	meta.ResponseAPIFallback = true
@@ -965,6 +969,11 @@ func supportsNativeResponseAPI(meta *metalib.Meta) bool {
 	if meta == nil {
 		return false
 	}
+
+	if isDeepSeekModel(meta.ActualModelName) || isDeepSeekModel(meta.OriginModelName) {
+		return false
+	}
+
 	switch meta.ChannelType {
 	case channeltype.OpenAI:
 		base := strings.TrimSpace(strings.ToLower(meta.BaseURL))
@@ -977,6 +986,14 @@ func supportsNativeResponseAPI(meta *metalib.Meta) bool {
 	default:
 		return false
 	}
+}
+
+func isDeepSeekModel(modelName string) bool {
+	normalized := strings.TrimSpace(strings.ToLower(modelName))
+	if normalized == "" {
+		return false
+	}
+	return strings.HasPrefix(normalized, "deepseek")
 }
 
 func isReasoningModel(modelName string) bool {
