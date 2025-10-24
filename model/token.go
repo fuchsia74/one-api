@@ -338,23 +338,28 @@ func increaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	err = DB.Model(&Token{}).Where("id = ?", id).Updates(
-		map[string]any{
-			"remain_quota":  gorm.Expr("remain_quota + ?", quota),
-			"used_quota":    gorm.Expr("used_quota - ?", quota),
-			"accessed_time": helper.GetTimestamp(),
-		},
-	).Error
-	if err == nil {
-		token, fetchErr := GetTokenById(id)
-		if fetchErr == nil && token != nil {
-			clearTokenCache(ctx, token.Key)
-		} else if fetchErr != nil {
-			logger.Logger.Error("failed to fetch token for cache clearing after quota increase", zap.Int("token_id", id), zap.Error(fetchErr))
-		}
-		return nil
+	var result *gorm.DB
+	err = runWithSQLiteBusyRetry(ctx, func() error {
+		result = DB.Model(&Token{}).Where("id = ?", id).Updates(
+			map[string]any{
+				"remain_quota":  gorm.Expr("remain_quota + ?", quota),
+				"used_quota":    gorm.Expr("used_quota - ?", quota),
+				"accessed_time": helper.GetTimestamp(),
+			},
+		)
+		return result.Error
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to increase token quota: id=%d", id)
 	}
-	return errors.Wrapf(err, "failed to increase token quota: id=%d", id)
+
+	token, fetchErr := GetTokenById(id)
+	if fetchErr == nil && token != nil {
+		clearTokenCache(ctx, token.Key)
+	} else if fetchErr != nil {
+		logger.Logger.Error("failed to fetch token for cache clearing after quota increase", zap.Int("token_id", id), zap.Error(fetchErr))
+	}
+	return nil
 }
 
 func DecreaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
@@ -372,15 +377,19 @@ func decreaseTokenQuota(ctx context.Context, id int, quota int64) (err error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	result := DB.Model(&Token{}).
-		Where("id = ? AND remain_quota >= ?", id, quota).
-		Updates(map[string]any{
-			"remain_quota":  gorm.Expr("remain_quota - ?", quota),
-			"used_quota":    gorm.Expr("used_quota + ?", quota),
-			"accessed_time": helper.GetTimestamp(),
-		})
-	if result.Error != nil {
-		return errors.Wrapf(result.Error, "failed to decrease token quota: id=%d", id)
+	var result *gorm.DB
+	err = runWithSQLiteBusyRetry(ctx, func() error {
+		result = DB.Model(&Token{}).
+			Where("id = ? AND remain_quota >= ?", id, quota).
+			Updates(map[string]any{
+				"remain_quota":  gorm.Expr("remain_quota - ?", quota),
+				"used_quota":    gorm.Expr("used_quota + ?", quota),
+				"accessed_time": helper.GetTimestamp(),
+			})
+		return result.Error
+	})
+	if err != nil {
+		return errors.Wrapf(err, "failed to decrease token quota: id=%d", id)
 	}
 	if result.RowsAffected == 0 {
 		return errors.Errorf("insufficient token quota for token %d", id)

@@ -447,7 +447,10 @@ func IncreaseUserQuota(id int, quota int64) (err error) {
 }
 
 func increaseUserQuota(id int, quota int64) (err error) {
-	if err = DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error; err != nil {
+	err = runWithSQLiteBusyRetry(nil, func() error {
+		return DB.Model(&User{}).Where("id = ?", id).Update("quota", gorm.Expr("quota + ?", quota)).Error
+	})
+	if err != nil {
 		return errors.Wrapf(err, "increase quota for user %d", id)
 	}
 	return nil
@@ -465,11 +468,15 @@ func DecreaseUserQuota(id int, quota int64) (err error) {
 }
 
 func decreaseUserQuota(id int, quota int64) (err error) {
-	result := DB.Model(&User{}).
-		Where("id = ? AND quota >= ?", id, quota).
-		Update("quota", gorm.Expr("quota - ?", quota))
-	if result.Error != nil {
-		return errors.Wrapf(result.Error, "decrease quota for user %d", id)
+	var result *gorm.DB
+	err = runWithSQLiteBusyRetry(nil, func() error {
+		result = DB.Model(&User{}).
+			Where("id = ? AND quota >= ?", id, quota).
+			Update("quota", gorm.Expr("quota - ?", quota))
+		return result.Error
+	})
+	if err != nil {
+		return errors.Wrapf(err, "decrease quota for user %d", id)
 	}
 	if result.RowsAffected == 0 {
 		return errors.Errorf("insufficient user quota for user %d", id)
