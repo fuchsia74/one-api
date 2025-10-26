@@ -63,80 +63,78 @@ func SendEmail(subject string, receiver string, content string) error {
 			receiverEmails = append(receiverEmails, email)
 		}
 	}
-
 	if len(receiverEmails) == 0 {
 		return errors.New("no valid recipient email addresses")
 	}
 
-	if config.SMTPPort == 465 || !shouldAuth() {
-		// need advanced client
-		var conn net.Conn
-		var err error
+	// ---- Unified advanced client with STARTTLS support ----
+	dialer := &net.Dialer{Timeout: 30 * time.Second}
+	tlsConfig := &tls.Config{
+		InsecureSkipVerify: !config.ForceEmailTLSVerify,
+		ServerName:         config.SMTPServer,
+	}
 
-		// Add connection timeout
-		dialer := &net.Dialer{
-			Timeout: 30 * time.Second,
-		}
+	var (
+		conn net.Conn
+		err  error
+	)
 
-		if config.SMTPPort == 465 {
-			tlsConfig := &tls.Config{
-				InsecureSkipVerify: !config.ForceEmailTLSVerify,
-				ServerName:         config.SMTPServer,
+	// 465: implicit TLS, others: plain first (will try STARTTLS below)
+	if config.SMTPPort == 465 {
+		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	} else {
+		conn, err = dialer.Dial("tcp", addr)
+	}
+	if err != nil {
+		return errors.Wrap(err, "failed to connect to SMTP server")
+	}
+
+	client, err := smtp.NewClient(conn, config.SMTPServer)
+	if err != nil {
+		return errors.Wrap(err, "failed to create SMTP client")
+	}
+	defer client.Close()
+
+	// For non-465 ports, try STARTTLS if the server advertises it
+	if config.SMTPPort != 465 {
+		if ok, _ := client.Extension("STARTTLS"); ok {
+			if err = client.StartTLS(tlsConfig); err != nil {
+				return errors.Wrap(err, "failed to start STARTTLS")
 			}
-			conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+			logger.Logger.Debug("SMTP connection upgraded via STARTTLS")
 		} else {
-			conn, err = dialer.Dial("tcp", addr)
+			logger.Logger.Warn("SMTP server does not advertise STARTTLS; proceeding without TLS")
 		}
-
-		if err != nil {
-			return errors.Wrap(err, "failed to connect to SMTP server")
-		}
-
-		client, err := smtp.NewClient(conn, config.SMTPServer)
-		if err != nil {
-			return errors.Wrap(err, "failed to create SMTP client")
-		}
-		defer client.Close()
-
-		if shouldAuth() {
-			if err = client.Auth(auth); err != nil {
-				return errors.Wrap(err, "SMTP authentication failed")
-			}
-		}
-
-		if err = client.Mail(config.SMTPFrom); err != nil {
-			return errors.Wrap(err, "failed to set MAIL FROM")
-		}
-
-		for _, receiver := range receiverEmails {
-			if err = client.Rcpt(receiver); err != nil {
-				return errors.Wrapf(err, "failed to add recipient: %s", receiver)
-			}
-		}
-
-		w, err := client.Data()
-		if err != nil {
-			return errors.Wrap(err, "failed to create message data writer")
-		}
-
-		if _, err = w.Write(mail); err != nil {
-			return errors.Wrap(err, "failed to write email content")
-		}
-
-		if err = w.Close(); err != nil {
-			return errors.Wrap(err, "failed to close message data writer")
-		}
-
-		return nil
 	}
 
-	// Use the same sender address in the SMTP protocol as in the From header
-	err := smtp.SendMail(addr, auth, config.SMTPFrom, receiverEmails, mail)
-	if err != nil && strings.Contains(err.Error(), "short response") {
-		// Certain providers report an error, yet the email has been delivered successfully.
-		logger.Logger.Warn("short response from SMTP server, return nil instead of error", zap.Error(err))
-		return nil
+	// Authenticate if configured
+	if shouldAuth() {
+		if err = client.Auth(auth); err != nil {
+			return errors.Wrap(err, "SMTP authentication failed")
+		}
 	}
 
-	return errors.WithStack(err)
+	if err = client.Mail(config.SMTPFrom); err != nil {
+		return errors.Wrap(err, "failed to set MAIL FROM")
+	}
+	for _, rcpt := range receiverEmails {
+		if err = client.Rcpt(rcpt); err != nil {
+			return errors.Wrapf(err, "failed to add recipient: %s", rcpt)
+		}
+	}
+
+	w, err := client.Data()
+	if err != nil {
+		return errors.Wrap(err, "failed to create message data writer")
+	}
+	if _, err = w.Write(mail); err != nil {
+		return errors.Wrap(err, "failed to write email content")
+	}
+	if err = w.Close(); err != nil {
+		return errors.Wrap(err, "failed to close message data writer")
+	}
+
+	// Try polite quit; ignore error since邮件已发送成功
+	_ = client.Quit()
+	return nil
 }
