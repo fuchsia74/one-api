@@ -96,6 +96,7 @@ func SendEmail(subject string, receiver string, content string) error {
 	}
 
 	var conn net.Conn
+	var client *smtp.Client
 	var err error
 
 	// Add connection timeout
@@ -103,40 +104,70 @@ func SendEmail(subject string, receiver string, content string) error {
 		Timeout: 30 * time.Second,
 	}
 
+	// Try to establish connection based on port
+	// For port 465, try implicit TLS first, if fails, try plain connection with STARTTLS
 	if config.SMTPPort == 465 {
-		// Port 465: implicit TLS (SMTPS)
+		// First attempt: Try implicit TLS (traditional port 465 behavior)
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: !config.ForceEmailTLSVerify,
 			ServerName:         config.SMTPServer,
 		}
 		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+		if err != nil {
+			// If implicit TLS fails, try plain connection (some misconfigured servers)
+			conn, err = dialer.Dial("tcp", addr)
+			if err != nil {
+				return errors.Wrap(err, "failed to connect to SMTP server")
+			}
+			
+			client, err = smtp.NewClient(conn, config.SMTPServer)
+			if err != nil {
+				conn.Close()
+				return errors.Wrap(err, "failed to create SMTP client")
+			}
+			
+			// Try STARTTLS on port 465 if implicit TLS failed
+			if ok, _ := client.Extension("STARTTLS"); ok {
+				if err = client.StartTLS(tlsConfig); err != nil {
+					client.Close()
+					return errors.Wrap(err, "failed to start TLS on port 465")
+				}
+			}
+		} else {
+			// Implicit TLS connection succeeded
+			client, err = smtp.NewClient(conn, config.SMTPServer)
+			if err != nil {
+				conn.Close()
+				return errors.Wrap(err, "failed to create SMTP client with TLS")
+			}
+		}
 	} else {
-		// Other ports: plain connection first, will use STARTTLS if available
+		// For other ports (25, 587, etc.): plain connection with STARTTLS
 		conn, err = dialer.Dial("tcp", addr)
-	}
+		if err != nil {
+			return errors.Wrap(err, "failed to connect to SMTP server")
+		}
 
-	if err != nil {
-		return errors.Wrap(err, "failed to connect to SMTP server")
-	}
+		client, err = smtp.NewClient(conn, config.SMTPServer)
+		if err != nil {
+			conn.Close()
+			return errors.Wrap(err, "failed to create SMTP client")
+		}
 
-	client, err := smtp.NewClient(conn, config.SMTPServer)
-	if err != nil {
-		return errors.Wrap(err, "failed to create SMTP client")
-	}
-	defer client.Close()
-
-	// For non-465 ports, try to use STARTTLS if supported
-	if config.SMTPPort != 465 {
+		// Try to use STARTTLS if supported
 		if ok, _ := client.Extension("STARTTLS"); ok {
 			tlsConfig := &tls.Config{
 				InsecureSkipVerify: !config.ForceEmailTLSVerify,
 				ServerName:         config.SMTPServer,
 			}
 			if err = client.StartTLS(tlsConfig); err != nil {
+				client.Close()
 				return errors.Wrap(err, "failed to start TLS")
 			}
 		}
 	}
+
+	defer client.Close()
 
 	// Authenticate if credentials are provided
 	if shouldAuth() {
