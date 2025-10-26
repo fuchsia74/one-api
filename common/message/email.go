@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/Laisky/errors/v2"
+	"github.com/Laisky/zap"
 
 	"github.com/songquanpeng/one-api/common/config"
 	"github.com/songquanpeng/one-api/common/logger"
@@ -62,28 +63,33 @@ func SendEmail(subject string, receiver string, content string) error {
 			receiverEmails = append(receiverEmails, email)
 		}
 	}
+
 	if len(receiverEmails) == 0 {
 		return errors.New("no valid recipient email addresses")
 	}
 
-	// ---- Unified advanced client with STARTTLS support ----
-	dialer := &net.Dialer{Timeout: 30 * time.Second}
-	tlsConfig := &tls.Config{
-		InsecureSkipVerify: !config.ForceEmailTLSVerify,
-		ServerName:         config.SMTPServer,
+	// Use advanced client for port 465 (implicit TLS) or when auth is not needed
+	// Also use advanced client for other ports to support STARTTLS
+	var conn net.Conn
+	var err error
+
+	// Add connection timeout
+	dialer := &net.Dialer{
+		Timeout: 30 * time.Second,
 	}
 
-	var (
-		conn net.Conn
-		err  error
-	)
-
-	// 465: implicit TLS, others: plain first (will try STARTTLS below)
 	if config.SMTPPort == 465 {
+		// Port 465: implicit TLS (SMTPS)
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: !config.ForceEmailTLSVerify,
+			ServerName:         config.SMTPServer,
+		}
 		conn, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
 	} else {
+		// Other ports: plain connection first, will use STARTTLS if available
 		conn, err = dialer.Dial("tcp", addr)
 	}
+
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to SMTP server")
 	}
@@ -94,19 +100,20 @@ func SendEmail(subject string, receiver string, content string) error {
 	}
 	defer client.Close()
 
-	// For non-465 ports, try STARTTLS if the server advertises it
+	// For non-465 ports, try to use STARTTLS if supported
 	if config.SMTPPort != 465 {
 		if ok, _ := client.Extension("STARTTLS"); ok {
-			if err = client.StartTLS(tlsConfig); err != nil {
-				return errors.Wrap(err, "failed to start STARTTLS")
+			tlsConfig := &tls.Config{
+				InsecureSkipVerify: !config.ForceEmailTLSVerify,
+				ServerName:         config.SMTPServer,
 			}
-			logger.Logger.Debug("SMTP connection upgraded via STARTTLS")
-		} else {
-			logger.Logger.Warn("SMTP server does not advertise STARTTLS; proceeding without TLS")
+			if err = client.StartTLS(tlsConfig); err != nil {
+				return errors.Wrap(err, "failed to start TLS")
+			}
 		}
 	}
 
-	// Authenticate if configured
+	// Authenticate if credentials are provided
 	if shouldAuth() {
 		if err = client.Auth(auth); err != nil {
 			return errors.Wrap(err, "SMTP authentication failed")
@@ -116,9 +123,10 @@ func SendEmail(subject string, receiver string, content string) error {
 	if err = client.Mail(config.SMTPFrom); err != nil {
 		return errors.Wrap(err, "failed to set MAIL FROM")
 	}
-	for _, rcpt := range receiverEmails {
-		if err = client.Rcpt(rcpt); err != nil {
-			return errors.Wrapf(err, "failed to add recipient: %s", rcpt)
+
+	for _, receiver := range receiverEmails {
+		if err = client.Rcpt(receiver); err != nil {
+			return errors.Wrapf(err, "failed to add recipient: %s", receiver)
 		}
 	}
 
@@ -126,14 +134,14 @@ func SendEmail(subject string, receiver string, content string) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to create message data writer")
 	}
+
 	if _, err = w.Write(mail); err != nil {
 		return errors.Wrap(err, "failed to write email content")
 	}
+
 	if err = w.Close(); err != nil {
 		return errors.Wrap(err, "failed to close message data writer")
 	}
 
-	// Try polite quit; ignore error since邮件已发送成功
-	_ = client.Quit()
 	return nil
 }
