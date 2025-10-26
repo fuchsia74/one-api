@@ -41,7 +41,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ppcelery/one-api:latest
+          tags: fuchsia74/one-api:latest
           cache-from: type=gha
           # cache-to: type=gha,mode=max
 
@@ -71,7 +71,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ppcelery/one-api:${{ env.SHORT_SHA }}
+          tags: fuchsia74/one-api:${{ env.SHORT_SHA }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -87,7 +87,7 @@ jobs:
           password: ${{ secrets.TARGET_HOST_PASSWORD }}
           port: ${{ secrets.TARGET_HOST_SSH_PORT }}
           script: |
-            docker pull ppcelery/one-api:latest
+            docker pull fuchsia74/one-api:latest
             cd /home/laisky/repo/VPS
             docker-compose -f b1-docker-compose.yml up -d --remove-orphans --force-recreate oneapi
             docker ps
@@ -118,7 +118,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ppcelery/one-api:arm64-${{ env.SHORT_SHA }}
+          tags: fuchsia74/one-api:arm64-${{ env.SHORT_SHA }}
           platforms: linux/arm64
           build-args: |
             TARGETARCH=arm64
@@ -150,7 +150,7 @@ jobs:
         with:
           context: .
           push: true
-          tags: ppcelery/one-api:arm64-latest
+          tags: fuchsia74/one-api:arm64-latest
           platforms: linux/arm64
           build-args: |
             TARGETARCH=arm64
